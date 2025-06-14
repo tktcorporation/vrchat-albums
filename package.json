@@ -62,7 +62,8 @@
     "knip": "knip --config knip.config.ts"
   },
   "simple-git-hooks": {
-    "pre-commit": "nr lint"
+    "pre-commit": "nr lint",
+    "pre-push": "nr test"
   },
   "packageManager": "yarn@4.1.0",
   "engines": {

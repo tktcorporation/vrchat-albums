@@ -34,6 +34,14 @@ export const getApplicationLogPath = (): string => {
 };
 
 /**
+ * ダウンロードフォルダのパスを取得する。
+ * エクスポート機能のデフォルト出力先として利用される。
+ */
+const getDownloadsPath = (): string => {
+  return app.getPath('downloads');
+};
+
+/**
  * ディレクトリ選択ダイアログを表示し、選択されたパスを返す。
  * 設定画面からフォルダ指定する際に使用される。
  */
@@ -311,4 +319,5 @@ export {
   copyImageByBase64,
   downloadImageAsPng,
   copyMultipleFilesToClipboard,
+  getDownloadsPath,
 };

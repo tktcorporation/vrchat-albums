@@ -2,9 +2,13 @@ import * as neverthrow from 'neverthrow';
 import { match } from 'ts-pattern';
 import z from 'zod';
 import { logger } from './../../lib/logger';
-import { procedure, router as trpcRouter } from './../../trpc';
+import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
+import * as playerJoinLogService from './../VRChatPlayerJoinLogModel/playerJoinLog.service';
+import * as playerLeaveLogService from './../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import * as vrchatLogFileDirService from './../vrchatLogFileDir/service';
 import * as worldJoinLogService from './../vrchatWorldJoinLog/service';
+import type { LogRecord } from './converters/dbToLogStore';
+import { exportLogStoreFromDB } from './exportService/exportService';
 import * as vrchatLogService from './service';
 
 /**
@@ -105,6 +109,85 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   return neverthrow.ok(undefined);
 };
 
+/**
+ * DBからlogStore形式でエクスポートする
+ */
+const getDBLogsFromDatabase = async (
+  startDate: Date,
+  endDate: Date,
+): Promise<LogRecord[]> => {
+  const logRecords: LogRecord[] = [];
+
+  // ワールド参加ログを取得
+  const worldJoinResult = await worldJoinLogService.findVRChatWorldJoinLogList({
+    gtJoinDateTime: startDate,
+    ltJoinDateTime: endDate,
+    orderByJoinDateTime: 'asc',
+  });
+
+  for (const log of worldJoinResult) {
+    logRecords.push({
+      type: 'worldJoin',
+      record: {
+        id: log.id,
+        worldId: log.worldId,
+        worldName: log.worldName,
+        worldInstanceId: log.worldInstanceId,
+        joinDateTime: log.joinDateTime,
+        createdAt: log.createdAt,
+        updatedAt: log.updatedAt || new Date(),
+      },
+    });
+  }
+
+  // プレイヤー参加ログを取得
+  const playerJoinResult =
+    await playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
+      startJoinDateTime: startDate,
+      endJoinDateTime: endDate,
+    });
+
+  if (playerJoinResult.isOk()) {
+    for (const log of playerJoinResult.value) {
+      logRecords.push({
+        type: 'playerJoin',
+        record: {
+          id: log.id,
+          playerName: log.playerName,
+          playerId: log.playerId,
+          joinDateTime: log.joinDateTime,
+          createdAt: log.createdAt,
+          updatedAt: log.updatedAt || new Date(),
+        },
+      });
+    }
+  }
+
+  // プレイヤー退出ログを取得
+  const playerLeaveResult =
+    await playerLeaveLogService.findVRChatPlayerLeaveLogList({
+      gtLeaveDateTime: startDate,
+      ltLeaveDateTime: endDate,
+      orderByLeaveDateTime: 'asc',
+    });
+
+  for (const log of playerLeaveResult) {
+    logRecords.push({
+      type: 'playerLeave',
+      record: {
+        id: log.id,
+        playerName: log.playerName,
+        playerId: log.playerId,
+        leaveDateTime: log.leaveDateTime,
+        createdAt: log.createdAt,
+        updatedAt: log.updatedAt || new Date(),
+      },
+    });
+  }
+
+  return logRecords;
+};
+
 export const vrchatLogRouter = () =>
   trpcRouter({
     appendLoglinesToFileFromLogFilePathList: procedure
@@ -128,5 +211,52 @@ export const vrchatLogRouter = () =>
           throw result.error;
         }
         return result.value;
+      }),
+    exportLogStoreData: procedure
+      .input(
+        z.object({
+          startDate: z.date(),
+          endDate: z.date(),
+          outputPath: z.string().optional(),
+        }),
+      )
+      .mutation(async (opts) => {
+        const { input } = opts;
+        logger.info(
+          `exportLogStoreData: ${input.startDate.toISOString()} to ${input.endDate.toISOString()}`,
+        );
+
+        try {
+          const result = await exportLogStoreFromDB(
+            {
+              startDate: input.startDate,
+              endDate: input.endDate,
+              outputBasePath: input.outputPath,
+            },
+            getDBLogsFromDatabase,
+          );
+
+          logger.info(
+            `Export completed: ${result.exportedFiles.length} files, ${result.totalLogLines} lines`,
+          );
+
+          eventEmitter.emit(
+            'toast',
+            `エクスポート完了: ${result.exportedFiles.length}ファイル、${result.totalLogLines}行`,
+          );
+
+          return result;
+        } catch (error) {
+          logger.error({
+            message: `Export failed: ${String(error)}`,
+          });
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          eventEmitter.emit(
+            'toast',
+            `エクスポートに失敗しました: ${errorMessage}`,
+          );
+          throw error;
+        }
       }),
   });

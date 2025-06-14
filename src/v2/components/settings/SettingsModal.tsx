@@ -1,4 +1,5 @@
 import {
+  Download,
   FileText,
   FolderOpen,
   Globe2,
@@ -16,6 +17,7 @@ import {
 import { useI18n } from '../../i18n/store';
 import LanguageSelector from '../LanguageSelector';
 import AppInfo from './AppInfo';
+import DataExport from './DataExport';
 import LicenseInfo from './LicenseInfo';
 import PathSettings from './PathSettings';
 import SystemSettings from './SystemSettings';
@@ -31,7 +33,8 @@ type SettingsTab =
   | 'language'
   | 'info'
   | 'license'
-  | 'system';
+  | 'system'
+  | 'export';
 
 interface TabConfig {
   id: SettingsTab;
@@ -64,6 +67,12 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
       label: t('settings.tabs.system'),
       icon: SettingsIcon,
       component: SystemSettings,
+    },
+    {
+      id: 'export',
+      label: 'データエクスポート',
+      icon: Download,
+      component: DataExport,
     },
     {
       id: 'paths',

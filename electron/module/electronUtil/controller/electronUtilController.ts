@@ -139,6 +139,9 @@ export const electronUtilRouter = () =>
         () => null,
       );
     }),
+    getDownloadsPath: procedure.query(async () => {
+      return utilsService.getDownloadsPath();
+    }),
     openPathWithAssociatedApp: procedure
       .input(z.string())
       .mutation(async (ctx) => {
