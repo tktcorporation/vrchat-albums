@@ -208,12 +208,24 @@ export const appendLoglinesToFile = async (props: {
     }
 
     const newLog = `${newLines.map((l) => l.value).join('\n')}\n`;
-    const writeResult = await fs.writeFileSyncSafe(
-      logStoreFilePath.value,
-      newLog,
-    );
-    if (writeResult.isErr()) {
-      throw writeResult.error;
+
+    // ファイルが存在しない場合は新規作成、存在する場合は追記
+    if (!isExists) {
+      const writeResult = await fs.writeFileSyncSafe(
+        logStoreFilePath.value,
+        newLog,
+      );
+      if (writeResult.isErr()) {
+        throw writeResult.error;
+      }
+    } else {
+      const appendResult = await fs.appendFileAsync(
+        logStoreFilePath.value,
+        newLog,
+      );
+      if (appendResult.isErr()) {
+        throw appendResult.error;
+      }
     }
   }
 

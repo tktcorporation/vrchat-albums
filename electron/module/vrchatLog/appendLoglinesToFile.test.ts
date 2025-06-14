@@ -3,17 +3,17 @@ import path from 'node:path';
 import * as readline from 'node:readline';
 import neverthrow from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as fs from '../../lib/wrappedFs';
+import * as fs from '../../../lib/wrappedFs';
+import { appendLoglinesToFile } from './fileHandlers/logStorageManager';
 import { VRChatLogLineSchema, VRChatLogStoreFilePathSchema } from './model';
-import * as service from './service';
 
 // モック設定
-vi.mock('../../lib/appPath', () => ({
+vi.mock('../../../lib/wrappedApp', () => ({
   getAppUserDataPath: () => '/mock/user/data',
 }));
 
 // 実際の関数をモックする
-vi.mock('../../lib/wrappedFs', () => {
+vi.mock('../../../lib/wrappedFs', () => {
   return {
     existsSyncSafe: vi.fn().mockReturnValue(false),
     mkdirSyncSafe: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
@@ -38,9 +38,18 @@ vi.mock('../../lib/wrappedFs', () => {
   };
 });
 
-vi.mock('node:fs', () => ({
-  statSync: vi.fn().mockReturnValue({ size: 100 }), // 小さいサイズを返す
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    statSync: vi.fn().mockReturnValue({ size: 100 }), // 小さいサイズを返す
+    existsSync: vi.fn().mockReturnValue(false),
+    mkdirSync: vi.fn(),
+    readdir: vi
+      .fn()
+      .mockImplementation((_path, callback) => callback(null, [])),
+  };
+});
 
 vi.mock('node:readline', () => ({
   createInterface: vi.fn().mockReturnValue({
@@ -59,59 +68,139 @@ describe('appendLoglinesToFile', () => {
 
     // ファイルが存在しないと仮定
     vi.mocked(fs.existsSyncSafe).mockReturnValue(false);
-
-    // Dateのモックをリセット
-    vi.restoreAllMocks();
-
-    // appendLoglinesToFile関数をモック
-    vi.spyOn(service, 'appendLoglinesToFile').mockImplementation(
-      async (props) => {
-        if (props.logLines.length === 0) {
-          return neverthrow.ok(undefined);
-        }
-        return neverthrow.ok(undefined);
-      },
+    vi.mocked(fs.readFileSyncSafe).mockReturnValue(
+      neverthrow.ok(Buffer.from('')),
     );
   });
 
   it('ログが空の場合は何もしない', async () => {
-    const result = await service.appendLoglinesToFile({
+    const result = await appendLoglinesToFile({
       logLines: [],
     });
 
     expect(result.isOk()).toBe(true);
     expect(fs.existsSyncSafe).not.toHaveBeenCalled();
-    expect(fs.mkdirSyncSafe).not.toHaveBeenCalled();
     expect(fs.appendFileAsync).not.toHaveBeenCalled();
   });
 
-  it('ログを日付ごとに適切なファイルに分割して保存する', async () => {
-    // 異なる月のログを用意
+  it('新しいファイルにログを書き込む', async () => {
     const logLines = [
       VRChatLogLineSchema.parse('2024.01.15 12:00:00 Log entry 1'),
-      VRChatLogLineSchema.parse('2024.01.20 15:30:00 Log entry 2'),
-      VRChatLogLineSchema.parse('2024.02.05 10:15:00 Log entry 3'),
-      VRChatLogLineSchema.parse('2024.02.10 18:45:00 Log entry 4'),
     ];
 
-    const result = await service.appendLoglinesToFile({
+    const result = await appendLoglinesToFile({
       logLines,
     });
 
     expect(result.isOk()).toBe(true);
-    expect(service.appendLoglinesToFile).toHaveBeenCalledWith({ logLines });
+    expect(fs.writeFileSyncSafe).toHaveBeenCalledWith(
+      expect.stringContaining('logStore-2024-01.txt'),
+      '2024.01.15 12:00:00 Log entry 1\n',
+    );
   });
 
-  it('ファイルサイズが上限を超えた場合は新しいファイルを作成する', async () => {
+  it('既存ファイルにログを追記する', async () => {
+    // ファイルが存在すると仮定
+    vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
+    vi.mocked(fs.readFileSyncSafe).mockReturnValue(
+      neverthrow.ok(Buffer.from('2024.01.14 11:00:00 Existing log\n')),
+    );
+
     const logLines = [
-      VRChatLogLineSchema.parse('2024.03.15 12:00:00 Log entry 1'),
+      VRChatLogLineSchema.parse('2024.01.15 12:00:00 New log entry'),
     ];
 
-    const result = await service.appendLoglinesToFile({
+    const result = await appendLoglinesToFile({
       logLines,
     });
 
     expect(result.isOk()).toBe(true);
-    expect(service.appendLoglinesToFile).toHaveBeenCalledWith({ logLines });
+    expect(fs.appendFileAsync).toHaveBeenCalledWith(
+      expect.stringContaining('logStore-2024-01.txt'),
+      '2024.01.15 12:00:00 New log entry\n',
+    );
+  });
+
+  it('重複ログは追記されない', async () => {
+    // ファイルが存在すると仮定
+    vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
+    vi.mocked(fs.readFileSyncSafe).mockReturnValue(
+      neverthrow.ok(Buffer.from('2024.01.15 12:00:00 Existing log\n')),
+    );
+
+    const logLines = [
+      VRChatLogLineSchema.parse('2024.01.15 12:00:00 Existing log'),
+    ];
+
+    const result = await appendLoglinesToFile({
+      logLines,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(fs.appendFileAsync).not.toHaveBeenCalled();
+  });
+
+  it('既存ファイルが上書きされない（追記のみ）', async () => {
+    // ファイルが存在すると仮定
+    vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
+    vi.mocked(fs.readFileSyncSafe).mockReturnValue(
+      neverthrow.ok(
+        Buffer.from(
+          '2024.01.14 11:00:00 Existing log 1\n2024.01.14 12:00:00 Existing log 2\n',
+        ),
+      ),
+    );
+
+    const logLines = [
+      VRChatLogLineSchema.parse('2024.01.15 12:00:00 New log entry'),
+    ];
+
+    const result = await appendLoglinesToFile({
+      logLines,
+    });
+
+    expect(result.isOk()).toBe(true);
+
+    // writeFileSyncSafeが呼ばれていないことを確認（上書きしていない）
+    expect(fs.writeFileSyncSafe).not.toHaveBeenCalled();
+
+    // appendFileAsyncが呼ばれていることを確認（追記している）
+    expect(fs.appendFileAsync).toHaveBeenCalledWith(
+      expect.stringContaining('logStore-2024-01.txt'),
+      '2024.01.15 12:00:00 New log entry\n',
+    );
+  });
+
+  it('混在パターン：既存ログ保持＋新規ログ追記＋重複ログ除外', async () => {
+    // 複数の既存ログがあるファイル
+    vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
+    vi.mocked(fs.readFileSyncSafe).mockReturnValue(
+      neverthrow.ok(
+        Buffer.from(
+          '2024.01.14 11:00:00 Existing log 1\n2024.01.14 12:00:00 Existing log 2\n',
+        ),
+      ),
+    );
+
+    const logLines = [
+      VRChatLogLineSchema.parse('2024.01.14 12:00:00 Existing log 2'), // 重複
+      VRChatLogLineSchema.parse('2024.01.15 12:00:00 New log entry 1'), // 新規
+      VRChatLogLineSchema.parse('2024.01.15 13:00:00 New log entry 2'), // 新規
+    ];
+
+    const result = await appendLoglinesToFile({
+      logLines,
+    });
+
+    expect(result.isOk()).toBe(true);
+
+    // 上書きされていない
+    expect(fs.writeFileSyncSafe).not.toHaveBeenCalled();
+
+    // 新規ログのみが追記されている（重複は除外）
+    expect(fs.appendFileAsync).toHaveBeenCalledWith(
+      expect.stringContaining('logStore-2024-01.txt'),
+      '2024.01.15 12:00:00 New log entry 1\n2024.01.15 13:00:00 New log entry 2\n',
+    );
   });
 });

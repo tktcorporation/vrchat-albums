@@ -25,7 +25,8 @@
       "Bash(gh issue view:*)",
       "Bash(git checkout:*)",
       "Bash(ls:*)",
-      "Bash(gh issue list:*)"
+      "Bash(gh issue list:*)",
+      "Bash(yarn typecheck)"
     ],
     "deny": []
   }
