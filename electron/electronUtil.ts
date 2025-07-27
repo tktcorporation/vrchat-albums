@@ -160,41 +160,64 @@ function createWindow(): BrowserWindow {
   });
 
   // ディスプレイ構成が変更された時のハンドリング
-  screen.on('display-metrics-changed', () => {
-    const currentBounds = mainWindow.getBounds();
-    const currentDisplay = screen.getDisplayNearestPoint({
-      x: currentBounds.x,
-      y: currentBounds.y,
-    });
+  const displayMetricsChangedHandler = () => {
+    // ウィンドウが破棄されているかチェック
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
 
-    // ウィンドウが表示可能な領域に収まるように調整
-    const adjustedBounds = {
-      width: Math.min(currentBounds.width, currentDisplay.workAreaSize.width),
-      height: Math.min(
-        currentBounds.height,
-        currentDisplay.workAreaSize.height,
-      ),
-      x: Math.max(
-        currentDisplay.workArea.x, // Ensure x is within workArea.x
-        Math.min(
-          currentBounds.x,
-          currentDisplay.workArea.x +
-            currentDisplay.workAreaSize.width -
-            currentBounds.width,
-        ),
-      ),
-      y: Math.max(
-        currentDisplay.workArea.y, // Ensure y is within workArea.y
-        Math.min(
-          currentBounds.y,
-          currentDisplay.workArea.y +
-            currentDisplay.workAreaSize.height -
-            currentBounds.height,
-        ),
-      ),
-    };
+    try {
+      const currentBounds = mainWindow.getBounds();
+      const currentDisplay = screen.getDisplayNearestPoint({
+        x: currentBounds.x,
+        y: currentBounds.y,
+      });
 
-    mainWindow.setBounds(adjustedBounds);
+      // ウィンドウが表示可能な領域に収まるように調整
+      const adjustedBounds = {
+        width: Math.min(currentBounds.width, currentDisplay.workAreaSize.width),
+        height: Math.min(
+          currentBounds.height,
+          currentDisplay.workAreaSize.height,
+        ),
+        x: Math.max(
+          currentDisplay.workArea.x, // Ensure x is within workArea.x
+          Math.min(
+            currentBounds.x,
+            currentDisplay.workArea.x +
+              currentDisplay.workAreaSize.width -
+              currentBounds.width,
+          ),
+        ),
+        y: Math.max(
+          currentDisplay.workArea.y, // Ensure y is within workArea.y
+          Math.min(
+            currentBounds.y,
+            currentDisplay.workArea.y +
+              currentDisplay.workAreaSize.height -
+              currentBounds.height,
+          ),
+        ),
+      };
+
+      mainWindow.setBounds(adjustedBounds);
+    } catch (error) {
+      logger.error({
+        message: `Display metrics changed handler error: ${JSON.stringify(
+          error,
+        )}`,
+      });
+    }
+  };
+
+  screen.on('display-metrics-changed', displayMetricsChangedHandler);
+
+  // ウィンドウ破棄時にイベントリスナーを削除
+  mainWindow.once('closed', () => {
+    screen.removeListener(
+      'display-metrics-changed',
+      displayMetricsChangedHandler,
+    );
   });
 
   return mainWindow;
