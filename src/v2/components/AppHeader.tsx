@@ -108,7 +108,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <div
-      className="flex h-9 items-center justify-between px-2 select-none border-b dark:border-gray-700"
+      className="flex h-11 items-center justify-between px-2 select-none border-b dark:border-gray-700"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       onDoubleClick={handleMaximize}
     >

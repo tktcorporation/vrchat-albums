@@ -295,6 +295,7 @@ const GalleryContent = memo(
                           setSelectedPhotos={setSelectedPhotos}
                           isMultiSelectMode={isMultiSelectMode}
                           setIsMultiSelectMode={setIsMultiSelectMode}
+                          onCopySelected={galleryData?.onCopySelected}
                         />
                       </div>
                     )}

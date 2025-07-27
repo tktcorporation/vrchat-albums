@@ -21,6 +21,8 @@ interface PhotoGridProps {
   isMultiSelectMode: boolean;
   /** 複数選択モードの有効/無効を設定する関数 */
   setIsMultiSelectMode: (value: boolean) => void;
+  /** 選択された写真をコピーする関数（全グループにアクセス可能） */
+  onCopySelected?: () => void;
 }
 
 /**
@@ -61,6 +63,7 @@ export default function PhotoGrid({
   setSelectedPhotos,
   isMultiSelectMode,
   setIsMultiSelectMode,
+  onCopySelected,
 }: PhotoGridProps) {
   const { containerRef, containerWidth } = useContainerWidth();
   const calculator = useMemo(() => new JustifiedLayoutCalculator(), []);
@@ -104,6 +107,7 @@ export default function PhotoGrid({
                       isMultiSelectMode={isMultiSelectMode}
                       setIsMultiSelectMode={setIsMultiSelectMode}
                       displayHeight={photo.displayHeight}
+                      onCopySelected={onCopySelected}
                     />
                   </div>
                 );

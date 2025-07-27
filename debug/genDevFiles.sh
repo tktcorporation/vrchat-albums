@@ -16,9 +16,29 @@ declare -A width_height_patterns=(
     [1440x2560]=5
 )
 
-# ランダムな色を生成する関数
-generate_random_color() {
-    printf "%06x" $((RANDOM % 16777215))
+# 淡いカラフルなパステルカラーパレット
+declare -a theme_colors=(
+    # パステルピンク系
+    "FFE5EC" "FFCCD5" "FFB3BA" "FF99A1" "FF8087"
+    # パステルブルー系
+    "E6F3FF" "CCE7FF" "B3DBFF" "99CFFF" "80C3FF"
+    # パステルグリーン系
+    "E6FFE6" "CCFFCC" "B3FFB3" "99FF99" "80FF80"
+    # パステルイエロー系
+    "FFFAE6" "FFF4CC" "FFEDB3" "FFE799" "FFE080"
+    # パステルパープル系
+    "F3E6FF" "E7CCFF" "DBB3FF" "CF99FF" "C380FF"
+    # パステルオレンジ系
+    "FFEDE6" "FFDACC" "FFC7B3" "FFB499" "FFA180"
+    # パステルターコイズ系
+    "E6FFF9" "CCFFF3" "B3FFEC" "99FFE6" "80FFDF"
+)
+
+# テーマに合う色をランダムに選択する関数
+generate_theme_color() {
+    local array_size=${#theme_colors[@]}
+    local random_index=$((RANDOM % array_size))
+    echo "${theme_colors[$random_index]}"
 }
 
 # ファイル名の生成関数を更新
@@ -60,6 +80,7 @@ declare -A month_counts=(
     ["2023-11"]=20
     ["2023-12"]=3
     ["2024-02"]=12
+    ["2025-01"]=3
 )
 
 # ファイルの生成処理を更新
@@ -73,12 +94,34 @@ for month_year in "${!month_counts[@]}"; do
         if [ ! -f "$dest_file" ]; then
             mkdir -p "$(dirname "$dest_file")"
             
-            # ランダムな背景色とテキスト色を生成
-            bg_color=$(generate_random_color)
-            text_color=$(generate_random_color)
+            # テーマに合う背景色とテキスト色を生成
+            # 背景色と前景色のペアを定義して、見やすい組み合わせを保証
+            bg_color=$(generate_theme_color)
             
-            # placehold.jpを使用して画像を生成
-            curl -s "https://placehold.jp/${text_color}/${bg_color}/${width}x${height}.png" -o "$dest_file"
+            # パステルカラーには濃いめのグレーまたは白を使用
+            # ランダムに選択（全て明るい背景なので）
+            if [ $((RANDOM % 2)) -eq 0 ]; then
+                text_color="4A5568"  # ミディアムグレー（読みやすい）
+            else
+                text_color="FFFFFF"  # 白（パステルカラーに映える）
+            fi
+            
+            # placehold.jpを使用して画像を生成（小さめのフォントサイズを指定）
+            # 画像サイズに応じてフォントサイズを調整
+            if [ $width -le 1280 ]; then
+                font_size=54
+            elif [ $width -le 1920 ]; then
+                font_size=72
+            else
+                font_size=96
+            fi
+            
+            # プレースホルダーテキストも小さめに
+            # placehold.jpのAPIは 背景色/文字色 の順序
+            # CSSパラメータはURLエンコードされたJSON形式で渡す
+            css_json="{\"font-size\":\"${font_size}px\"}"
+            css_encoded=$(echo -n "$css_json" | jq -sRr @uri)
+            curl -s "https://placehold.jp/${bg_color}/${text_color}/${width}x${height}.png?text=${width}x${height}&css=${css_encoded}" -o "$dest_file"
             echo "作成完了: $dest_file (${width}x${height})"
         else
             echo "既に存在します: $dest_file, スキップします"
