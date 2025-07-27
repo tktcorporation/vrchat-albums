@@ -40,6 +40,8 @@ interface PhotoCardProps {
   setIsMultiSelectMode: (value: boolean) => void;
   /** 計算された表示高さ (オプション) */
   displayHeight?: number;
+  /** 選択された写真をコピーする関数（全グループにアクセス可能） */
+  onCopySelected?: () => void;
 }
 
 /**
@@ -56,6 +58,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     isMultiSelectMode,
     setIsMultiSelectMode,
     displayHeight,
+    onCopySelected,
   }) => {
     const { t } = useI18n();
     const elementRef = useRef<HTMLDivElement>(null);
@@ -99,7 +102,11 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     /** コンテキストメニュー: 写真パスコピー (単一/複数対応) */
     const handleCopyPhotoData = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (selectedPhotos.size > 1) {
+      if (selectedPhotos.size > 1 && onCopySelected) {
+        // 複数選択時は親コンポーネントのコピー機能を使用（全グループにアクセス可能）
+        onCopySelected();
+      } else if (selectedPhotos.size > 1) {
+        // フォールバック：同じグループ内の写真のみコピー（後方互換性のため）
         const pathsToCopy = Array.from(selectedPhotos)
           .map((id) => {
             const p = photos.find((p) => String(p.id) === id);

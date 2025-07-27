@@ -175,11 +175,11 @@
     "path": "node_modules/@electron/get",
     "licenseFile": "node_modules/@electron/get/LICENSE"
   },
-  "@esbuild/linux-arm64@0.21.5": {
+  "@esbuild/linux-x64@0.21.5": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/@esbuild/linux-arm64",
-    "licenseFile": "node_modules/@esbuild/linux-arm64/README.md"
+    "path": "node_modules/@esbuild/linux-x64",
+    "licenseFile": "node_modules/@esbuild/linux-x64/README.md"
   },
   "@floating-ui/core@1.7.1": {
     "licenses": "MIT",
@@ -217,21 +217,21 @@
     "path": "node_modules/@gar/promisify",
     "licenseFile": "node_modules/@gar/promisify/LICENSE.md"
   },
-  "@img/sharp-libvips-linux-arm64@1.0.2": {
+  "@img/sharp-libvips-linux-x64@1.0.2": {
     "licenses": "LGPL-3.0-or-later",
     "repository": "https://github.com/lovell/sharp-libvips",
     "publisher": "Lovell Fuller",
     "email": "npm@lovell.info",
-    "path": "node_modules/sharp/node_modules/@img/sharp-libvips-linux-arm64",
-    "licenseFile": "node_modules/sharp/node_modules/@img/sharp-libvips-linux-arm64/README.md"
+    "path": "node_modules/sharp/node_modules/@img/sharp-libvips-linux-x64",
+    "licenseFile": "node_modules/sharp/node_modules/@img/sharp-libvips-linux-x64/README.md"
   },
-  "@img/sharp-linux-arm64@0.33.3": {
+  "@img/sharp-linux-x64@0.33.3": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/lovell/sharp",
     "publisher": "Lovell Fuller",
     "email": "npm@lovell.info",
-    "path": "node_modules/sharp/node_modules/@img/sharp-linux-arm64",
-    "licenseFile": "node_modules/sharp/node_modules/@img/sharp-linux-arm64/LICENSE"
+    "path": "node_modules/sharp/node_modules/@img/sharp-linux-x64",
+    "licenseFile": "node_modules/sharp/node_modules/@img/sharp-linux-x64/LICENSE"
   },
   "@isaacs/cliui@8.0.2": {
     "licenses": "ISC",
@@ -807,12 +807,12 @@
     "path": "node_modules/@radix-ui/rect",
     "licenseFile": "node_modules/@radix-ui/rect/README.md"
   },
-  "@rollup/rollup-linux-arm64-gnu@4.43.0": {
+  "@rollup/rollup-linux-x64-gnu@4.43.0": {
     "licenses": "MIT",
     "repository": "https://github.com/rollup/rollup",
     "publisher": "Lukas Taegert-Atkinson",
-    "path": "node_modules/@rollup/rollup-linux-arm64-gnu",
-    "licenseFile": "node_modules/@rollup/rollup-linux-arm64-gnu/README.md"
+    "path": "node_modules/@rollup/rollup-linux-x64-gnu",
+    "licenseFile": "node_modules/@rollup/rollup-linux-x64-gnu/README.md"
   },
   "@sentry-internal/browser-utils@9.26.0": {
     "licenses": "MIT",
@@ -863,17 +863,17 @@
     "path": "node_modules/@sentry/bundler-plugin-core",
     "licenseFile": "node_modules/@sentry/bundler-plugin-core/LICENSE"
   },
-  "@sentry/cli-linux-arm64@2.42.2": {
+  "@sentry/cli-linux-x64@2.42.2": {
     "licenses": "BSD-3-Clause",
     "repository": "https://github.com/getsentry/sentry-cli",
-    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64",
-    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64/README.md"
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-x64",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-x64/README.md"
   },
-  "@sentry/cli-linux-arm64@2.46.0": {
+  "@sentry/cli-linux-x64@2.46.0": {
     "licenses": "BSD-3-Clause",
     "repository": "https://github.com/getsentry/sentry-cli",
-    "path": "node_modules/@sentry/cli-linux-arm64",
-    "licenseFile": "node_modules/@sentry/cli-linux-arm64/README.md"
+    "path": "node_modules/@sentry/cli-linux-x64",
+    "licenseFile": "node_modules/@sentry/cli-linux-x64/README.md"
   },
   "@sentry/cli@2.42.2": {
     "licenses": "BSD-3-Clause",
@@ -1577,11 +1577,11 @@
     "path": "node_modules/clean-stack",
     "licenseFile": "node_modules/clean-stack/license"
   },
-  "clip-filepaths-linux-arm64-gnu@0.2.0": {
+  "clip-filepaths-linux-x64-gnu@0.2.0": {
     "licenses": "MIT",
     "repository": "https://github.com/tktcorporation/clip-filepaths",
-    "path": "node_modules/clip-filepaths-linux-arm64-gnu",
-    "licenseFile": "node_modules/clip-filepaths-linux-arm64-gnu/README.md"
+    "path": "node_modules/clip-filepaths-linux-x64-gnu",
+    "licenseFile": "node_modules/clip-filepaths-linux-x64-gnu/README.md"
   },
   "clip-filepaths@0.2.0": {
     "licenses": "MIT",
@@ -2781,11 +2781,11 @@
     "path": "node_modules/lazy-val",
     "licenseFile": "node_modules/lazy-val/readme.md"
   },
-  "lightningcss-linux-arm64-gnu@1.30.1": {
+  "lightningcss-linux-x64-gnu@1.30.1": {
     "licenses": "MPL-2.0",
     "repository": "https://github.com/parcel-bundler/lightningcss",
-    "path": "node_modules/lightningcss-linux-arm64-gnu",
-    "licenseFile": "node_modules/lightningcss-linux-arm64-gnu/LICENSE"
+    "path": "node_modules/lightningcss-linux-x64-gnu",
+    "licenseFile": "node_modules/lightningcss-linux-x64-gnu/LICENSE"
   },
   "lightningcss@1.30.1": {
     "licenses": "MPL-2.0",
