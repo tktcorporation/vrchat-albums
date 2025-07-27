@@ -27,15 +27,6 @@ const config = {
     target: 'nsis',
     icon: 'assets/icon.ico',
   },
-  linux: {
-    target: 'AppImage',
-    icon: 'assets/icons',
-  },
-  mac: {
-    target: 'dmg',
-    identity: null,
-    icon: 'assets/icon.icns',
-  },
 };
 
 module.exports = config;

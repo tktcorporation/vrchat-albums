@@ -46,15 +46,12 @@ function Download() {
     fetchRelease();
   }, []);
 
-  const getDownloadLink = (platform: string) => {
+  const getDownloadLink = () => {
     if (!release) return '#';
 
     const asset = release.assets.find((a) => {
       const name = a.name.toLowerCase();
-      if (platform === 'windows' && name.endsWith('.exe')) return true;
-      if (platform === 'mac' && name.endsWith('.dmg')) return true;
-      if (platform === 'linux' && name.endsWith('.appimage')) return true;
-      return false;
+      return name.endsWith('.exe');
     });
 
     return asset?.browser_download_url || '#';
@@ -87,10 +84,10 @@ function Download() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto my-12">
+        <div className="flex justify-center my-12">
           <a
-            href={getDownloadLink('windows')}
-            className="bg-gray-50 dark:bg-gray-900 p-8 rounded-lg text-center no-underline text-gray-900 dark:text-gray-100 transition-all duration-250 border-2 border-transparent flex flex-col items-center hover:-translate-y-1 hover:shadow-lg hover:border-[#5865F2]"
+            href={getDownloadLink()}
+            className="bg-gray-50 dark:bg-gray-900 p-8 rounded-lg text-center no-underline text-gray-900 dark:text-gray-100 transition-all duration-250 border-2 border-transparent flex flex-col items-center hover:-translate-y-1 hover:shadow-lg hover:border-[#5865F2] max-w-xs"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -101,38 +98,6 @@ function Download() {
             </p>
             <span className="inline-block bg-[#5865F2] text-white px-6 py-2 rounded-full font-medium text-sm mt-auto">
               ダウンロード (.exe)
-            </span>
-          </a>
-
-          <a
-            href={getDownloadLink('mac')}
-            className="bg-gray-50 dark:bg-gray-900 p-8 rounded-lg text-center no-underline text-gray-900 dark:text-gray-100 transition-all duration-250 border-2 border-transparent flex flex-col items-center hover:-translate-y-1 hover:shadow-lg hover:border-[#5865F2]"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <div className="text-5xl mb-4">🍎</div>
-            <h3 className="text-xl font-semibold mb-1">macOS</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              macOS 10.15+
-            </p>
-            <span className="inline-block bg-[#5865F2] text-white px-6 py-2 rounded-full font-medium text-sm mt-auto">
-              ダウンロード (.dmg)
-            </span>
-          </a>
-
-          <a
-            href={getDownloadLink('linux')}
-            className="bg-gray-50 dark:bg-gray-900 p-8 rounded-lg text-center no-underline text-gray-900 dark:text-gray-100 transition-all duration-250 border-2 border-transparent flex flex-col items-center hover:-translate-y-1 hover:shadow-lg hover:border-[#5865F2]"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <div className="text-5xl mb-4">🐧</div>
-            <h3 className="text-xl font-semibold mb-1">Linux</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              AppImage形式
-            </p>
-            <span className="inline-block bg-[#5865F2] text-white px-6 py-2 rounded-full font-medium text-sm mt-auto">
-              ダウンロード (.AppImage)
             </span>
           </a>
         </div>

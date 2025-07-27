@@ -185,14 +185,6 @@
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icons"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.icns"
     }
   }
 }
