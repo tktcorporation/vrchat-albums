@@ -24,6 +24,42 @@ jobs:
       - name: lint
         run: nr lint
 
+  check-unused-code:
+    runs-on: ubuntu-22.04
+    # 警告のみ、失敗してもCIは通す
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+
+      - run: npm i -g @antfu/ni
+      
+      - name: install dependencies
+        run: nci
+
+      - name: Check for unused code with KNIP
+        id: knip
+        run: |
+          set +e  # エラーが発生しても続行
+          OUTPUT=$(nr knip 2>&1)
+          EXIT_CODE=$?
+          echo "$OUTPUT"
+          
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::warning::KNIP detected unused code. Please review the output above."
+            # 出力を整形してGitHubのアノテーションとして表示
+            echo "$OUTPUT" | grep -E "(Unused|Remove)" | while read -r line; do
+              echo "::warning::$line"
+            done
+          fi
+          exit 0  # 常に成功として扱う
+
   test:
     strategy:
       matrix:
