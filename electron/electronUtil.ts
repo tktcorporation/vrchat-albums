@@ -2,6 +2,7 @@
 import EventEmitter from 'node:events';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import { type Result, err, ok } from 'neverthrow';
 
 // Packages
 import {
@@ -29,6 +30,10 @@ const WINDOW_CONFIG = {
   MIN_WIDTH: 800,
   MIN_HEIGHT: 600,
 } as const;
+
+type DisplayMetricsError =
+  | { code: 'WINDOW_DESTROYED'; message: string }
+  | { code: 'BOUNDS_ADJUSTMENT_FAILED'; message: string };
 
 /**
  * メインウィンドウを生成するヘルパー関数。
@@ -160,10 +165,16 @@ function createWindow(): BrowserWindow {
   });
 
   // ディスプレイ構成が変更された時のハンドリング
-  const displayMetricsChangedHandler = () => {
+  const displayMetricsChangedHandler = (): Result<
+    void,
+    DisplayMetricsError
+  > => {
     // ウィンドウが破棄されているかチェック
     if (!mainWindow || mainWindow.isDestroyed()) {
-      return;
+      return err({
+        code: 'WINDOW_DESTROYED' as const,
+        message: 'Window has been destroyed',
+      });
     }
 
     try {
@@ -201,22 +212,40 @@ function createWindow(): BrowserWindow {
       };
 
       mainWindow.setBounds(adjustedBounds);
+      return ok(undefined);
     } catch (error) {
-      logger.error({
-        message: `Display metrics changed handler error: ${JSON.stringify(
-          error,
-        )}`,
+      return err({
+        code: 'BOUNDS_ADJUSTMENT_FAILED' as const,
+        message: `Failed to adjust window bounds: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       });
     }
   };
 
-  screen.on('display-metrics-changed', displayMetricsChangedHandler);
+  const displayMetricsChangedWrapper = () => {
+    const result = displayMetricsChangedHandler();
+    if (result.isErr()) {
+      match(result.error.code)
+        .with('WINDOW_DESTROYED', () => {
+          // ウィンドウが破棄されている場合はログ出力しない（正常な状態）
+        })
+        .with('BOUNDS_ADJUSTMENT_FAILED', () => {
+          logger.error({
+            message: `Display metrics changed handler error: ${result.error.message}`,
+          });
+        })
+        .exhaustive();
+    }
+  };
+
+  screen.on('display-metrics-changed', displayMetricsChangedWrapper);
 
   // ウィンドウ破棄時にイベントリスナーを削除
   mainWindow.once('closed', () => {
     screen.removeListener(
       'display-metrics-changed',
-      displayMetricsChangedHandler,
+      displayMetricsChangedWrapper,
     );
   });
 
