@@ -6,6 +6,38 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Improve instance type display with confidence-based detection (#558)
+- Remove photo count display from LocationGroupHeader (#561)
+
+### 🐛 Bug Fixes
+
+- *(#549)* LogLoad中のエラーハンドリングを改善し、部分的な成功を許容 (#551)
+- Replace wildcard pattern in sentry:sourcemaps script with explicit script names (#571)
+- Improve light mode contrast by making foreground elements brighter (#574)
+- Update LP image references to use playwright/previews images (#578)
+- Automate landing page screenshot sync from playwright tests (#581)
+- Automate landing page screenshot sync and UI improvements (#583)
+- 右クリック写真コピーで全選択写真をコピーできない問題を修正 (#587)
+- Screenイベントリスナーのクリーンアップ処理を追加 (#589)
+
+### 🚜 Refactor
+
+- Eliminate code duplication in logFileReader.ts (#560)
+
+### 🎨 Styling
+
+- Lighten glass-panel shadow for better visual weight (#567)
+
+### ⚙️ Miscellaneous Tasks
+
+- エラーハンドリングとプレイヤーアクションパーシングの堅牢性向上 (#565)
+- Upgrade Zod to v4.0.5 (#573)
+- Release v0.19.0
+
+## [0.18.0] - 2025-06-30
+
+### 🚀 Features
+
 - 写真選択UIをモダンでシンプルなデザインに改善 (#497)
 - ランディングページの実装とTailwind CSS v4への移行 (#532)
 - VRChat Albums紹介用ランディングページの実装 (#533)
