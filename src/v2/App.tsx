@@ -283,8 +283,15 @@ const ToasterWrapper = () => {
         )
         // その他の場合
         .otherwise((c) => {
+          // 予期しないデータ型をログに記録（デバッグ用）
+          console.warn('[Toast] 予期しないデータ型を受信しました:', c);
+          console.trace('[Toast] スタックトレース');
+
+          // JSON.stringifyを使わず、安全なメッセージを表示
           toast({
-            description: JSON.stringify(c),
+            variant: 'warning',
+            description: '予期しないメッセージ形式です。',
+            title: '警告',
           });
         });
     },
