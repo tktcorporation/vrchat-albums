@@ -51,9 +51,9 @@
     --radius: 0.75rem;
 
     /* Arc Browser style subtle gradient background - reduced brightness for better contrast */
-    --gradient-start: 220 15% 92%;
-    --gradient-middle: 225 12% 90%;
-    --gradient-end: 230 10% 88%;
+    --gradient-start: 220 15% 82%;
+    --gradient-middle: 225 12% 80%;
+    --gradient-end: 230 10% 78%;
     
     /* Glass effect backdrop */
     --glass-bg: 0 0% 100% / 0.1;

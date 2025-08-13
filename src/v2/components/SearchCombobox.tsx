@@ -37,7 +37,7 @@ const SearchCombobox = memo(
         <button
           type="button"
           onClick={handleOpenOverlay}
-          className={`relative flex items-center w-full h-7 bg-white/60 dark:bg-gray-900/40 backdrop-blur-xl rounded-2xl border-0 px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-white/70 dark:hover:bg-gray-900/50 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-white/5 ${
+          className={`relative flex items-center w-full h-7 backdrop-blur-xl rounded-2xl border-2 border-solid border-border text-foreground px-4 py-2 text-sm font-medium transition-all duration-300 hover:border-ring hover:shadow-md hover:shadow-black/5 dark:hover:shadow-white/5 ${
             className || ''
           }`}
           aria-label="検索を開く"
