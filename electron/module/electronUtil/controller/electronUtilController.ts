@@ -97,7 +97,7 @@ export const electronUtilRouter = () =>
             }
 
             // Write EXIF data with timezone
-            await exiftool.writeDateTimeWithTimezone({
+            const exifResult = await exiftool.writeDateTimeWithTimezone({
               filePath: tempPngPath,
               description: ctx.input.worldId,
               dateTimeOriginal: datefns.format(
@@ -106,6 +106,11 @@ export const electronUtilRouter = () =>
               ),
               timezoneOffset: datefns.format(ctx.input.joinDateTime, 'xxx'),
             });
+
+            if (exifResult.isErr()) {
+              consola.warn('Failed to write EXIF data:', exifResult.error);
+              // Continue without EXIF data - the photo will still be saved
+            }
 
             // Move the temp file to the final destination
             await utilsService.saveFileToPath(

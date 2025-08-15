@@ -5,10 +5,23 @@ import * as tmp from 'tmp-promise';
 import * as fs from './wrappedFs';
 
 let exiftoolInstance: exiftool.ExifTool | null = null;
+let exiftoolInitError: Error | null = null;
 
 const getExiftoolInstance = async () => {
+  if (exiftoolInitError) {
+    throw exiftoolInitError;
+  }
+
   if (!exiftoolInstance) {
-    exiftoolInstance = new exiftool.ExifTool();
+    try {
+      exiftoolInstance = new exiftool.ExifTool();
+    } catch (error) {
+      exiftoolInitError = new Error(
+        'Failed to initialize ExifTool. This may be due to missing dependencies or platform incompatibility.',
+        { cause: error },
+      );
+      throw exiftoolInitError;
+    }
   }
   return exiftoolInstance;
 };
@@ -23,19 +36,25 @@ export const writeDateTimeWithTimezone = async ({
   description: string;
   dateTimeOriginal: string;
   timezoneOffset: string;
-}) => {
-  const exifTool = await getExiftoolInstance();
+}): Promise<Result<void, Error>> => {
+  try {
+    const exifTool = await getExiftoolInstance();
 
-  // EXIF情報を書き込む
-  await exifTool.write(filePath, {
-    Description: description,
-    ImageDescription: description,
-    DateTimeOriginal: dateTimeOriginal,
-    DateTimeDigitized: dateTimeOriginal,
-    OffsetTimeOriginal: timezoneOffset,
-    OffsetTime: timezoneOffset,
-    OffsetTimeDigitized: timezoneOffset,
-  });
+    // EXIF情報を書き込む
+    await exifTool.write(filePath, {
+      Description: description,
+      ImageDescription: description,
+      DateTimeOriginal: dateTimeOriginal,
+      DateTimeDigitized: dateTimeOriginal,
+      OffsetTimeOriginal: timezoneOffset,
+      OffsetTime: timezoneOffset,
+      OffsetTimeDigitized: timezoneOffset,
+    });
+
+    return ok(undefined);
+  } catch (error) {
+    return err(new Error('Failed to write EXIF data', { cause: error }));
+  }
 };
 
 export const setExifToBuffer = async (
@@ -57,12 +76,18 @@ export const setExifToBuffer = async (
     );
   }
 
-  await writeDateTimeWithTimezone({
+  const writeExifResult = await writeDateTimeWithTimezone({
     filePath: tmpFile.path,
     description: exif.description,
     dateTimeOriginal: exif.dateTimeOriginal,
     timezoneOffset: exif.timezoneOffset,
   });
+
+  if (writeExifResult.isErr()) {
+    // Try to clean up the temp file before returning
+    await fs.unlinkAsync(tmpFile.path);
+    return err(writeExifResult.error);
+  }
 
   // 一時ファイルを読み込み
   const read_r = fs.readFileSyncSafe(tmpFile.path);
@@ -83,10 +108,16 @@ export const setExifToBuffer = async (
   return ok(read_r.value);
 };
 
-const readExif = async (filePath: string) => {
-  const exiftool = await getExiftoolInstance();
-  const exif = await exiftool.read(filePath);
-  return exif;
+const readExif = async (
+  filePath: string,
+): Promise<Result<exiftool.Tags, Error>> => {
+  try {
+    const exiftool = await getExiftoolInstance();
+    const exif = await exiftool.read(filePath);
+    return ok(exif);
+  } catch (error) {
+    return err(new Error('Failed to read EXIF data', { cause: error }));
+  }
 };
 
 export const readExifByBuffer = async (
@@ -106,7 +137,7 @@ export const readExifByBuffer = async (
     );
   }
 
-  const exif = await readExif(tmpFile.path);
+  const exifResult = await readExif(tmpFile.path);
 
   // 一時ファイルを削除
   const unlink_r = await fs.unlinkAsync(tmpFile.path);
@@ -116,7 +147,11 @@ export const readExifByBuffer = async (
     );
   }
 
-  return ok(exif);
+  if (exifResult.isErr()) {
+    return err(exifResult.error);
+  }
+
+  return ok(exifResult.value);
 };
 
 // アプリケーション終了時にExiftoolのインスタンスを終了
