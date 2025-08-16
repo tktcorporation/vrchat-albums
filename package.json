@@ -26,6 +26,7 @@
     "rebuild-native": "electron-rebuild -f -w clip-filepaths",
     "setup:debug": "bash debug/genDevFiles.sh",
     "generate:debug-data": "nlx tsx scripts/generate-debug-data.mts",
+    "generate:icons": "nlx tsx scripts/generate-platform-icons.ts",
     "dev": "SENTRY_DSN='' ./scripts/dev.sh",
     "dev:vite": "vite",
     "dev:electron": "vite build -c electron/vite.config.ts && electron . --disable-gpu",
