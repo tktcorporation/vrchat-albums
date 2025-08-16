@@ -228,11 +228,49 @@ Example: `logInfoController.test.ts` (mocked) vs `logInfoController.integration.
 - **症状**: Playwright テストで `electronApplication.firstWindow: Timeout` エラー
 - **Reference**: `docs/troubleshooting-migration-playwright-timeout.md`
 
+## MCP Server Usage Guidelines
+
+### 1. IDE MCP Server (`mcp__ide__`)
+VS Code統合機能を提供。エディタの診断情報取得やコード実行に使用。
+- `getDiagnostics`: TypeScriptエラーや警告を取得
+- `executeCode`: Jupyter notebookでのPythonコード実行
+
+### 2. Context7 MCP Server (`mcp__context7__`)
+最新のライブラリドキュメント取得用。
+- **使用手順**:
+  1. `resolve-library-id`: ライブラリ名からContext7互換IDを取得
+  2. `get-library-docs`: IDを使用してドキュメントを取得
+- **対応ライブラリ**: React, Next.js, Supabase, MongoDB等の主要ライブラリ
+
+### 3. Serena MCP Server (`mcp__serena__`)
+セマンティックコード解析とシンボルベースの編集。
+- **主要機能**:
+  - `find_symbol`: 名前パスによるシンボル検索
+  - `replace_symbol_body`: シンボル全体の置換
+  - `insert_before_symbol`/`insert_after_symbol`: シンボル前後への挿入
+  - `find_referencing_symbols`: シンボルの参照箇所検索
+  - `get_symbols_overview`: ファイル内シンボルの概要取得
+- **メモリ管理**:
+  - `write_memory`: プロジェクト情報の保存
+  - `read_memory`: 保存情報の読み取り
+  - `onboarding`: 初回プロジェクト分析
+- **使用原則**:
+  - ファイル全体読み込みは避け、シンボル単位で操作
+  - 相対パスではなくシンボルの名前パスで指定
+  - ts-patternによるマッチングを活用
+
+### MCP Server選択の指針
+- **ドキュメント参照が必要**: Context7を使用
+- **コード解析・編集**: Serenaのシンボルツールを優先
+- **エディタ診断**: IDE MCPサーバーを使用
+- **ファイル操作**: 内蔵ツール（Read, Write, Edit）を使用
+
 ## CLAUDE.md 更新ルール
 
 以下の場合に更新:
 - データ整合性に関わる重要パターンの発見
 - データ破損やバグを防ぐ制約の発見
 - 新しい技術スタックやアーキテクチャパターンの導入
+- MCP Server構成の変更
 
 更新原則: Critical情報を簡潔に記載、詳細は別ドキュメントへ参照

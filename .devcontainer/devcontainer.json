@@ -7,21 +7,12 @@
     "SSH_AUTH_SOCK": "/ssh-agent"
   },
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
-      "enableNonRootDocker": "true",
-      "moby": "true"
-    },
-    "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "20"
-    },
     "ghcr.io/devcontainers/features/desktop-lite:1": {
       "webPort": "6080",
       "vncPort": "5901"
     },
-    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+    "ghcr.io/devcontainers-extra/features/mise:1": {}
   },
   "customizations": {
     "vscode": {
@@ -46,9 +37,27 @@
     "--env-file",
     ".devcontainer/devcontainer.env"
   ],
-  "updateContentCommand": "",
-  "postCreateCommand": "npm i -g @antfu/ni && sudo apt-get install -y ripgrep bc",
   "containerEnv": {
     "VNC_RESOLUTION": "1920x1080x24"
-  }
+  },
+  "onCreateCommand": {
+    "update-apt": ["sudo", "apt-get", "update"]
+  },
+  "updateContentCommand": {
+    "install-packages": ["sudo", "apt-get", "install", "-y", "ripgrep", "bc"]
+  },
+  "postCreateCommand": {
+    "add-new-node-gpg-key": [
+      "bash",
+      "-c",
+      "gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 5BE8A3F6C8A5C01D106C0AD820B1A390B168D356"
+    ],
+    "setup-mise-bash": [
+      "bash",
+      "-c",
+      "echo 'eval \"$(mise activate bash)\"' >> ~/.bashrc"
+    ],
+    "trust-mise": ["mise", "trust"]
+  },
+  "postStartCommand": "mise install"
 }

@@ -63,6 +63,6 @@
     ],
     "deny": []
   },
-  "enabledMcpjsonServers": ["context7"],
-  "enableAllProjectMcpServers": true
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["context7", "serena"]
 }
