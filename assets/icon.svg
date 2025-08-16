@@ -23,8 +23,8 @@
     
     <!-- シンプルなグラデーション（彩度を抑えめに） -->
     <linearGradient id="appleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFA85C"/>
-      <stop offset="100%" stop-color="#FF8533"/>
+      <stop offset="0%" stop-color="#FFB145"/>
+      <stop offset="100%" stop-color="#FF751F"/>
     </linearGradient>
     
     <!-- ハイライト効果 -->
