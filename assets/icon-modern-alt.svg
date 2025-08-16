@@ -1,0 +1,117 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- ニューモーフィズムシャドウ -->
+    <filter id="neuShadow">
+      <!-- 暗い影 -->
+      <feGaussianBlur in="SourceAlpha" stdDeviation="30"/>
+      <feOffset dx="20" dy="20" result="offsetblur"/>
+      <feFlood flood-color="#D84315" flood-opacity="0.4"/>
+      <feComposite in2="offsetblur" operator="in" result="shadow1"/>
+      <!-- 明るい影 -->
+      <feGaussianBlur in="SourceAlpha" stdDeviation="30"/>
+      <feOffset dx="-20" dy="-20" result="offsetblur2"/>
+      <feFlood flood-color="#FFB74D" flood-opacity="0.4"/>
+      <feComposite in2="offsetblur2" operator="in" result="shadow2"/>
+      <!-- 結合 -->
+      <feMerge>
+        <feMergeNode in="shadow1"/>
+        <feMergeNode in="shadow2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- ネオンエフェクト -->
+    <filter id="neonGlow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur1"/>
+      <feGaussianBlur stdDeviation="10" result="coloredBlur2"/>
+      <feGaussianBlur stdDeviation="20" result="coloredBlur3"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur3"/>
+        <feMergeNode in="coloredBlur2"/>
+        <feMergeNode in="coloredBlur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- メッシュグラデーション風 -->
+    <radialGradient id="mesh1" cx="20%" cy="20%">
+      <stop offset="0%" stop-color="#FF6B35"/>
+      <stop offset="100%" stop-color="#FF6B35" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mesh2" cx="80%" cy="80%">
+      <stop offset="0%" stop-color="#E63312"/>
+      <stop offset="100%" stop-color="#E63312" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mesh3" cx="80%" cy="20%">
+      <stop offset="0%" stop-color="#6B35FF" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#6B35FF" stop-opacity="0"/>
+    </radialGradient>
+    
+    <!-- ホログラフィック効果 -->
+    <linearGradient id="holographic" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B35">
+        <animate attributeName="stop-color" values="#FF6B35;#FF4517;#E63312;#FF6B35" dur="4s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="50%" stop-color="#FF4517">
+        <animate attributeName="stop-color" values="#FF4517;#E63312;#FF6B35;#FF4517" dur="4s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" stop-color="#E63312">
+        <animate attributeName="stop-color" values="#E63312;#FF6B35;#FF4517;#E63312" dur="4s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <g filter="url(#neuShadow)">
+    <rect x="0" y="0" width="1024" height="1024" rx="234" ry="234" fill="#FF5722"/>
+    
+    <!-- メッシュグラデーション -->
+    <rect x="0" y="0" width="1024" height="1024" rx="234" ry="234" fill="url(#mesh1)"/>
+    <rect x="0" y="0" width="1024" height="1024" rx="234" ry="234" fill="url(#mesh2)"/>
+    <rect x="0" y="0" width="1024" height="1024" rx="234" ry="234" fill="url(#mesh3)"/>
+  </g>
+  
+  <!-- 背景パターン（点線グリッド） -->
+  <defs>
+    <pattern id="dots" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1" fill="white" opacity="0.1"/>
+    </pattern>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="234" ry="234" fill="url(#dots)"/>
+  
+  <!-- キャラクター -->
+  <g transform="translate(512, 512)">
+    <g transform="scale(2.4) translate(-150, -150)" filter="url(#neonGlow)">
+      <!-- 補色アクセントの背景円 -->
+      <circle cx="150" cy="150" r="140" fill="none" stroke="#3580FF" stroke-width="2" opacity="0.3" stroke-dasharray="10 5">
+        <animateTransform attributeName="transform" type="rotate" from="0 150 150" to="360 150 150" dur="60s" repeatCount="indefinite"/>
+      </circle>
+      
+      <!-- メインパス -->
+      <g>
+        <path d="M28 170C124.5 173 136 199.5 127 115.5C127 101.75 164.5 62.5 118 62.5H62" 
+              stroke="white" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.95"/>
+        <path d="M200.5 38C175.5 69.5 193.5 91 242 69.5" 
+              stroke="white" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.95"/>
+        <path d="M125.494 269.854C131.072 266.094 154.897 233.088 112.835 237.78C106.269 236.857 92.2773 215.199 76.5053 244.792" 
+              stroke="white" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.95"/>
+        <path d="M192 267.5C170.5 276.5 150 275 150 275C80.9644 275 25 219.036 25 150C25 80.9644 80.9644 25 150 25C219.036 25 275 80.9644 275 150C275 150 275 159.5 273.5 168" 
+              stroke="white" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.95"/>
+        <path d="M272.019 202.417C272.019 202.417 262.788 195.321 254.984 184.967C247.18 174.614 249.176 144.439 233.997 136.157C218.819 127.875 209.147 137.017 209.147 137.017C209.147 137.017 193.337 129.325 180.939 137.903C173.736 142.887 169.366 150.471 168.01 160.508C154.044 162.909 150.329 177.113 149.02 181.142C147.711 185.17 147.676 197.401 154.408 202.371C150.027 212.227 157.438 226.622 164.71 231.594C171.983 236.566 186.736 237.032 196.333 241.869C208.809 248.156 217.23 263.547 217.23 263.547" 
+              stroke="white" stroke-width="20" stroke-linecap="round" fill="none" opacity="0.95"/>
+        
+        <!-- 塗りつぶし要素（ホログラフィック） -->
+        <path d="M190.093 158.769C188.105 160.758 188.554 165.416 190.416 167.279C192.279 169.141 196.831 171.889 199.929 168.791C203.027 165.693 202.973 162.111 200.17 159.308C197.368 156.506 192.082 156.78 190.093 158.769Z" 
+              fill="url(#holographic)" stroke="white" stroke-width="8"/>
+        <path d="M172.182 178.419C170.201 180.4 169.398 183.999 172.524 187.125C175.65 190.251 181.219 191.326 183.596 188.949C185.973 186.572 186.546 181.945 182.795 178.194C179.043 174.443 174.162 176.438 172.182 178.419Z" 
+              fill="url(#holographic)" stroke="white" stroke-width="7"/>
+        <path d="M178.52 207.14C177.477 209.19 179.375 211.088 180.517 211.648C181.659 212.209 184.251 213.055 185.959 211.347C187.667 209.639 187.233 207.177 184.995 205.739C182.756 204.301 179.562 205.09 178.52 207.14Z" 
+              fill="white" stroke="white" stroke-width="12"/>
+        <path d="M202.351 182.055C197.208 187.197 190.051 198.127 198.417 210.512C201.459 215.016 206.102 215.784 210.245 214.393C217.837 211.844 215.993 204.202 218.392 201.855C221.226 199.082 226.882 199.642 230.963 193.675C235.044 187.708 231.842 182.747 227.622 179.421C219.182 172.77 207.493 176.913 202.351 182.055Z" 
+              fill="white" opacity="0.95"/>
+        <path d="M218.304 156.044C215.626 156.899 215.944 160.795 217.152 162.834C218.36 164.872 220.114 165.041 221.564 164.781C224.057 164.333 225.782 162.321 224.584 159.461C223.386 156.6 220.981 155.19 218.304 156.044Z" 
+              fill="url(#holographic)" stroke="white" stroke-width="10"/>
+      </g>
+    </g>
+  </g>
+</svg>

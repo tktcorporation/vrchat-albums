@@ -1,0 +1,57 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 最小限のシャドウ -->
+    <filter id="minimalShadow">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+      <feOffset dx="0" dy="4" result="offsetblur"/>
+      <feFlood flood-color="#000000" flood-opacity="0.08"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- フラットなグラデーション -->
+    <linearGradient id="flatGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF7643"/>
+      <stop offset="100%" stop-color="#FF6E38"/>
+    </linearGradient>
+    
+    <!-- 微細な光沢 -->
+    <linearGradient id="subtleShine" x1="0%" y1="0%" x2="0%" y2="40%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <g filter="url(#minimalShadow)">
+    <rect x="0" y="0" width="1024" height="1024" rx="234" ry="234" fill="url(#flatGradient)"/>
+    <rect x="0" y="0" width="1024" height="400" rx="234" ry="234" fill="url(#subtleShine)"/>
+  </g>
+  
+  <!-- シンプル化されたキャラクター -->
+  <g transform="translate(512, 512)">
+    <g transform="scale(2.0) translate(-150, -150)">
+      <!-- 外周の円（シンプルな境界） -->
+      <circle cx="150" cy="150" r="125" fill="none" stroke="white" stroke-width="10" opacity="0.9"/>
+      
+      <!-- 簡略化されたキャラクター要素 -->
+      <path d="M75 150 Q 75 90 120 90 Q 150 90 150 120 Q 150 150 120 170" 
+            fill="none" stroke="white" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+      
+      <path d="M180 80 Q 200 100 220 90" 
+            fill="none" stroke="white" stroke-width="14" stroke-linecap="round" opacity="0.95"/>
+      
+      <!-- 中心の雲形状（簡略化） -->
+      <path d="M200 180 Q 240 180 250 200 Q 250 220 230 230 Q 210 240 190 230 Q 170 240 150 230 Q 130 230 120 210 Q 120 190 140 180 Q 160 170 180 180"
+            fill="white" stroke="none" opacity="0.95"/>
+      
+      <!-- アクセントの円 -->
+      <circle cx="185" cy="165" r="6" fill="white" opacity="0.95"/>
+      <circle cx="165" cy="180" r="5" fill="white" opacity="0.95"/>
+      <circle cx="180" cy="205" r="4" fill="white" opacity="0.95"/>
+    </g>
+  </g>
+</svg>
