@@ -98,7 +98,7 @@
     "@sequelize/core": "7.0.0-alpha.40",
     "@sequelize/sqlite3": "7.0.0-alpha.40",
     "@tanstack/react-query": "4.36.1",
-    "@tanstack/react-virtual": "~3.11.3",
+    "@tanstack/react-virtual": "~3.13.12",
     "@trpc/client": "10.45.2",
     "@trpc/react-query": "10.45.2",
     "@trpc/server": "10.45.2",
