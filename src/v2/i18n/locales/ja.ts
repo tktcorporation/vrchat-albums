@@ -85,6 +85,9 @@ const ja: Translations = {
       removeExtraDirectory: '追加の写真フォルダを削除',
       validate: '確認',
       validating: '確認中...',
+      addonNotice: '完全にアドオン型のアプリです',
+      addonDescription:
+        '写真のメタデータ編集や圧縮は一切行いません。写真フォルダに影響を与えることなく安全に導入できます。',
       logFormat: {
         title: 'ログファイルの形式',
         description:
@@ -97,6 +100,8 @@ const ja: Translations = {
       name: 'アプリ名',
       dependencies: '主要な依存関係',
       openLog: 'アプリログを開く',
+      addonApp: '完全にアドオン型のアプリです',
+      addonDescription: '写真のメタデータを編集したり圧縮したりしません',
       licenses: {
         title: 'ライセンス情報',
         viewLicense: 'ライセンスを表示',

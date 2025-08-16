@@ -282,6 +282,21 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Add-on Notice */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="flex items-start space-x-3">
+          <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              {t('settings.paths.addonNotice')}
+            </h4>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+              {t('settings.paths.addonDescription')}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div className="space-y-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
           {/* Photo Directory Section */}
