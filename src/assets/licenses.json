@@ -181,6 +181,14 @@
     "path": "node_modules/@esbuild/linux-arm64",
     "licenseFile": "node_modules/@esbuild/linux-arm64/README.md"
   },
+  "@fastify/otel@0.8.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/fastify/otel",
+    "publisher": "Carlos Fuentes - @metcoder95",
+    "url": "https://metcoder.dev",
+    "path": "node_modules/@fastify/otel",
+    "licenseFile": "node_modules/@fastify/otel/LICENSE"
+  },
   "@floating-ui/core@1.7.1": {
     "licenses": "MIT",
     "repository": "https://github.com/floating-ui/floating-ui",
@@ -531,6 +539,13 @@
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
+    "path": "node_modules/@opentelemetry/instrumentation-amqplib/node_modules/@opentelemetry/semantic-conventions",
+    "licenseFile": "node_modules/@opentelemetry/instrumentation-amqplib/node_modules/@opentelemetry/semantic-conventions/LICENSE"
+  },
+  "@opentelemetry/semantic-conventions@1.36.0": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/open-telemetry/opentelemetry-js",
+    "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/semantic-conventions",
     "licenseFile": "node_modules/@opentelemetry/semantic-conventions/LICENSE"
   },
@@ -555,7 +570,7 @@
     "path": "node_modules/@pkgjs/parseargs",
     "licenseFile": "node_modules/@pkgjs/parseargs/LICENSE"
   },
-  "@prisma/instrumentation@6.8.2": {
+  "@prisma/instrumentation@6.7.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/prisma/prisma",
     "path": "node_modules/@prisma/instrumentation",
@@ -570,8 +585,20 @@
   "@radix-ui/primitive@1.1.2": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-checkbox/node_modules/@radix-ui/primitive",
+    "licenseFile": "node_modules/@radix-ui/react-checkbox/node_modules/@radix-ui/primitive/README.md"
+  },
+  "@radix-ui/primitive@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/primitive",
-    "licenseFile": "node_modules/@radix-ui/primitive/README.md"
+    "licenseFile": "node_modules/@radix-ui/primitive/LICENSE"
+  },
+  "@radix-ui/react-arrow@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-arrow",
+    "licenseFile": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-arrow/README.md"
   },
   "@radix-ui/react-arrow@1.1.7": {
     "licenses": "MIT",
@@ -585,6 +612,12 @@
     "path": "node_modules/@radix-ui/react-checkbox",
     "licenseFile": "node_modules/@radix-ui/react-checkbox/README.md"
   },
+  "@radix-ui/react-collection@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-collection",
+    "licenseFile": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-collection/README.md"
+  },
   "@radix-ui/react-collection@1.1.7": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
@@ -597,7 +630,7 @@
     "path": "node_modules/@radix-ui/react-compose-refs",
     "licenseFile": "node_modules/@radix-ui/react-compose-refs/README.md"
   },
-  "@radix-ui/react-context-menu@2.2.15": {
+  "@radix-ui/react-context-menu@2.2.16": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-context-menu",
@@ -609,7 +642,7 @@
     "path": "node_modules/@radix-ui/react-context",
     "licenseFile": "node_modules/@radix-ui/react-context/README.md"
   },
-  "@radix-ui/react-dialog@1.1.14": {
+  "@radix-ui/react-dialog@1.1.15": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-dialog",
@@ -621,17 +654,35 @@
     "path": "node_modules/@radix-ui/react-direction",
     "licenseFile": "node_modules/@radix-ui/react-direction/README.md"
   },
-  "@radix-ui/react-dismissable-layer@1.1.10": {
+  "@radix-ui/react-dismissable-layer@1.1.11": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-dismissable-layer",
     "licenseFile": "node_modules/@radix-ui/react-dismissable-layer/LICENSE"
   },
+  "@radix-ui/react-dismissable-layer@1.1.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-dismissable-layer",
+    "licenseFile": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-dismissable-layer/README.md"
+  },
   "@radix-ui/react-focus-guards@1.1.2": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-focus-guards",
+    "licenseFile": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-focus-guards/README.md"
+  },
+  "@radix-ui/react-focus-guards@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-focus-guards",
-    "licenseFile": "node_modules/@radix-ui/react-focus-guards/README.md"
+    "licenseFile": "node_modules/@radix-ui/react-focus-guards/LICENSE"
+  },
+  "@radix-ui/react-focus-scope@1.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-focus-scope",
+    "licenseFile": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-focus-scope/README.md"
   },
   "@radix-ui/react-focus-scope@1.1.7": {
     "licenses": "MIT",
@@ -651,17 +702,29 @@
     "path": "node_modules/@radix-ui/react-label",
     "licenseFile": "node_modules/@radix-ui/react-label/LICENSE"
   },
-  "@radix-ui/react-menu@2.1.15": {
+  "@radix-ui/react-menu@2.1.16": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-menu",
     "licenseFile": "node_modules/@radix-ui/react-menu/LICENSE"
   },
-  "@radix-ui/react-popper@1.2.7": {
+  "@radix-ui/react-popper@1.2.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-popper",
+    "licenseFile": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-popper/README.md"
+  },
+  "@radix-ui/react-popper@1.2.8": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-popper",
     "licenseFile": "node_modules/@radix-ui/react-popper/LICENSE"
+  },
+  "@radix-ui/react-portal@1.1.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-portal",
+    "licenseFile": "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-portal/README.md"
   },
   "@radix-ui/react-portal@1.1.9": {
     "licenses": "MIT",
@@ -675,7 +738,7 @@
     "path": "node_modules/@radix-ui/react-checkbox/node_modules/@radix-ui/react-presence",
     "licenseFile": "node_modules/@radix-ui/react-checkbox/node_modules/@radix-ui/react-presence/README.md"
   },
-  "@radix-ui/react-presence@1.1.4": {
+  "@radix-ui/react-presence@1.1.5": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-presence",
@@ -693,23 +756,23 @@
     "path": "node_modules/@radix-ui/react-primitive",
     "licenseFile": "node_modules/@radix-ui/react-primitive/LICENSE"
   },
-  "@radix-ui/react-roving-focus@1.1.10": {
+  "@radix-ui/react-roving-focus@1.1.11": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-roving-focus",
     "licenseFile": "node_modules/@radix-ui/react-roving-focus/LICENSE"
   },
-  "@radix-ui/react-scroll-area@1.2.9": {
+  "@radix-ui/react-scroll-area@1.2.10": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-scroll-area",
     "licenseFile": "node_modules/@radix-ui/react-scroll-area/LICENSE"
   },
-  "@radix-ui/react-select@2.2.5": {
+  "@radix-ui/react-select@2.1.7": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-select",
-    "licenseFile": "node_modules/@radix-ui/react-select/LICENSE"
+    "licenseFile": "node_modules/@radix-ui/react-select/README.md"
   },
   "@radix-ui/react-separator@1.1.7": {
     "licenses": "MIT",
@@ -729,13 +792,13 @@
     "path": "node_modules/@radix-ui/react-slot",
     "licenseFile": "node_modules/@radix-ui/react-slot/LICENSE"
   },
-  "@radix-ui/react-switch@1.2.5": {
+  "@radix-ui/react-switch@1.1.4": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-switch",
-    "licenseFile": "node_modules/@radix-ui/react-switch/LICENSE"
+    "licenseFile": "node_modules/@radix-ui/react-switch/README.md"
   },
-  "@radix-ui/react-toast@1.2.14": {
+  "@radix-ui/react-toast@1.2.15": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-toast",
@@ -795,11 +858,17 @@
     "path": "node_modules/@radix-ui/react-use-size",
     "licenseFile": "node_modules/@radix-ui/react-use-size/README.md"
   },
-  "@radix-ui/react-visually-hidden@1.2.3": {
+  "@radix-ui/react-visually-hidden@1.1.3": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-visually-hidden",
-    "licenseFile": "node_modules/@radix-ui/react-visually-hidden/LICENSE"
+    "licenseFile": "node_modules/@radix-ui/react-visually-hidden/README.md"
+  },
+  "@radix-ui/react-visually-hidden@1.2.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/radix-ui/primitives",
+    "path": "node_modules/@radix-ui/react-toast/node_modules/@radix-ui/react-visually-hidden",
+    "licenseFile": "node_modules/@radix-ui/react-toast/node_modules/@radix-ui/react-visually-hidden/LICENSE"
   },
   "@radix-ui/rect@1.1.1": {
     "licenses": "MIT",
@@ -814,28 +883,28 @@
     "path": "node_modules/@rollup/rollup-linux-arm64-gnu",
     "licenseFile": "node_modules/@rollup/rollup-linux-arm64-gnu/README.md"
   },
-  "@sentry-internal/browser-utils@9.26.0": {
+  "@sentry-internal/browser-utils@9.18.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry-internal/browser-utils",
     "licenseFile": "node_modules/@sentry-internal/browser-utils/LICENSE"
   },
-  "@sentry-internal/feedback@9.26.0": {
+  "@sentry-internal/feedback@9.18.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry-internal/feedback",
     "licenseFile": "node_modules/@sentry-internal/feedback/LICENSE"
   },
-  "@sentry-internal/replay-canvas@9.26.0": {
+  "@sentry-internal/replay-canvas@9.18.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry-internal/replay-canvas",
     "licenseFile": "node_modules/@sentry-internal/replay-canvas/LICENSE"
   },
-  "@sentry-internal/replay@9.26.0": {
+  "@sentry-internal/replay@9.18.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
@@ -849,7 +918,7 @@
     "path": "node_modules/@sentry/babel-plugin-component-annotate",
     "licenseFile": "node_modules/@sentry/babel-plugin-component-annotate/LICENSE"
   },
-  "@sentry/browser@9.26.0": {
+  "@sentry/browser@9.18.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
@@ -869,7 +938,7 @@
     "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64",
     "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64/README.md"
   },
-  "@sentry/cli-linux-arm64@2.46.0": {
+  "@sentry/cli-linux-arm64@2.45.0": {
     "licenses": "BSD-3-Clause",
     "repository": "https://github.com/getsentry/sentry-cli",
     "path": "node_modules/@sentry/cli-linux-arm64",
@@ -882,35 +951,35 @@
     "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli",
     "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli/LICENSE"
   },
-  "@sentry/cli@2.46.0": {
+  "@sentry/cli@2.45.0": {
     "licenses": "BSD-3-Clause",
     "repository": "https://github.com/getsentry/sentry-cli",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/cli",
     "licenseFile": "node_modules/@sentry/cli/LICENSE"
   },
-  "@sentry/core@9.26.0": {
+  "@sentry/core@9.18.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/core",
     "licenseFile": "node_modules/@sentry/core/LICENSE"
   },
-  "@sentry/electron@6.8.0": {
+  "@sentry/electron@6.6.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-electron",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/electron",
     "licenseFile": "node_modules/@sentry/electron/LICENSE"
   },
-  "@sentry/node@9.26.0": {
+  "@sentry/node@9.18.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/node",
     "licenseFile": "node_modules/@sentry/node/LICENSE"
   },
-  "@sentry/opentelemetry@9.26.0": {
+  "@sentry/opentelemetry@9.18.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
@@ -972,14 +1041,14 @@
     "path": "node_modules/@tanstack/react-query",
     "licenseFile": "node_modules/@tanstack/react-query/LICENSE"
   },
-  "@tanstack/react-virtual@3.13.10": {
+  "@tanstack/react-virtual@3.11.3": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/virtual",
     "publisher": "Tanner Linsley",
     "path": "node_modules/@tanstack/react-virtual",
     "licenseFile": "node_modules/@tanstack/react-virtual/LICENSE"
   },
-  "@tanstack/virtual-core@3.13.10": {
+  "@tanstack/virtual-core@3.11.3": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/virtual",
     "publisher": "Tanner Linsley",
@@ -1105,7 +1174,7 @@
     "path": "node_modules/electron/node_modules/@types/node",
     "licenseFile": "node_modules/electron/node_modules/@types/node/LICENSE"
   },
-  "@types/node@22.15.32": {
+  "@types/node@22.15.35": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/node",
@@ -2068,7 +2137,7 @@
     "path": "node_modules/eventemitter3",
     "licenseFile": "node_modules/eventemitter3/LICENSE"
   },
-  "exiftool-vendored.pl@12.78.0": {
+  "exiftool-vendored.pl@12.76.0": {
     "licenses": "MIT",
     "repository": "https://github.com/mceachen/exiftool-vendored.pl",
     "publisher": "Matthew McEachen",
@@ -2076,7 +2145,7 @@
     "path": "node_modules/exiftool-vendored.pl",
     "licenseFile": "node_modules/exiftool-vendored.pl/LICENSE"
   },
-  "exiftool-vendored@24.6.0": {
+  "exiftool-vendored@24.5.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.js",
     "publisher": "Matthew McEachen",
@@ -3021,8 +3090,8 @@
     "publisher": "Isaac Z. Schlueter",
     "email": "i@izs.me",
     "url": "http://blog.izs.me",
-    "path": "node_modules/@sentry/node/node_modules/minimatch",
-    "licenseFile": "node_modules/@sentry/node/node_modules/minimatch/LICENSE"
+    "path": "node_modules/@fastify/otel/node_modules/minimatch",
+    "licenseFile": "node_modules/@fastify/otel/node_modules/minimatch/LICENSE"
   },
   "minimist@1.2.8": {
     "licenses": "MIT",
@@ -4373,11 +4442,17 @@
     "path": "node_modules/type-fest",
     "licenseFile": "node_modules/type-fest/license-cc0"
   },
-  "ufo@1.6.1": {
+  "ufo@1.5.4": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/ufo",
     "path": "node_modules/ufo",
     "licenseFile": "node_modules/ufo/LICENSE"
+  },
+  "ufo@1.6.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/unjs/ufo",
+    "path": "node_modules/ofetch/node_modules/ufo",
+    "licenseFile": "node_modules/ofetch/node_modules/ufo/LICENSE"
   },
   "undici-types@6.21.0": {
     "licenses": "MIT",
@@ -4639,7 +4714,7 @@
     "path": "node_modules/yocto-queue",
     "licenseFile": "node_modules/yocto-queue/license"
   },
-  "zod@4.0.5": {
+  "zod@4.0.17": {
     "licenses": "MIT",
     "repository": "https://github.com/colinhacks/zod",
     "publisher": "Colin McDonnell",
