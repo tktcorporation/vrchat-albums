@@ -62,5 +62,7 @@
       "Bash(diff:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": ["context7"],
+  "enableAllProjectMcpServers": true
 }
