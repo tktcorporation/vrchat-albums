@@ -29,7 +29,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@antfu/ni@npm:~0.23.0":
+"@antfu/ni@npm:~0.23.2":
   version: 0.23.2
   resolution: "@antfu/ni@npm:0.23.2"
   bin:
@@ -4065,7 +4065,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@testing-library/dom@npm:~10.4.0":
+"@testing-library/dom@npm:~10.4.1":
   version: 10.4.1
   resolution: "@testing-library/dom@npm:10.4.1"
   dependencies:
@@ -4375,7 +4375,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:~22.15.29":
+"@types/node@npm:~22.15.35":
   version: 22.15.35
   resolution: "@types/node@npm:22.15.35"
   dependencies:
@@ -4733,7 +4733,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@typescript/native-preview@npm:~7.0.0-dev.20250523.1":
+"@typescript/native-preview@npm:~7.0.0-dev.20250816.1":
   version: 7.0.0-dev.20250816.1
   resolution: "@typescript/native-preview@npm:7.0.0-dev.20250816.1"
   dependencies:
@@ -4796,7 +4796,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@vitest/coverage-v8@npm:~2.1.8":
+"@vitest/coverage-v8@npm:~2.1.9":
   version: 2.1.9
   resolution: "@vitest/coverage-v8@npm:2.1.9"
   dependencies:
@@ -12600,7 +12600,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vitest@npm:~2.1.8":
+"vitest@npm:~2.1.9":
   version: 2.1.9
   resolution: "vitest@npm:2.1.9"
   dependencies:
@@ -12654,7 +12654,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "vrchat-albums@workspace:."
   dependencies:
-    "@antfu/ni": "npm:~0.23.0"
+    "@antfu/ni": "npm:~0.23.2"
     "@biomejs/biome": "npm:1.6.0"
     "@playwright/test": "npm:1.43.1"
     "@radix-ui/react-checkbox": "npm:1.1.5"
@@ -12674,7 +12674,7 @@ __metadata:
     "@sequelize/sqlite3": "npm:7.0.0-alpha.40"
     "@tanstack/react-query": "npm:4.36.1"
     "@tanstack/react-virtual": "npm:~3.11.3"
-    "@testing-library/dom": "npm:~10.4.0"
+    "@testing-library/dom": "npm:~10.4.1"
     "@testing-library/react": "npm:~16.1.0"
     "@tktco/node-actionlint": "npm:~1.5.2"
     "@trpc/client": "npm:10.45.2"
@@ -12682,14 +12682,14 @@ __metadata:
     "@trpc/server": "npm:10.45.2"
     "@types/electron-is-dev": "npm:1.1.1"
     "@types/license-checker": "npm:25.0.6"
-    "@types/node": "npm:~22.15.29"
+    "@types/node": "npm:~22.15.35"
     "@types/react": "npm:18.2.33"
     "@types/react-dom": "npm:18.2.14"
     "@types/sharp": "npm:0.32.0"
     "@types/uuid": "npm:~10.0.0"
-    "@typescript/native-preview": "npm:~7.0.0-dev.20250523.1"
+    "@typescript/native-preview": "npm:~7.0.0-dev.20250816.1"
     "@vitejs/plugin-react": "npm:4.2.1"
-    "@vitest/coverage-v8": "npm:~2.1.8"
+    "@vitest/coverage-v8": "npm:~2.1.9"
     "@welldone-software/why-did-you-render": "npm:~8.0.3"
     autoprefixer: "npm:10.4.19"
     class-variance-authority: "npm:0.7.0"
@@ -12742,7 +12742,7 @@ __metadata:
     uuid: "npm:~10.0.0"
     uuidv7: "npm:~1.0.2"
     vite: "npm:5.4.14"
-    vitest: "npm:~2.1.8"
+    vitest: "npm:~2.1.9"
     zod: "npm:~4.0.17"
     zustand: "npm:4.5.2"
   languageName: unknown
