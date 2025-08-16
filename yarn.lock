@@ -2156,7 +2156,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@photostructure/tz-lookup@npm:^9.0.1":
+"@photostructure/tz-lookup@npm:^9.0.2":
   version: 9.0.2
   resolution: "@photostructure/tz-lookup@npm:9.0.2"
   checksum: 10c0/6708b9e7ee850d6e7b26c6324b60a8eed0a7327ac44c6009cabe5232676bd4cc27f6aec635579c97ff19fd7144cfed36b3509ac2c1076439841b9645ea7b731a
@@ -6880,29 +6880,29 @@ __metadata:
   languageName: node
   linkType: hard
 
-"exiftool-vendored.exe@npm:12.76.0":
-  version: 12.76.0
-  resolution: "exiftool-vendored.exe@npm:12.76.0"
+"exiftool-vendored.exe@npm:12.78.0":
+  version: 12.78.0
+  resolution: "exiftool-vendored.exe@npm:12.78.0"
   conditions: os=win32
   languageName: node
   linkType: hard
 
-"exiftool-vendored.pl@npm:12.76.0":
-  version: 12.76.0
-  resolution: "exiftool-vendored.pl@npm:12.76.0"
+"exiftool-vendored.pl@npm:12.78.0":
+  version: 12.78.0
+  resolution: "exiftool-vendored.pl@npm:12.78.0"
   conditions: "!os=win32"
   languageName: node
   linkType: hard
 
-"exiftool-vendored@npm:~24.5.0":
-  version: 24.5.0
-  resolution: "exiftool-vendored@npm:24.5.0"
+"exiftool-vendored@npm:~24.6.0":
+  version: 24.6.0
+  resolution: "exiftool-vendored@npm:24.6.0"
   dependencies:
-    "@photostructure/tz-lookup": "npm:^9.0.1"
+    "@photostructure/tz-lookup": "npm:^9.0.2"
     "@types/luxon": "npm:^3.4.2"
     batch-cluster: "npm:^13.0.0"
-    exiftool-vendored.exe: "npm:12.76.0"
-    exiftool-vendored.pl: "npm:12.76.0"
+    exiftool-vendored.exe: "npm:12.78.0"
+    exiftool-vendored.pl: "npm:12.78.0"
     he: "npm:^1.2.0"
     luxon: "npm:^3.4.4"
   dependenciesMeta:
@@ -6910,7 +6910,7 @@ __metadata:
       optional: true
     exiftool-vendored.pl:
       optional: true
-  checksum: 10c0/f1cff06225889d0ae6ef2acdf61df7ed2072de6346a2ef35f7b89841e0781bf3ec24648a0422b5703d832ae857b1b661aa5ee498cd70a0d5320666435440c87e
+  checksum: 10c0/3b2dd17c7457382d853d10487f0f75686c94d1a346ce072c27b148f42dfaad6a7dc79a1a08d2068acf6064c080f3f66fd181688ee5304e0022d996ddd7a4543f
   languageName: node
   linkType: hard
 
@@ -8150,18 +8150,24 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jotai@npm:~2.12.5":
-  version: 2.12.5
-  resolution: "jotai@npm:2.12.5"
+"jotai@npm:~2.13.1":
+  version: 2.13.1
+  resolution: "jotai@npm:2.13.1"
   peerDependencies:
+    "@babel/core": ">=7.0.0"
+    "@babel/template": ">=7.0.0"
     "@types/react": ">=17.0.0"
     react: ">=17.0.0"
   peerDependenciesMeta:
+    "@babel/core":
+      optional: true
+    "@babel/template":
+      optional: true
     "@types/react":
       optional: true
     react:
       optional: true
-  checksum: 10c0/5075b2c78f3e170d84a14b9f69a5903a5aa5b61242ee9acebc5665ce5a5fb13724748107dfd1069d00fe45b3a4ed15e07c40c0861dc817effc10532b733afabe
+  checksum: 10c0/777915c4f83c372bac066ce3acb037c8c5c01e2789b8b435bf3f302ef32a5564d471217c89b9cdee219d735d445b166bf3ff15a9f43f4cb92a8a9115c72446ad
   languageName: node
   linkType: hard
 
@@ -11939,17 +11945,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ufo@npm:^1.5.4":
+"ufo@npm:^1.5.4, ufo@npm:~1.6.1":
   version: 1.6.1
   resolution: "ufo@npm:1.6.1"
   checksum: 10c0/5a9f041e5945fba7c189d5410508cbcbefef80b253ed29aa2e1f8a2b86f4bd51af44ee18d4485e6d3468c92be9bf4a42e3a2b72dcaf27ce39ce947ec994f1e6b
-  languageName: node
-  linkType: hard
-
-"ufo@npm:~1.5.4":
-  version: 1.5.4
-  resolution: "ufo@npm:1.5.4"
-  checksum: 10c0/b5dc4dc435c49c9ef8890f1b280a19ee4d0954d1d6f9ab66ce62ce64dd04c7be476781531f952a07c678d51638d02ad4b98e16237be29149295b0f7c09cda765
   languageName: node
   linkType: hard
 
@@ -12457,10 +12456,10 @@ __metadata:
     electron-trpc: "npm:0.5.2"
     electron-unhandled: "npm:4.0.1"
     electron-updater: "npm:6.3.9"
-    exiftool-vendored: "npm:~24.5.0"
+    exiftool-vendored: "npm:~24.6.0"
     git-cliff: "npm:~2.5.0"
     glob: "npm:10.4.3"
-    jotai: "npm:~2.12.5"
+    jotai: "npm:~2.13.1"
     jsdom: "npm:~26.1.0"
     knip: "npm:~5.59.1"
     license-checker: "npm:25.0.1"
@@ -12489,7 +12488,7 @@ __metadata:
     ts-pattern: "npm:5.1.1"
     ts-prune: "npm:0.10.3"
     typescript: "npm:~5.8.3"
-    ufo: "npm:~1.5.4"
+    ufo: "npm:~1.6.1"
     uuid: "npm:~10.0.0"
     uuidv7: "npm:~1.0.2"
     vite: "npm:5.4.14"
