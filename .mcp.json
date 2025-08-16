@@ -3,10 +3,23 @@
     "context7": {
       "type": "stdio",
       "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {}
+    },
+    "serena": {
+      "type": "stdio",
+      "command": "uvx",
       "args": [
-        "-y",
-        "--node-options=--experimental-fetch",
-        "@upstash/context7-mcp@latest"
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "ide-assistant",
+        "--project",
+        ".",
+        "--enable-web-dashboard",
+        "false"
       ],
       "env": {}
     }

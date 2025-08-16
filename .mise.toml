@@ -1,0 +1,25 @@
+# mise configuration file
+# https://mise.jdx.dev/configuration.html
+
+[tools]
+jq = "latest"
+
+node = "{{ exec(command='jq -r .engines.node package.json') | default(value='lts') }}"
+yarn = "latest"
+uv = "latest"
+
+# Node.js global packages
+"npm:@anthropic-ai/claude-code" = "latest"
+"npm:@antfu/ni" = "latest"
+
+
+[settings]
+# Enable automatic installation of tools
+experimental = true
+# Explicitly enable idiomatic version files for node
+idiomatic_version_file_enable_tools = ["node"]
+
+[hooks]
+postinstall = [
+  "ni",
+]
