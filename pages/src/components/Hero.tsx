@@ -40,12 +40,6 @@ function Hero() {
               <span className="inline-block px-4 py-1 bg-white/20 rounded-full text-sm backdrop-blur-[10px]">
                 Windows対応
               </span>
-              <span className="inline-block px-4 py-1 bg-white/20 rounded-full text-sm backdrop-blur-[10px]">
-                macOS対応
-              </span>
-              <span className="inline-block px-4 py-1 bg-white/20 rounded-full text-sm backdrop-blur-[10px]">
-                Linux対応
-              </span>
             </div>
           </div>
           <div className="relative">

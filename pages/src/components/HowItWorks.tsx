@@ -2,8 +2,7 @@ const steps = [
   {
     number: '01',
     title: 'アプリをダウンロード',
-    description:
-      'Windows、macOS、Linuxに対応。お使いのOSに合わせてダウンロードしてください。',
+    description: 'Windows対応。簡単にダウンロードしてすぐに使い始められます。',
   },
   {
     number: '02',

@@ -46,15 +46,12 @@ function Download() {
     fetchRelease();
   }, []);
 
-  const getDownloadLink = (platform: string) => {
+  const getDownloadLink = () => {
     if (!release) return '#';
 
     const asset = release.assets.find((a) => {
       const name = a.name.toLowerCase();
-      if (platform === 'windows' && name.endsWith('.exe')) return true;
-      if (platform === 'mac' && name.endsWith('.dmg')) return true;
-      if (platform === 'linux' && name.endsWith('.appimage')) return true;
-      return false;
+      return name.endsWith('.exe');
     });
 
     return asset?.browser_download_url || '#';
@@ -89,7 +86,7 @@ function Download() {
 
         <div className="flex justify-center my-12">
           <a
-            href={getDownloadLink('windows')}
+            href={getDownloadLink()}
             className="bg-gray-50 dark:bg-gray-900 p-8 rounded-lg text-center no-underline text-gray-900 dark:text-gray-100 transition-all duration-250 border-2 border-transparent flex flex-col items-center hover:-translate-y-1 hover:shadow-lg hover:border-[#5865F2] max-w-sm"
             target="_blank"
             rel="noopener noreferrer"
