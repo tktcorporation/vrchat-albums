@@ -25,16 +25,16 @@ const config = {
   ],
   win: {
     target: 'nsis',
-    icon: 'assets/icon.ico',
+    icon: 'assets/icon-win.png',
   },
   linux: {
     target: 'AppImage',
-    icon: 'assets/icons',
+    icon: 'assets/icon-linux.png',
   },
   mac: {
     target: 'dmg',
     identity: null,
-    icon: 'assets/icon.icns',
+    icon: 'assets/icon-mac.png',
   },
 };
 

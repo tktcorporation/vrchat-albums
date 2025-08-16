@@ -62,5 +62,7 @@
       "Bash(diff:*)"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["context7", "serena"]
 }

@@ -294,7 +294,7 @@ const setTray = () => {
     const appPath = app.isPackaged
       ? process.resourcesPath
       : `${app.getAppPath()}`;
-    const iconPath = join(appPath, 'assets', 'icons', '256x256.png');
+    const iconPath = join(appPath, 'assets', 'icon.png');
 
     // アイコンパスの存在確認とログ出力
     try {
