@@ -13,9 +13,6 @@
   <a href="https://github.com/tktcorporation/vrchat-albums/releases">
     <img src="https://img.shields.io/github/v/release/tktcorporation/vrchat-albums?label=latest%20release" alt="Latest Release">
   </a>
-  <a href="https://github.com/tktcorporation/vrchat-albums/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/tktcorporation/vrchat-albums" alt="License">
-  </a>
   <a href="https://github.com/tktcorporation/vrchat-albums/issues">
     <img src="https://img.shields.io/github/issues/tktcorporation/vrchat-albums" alt="Issues">
   </a>
@@ -97,42 +94,10 @@
 ### Q: データのバックアップはどこに保存されますか
 **A:** エクスポート時に指定したフォルダに、日時付きのサブフォルダが作成されて保存されます。
 
-## 🐛 トラブルシューティング
-
-問題が発生した場合は、以下を試してください：
-
-1. アプリを再起動する
-2. 設定画面でフォルダパスを確認する
-3. [Issues](https://github.com/tktcorporation/vrchat-albums/issues)で既知の問題を確認する
-
-## 🛠️ 技術スタック
-
-- **Electron**: クロスプラットフォームのデスクトップアプリケーションフレームワーク
-- **React**: ユーザーインターフェース構築のための JavaScript ライブラリ
-- **Vite**: 高速なフロントエンドビルドツール
-- **tRPC**: 型安全な API 開発のためのフレームワーク
-- **SQLite**: 軽量なローカルデータベース
-- **Tailwind CSS**: ユーティリティファーストの CSS フレームワーク
-- **Vitest**: Vite 上で動作するユニットテストフレームワーク
-
 ## 🤝 コントリビューション
 
 バグ報告、機能提案、プルリクエストを歓迎します！
 詳細は[CONTRIBUTING.md](CONTRIBUTING.md)をご覧ください。
-
-### 開発に参加する
-
-```bash
-# リポジトリをクローン
-git clone https://github.com/tktcorporation/vrchat-albums.git
-cd vrchat-albums
-
-# 依存関係をインストール
-yarn install
-
-# 開発サーバーを起動
-yarn dev
-```
 
 ## 📄 ライセンス
 
