@@ -36,9 +36,9 @@
     
     <!-- ストロークのドロップシャドウ -->
     <filter id="strokeShadow">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
       <feOffset dx="0" dy="3" result="offsetblur"/>
-      <feFlood flood-color="#000000" flood-opacity="0.25"/>
+      <feFlood flood-color="#000000" flood-opacity="0.20"/>
       <feComposite in2="offsetblur" operator="in"/>
       <feMerge>
         <feMergeNode/>
