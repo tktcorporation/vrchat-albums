@@ -35,7 +35,7 @@
     </linearGradient>
     
     <!-- ストロークのドロップシャドウ -->
-    <filter id="strokeShadow">
+    <filter id="strokeShadow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
       <feOffset dx="0" dy="3" result="offsetblur"/>
       <feFlood flood-color="#000000" flood-opacity="0.20"/>
