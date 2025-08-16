@@ -23,8 +23,8 @@
     
     <!-- シンプルなグラデーション（彩度を抑えめに） -->
     <linearGradient id="appleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FF8A50"/>
-      <stop offset="100%" stop-color="#FF6830"/>
+      <stop offset="0%" stop-color="#FFA85C"/>
+      <stop offset="100%" stop-color="#FF8533"/>
     </linearGradient>
     
     <!-- ハイライト効果 -->
@@ -60,7 +60,7 @@
   
   <!-- キャラクター（シンプルに、線を細く） -->
   <g transform="translate(512, 512)">
-    <g transform="scale(2.2) translate(-150, -150)">
+    <g transform="scale(2.7) translate(-150, -150)">
       <!-- メイン要素（線を細く、シンプルに、シャドウ付き） -->
       <g filter="url(#strokeShadow)">
         <path d="M28 170C124.5 173 136 199.5 127 115.5C127 101.75 164.5 62.5 118 62.5H62" 
