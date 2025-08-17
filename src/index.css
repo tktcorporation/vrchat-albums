@@ -1,116 +1,116 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* For AppBar */
 .draggable {
-    -webkit-user-select: none;
-    -webkit-app-region: drag;
-  }
+  -webkit-user-select: none;
+  -webkit-app-region: drag;
+}
 
 .undraggable {
-    -webkit-app-region: no-drag;
-  }
+  -webkit-app-region: no-drag;
+}
 
-   
 @layer base {
   :root {
     /* Arc Browser inspired light theme with glassmorphism */
     --background: 0 0% 100% / 0.05;
     --foreground: 220 9% 15%;
- 
+
     --muted: 220 5% 98% / 0.4;
     --muted-foreground: 220 5% 45%;
- 
+
     --popover: 0 0% 100% / 0.95;
     --popover-foreground: 220 9% 15%;
- 
+
     --border: 220 10% 90% / 0.3;
     --input: 220 10% 85% / 0.5;
- 
+
     --card: 0 0% 100% / 0.7;
     --card-foreground: 220 9% 15%;
- 
+
     --primary: 240 75% 60%;
     --primary-foreground: 210 40% 98%;
 
     --secondary-muted: 220 5% 96% / 0.6;
     --secondary: 220 5% 96% / 0.8;
     --secondary-foreground: 220 9% 15%;
- 
+
     --accent: 240 30% 95% / 0.6;
     --accent-foreground: 240 75% 60%;
- 
+
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
- 
+
     --ring: 240 75% 60% / 0.3;
- 
+
     --radius: 0.75rem;
 
     /* Arc Browser style subtle gradient background - reduced brightness for better contrast */
     --gradient-start: 220 15% 92%;
     --gradient-middle: 225 12% 90%;
     --gradient-end: 230 10% 88%;
-    
+
     /* Glass effect backdrop */
     --glass-bg: 0 0% 100% / 0.1;
     --glass-border: 0 0% 100% / 0.2;
     --glass-shadow: 0 4px 16px rgba(31, 38, 135, 0.15);
   }
- 
+
   .dark {
     /* Arc Browser inspired dark theme with glassmorphism */
     --background: 220 27% 8% / 0.05;
     --foreground: 220 15% 85%;
- 
+
     --muted: 220 27% 12% / 0.4;
     --muted-foreground: 220 10% 60%;
- 
+
     --accent: 220 27% 18% / 0.6;
     --accent-foreground: 220 15% 85%;
- 
+
     --popover: 220 27% 8% / 0.95;
     --popover-foreground: 220 15% 85%;
- 
+
     --border: 220 27% 20% / 0.3;
     --input: 220 27% 25% / 0.5;
- 
+
     --card: 220 27% 12% / 0.7;
     --card-foreground: 220 15% 85%;
- 
+
     --primary: 240 75% 60%;
     --primary-foreground: 220 27% 8%;
- 
+
     --secondary: 220 27% 16% / 0.8;
     --secondary-foreground: 220 15% 85%;
- 
+
     --destructive: 0 75% 55%;
     --destructive-foreground: 210 40% 98%;
- 
+
     --ring: 240 75% 60% / 0.3;
- 
+
     --radius: 0.75rem;
 
     /* Dark mode subtle gradient */
     --gradient-start: 220 27% 10%;
     --gradient-middle: 225 24% 8%;
     --gradient-end: 230 20% 6%;
-    
+
     /* Dark glass effect */
     --glass-bg: 220 27% 12% / 0.1;
     --glass-border: 220 27% 25% / 0.2;
     --glass-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   }
 }
- 
+
 @layer base {
   * {
     @apply border-border;
   }
-  html, body {
+  html,
+  body {
     height: 100%;
     margin: 0;
     padding: 0;
@@ -127,21 +127,26 @@
     height: 100vh;
     overflow: hidden;
   }
-  
+
   /* Glassmorphism background with gradient overlay */
   body::before {
-    content: '';
+    content: "";
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, hsl(var(--gradient-start)) 0%, hsl(var(--gradient-middle)) 50%, hsl(var(--gradient-end)) 100%);
+    background: linear-gradient(
+      135deg,
+      hsl(var(--gradient-start)) 0%,
+      hsl(var(--gradient-middle)) 50%,
+      hsl(var(--gradient-end)) 100%
+    );
     z-index: -2;
   }
-  
+
   body::after {
-    content: '';
+    content: "";
     position: fixed;
     top: 0;
     left: 0;
@@ -153,8 +158,8 @@
     z-index: -1;
   }
   @font-face {
-    font-family: 'Noto Sans CJK JP';
-    src: url('assets/NotoSansCJKjp-Regular.ttf') format('truetype');
+    font-family: "Noto Sans CJK JP";
+    src: url("assets/NotoSansCJKjp-Regular.ttf") format("truetype");
   }
 
   /* Webkit browsers (Chrome, Safari, etc) */
@@ -174,11 +179,11 @@
   /* Firefox */
   * {
     scrollbar-width: thin;
-    scrollbar-color: theme('colors.gray.300') theme('colors.gray.100');
+    scrollbar-color: theme("colors.gray.300") theme("colors.gray.100");
   }
 
   .dark * {
-    scrollbar-color: theme('colors.gray.700') theme('colors.gray.900');
+    scrollbar-color: theme("colors.gray.700") theme("colors.gray.900");
   }
 
   /* Hide scrollbar for Chrome, Safari and Opera when not hovering */
@@ -188,8 +193,8 @@
 
   /* Hide scrollbar for IE, Edge and Firefox */
   .scrollbar-hide {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
 
   /* Show scrollbar on hover */
@@ -224,26 +229,24 @@
     border: 1px solid hsl(var(--glass-border));
     box-shadow: var(--glass-shadow);
   }
-  
+
   .glass-panel {
     background: hsl(var(--card));
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    box-shadow: 
-      0 2px 8px rgba(0, 0, 0, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), inset 0 1px 0
+      rgba(255, 255, 255, 0.03);
   }
-  
+
   .glass-card {
     background: hsl(var(--card));
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid hsl(var(--border));
-    box-shadow: 
-      0 2px 8px rgba(31, 38, 135, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    box-shadow: 0 2px 8px rgba(31, 38, 135, 0.1), inset 0 1px 0
+      rgba(255, 255, 255, 0.03);
   }
-  
+
   .glass-button {
     background: hsl(var(--primary) / 0.8);
     backdrop-filter: blur(8px);
@@ -251,26 +254,26 @@
     border: 1px solid hsl(var(--primary) / 0.3);
     transition: all 0.2s ease;
   }
-  
+
   .glass-button:hover {
     background: hsl(var(--primary) / 0.9);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(31, 38, 135, 0.2);
   }
-  
+
   .glass-input {
     background: hsl(var(--input));
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid hsl(var(--border));
   }
-  
+
   .glass-input:focus {
     background: hsl(var(--input) / 0.8);
     border: 1px solid hsl(var(--ring));
     box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
   }
-  
+
   /* Minimal title bar style */
   .minimal-header {
     background: hsl(var(--background) / 0.02);
