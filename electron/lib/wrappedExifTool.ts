@@ -5,6 +5,7 @@ import * as exiftool from 'exiftool-vendored';
 import type { Result } from 'neverthrow';
 import { err, ok } from 'neverthrow';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from './logger';
 import * as fs from './wrappedFs';
 
 let exiftoolInstance: exiftool.ExifTool | null = null;
@@ -68,8 +69,9 @@ export const setExifToBuffer = async (
     // クリーンアップ
     try {
       await nodeFs.promises.rmdir(tempDir);
-    } catch {
-      // 無視
+    } catch (error) {
+      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
+      // Non-critical error, continue
     }
     return err(
       new Error('Failed to write buffer to temporary file', {
@@ -99,13 +101,15 @@ export const setExifToBuffer = async (
     // クリーンアップ
     try {
       await nodeFs.promises.unlink(tempFilePath);
-    } catch {
-      // ファイル削除失敗は無視
+    } catch (error) {
+      logger.debug(`Failed to remove temp file: ${tempFilePath}`, error);
+      // Non-critical error, continue
     }
     try {
       await nodeFs.promises.rmdir(tempDir);
-    } catch {
-      // ディレクトリ削除失敗は無視
+    } catch (error) {
+      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
+      // Non-critical error, continue
     }
   }
 };
@@ -141,8 +145,9 @@ export const readExifByBuffer = async (
     // クリーンアップ
     try {
       await nodeFs.promises.rmdir(tempDir);
-    } catch {
-      // 無視
+    } catch (error) {
+      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
+      // Non-critical error, continue
     }
     return err(
       new Error('Failed to write buffer to temporary file', {
@@ -160,13 +165,15 @@ export const readExifByBuffer = async (
     // クリーンアップ
     try {
       await nodeFs.promises.unlink(tempFilePath);
-    } catch {
-      // ファイル削除失敗は無視
+    } catch (error) {
+      logger.debug(`Failed to remove temp file: ${tempFilePath}`, error);
+      // Non-critical error, continue
     }
     try {
       await nodeFs.promises.rmdir(tempDir);
-    } catch {
-      // ディレクトリ削除失敗は無視
+    } catch (error) {
+      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
+      // Non-critical error, continue
     }
   }
 };

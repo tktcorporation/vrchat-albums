@@ -6,6 +6,9 @@ import sharp from 'sharp';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as wrappedExiftool from './wrappedExifTool';
 
+// Constants for test configuration
+const WINDOWS_FILE_WRITE_DELAY_MS = 100; // Windowsでファイル書き込みが完了するまでの待機時間
+
 describe('wrappedExifTool', () => {
   let testImagePath: string;
   let tempDir: string;
@@ -29,7 +32,9 @@ describe('wrappedExifTool', () => {
     await image.png().toFile(testImagePath);
 
     // Windowsでファイルが確実に書き込まれるまで待機
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) =>
+      setTimeout(resolve, WINDOWS_FILE_WRITE_DELAY_MS),
+    );
 
     // ファイルが存在することを確認
     const exists = await fs.promises

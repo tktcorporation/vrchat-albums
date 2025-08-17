@@ -74,6 +74,8 @@ describe('getVRChaLogInfoFromLogPath', () => {
   >;
 
   // このテストはスキップします
+  // TODO: Issue #XXX - このテストは現在の実装と整合性が取れていないため一時的にスキップ
+  // loadLogInfoFromLogFiles関数の戻り値の型が変更されたため、修正が必要
   it.skip('should-return-VRChatWorldJoinLog[]', async () => {
     // モックデータを設定
     const mockLogs = [

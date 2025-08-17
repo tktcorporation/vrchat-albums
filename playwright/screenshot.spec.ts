@@ -8,6 +8,12 @@ import consola from 'consola';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Constants
+const XVFB_STARTUP_DELAY_MS = 1000; // Xvfb起動待機時間
+const SERVER_CHECK_INTERVAL_MS = 1000; // サーバーチェック間隔
+const SERVER_MAX_ATTEMPTS = 10; // サーバーチェック最大試行回数
+const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY || '4096'; // メモリ上限設定
+
 const launchElectronApp = async () => {
   // Start Xvfb if not running
   const { execSync } = await import('node:child_process');
@@ -19,12 +25,15 @@ const launchElectronApp = async () => {
     execSync('Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &', {
       shell: '/bin/bash',
     });
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for Xvfb to start
+    await new Promise((resolve) => setTimeout(resolve, XVFB_STARTUP_DELAY_MS)); // Wait for Xvfb to start
   }
 
   // 開発サーバーが起動するまで待つ（Playwrightのwebserver設定が処理する）
   // ただし、念のため確認する
-  const waitForServer = async (url: string, maxAttempts = 10) => {
+  const waitForServer = async (
+    url: string,
+    maxAttempts = SERVER_MAX_ATTEMPTS,
+  ) => {
     console.log('Checking if development server is ready...');
     for (let i = 0; i < maxAttempts; i++) {
       try {
@@ -37,7 +46,9 @@ const launchElectronApp = async () => {
         // サーバーがまだ起動していない
         console.log(`Waiting for server... (attempt ${i + 1}/${maxAttempts})`);
       }
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) =>
+        setTimeout(resolve, SERVER_CHECK_INTERVAL_MS),
+      );
     }
     // webServerの設定があるので、サーバーは起動しているはず
     console.warn('Could not verify development server, but proceeding anyway');
@@ -51,8 +62,8 @@ const launchElectronApp = async () => {
   const electronApp = await _electron.launch({
     args: [
       '--no-sandbox',
-      '--max-old-space-size=4096', // Node.jsのヒープメモリを4GBに増やす
-      '--js-flags=--max-old-space-size=4096', // V8エンジンのメモリ制限を増やす
+      `--max-old-space-size=${MEMORY_LIMIT_MB}`, // Node.jsのヒープメモリを増やす
+      `--js-flags=--max-old-space-size=${MEMORY_LIMIT_MB}`, // V8エンジンのメモリ制限を増やす
       '--disable-dev-shm-usage', // /dev/shmの使用を無効化（コンテナ環境向け）
       '--disable-gpu', // GPU無効化でメモリ節約
       '--disable-software-rasterizer',
@@ -69,7 +80,7 @@ const launchElectronApp = async () => {
       PLAYWRIGHT_STORE_HASH: Date.now().toString(),
       NODE_ENV: 'development', // 開発モードを強制
       PORT: '3000', // 開発サーバーのポート
-      NODE_OPTIONS: '--max-old-space-size=4096', // Node.js環境変数でもメモリ制限を設定
+      NODE_OPTIONS: `--max-old-space-size=${MEMORY_LIMIT_MB}`, // Node.js環境変数でもメモリ制限を設定
       ELECTRON_ENABLE_LOGGING: '1', // Enable Electron logging
       G_SLICE: 'always-malloc', // Fix GLib memory issues
       GTK_THEME: 'Adwaita', // Set a default GTK theme
