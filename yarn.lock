@@ -6401,16 +6401,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"electron-trpc@npm:0.5.2":
-  version: 0.5.2
-  resolution: "electron-trpc@npm:0.5.2"
+"electron-trpc@npm:0.7.1":
+  version: 0.7.1
+  resolution: "electron-trpc@npm:0.7.1"
   dependencies:
     debug: "npm:^4.3.4"
   peerDependencies:
     "@trpc/client": ">10.0.0"
     "@trpc/server": ">10.0.0"
     electron: ">19.0.0"
-  checksum: 10c0/784fe5f558481a8cf40ec43643889ecbfde6f02e5e2feec322bca5cdd833e58def1d7d441dc1c0ff04d76e603e8683b9b244f946261e8e40a1f00c7b49688940
+  checksum: 10c0/c285403de2a5d854671f252ace9fa83155610efe98887c0002a9bdeac4899640c8adbd11668ac194c3fb1c800c75f8c1c9666f0e2b1444f68b544a7d0d756ad0
   languageName: node
   linkType: hard
 
@@ -12471,7 +12471,7 @@ __metadata:
     electron-log: "npm:5.4.2"
     electron-rebuild: "npm:~3.2.9"
     electron-store: "npm:8.2.0"
-    electron-trpc: "npm:0.5.2"
+    electron-trpc: "npm:0.7.1"
     electron-unhandled: "npm:4.0.1"
     electron-updater: "npm:6.6.2"
     exiftool-vendored: "npm:^30.3.0"

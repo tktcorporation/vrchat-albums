@@ -1957,8 +1957,9 @@
     "path": "node_modules/electron-to-chromium",
     "licenseFile": "node_modules/electron-to-chromium/LICENSE"
   },
-  "electron-trpc@0.5.2": {
+  "electron-trpc@0.7.1": {
     "licenses": "MIT",
+    "repository": "https://github.com/jsonnull/electron-trpc",
     "publisher": "Jason Nall",
     "email": "jsonnull@gmail.com",
     "path": "node_modules/electron-trpc",
