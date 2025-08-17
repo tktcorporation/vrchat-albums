@@ -27,6 +27,38 @@ export default defineConfig({
       },
       interopDefault: true,
     },
+    projects: [
+      // フロントエンド用の設定
+      {
+        test: {
+          name: 'web',
+          environment: 'jsdom',
+          include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+          setupFiles: ['./vitest.setup.ts'],
+        },
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, './src'),
+            '@shared': path.resolve(__dirname, './shared'),
+          },
+        },
+      },
+      // Electron/Node.js用の設定
+      {
+        test: {
+          name: 'electron',
+          environment: 'node',
+          include: ['electron/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+          setupFiles: ['./vitest.setup.ts'],
+        },
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, './src'),
+            '@shared': path.resolve(__dirname, './shared'),
+          },
+        },
+      },
+    ],
   },
   resolve: {
     alias: {

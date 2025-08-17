@@ -1,4 +1,5 @@
-import { afterAll, vi } from 'vitest';
+import { cleanup } from '@testing-library/react';
+import { afterAll, afterEach, vi } from 'vitest';
 
 import * as client from './electron/lib/sequelize';
 
@@ -7,6 +8,11 @@ vi.mock('@sentry/electron/main', () => ({
   captureException: vi.fn(),
   init: vi.fn(),
 }));
+
+// React Testing Libraryのクリーンアップ
+afterEach(() => {
+  cleanup();
+});
 
 afterAll(async () => {
   await client.__cleanupTestRDBClient();
