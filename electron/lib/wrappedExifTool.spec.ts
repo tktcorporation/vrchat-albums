@@ -6,9 +6,6 @@ import sharp from 'sharp';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as wrappedExiftool from './wrappedExifTool';
 
-// Constants for test configuration
-const WINDOWS_FILE_WRITE_DELAY_MS = 100; // Windowsでファイル書き込みが完了するまでの待機時間
-
 describe('wrappedExifTool', () => {
   let testImagePath: string;
   let tempDir: string;
@@ -17,7 +14,7 @@ describe('wrappedExifTool', () => {
     // テスト用の一時ディレクトリを作成
     tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-test-'));
 
-    // テスト用のファイルパスを生成（短縮パスを避ける）
+    // テスト用のファイルパスを生成
     testImagePath = path.join(tempDir, 'test-image.png');
 
     // テスト用の画像を作成
@@ -30,20 +27,6 @@ describe('wrappedExifTool', () => {
       },
     });
     await image.png().toFile(testImagePath);
-
-    // Windowsでファイルが確実に書き込まれるまで待機
-    await new Promise((resolve) =>
-      setTimeout(resolve, WINDOWS_FILE_WRITE_DELAY_MS),
-    );
-
-    // ファイルが存在することを確認
-    const exists = await fs.promises
-      .access(testImagePath)
-      .then(() => true)
-      .catch(() => false);
-    if (!exists) {
-      throw new Error(`Test image file was not created: ${testImagePath}`);
-    }
   });
 
   afterEach(async () => {

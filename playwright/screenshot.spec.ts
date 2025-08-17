@@ -139,43 +139,15 @@ test('各画面でスクショ', async () => {
   // 開発サーバーが完全に起動するまで待つ
   await page.waitForTimeout(5000);
 
-  // Listen for console messages
-  page.on('console', (msg) => {
-    const text = msg.text();
-    // Filter out noisy messages
-    if (!text.includes('Download the React DevTools')) {
-      console.log(`[${msg.type()}] ${text}`);
-    }
-  });
-
-  // Listen for page errors
+  // Listen for critical errors only
   page.on('pageerror', (error) => {
     console.error('[Page Error]', error.message);
-    console.error(error.stack);
   });
 
-  // Listen for request failures
-  page.on('requestfailed', (request) => {
-    console.error(
-      '[Request Failed]',
-      request.url(),
-      request.failure()?.errorText,
-    );
-  });
-
-  // Listen for uncaught exceptions in the main process
-  electronApp.on('window', async (window) => {
-    window.on('console', (msg) => {
-      console.log(`[Main Process] ${msg.text()}`);
-    });
-  });
-
-  // Listen for page close events
   page.on('close', () => {
     console.error('[Page Closed] The page was closed unexpectedly');
   });
 
-  // Listen for crashes
   page.on('crash', () => {
     console.error('[Page Crashed] The page crashed');
   });
@@ -219,43 +191,9 @@ test('各画面でスクショ', async () => {
   // 初期セットアップ画面または既にセットアップ済みの画面を待つ
   console.log('Waiting for setup or main screen...');
 
-  // ページの内容をデバッグのために取得
-  await page.waitForTimeout(2000); // Wait for content to load
-  const pageText = await page.textContent('body');
-  console.log('Page content preview:', pageText?.substring(0, 200));
-
-  // スクリーンショットを取得してデバッグ
+  // Wait for content to load
+  await page.waitForTimeout(2000);
   await screenshot(page, title, 'debug-current-state');
-
-  // 様々な可能性のあるセレクタを試す
-  const possibleSelectors = [
-    'text=初期セットアップ',
-    'text=Initial Setup',
-    'text=VRChatログファイルディレクトリ',
-    '[aria-label*="VRChat"]',
-    'input[type="text"]',
-    'button',
-    '.setup-container',
-    '[data-testid="location-group-header"]',
-    '.photo-card',
-  ];
-
-  let foundSelector = null;
-  for (const selector of possibleSelectors) {
-    const count = await page.locator(selector).count();
-    if (count > 0) {
-      console.log(`Found selector: ${selector} (count: ${count})`);
-      foundSelector = selector;
-      break;
-    }
-  }
-
-  if (!foundSelector) {
-    console.log(
-      'No expected selectors found, waiting for any input or button...',
-    );
-    await page.waitForSelector('input, button', { timeout: 5000 });
-  }
 
   // 入力フィールドがあるか確認
   const hasInput = (await page.locator('input[type="text"]').count()) > 0;
@@ -391,8 +329,8 @@ test('各画面でスクショ', async () => {
     'terms',
     'debug-current-state',
     'setup',
-    'logs-loaded', // データ処理後の画面
-    'finalized', // 最終状態
+    'logs-loaded',
+    'finalized',
   ];
 
   for (const name of requiredScreenshots) {
