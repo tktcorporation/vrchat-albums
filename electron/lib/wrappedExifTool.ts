@@ -1,7 +1,10 @@
+import * as nodeFs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import * as exiftool from 'exiftool-vendored';
 import type { Result } from 'neverthrow';
 import { err, ok } from 'neverthrow';
-import * as tmp from 'tmp-promise';
+import { v4 as uuidv4 } from 'uuid';
 import * as fs from './wrappedFs';
 
 let exiftoolInstance: exiftool.ExifTool | null = null;
@@ -46,10 +49,28 @@ export const setExifToBuffer = async (
     timezoneOffset: string;
   },
 ): Promise<Result<Buffer, Error>> => {
+  // Windows短縮パス問題を回避するため、一時ディレクトリを作成
+  let tempDir: string;
+  let tempFilePath: string;
+
+  try {
+    tempDir = await nodeFs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-'));
+    tempFilePath = path.join(tempDir, `${uuidv4()}.png`);
+  } catch (error) {
+    return err(
+      new Error('Failed to create temporary directory', { cause: error }),
+    );
+  }
+
   // 一時ファイルに書き込み
-  const tmpFile = await tmp.file();
-  const write_r = fs.writeFileSyncSafe(tmpFile.path, new Uint8Array(buffer));
+  const write_r = fs.writeFileSyncSafe(tempFilePath, new Uint8Array(buffer));
   if (write_r.isErr()) {
+    // クリーンアップ
+    try {
+      await nodeFs.promises.rmdir(tempDir);
+    } catch {
+      // 無視
+    }
     return err(
       new Error('Failed to write buffer to temporary file', {
         cause: write_r.error,
@@ -57,30 +78,36 @@ export const setExifToBuffer = async (
     );
   }
 
-  await writeDateTimeWithTimezone({
-    filePath: tmpFile.path,
-    description: exif.description,
-    dateTimeOriginal: exif.dateTimeOriginal,
-    timezoneOffset: exif.timezoneOffset,
-  });
+  try {
+    await writeDateTimeWithTimezone({
+      filePath: tempFilePath,
+      description: exif.description,
+      dateTimeOriginal: exif.dateTimeOriginal,
+      timezoneOffset: exif.timezoneOffset,
+    });
 
-  // 一時ファイルを読み込み
-  const read_r = fs.readFileSyncSafe(tmpFile.path);
-  if (read_r.isErr()) {
-    return err(
-      new Error('Failed to read temporary file', { cause: read_r.error }),
-    );
+    // 一時ファイルを読み込み
+    const read_r = fs.readFileSyncSafe(tempFilePath);
+    if (read_r.isErr()) {
+      return err(
+        new Error('Failed to read temporary file', { cause: read_r.error }),
+      );
+    }
+
+    return ok(read_r.value);
+  } finally {
+    // クリーンアップ
+    try {
+      await nodeFs.promises.unlink(tempFilePath);
+    } catch {
+      // ファイル削除失敗は無視
+    }
+    try {
+      await nodeFs.promises.rmdir(tempDir);
+    } catch {
+      // ディレクトリ削除失敗は無視
+    }
   }
-
-  // 一時ファイルを削除
-  const delete_r = await fs.unlinkAsync(tmpFile.path);
-  if (delete_r.isErr()) {
-    return err(
-      new Error('Failed to delete temporary file', { cause: delete_r.error }),
-    );
-  }
-
-  return ok(read_r.value);
 };
 
 const readExif = async (filePath: string) => {
@@ -92,13 +119,31 @@ const readExif = async (filePath: string) => {
 export const readExifByBuffer = async (
   buffer: Buffer,
 ): Promise<Result<exiftool.Tags, Error>> => {
+  // Windows短縮パス問題を回避するため、一時ディレクトリを作成
+  let tempDir: string;
+  let tempFilePath: string;
+
+  try {
+    tempDir = await nodeFs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-'));
+    tempFilePath = path.join(tempDir, `${uuidv4()}.png`);
+  } catch (error) {
+    return err(
+      new Error('Failed to create temporary directory', { cause: error }),
+    );
+  }
+
   // 一時ファイルに書き込み
-  const tmpFile = await tmp.file();
   const write_r = await fs.writeFileSyncSafe(
-    tmpFile.path,
+    tempFilePath,
     new Uint8Array(buffer),
   );
   if (write_r.isErr()) {
+    // クリーンアップ
+    try {
+      await nodeFs.promises.rmdir(tempDir);
+    } catch {
+      // 無視
+    }
     return err(
       new Error('Failed to write buffer to temporary file', {
         cause: write_r.error,
@@ -106,17 +151,24 @@ export const readExifByBuffer = async (
     );
   }
 
-  const exif = await readExif(tmpFile.path);
-
-  // 一時ファイルを削除
-  const unlink_r = await fs.unlinkAsync(tmpFile.path);
-  if (unlink_r.isErr()) {
-    return err(
-      new Error('Failed to delete temporary file', { cause: unlink_r.error }),
-    );
+  try {
+    const exif = await readExif(tempFilePath);
+    return ok(exif);
+  } catch (error) {
+    return err(new Error('Failed to read EXIF data', { cause: error }));
+  } finally {
+    // クリーンアップ
+    try {
+      await nodeFs.promises.unlink(tempFilePath);
+    } catch {
+      // ファイル削除失敗は無視
+    }
+    try {
+      await nodeFs.promises.rmdir(tempDir);
+    } catch {
+      // ディレクトリ削除失敗は無視
+    }
   }
-
-  return ok(exif);
 };
 
 // アプリケーション終了時にExiftoolのインスタンスを終了
