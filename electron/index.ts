@@ -167,7 +167,10 @@ const initializeApp = async () => {
 
   registerIpcMainListeners();
   const mainWindow = await createOrGetMainWindow();
-  createIPCHandler({ router, windows: [mainWindow] });
+  createIPCHandler({
+    router,
+    windows: [mainWindow],
+  });
   electronUtil.setTray();
 
   unhandled({

@@ -1021,14 +1021,14 @@
     "path": "node_modules/@szmarczak/http-timer",
     "licenseFile": "node_modules/@szmarczak/http-timer/LICENSE"
   },
-  "@tanstack/query-core@5.85.3": {
+  "@tanstack/query-core@4.40.0": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
     "path": "node_modules/@tanstack/query-core",
     "licenseFile": "node_modules/@tanstack/query-core/LICENSE"
   },
-  "@tanstack/react-query@5.85.3": {
+  "@tanstack/react-query@4.40.1": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
@@ -1057,21 +1057,21 @@
     "url": "http://n8.io/",
     "path": "node_modules/@tootallnate/once"
   },
-  "@trpc/client@11.4.4": {
+  "@trpc/client@10.45.2": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/client",
     "licenseFile": "node_modules/@trpc/client/LICENSE"
   },
-  "@trpc/react-query@11.4.4": {
+  "@trpc/react-query@10.45.2": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/react-query",
     "licenseFile": "node_modules/@trpc/react-query/LICENSE"
   },
-  "@trpc/server@11.4.4": {
+  "@trpc/server@10.45.2": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
@@ -4362,13 +4362,6 @@
     "url": "https://sindresorhus.com",
     "path": "node_modules/type-fest",
     "licenseFile": "node_modules/type-fest/license-cc0"
-  },
-  "typescript@5.9.2": {
-    "licenses": "Apache-2.0",
-    "repository": "https://github.com/microsoft/TypeScript",
-    "publisher": "Microsoft Corp.",
-    "path": "node_modules/typescript",
-    "licenseFile": "node_modules/typescript/LICENSE.txt"
   },
   "ufo@1.6.1": {
     "licenses": "MIT",

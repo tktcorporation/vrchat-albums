@@ -51,11 +51,10 @@ describe('electronUtilController', () => {
           pngBase64: 'test-base64',
           filenameWithoutExt: 'test',
         },
-        getRawInput: async () => ({
+        rawInput: {
           pngBase64: 'test-base64',
           filenameWithoutExt: 'test',
-        }),
-        signal: new AbortController().signal,
+        },
         path: '',
         type: 'mutation',
       });
@@ -99,11 +98,10 @@ describe('electronUtilController', () => {
           pngBase64: 'test-base64',
           filenameWithoutExt: 'test',
         },
-        getRawInput: async () => ({
+        rawInput: {
           pngBase64: 'test-base64',
           filenameWithoutExt: 'test',
-        }),
-        signal: new AbortController().signal,
+        },
         path: '',
         type: 'mutation',
       });
@@ -135,11 +133,10 @@ describe('electronUtilController', () => {
             pngBase64: 'test-base64',
             filenameWithoutExt: 'test',
           },
-          getRawInput: async () => ({
+          rawInput: {
             pngBase64: 'test-base64',
             filenameWithoutExt: 'test',
-          }),
-          signal: new AbortController().signal,
+          },
           path: '',
           type: 'mutation',
         }),

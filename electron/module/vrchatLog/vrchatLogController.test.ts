@@ -75,8 +75,7 @@ describe('vrchatLogController', () => {
           outputPath: '/custom/path',
         },
         ctx: createMockContext(),
-        getRawInput: async () => ({ outputPath: '/custom/path' }),
-        signal: new AbortController().signal,
+        rawInput: { outputPath: '/custom/path' },
         path: 'exportLogStoreData',
         type: 'mutation',
       });
@@ -118,12 +117,11 @@ describe('vrchatLogController', () => {
           outputPath: '/custom/path',
         },
         ctx: createMockContext(),
-        getRawInput: async () => ({
+        rawInput: {
           startDate,
           endDate,
           outputPath: '/custom/path',
-        }),
-        signal: new AbortController().signal,
+        },
         path: 'exportLogStoreData',
         type: 'mutation',
       });
@@ -155,11 +153,10 @@ describe('vrchatLogController', () => {
             endDate: new Date('2023-10-08T23:59:59'),
           },
           ctx: createMockContext(),
-          getRawInput: async () => ({
+          rawInput: {
             startDate: new Date('2023-10-08T00:00:00'),
             endDate: new Date('2023-10-08T23:59:59'),
-          }),
-          signal: new AbortController().signal,
+          },
           path: 'exportLogStoreData',
           type: 'mutation',
         }),
@@ -186,8 +183,7 @@ describe('vrchatLogController', () => {
       await mutation({
         input: {},
         ctx: createMockContext(),
-        getRawInput: async () => ({}),
-        signal: new AbortController().signal,
+        rawInput: {},
         path: 'exportLogStoreData',
         type: 'mutation',
       });
@@ -230,8 +226,7 @@ describe('vrchatLogController', () => {
           endDate,
         },
         ctx: createMockContext(),
-        getRawInput: async () => ({ startDate, endDate }),
-        signal: new AbortController().signal,
+        rawInput: { startDate, endDate },
         path: 'exportLogStoreData',
         type: 'mutation',
       });

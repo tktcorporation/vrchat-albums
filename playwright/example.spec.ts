@@ -42,6 +42,26 @@ test('各画面でスクショ', async () => {
   // Get the first window that the app opens, wait if necessary.
   const page = await electronApp.firstWindow();
 
+  // Listen for console messages
+  page.on('console', (msg) => {
+    console.log(`[${msg.type()}] ${msg.text()}`);
+  });
+
+  // Listen for page errors
+  page.on('pageerror', (error) => {
+    console.error('[Page Error]', error.message);
+    console.error(error.stack);
+  });
+
+  // Listen for request failures
+  page.on('requestfailed', (request) => {
+    console.error(
+      '[Request Failed]',
+      request.url(),
+      request.failure()?.errorText,
+    );
+  });
+
   const title = await page.title();
 
   // Print the title.
@@ -76,6 +96,7 @@ test('各画面でスクショ', async () => {
     consola.log('「同意する」ボタンが表示されていません');
   }
 
+  console.log('Waiting for 初期セットアップ text...');
   await page.waitForSelector('text=初期セットアップ');
   await screenshot(page, title, 'setup');
 

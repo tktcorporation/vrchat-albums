@@ -105,8 +105,7 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const result = await router.getFrequentPlayerNames({
       ctx: {} as unknown,
       input: { limit: 3 },
-      getRawInput: async () => ({ limit: 3 }),
-      signal: new AbortController().signal,
+      rawInput: { limit: 3 },
       path: '',
       type: 'query',
     });
@@ -177,8 +176,7 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const result = await router.getFrequentPlayerNames({
       ctx: {} as unknown,
       input: { limit: 2 },
-      getRawInput: async () => ({ limit: 2 }),
-      signal: new AbortController().signal,
+      rawInput: { limit: 2 },
       path: '',
       type: 'query',
     });
@@ -194,8 +192,7 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const result = await router.getFrequentPlayerNames({
       ctx: {} as unknown,
       input: { limit: 5 },
-      getRawInput: async () => ({ limit: 5 }),
-      signal: new AbortController().signal,
+      rawInput: { limit: 5 },
       path: '',
       type: 'query',
     });
@@ -253,8 +250,7 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const result = await router.getFrequentPlayerNames({
       ctx: {} as unknown,
       input: { limit: 5 }, // Explicitly pass default limit since we're bypassing zod parsing
-      getRawInput: async () => ({ limit: 5 }),
-      signal: new AbortController().signal,
+      rawInput: { limit: 5 },
       path: '',
       type: 'query',
     });

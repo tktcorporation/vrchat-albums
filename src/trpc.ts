@@ -23,4 +23,5 @@ export const trpcReact = createTRPCReact<AppRouter>();
  */
 export const trpcClient = createTRPCProxyClient<AppRouter>({
   links: [ipcLink()],
+  transformer: superjson,
 });

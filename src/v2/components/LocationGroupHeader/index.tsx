@@ -92,7 +92,7 @@ export const LocationGroupHeader = ({
     trpcReact.vrchatApi.getVrcWorldInfoByWorldId.useQuery(worldId ?? '', {
       enabled: worldId !== null && worldId !== '' && canExecuteQuery,
       staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 30,
+      cacheTime: 1000 * 60 * 30,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     });
