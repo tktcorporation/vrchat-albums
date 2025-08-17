@@ -1,7 +1,7 @@
 import { Toaster } from '@/components/ui/toaster';
 import { scrubEventData } from '@/lib/utils/masking';
 import { trpcClient, trpcReact } from '@/trpc';
-import TrpcWrapper from '@/trpcWrapper';
+import { TrpcWrapper } from '@/trpcWrapper';
 import type { Event, EventHint } from '@sentry/electron/main';
 import { init as initSentry } from '@sentry/electron/renderer';
 import { useEffect, useState } from 'react';

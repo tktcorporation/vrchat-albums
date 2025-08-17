@@ -11,7 +11,7 @@ interface UseIntersectionObserverOptions {
  * 指定要素がビューポートに入ったかどうかを返す。
  */
 export function useIntersectionObserver(
-  elementRef: RefObject<Element>,
+  elementRef: RefObject<Element | null>,
   options: UseIntersectionObserverOptions = {},
 ): boolean {
   const [isIntersecting, setIsIntersecting] = useState(false);

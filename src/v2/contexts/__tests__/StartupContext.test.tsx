@@ -147,29 +147,26 @@ describe('StartupContext', () => {
     consoleSpy.mockRestore();
   });
 
-  it('ステージマッピングが正しく動作する', () => {
-    const testCases = [
-      { initialization: 'pending', expected: 'idle' },
-      { initialization: 'inProgress', expected: 'syncing' },
-      { initialization: 'success', expected: 'ready' },
-      { initialization: 'error', expected: 'error' },
-    ] as const;
-
-    for (const { initialization, expected } of testCases) {
+  it.each([
+    { initialization: 'pending' as const, expected: 'idle' },
+    { initialization: 'inProgress' as const, expected: 'syncing' },
+    { initialization: 'success' as const, expected: 'ready' },
+    { initialization: 'error' as const, expected: 'error' },
+  ])(
+    '$initialization ステージは $expected として表示される',
+    ({ initialization, expected }) => {
       mockUseStartupStage.stages = { initialization };
       mockUseStartupStageHook.mockReturnValue(mockUseStartupStage);
 
-      const { unmount } = render(
+      render(
         <StartupProvider>
           <TestComponent />
         </StartupProvider>,
       );
 
       expect(screen.getByTestId('stage').textContent).toBe(expected);
-
-      unmount();
-    }
-  });
+    },
+  );
 
   it('completed フラグが正しく反映される', () => {
     // 完了していない状態

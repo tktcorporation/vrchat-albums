@@ -123,7 +123,7 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
   const startInitialization = useCallback(() => {
     match({
       stage: stages.initialization,
-      isLoading: initializeAppDataMutation.isLoading,
+      isLoading: initializeAppDataMutation.isPending,
       isSuccess: initializeAppDataMutation.isSuccess,
       hasTriggered: hasTriggeredInitialization,
     })

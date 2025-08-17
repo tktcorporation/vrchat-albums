@@ -179,7 +179,6 @@ const clearStoredSetting =
   };
 
 import path from 'node:path';
-import consola from 'consola';
 import { logger } from './../lib/logger';
 import {
   type VRChatPhotoDirPath,
@@ -265,13 +264,11 @@ const setSettingStore = (name: StoreName) => {
 };
 
 const initSettingStore = (name?: StoreName) => {
-  consola.log('process.env.PLAYWRIGHT_TEST', process.env.PLAYWRIGHT_TEST);
   const storeName: StoreName =
     name ??
     (process.env.PLAYWRIGHT_TEST === 'true' && process.env.PLAYWRIGHT_STORE_HASH
       ? `test-playwright-settings-${process.env.PLAYWRIGHT_STORE_HASH}`
       : 'v0-settings');
-  console.log('storeName', storeName);
 
   if (settingStore !== null) {
     const existsPath = settingStore.__store.path;

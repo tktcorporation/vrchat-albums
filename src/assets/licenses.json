@@ -628,7 +628,7 @@
     "path": "node_modules/@opentelemetry/sql-common",
     "licenseFile": "node_modules/@opentelemetry/sql-common/LICENSE"
   },
-  "@photostructure/tz-lookup@9.0.2": {
+  "@photostructure/tz-lookup@11.2.0": {
     "licenses": "CC0-1.0",
     "repository": "https://github.com/photostructure/tz-lookup",
     "publisher": "PhotoStructure, Inc.",
@@ -911,7 +911,7 @@
     "path": "node_modules/@sentry-internal/replay",
     "licenseFile": "node_modules/@sentry-internal/replay/LICENSE"
   },
-  "@sentry/babel-plugin-component-annotate@3.6.1": {
+  "@sentry/babel-plugin-component-annotate@4.1.1": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -925,7 +925,7 @@
     "path": "node_modules/@sentry/browser",
     "licenseFile": "node_modules/@sentry/browser/LICENSE"
   },
-  "@sentry/bundler-plugin-core@3.6.1": {
+  "@sentry/bundler-plugin-core@4.1.1": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -980,7 +980,7 @@
     "path": "node_modules/@sentry/opentelemetry",
     "licenseFile": "node_modules/@sentry/opentelemetry/LICENSE"
   },
-  "@sentry/vite-plugin@3.6.1": {
+  "@sentry/vite-plugin@4.1.1": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -1144,7 +1144,7 @@
     "path": "node_modules/@types/lodash",
     "licenseFile": "node_modules/@types/lodash/LICENSE"
   },
-  "@types/luxon@3.6.2": {
+  "@types/luxon@3.7.1": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/luxon",
@@ -1198,19 +1198,13 @@
     "path": "node_modules/@types/pg",
     "licenseFile": "node_modules/@types/pg/LICENSE"
   },
-  "@types/prop-types@15.7.15": {
-    "licenses": "MIT",
-    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
-    "path": "node_modules/@types/prop-types",
-    "licenseFile": "node_modules/@types/prop-types/LICENSE"
-  },
-  "@types/react-dom@18.3.7": {
+  "@types/react-dom@19.1.7": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/react-dom",
     "licenseFile": "node_modules/@types/react-dom/LICENSE"
   },
-  "@types/react@18.3.23": {
+  "@types/react@19.1.10": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/react",
@@ -1436,7 +1430,7 @@
     "path": "node_modules/base64-js",
     "licenseFile": "node_modules/base64-js/LICENSE"
   },
-  "batch-cluster@13.0.0": {
+  "batch-cluster@14.0.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/batch-cluster.js",
     "publisher": "Matthew McEachen",
@@ -1629,13 +1623,13 @@
     "path": "node_modules/clean-stack",
     "licenseFile": "node_modules/clean-stack/license"
   },
-  "clip-filepaths-linux-arm64-gnu@0.2.0": {
+  "clip-filepaths-linux-arm64-gnu@0.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/tktcorporation/clip-filepaths",
     "path": "node_modules/clip-filepaths-linux-arm64-gnu",
     "licenseFile": "node_modules/clip-filepaths-linux-arm64-gnu/README.md"
   },
-  "clip-filepaths@0.2.0": {
+  "clip-filepaths@0.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/tktcorporation/clip-filepaths",
     "path": "node_modules/clip-filepaths",
@@ -1963,8 +1957,9 @@
     "path": "node_modules/electron-to-chromium",
     "licenseFile": "node_modules/electron-to-chromium/LICENSE"
   },
-  "electron-trpc@0.5.2": {
+  "electron-trpc@0.7.1": {
     "licenses": "MIT",
+    "repository": "https://github.com/jsonnull/electron-trpc",
     "publisher": "Jason Nall",
     "email": "jsonnull@gmail.com",
     "path": "node_modules/electron-trpc",
@@ -2105,15 +2100,15 @@
     "path": "node_modules/eventemitter3",
     "licenseFile": "node_modules/eventemitter3/LICENSE"
   },
-  "exiftool-vendored.pl@12.78.0": {
+  "exiftool-vendored.pl@13.31.0": {
     "licenses": "MIT",
-    "repository": "https://github.com/mceachen/exiftool-vendored.pl",
+    "repository": "https://github.com/photostructure/exiftool-vendored.pl",
     "publisher": "Matthew McEachen",
     "email": "matthew-exiftoolvendored@mceachen.org",
     "path": "node_modules/exiftool-vendored.pl",
     "licenseFile": "node_modules/exiftool-vendored.pl/LICENSE"
   },
-  "exiftool-vendored@24.6.0": {
+  "exiftool-vendored@30.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.js",
     "publisher": "Matthew McEachen",
@@ -2689,8 +2684,8 @@
   "jiti@1.21.7": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/jiti",
-    "path": "node_modules/tailwindcss/node_modules/jiti",
-    "licenseFile": "node_modules/tailwindcss/node_modules/jiti/LICENSE"
+    "path": "node_modules/jiti",
+    "licenseFile": "node_modules/jiti/LICENSE"
   },
   "jotai@2.13.1": {
     "licenses": "MIT",
@@ -2703,8 +2698,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/lydell/js-tokens",
     "publisher": "Simon Lydell",
-    "path": "node_modules/js-tokens",
-    "licenseFile": "node_modules/js-tokens/LICENSE"
+    "path": "node_modules/@babel/code-frame/node_modules/js-tokens",
+    "licenseFile": "node_modules/@babel/code-frame/node_modules/js-tokens/LICENSE"
   },
   "js-yaml@4.1.0": {
     "licenses": "MIT",
@@ -2880,14 +2875,6 @@
     "path": "node_modules/lodash",
     "licenseFile": "node_modules/lodash/LICENSE"
   },
-  "loose-envify@1.4.0": {
-    "licenses": "MIT",
-    "repository": "https://github.com/zertosh/loose-envify",
-    "publisher": "Andres Suarez",
-    "email": "zertosh@gmail.com",
-    "path": "node_modules/loose-envify",
-    "licenseFile": "node_modules/loose-envify/LICENSE"
-  },
   "lowercase-keys@2.0.0": {
     "licenses": "MIT",
     "repository": "https://github.com/sindresorhus/lowercase-keys",
@@ -2921,14 +2908,14 @@
     "path": "node_modules/sqlite3/node_modules/lru-cache",
     "licenseFile": "node_modules/sqlite3/node_modules/lru-cache/LICENSE"
   },
-  "lucide-react@0.376.0": {
+  "lucide-react@0.539.0": {
     "licenses": "ISC",
     "repository": "https://github.com/lucide-icons/lucide",
     "publisher": "Eric Fennis",
     "path": "node_modules/lucide-react",
     "licenseFile": "node_modules/lucide-react/LICENSE"
   },
-  "luxon@3.6.1": {
+  "luxon@3.7.1": {
     "licenses": "MIT",
     "repository": "https://github.com/moment/luxon",
     "publisher": "Isaac Cambron",
@@ -3713,7 +3700,7 @@
     "path": "node_modules/rc",
     "licenseFile": "node_modules/rc/LICENSE.APACHE2"
   },
-  "react-dom@18.3.1": {
+  "react-dom@19.1.1": {
     "licenses": "MIT",
     "repository": "https://github.com/facebook/react",
     "path": "node_modules/react-dom",
@@ -3764,7 +3751,7 @@
     "path": "node_modules/react-style-singleton",
     "licenseFile": "node_modules/react-style-singleton/LICENSE"
   },
-  "react@18.3.1": {
+  "react@19.1.1": {
     "licenses": "MIT",
     "repository": "https://github.com/facebook/react",
     "path": "node_modules/react",
@@ -3928,7 +3915,7 @@
     "path": "node_modules/sax",
     "licenseFile": "node_modules/sax/LICENSE"
   },
-  "scheduler@0.23.2": {
+  "scheduler@0.26.0": {
     "licenses": "MIT",
     "repository": "https://github.com/facebook/react",
     "path": "node_modules/scheduler",
@@ -4476,8 +4463,8 @@
   "uuid@11.1.0": {
     "licenses": "MIT",
     "repository": "https://github.com/uuidjs/uuid",
-    "path": "node_modules/@sequelize/core/node_modules/uuid",
-    "licenseFile": "node_modules/@sequelize/core/node_modules/uuid/LICENSE.md"
+    "path": "node_modules/uuid",
+    "licenseFile": "node_modules/uuid/LICENSE.md"
   },
   "uuidv7@1.0.2": {
     "licenses": "Apache-2.0",

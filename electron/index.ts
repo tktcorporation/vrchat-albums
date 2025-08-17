@@ -156,10 +156,13 @@ const initializeRDBClient = async () => {
  * ウィンドウ生成や IPC ハンドラ登録、Sentry 設定をここで実行する。
  */
 const initializeApp = async () => {
-  const gotTheLock = app.requestSingleInstanceLock();
-  if (!gotTheLock) {
-    app.quit();
-    return;
+  // Skip single instance lock in Playwright tests
+  if (!process.env.PLAYWRIGHT_TEST) {
+    const gotTheLock = app.requestSingleInstanceLock();
+    if (!gotTheLock) {
+      app.quit();
+      return;
+    }
   }
 
   // データベースクライアント初期化
@@ -167,7 +170,10 @@ const initializeApp = async () => {
 
   registerIpcMainListeners();
   const mainWindow = await createOrGetMainWindow();
-  createIPCHandler({ router, windows: [mainWindow] });
+  createIPCHandler({
+    router,
+    windows: [mainWindow],
+  });
   electronUtil.setTray();
 
   unhandled({

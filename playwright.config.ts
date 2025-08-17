@@ -54,5 +54,11 @@ export default defineConfig({
     command: 'nr dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
+    timeout: 60000,
+    env: {
+      NODE_OPTIONS: `--max-old-space-size=${
+        process.env.PLAYWRIGHT_MAX_MEMORY || '4096'
+      }`,
+    },
   },
 });

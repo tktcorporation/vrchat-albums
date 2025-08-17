@@ -75,9 +75,7 @@ describe('vrchatLogController', () => {
           outputPath: '/custom/path',
         },
         ctx: createMockContext(),
-        rawInput: {
-          outputPath: '/custom/path',
-        },
+        rawInput: { outputPath: '/custom/path' },
         path: 'exportLogStoreData',
         type: 'mutation',
       });
@@ -228,10 +226,7 @@ describe('vrchatLogController', () => {
           endDate,
         },
         ctx: createMockContext(),
-        rawInput: {
-          startDate,
-          endDate,
-        },
+        rawInput: { startDate, endDate },
         path: 'exportLogStoreData',
         type: 'mutation',
       });

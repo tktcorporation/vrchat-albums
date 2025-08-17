@@ -61,7 +61,7 @@ export const useLogSync = (options?: UseLogSyncOptions) => {
 
   return {
     sync,
-    isLoading: syncLogsMutation.isLoading,
+    isLoading: syncLogsMutation.isPending,
     isError: syncLogsMutation.isError,
     error: syncLogsMutation.error,
   };

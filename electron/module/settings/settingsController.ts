@@ -192,8 +192,8 @@ export const settingsRouter = () =>
           }, using ${syncMode} sync mode`,
         );
 
-        // Step 3.5: 初回起動時に自動起動を有効化
-        if (isFirstLaunch) {
+        // Step 3.5: 初回起動時に自動起動を有効化（テスト時はスキップ）
+        if (isFirstLaunch && !process.env.PLAYWRIGHT_TEST) {
           logger.info(
             'Step 3.5: Setting default auto-start enabled for first launch...',
           );
@@ -208,6 +208,8 @@ export const settingsRouter = () =>
             logger.warn('Failed to set default auto-start:', error);
             // 自動起動の設定に失敗してもアプリの初期化は続行
           }
+        } else if (isFirstLaunch && process.env.PLAYWRIGHT_TEST) {
+          logger.info('Step 3.5: Skipping auto-start setup in Playwright test');
         }
 
         // Step 4: ログ同期実行

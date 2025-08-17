@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
  */
 export const useQueryQueue = (isVisible: boolean, priority = 0, delay = 0) => {
   const [canExecuteQuery, setCanExecuteQuery] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const priorityRef = useRef(priority);
 
   // グローバルなクエリカウンターとキューを管理
