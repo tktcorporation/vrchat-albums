@@ -8,8 +8,7 @@ import { trpcReact } from '@/trpc';
 import clsx from 'clsx';
 import { CheckCircle2, Circle } from 'lucide-react';
 import pathe from 'pathe';
-import type React from 'react';
-import { memo, useCallback, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { P, match } from 'ts-pattern';
 import { ICON_SIZE } from '../constants/ui';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
@@ -83,12 +82,14 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     const { data: photoData } =
       trpcReact.vrchatPhoto.getVRChatPhotoItemData.useQuery(photo.url, {
         enabled: shouldLoad,
-        onSuccess: (result) => {
-          if (result.error === 'InputFileIsMissing') {
-            validatePhotoPathMutation.mutate(photo.url);
-          }
-        },
       });
+
+    // Handle missing photo validation
+    React.useEffect(() => {
+      if (photoData?.error === 'InputFileIsMissing') {
+        validatePhotoPathMutation.mutate(photo.url);
+      }
+    }, [photoData, photo.url, validatePhotoPathMutation]);
     const copySingleMutation =
       trpcReact.electronUtil.copySingleImagePath.useMutation();
     const copyMultipleMutation =

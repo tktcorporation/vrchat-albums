@@ -42,7 +42,7 @@ const DataExport = memo(() => {
     }
   };
 
-  const { mutate: exportLogStore, isLoading: isExporting } =
+  const { mutate: exportLogStore, isPending: isExporting } =
     trpcReact.vrchatLog.exportLogStoreData.useMutation({
       onSuccess: (result) => {
         toast({

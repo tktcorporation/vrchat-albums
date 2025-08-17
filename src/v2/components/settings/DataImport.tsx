@@ -131,7 +131,7 @@ const DataImport = memo(() => {
   };
 
   // インポート実行
-  const { mutate: importFiles, isLoading: isImporting } =
+  const { mutate: importFiles, isPending: isImporting } =
     trpcReact.vrchatLog.importLogStoreFiles.useMutation({
       onSuccess: (result) => {
         toast({
@@ -153,7 +153,7 @@ const DataImport = memo(() => {
     });
 
   // ロールバック実行
-  const { mutate: rollbackToBackup, isLoading: isRollingBack } =
+  const { mutate: rollbackToBackup, isPending: isRollingBack } =
     trpcReact.vrchatLog.rollbackToBackup.useMutation({
       onSuccess: () => {
         toast({

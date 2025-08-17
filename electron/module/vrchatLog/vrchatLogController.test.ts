@@ -75,9 +75,8 @@ describe('vrchatLogController', () => {
           outputPath: '/custom/path',
         },
         ctx: createMockContext(),
-        rawInput: {
-          outputPath: '/custom/path',
-        },
+        getRawInput: async () => ({ outputPath: '/custom/path' }),
+        signal: new AbortController().signal,
         path: 'exportLogStoreData',
         type: 'mutation',
       });
@@ -119,11 +118,12 @@ describe('vrchatLogController', () => {
           outputPath: '/custom/path',
         },
         ctx: createMockContext(),
-        rawInput: {
+        getRawInput: async () => ({
           startDate,
           endDate,
           outputPath: '/custom/path',
-        },
+        }),
+        signal: new AbortController().signal,
         path: 'exportLogStoreData',
         type: 'mutation',
       });
@@ -155,10 +155,11 @@ describe('vrchatLogController', () => {
             endDate: new Date('2023-10-08T23:59:59'),
           },
           ctx: createMockContext(),
-          rawInput: {
+          getRawInput: async () => ({
             startDate: new Date('2023-10-08T00:00:00'),
             endDate: new Date('2023-10-08T23:59:59'),
-          },
+          }),
+          signal: new AbortController().signal,
           path: 'exportLogStoreData',
           type: 'mutation',
         }),
@@ -185,7 +186,8 @@ describe('vrchatLogController', () => {
       await mutation({
         input: {},
         ctx: createMockContext(),
-        rawInput: {},
+        getRawInput: async () => ({}),
+        signal: new AbortController().signal,
         path: 'exportLogStoreData',
         type: 'mutation',
       });
@@ -228,10 +230,8 @@ describe('vrchatLogController', () => {
           endDate,
         },
         ctx: createMockContext(),
-        rawInput: {
-          startDate,
-          endDate,
-        },
+        getRawInput: async () => ({ startDate, endDate }),
+        signal: new AbortController().signal,
         path: 'exportLogStoreData',
         type: 'mutation',
       });

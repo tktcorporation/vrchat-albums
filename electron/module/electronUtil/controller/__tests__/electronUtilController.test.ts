@@ -1,6 +1,5 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import type { inferProcedureInput } from '@trpc/server';
 import { dialog } from 'electron';
 import * as path from 'pathe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -46,17 +45,19 @@ describe('electronUtilController', () => {
         filePath: mockPath,
       });
 
-      const resolver = router.downloadImageAsPng._def.resolver as (opts: {
-        ctx: Record<string, unknown>;
-        input: inferProcedureInput<typeof router.downloadImageAsPng>;
-      }) => Promise<void>;
-
-      await resolver({
-        ctx: {},
+      await router.downloadImageAsPng({
+        ctx: {} as unknown,
         input: {
           pngBase64: 'test-base64',
           filenameWithoutExt: 'test',
         },
+        getRawInput: async () => ({
+          pngBase64: 'test-base64',
+          filenameWithoutExt: 'test',
+        }),
+        signal: new AbortController().signal,
+        path: '',
+        type: 'mutation',
       });
 
       const expectedTempPath = path.join(os.tmpdir(), 'test-dir', 'test.png');
@@ -92,17 +93,19 @@ describe('electronUtilController', () => {
         canceled: true,
       });
 
-      const resolver = router.downloadImageAsPng._def.resolver as (opts: {
-        ctx: Record<string, unknown>;
-        input: inferProcedureInput<typeof router.downloadImageAsPng>;
-      }) => Promise<void>;
-
-      await resolver({
-        ctx: {},
+      await router.downloadImageAsPng({
+        ctx: {} as unknown,
         input: {
           pngBase64: 'test-base64',
           filenameWithoutExt: 'test',
         },
+        getRawInput: async () => ({
+          pngBase64: 'test-base64',
+          filenameWithoutExt: 'test',
+        }),
+        signal: new AbortController().signal,
+        path: '',
+        type: 'mutation',
       });
 
       // 一時ファイルの作成は行われる
@@ -125,18 +128,20 @@ describe('electronUtilController', () => {
       const mockError = new Error('Write error');
       (fs.copyFile as ReturnType<typeof vi.fn>).mockRejectedValue(mockError);
 
-      const resolver = router.downloadImageAsPng._def.resolver as (opts: {
-        ctx: Record<string, unknown>;
-        input: inferProcedureInput<typeof router.downloadImageAsPng>;
-      }) => Promise<boolean>;
-
       await expect(
-        resolver({
-          ctx: {},
+        router.downloadImageAsPng({
+          ctx: {} as unknown,
           input: {
             pngBase64: 'test-base64',
             filenameWithoutExt: 'test',
           },
+          getRawInput: async () => ({
+            pngBase64: 'test-base64',
+            filenameWithoutExt: 'test',
+          }),
+          signal: new AbortController().signal,
+          path: '',
+          type: 'mutation',
         }),
       ).rejects.toThrow('ファイル操作中にエラーが発生しました。');
 

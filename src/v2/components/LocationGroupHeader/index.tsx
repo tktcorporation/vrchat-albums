@@ -70,7 +70,7 @@ export const LocationGroupHeader = ({
 
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
-  const visibilityTimeoutRef = useRef<NodeJS.Timeout>();
+  const visibilityTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Query queueing to prevent too many simultaneous requests
   // Priority based on scroll position - elements higher up get higher priority
@@ -92,7 +92,7 @@ export const LocationGroupHeader = ({
     trpcReact.vrchatApi.getVrcWorldInfoByWorldId.useQuery(worldId ?? '', {
       enabled: worldId !== null && worldId !== '' && canExecuteQuery,
       staleTime: 1000 * 60 * 5,
-      cacheTime: 1000 * 60 * 30,
+      gcTime: 1000 * 60 * 30,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     });

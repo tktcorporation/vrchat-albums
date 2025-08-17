@@ -102,14 +102,13 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const router = logInfoRouter();
 
     // tRPCエンドポイントを直接呼び出し
-    const resolver = router.getFrequentPlayerNames._def.resolver as (opts: {
-      ctx: Record<string, unknown>;
-      input: { limit?: number };
-    }) => Promise<string[]>;
-
-    const result = await resolver({
-      ctx: {},
+    const result = await router.getFrequentPlayerNames({
+      ctx: {} as unknown,
       input: { limit: 3 },
+      getRawInput: async () => ({ limit: 3 }),
+      signal: new AbortController().signal,
+      path: '',
+      type: 'query',
     });
 
     // 頻度順で返されることを確認
@@ -175,14 +174,13 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const router = logInfoRouter();
 
     // limit=2で取得
-    const resolver = router.getFrequentPlayerNames._def.resolver as (opts: {
-      ctx: Record<string, unknown>;
-      input: { limit?: number };
-    }) => Promise<string[]>;
-
-    const result = await resolver({
-      ctx: {},
+    const result = await router.getFrequentPlayerNames({
+      ctx: {} as unknown,
       input: { limit: 2 },
+      getRawInput: async () => ({ limit: 2 }),
+      signal: new AbortController().signal,
+      path: '',
+      type: 'query',
     });
 
     expect(result).toHaveLength(2);
@@ -193,14 +191,13 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const { logInfoRouter } = await import('./logInfoCointroller');
     const router = logInfoRouter();
 
-    const resolver = router.getFrequentPlayerNames._def.resolver as (opts: {
-      ctx: Record<string, unknown>;
-      input: { limit?: number };
-    }) => Promise<string[]>;
-
-    const result = await resolver({
-      ctx: {},
+    const result = await router.getFrequentPlayerNames({
+      ctx: {} as unknown,
       input: { limit: 5 },
+      getRawInput: async () => ({ limit: 5 }),
+      signal: new AbortController().signal,
+      path: '',
+      type: 'query',
     });
 
     expect(result).toEqual([]);
@@ -253,14 +250,13 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const router = logInfoRouter();
 
     // limitを指定せずに呼び出し（デフォルト=5が適用されるはず）
-    const resolver = router.getFrequentPlayerNames._def.resolver as (opts: {
-      ctx: Record<string, unknown>;
-      input: { limit?: number };
-    }) => Promise<string[]>;
-
-    const result = await resolver({
-      ctx: {},
+    const result = await router.getFrequentPlayerNames({
+      ctx: {} as unknown,
       input: { limit: 5 }, // Explicitly pass default limit since we're bypassing zod parsing
+      getRawInput: async () => ({ limit: 5 }),
+      signal: new AbortController().signal,
+      path: '',
+      type: 'query',
     });
 
     expect(result).toHaveLength(5); // デフォルトの5件

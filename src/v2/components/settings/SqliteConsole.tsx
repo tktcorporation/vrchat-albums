@@ -28,13 +28,13 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState('');
   const [result, setResult] = useState('');
   const [isDebugLogEnabled, setIsDebugLogEnabled] = useState(false);
-  const { mutateAsync: executeQuery, isLoading: isExecutingQuery } =
+  const { mutateAsync: executeQuery, isPending: isExecutingQuery } =
     trpcReact.debug.executeSqlite.useMutation();
   const { data: currentLogLevel, isLoading: isLoadingLogLevel } =
     trpcReact.debug.getLogLevel.useQuery(undefined, { enabled: isOpen });
-  const { mutate: setLogLevel, isLoading: isSettingLogLevel } =
+  const { mutate: setLogLevel, isPending: isSettingLogLevel } =
     trpcReact.debug.setLogLevel.useMutation();
-  const { mutateAsync: throwErrorForSentryTest, isLoading: isThrowingError } =
+  const { mutateAsync: throwErrorForSentryTest, isPending: isThrowingError } =
     trpcReact.settings.throwErrorForSentryTest.useMutation();
 
   useEffect(() => {

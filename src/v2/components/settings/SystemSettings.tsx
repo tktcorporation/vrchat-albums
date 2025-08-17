@@ -40,7 +40,7 @@ const SystemSettings = memo(() => {
 
   const { data: startupLaunch, isLoading: isStartupLoading } =
     trpcReact.backgroundSettings.getIsAppAutoStartEnabled.useQuery();
-  const { mutate: setStartupLaunch, isLoading: isStartupUpdating } =
+  const { mutate: setStartupLaunch, isPending: isStartupUpdating } =
     trpcReact.backgroundSettings.setIsAppAutoStartEnabled.useMutation({
       onMutate: async (newValue) => {
         await utils.backgroundSettings.getIsAppAutoStartEnabled.cancel();
