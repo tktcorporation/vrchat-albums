@@ -47,7 +47,7 @@ describe('useStartupStage - simplified implementation', () => {
   let mockMutation: {
     mutate: ReturnType<typeof vi.fn>;
     reset: ReturnType<typeof vi.fn>;
-    isLoading: boolean;
+    isPending: boolean;
     isSuccess: boolean;
     isError: boolean;
   };
@@ -61,7 +61,7 @@ describe('useStartupStage - simplified implementation', () => {
     mockMutation = {
       mutate: mockMutate,
       reset: mockReset,
-      isLoading: false,
+      isPending: false,
       isSuccess: false,
       isError: false,
     };
@@ -220,10 +220,10 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   it('重複実行防止が機能する', async () => {
-    // isLoading = true の状態をモック
+    // isPending = true の状態をモック
     const loadingMutation = {
       ...mockMutation,
-      isLoading: true,
+      isPending: true,
     };
 
     mockTrpcReact.settings.initializeAppData.useMutation.mockReturnValue(
