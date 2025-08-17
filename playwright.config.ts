@@ -51,11 +51,14 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: `NODE_OPTIONS="--max-old-space-size=${
-      process.env.PLAYWRIGHT_MAX_MEMORY || '4096'
-    }" nr dev`,
+    command: 'nr dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 60000,
+    env: {
+      NODE_OPTIONS: `--max-old-space-size=${
+        process.env.PLAYWRIGHT_MAX_MEMORY || '4096'
+      }`,
+    },
   },
 });

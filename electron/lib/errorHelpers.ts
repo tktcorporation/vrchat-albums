@@ -360,6 +360,21 @@ export type DatabaseOperationError =
   | 'QUERY_FAILED'
   | 'TRANSACTION_FAILED';
 
+// EXIF操作関連のエラー型定義
+export type ExifOperationErrorCode =
+  | 'EXIF_TEMP_DIR_CREATE_FAILED'
+  | 'EXIF_TEMP_FILE_WRITE_FAILED'
+  | 'EXIF_WRITE_FAILED'
+  | 'EXIF_TEMP_FILE_READ_FAILED'
+  | 'EXIF_READ_FAILED';
+
+export type ExifOperationError = {
+  code: ExifOperationErrorCode;
+  message: string;
+  cause?: unknown;
+  filePath?: string;
+};
+
 /**
  * 型安全なエラーマッピング関数
  * ts-patternを使用してエラー型に基づいた適切なUserFacingErrorを生成
