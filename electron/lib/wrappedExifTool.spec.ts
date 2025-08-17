@@ -1,18 +1,21 @@
 import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import type { ExifDateTime } from 'exiftool-vendored';
 import sharp from 'sharp';
-import * as tmp from 'tmp-promise';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as wrappedExiftool from './wrappedExifTool';
 
 describe('wrappedExifTool', () => {
-  let tempFile: tmp.FileResult;
   let testImagePath: string;
+  let tempDir: string;
 
   beforeEach(async () => {
-    // テスト用の一時ファイルを作成
-    tempFile = await tmp.file({ postfix: '.png' });
-    testImagePath = tempFile.path;
+    // テスト用の一時ディレクトリを作成
+    tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-test-'));
+
+    // テスト用のファイルパスを生成（短縮パスを避ける）
+    testImagePath = path.join(tempDir, 'test-image.png');
 
     // テスト用の画像を作成
     const image = sharp({
@@ -24,11 +27,32 @@ describe('wrappedExifTool', () => {
       },
     });
     await image.png().toFile(testImagePath);
+
+    // Windowsでファイルが確実に書き込まれるまで待機
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // ファイルが存在することを確認
+    const exists = await fs.promises
+      .access(testImagePath)
+      .then(() => true)
+      .catch(() => false);
+    if (!exists) {
+      throw new Error(`Test image file was not created: ${testImagePath}`);
+    }
   });
 
   afterEach(async () => {
-    // テストファイルを削除
-    await fs.promises.unlink(testImagePath);
+    // テストファイルとディレクトリを削除
+    try {
+      await fs.promises.unlink(testImagePath);
+    } catch (_error) {
+      // ファイルが既に削除されている場合は無視
+    }
+    try {
+      await fs.promises.rmdir(tempDir);
+    } catch (_error) {
+      // ディレクトリが削除できない場合は無視
+    }
   });
 
   afterAll(async () => {
