@@ -79,6 +79,9 @@ const en: Translations = {
       removeExtraDirectory: 'Remove Extra Photo Folder',
       validate: 'Validate Paths',
       validating: 'Validating...',
+      addonNotice: 'This is a pure add-on application',
+      addonDescription:
+        'No metadata editing or compression. Your photo folders remain completely untouched and safe to use.',
       logFormat: {
         title: 'Log File Format',
         description:
@@ -91,6 +94,8 @@ const en: Translations = {
       name: 'Name',
       dependencies: 'Major Dependencies',
       openLog: 'Open App Log',
+      addonApp: 'This is a pure add-on application',
+      addonDescription: 'No metadata editing or photo compression',
       licenses: {
         title: 'License Information',
         viewLicense: 'View License',
