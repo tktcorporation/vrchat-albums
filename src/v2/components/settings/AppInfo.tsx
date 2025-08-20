@@ -49,6 +49,20 @@ const AppInfo = memo(() => {
         <Info className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
         {t('settings.info.title')}
       </h3>
+
+      {/* Addon Type Information */}
+      <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+        <div className="flex items-start space-x-3">
+          <Info className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-green-700 dark:text-green-300">
+            <p className="font-medium mb-1">
+              {t('settings.info.addonType.title')}
+            </p>
+            <p>{t('settings.info.addonType.description')}</p>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 space-y-2">
         <div className="flex justify-between">
           <span className="text-gray-600 dark:text-gray-400">
