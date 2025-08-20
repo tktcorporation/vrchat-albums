@@ -79,6 +79,11 @@ const en: Translations = {
       removeExtraDirectory: 'Remove Extra Photo Folder',
       validate: 'Validate Paths',
       validating: 'Validating...',
+      addonInfo: {
+        title: 'This app is a complete add-on',
+        description:
+          'It does not edit original photo data or metadata, nor move files. It specializes in reading photos to display and organize information.',
+      },
       logFormat: {
         title: 'Log File Format',
         description:
@@ -90,6 +95,11 @@ const en: Translations = {
       version: 'Version',
       name: 'Name',
       dependencies: 'Major Dependencies',
+      addonType: {
+        title: 'Complete Add-on Application',
+        description:
+          'Does not edit original photo data or metadata, nor move files. This is a dedicated tool for reading and organizing VRChat photos to display information.',
+      },
       openLog: 'Open App Log',
       licenses: {
         title: 'License Information',

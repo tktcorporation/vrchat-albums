@@ -85,6 +85,11 @@ const ja: Translations = {
       removeExtraDirectory: '追加の写真フォルダを削除',
       validate: '確認',
       validating: '確認中...',
+      addonInfo: {
+        title: 'このアプリはアドオン型です',
+        description:
+          '元の写真のデータ、メタデータの編集や、ファイルの移動は行いません。写真を読み込んで情報を表示し、整理することに特化しています。',
+      },
       logFormat: {
         title: 'ログファイルの形式',
         description:
@@ -96,6 +101,11 @@ const ja: Translations = {
       version: 'バージョン',
       name: 'アプリ名',
       dependencies: '主要な依存関係',
+      addonType: {
+        title: '完全にアドオン型のアプリケーション',
+        description:
+          '元の写真データ、メタデータの編集やファイルの移動は行いません。VRChatの写真を読み込んで情報を表示・整理する専用ツールです。',
+      },
       openLog: 'アプリログを開く',
       licenses: {
         title: 'ライセンス情報',
