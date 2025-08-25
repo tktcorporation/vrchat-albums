@@ -18,6 +18,23 @@ const getExiftoolInstance = async () => {
   return exiftoolInstance;
 };
 
+// 共通のクリーンアップ関数
+const cleanupTempFiles = async (
+  tempFilePath: string,
+  tempDir: string,
+): Promise<void> => {
+  try {
+    await nodeFs.promises.unlink(tempFilePath);
+  } catch (error) {
+    logger.debug(`Failed to remove temp file: ${tempFilePath}`, error);
+  }
+  try {
+    await nodeFs.promises.rmdir(tempDir);
+  } catch (error) {
+    logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
+  }
+};
+
 export const writeDateTimeWithTimezone = async ({
   filePath,
   description,
@@ -116,19 +133,8 @@ export const setExifToBuffer = async (
       filePath: tempFilePath,
     });
   } finally {
-    // クリーンアップ
-    try {
-      await nodeFs.promises.unlink(tempFilePath);
-    } catch (error) {
-      logger.debug(`Failed to remove temp file: ${tempFilePath}`, error);
-      // Non-critical error, continue
-    }
-    try {
-      await nodeFs.promises.rmdir(tempDir);
-    } catch (error) {
-      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
-      // Non-critical error, continue
-    }
+    // クリーンアップ処理を統合
+    await cleanupTempFiles(tempFilePath, tempDir);
   }
 };
 
@@ -188,19 +194,8 @@ export const readExifByBuffer = async (
       filePath: tempFilePath,
     });
   } finally {
-    // クリーンアップ
-    try {
-      await nodeFs.promises.unlink(tempFilePath);
-    } catch (error) {
-      logger.debug(`Failed to remove temp file: ${tempFilePath}`, error);
-      // Non-critical error, continue
-    }
-    try {
-      await nodeFs.promises.rmdir(tempDir);
-    } catch (error) {
-      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
-      // Non-critical error, continue
-    }
+    // クリーンアップ処理を統合
+    await cleanupTempFiles(tempFilePath, tempDir);
   }
 };
 

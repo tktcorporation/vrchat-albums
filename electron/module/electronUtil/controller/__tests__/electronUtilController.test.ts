@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import { dialog } from 'electron';
@@ -26,6 +27,7 @@ vi.mock('electron', () => ({
 
 describe('electronUtilController', () => {
   const router = electronUtilRouter();
+  const createCaller = router.createCaller;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -45,18 +47,11 @@ describe('electronUtilController', () => {
         filePath: mockPath,
       });
 
-      await router.downloadImageAsPng({
-        ctx: {} as unknown,
-        input: {
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        },
-        rawInput: {
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        },
-        path: '',
-        type: 'mutation',
+      // tRPC v11のサーバーサイド呼び出し
+      const caller = createCaller({ eventEmitter: new EventEmitter() });
+      await caller.downloadImageAsPng({
+        pngBase64: 'test-base64',
+        filenameWithoutExt: 'test',
       });
 
       const expectedTempPath = path.join(os.tmpdir(), 'test-dir', 'test.png');
@@ -92,18 +87,11 @@ describe('electronUtilController', () => {
         canceled: true,
       });
 
-      await router.downloadImageAsPng({
-        ctx: {} as unknown,
-        input: {
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        },
-        rawInput: {
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        },
-        path: '',
-        type: 'mutation',
+      // tRPC v11のサーバーサイド呼び出し
+      const caller = createCaller({ eventEmitter: new EventEmitter() });
+      await caller.downloadImageAsPng({
+        pngBase64: 'test-base64',
+        filenameWithoutExt: 'test',
       });
 
       // 一時ファイルの作成は行われる
@@ -126,19 +114,11 @@ describe('electronUtilController', () => {
       const mockError = new Error('Write error');
       (fs.copyFile as ReturnType<typeof vi.fn>).mockRejectedValue(mockError);
 
+      const caller = createCaller({ eventEmitter: new EventEmitter() });
       await expect(
-        router.downloadImageAsPng({
-          ctx: {} as unknown,
-          input: {
-            pngBase64: 'test-base64',
-            filenameWithoutExt: 'test',
-          },
-          rawInput: {
-            pngBase64: 'test-base64',
-            filenameWithoutExt: 'test',
-          },
-          path: '',
-          type: 'mutation',
+        caller.downloadImageAsPng({
+          pngBase64: 'test-base64',
+          filenameWithoutExt: 'test',
         }),
       ).rejects.toThrow('ファイル操作中にエラーが発生しました。');
 

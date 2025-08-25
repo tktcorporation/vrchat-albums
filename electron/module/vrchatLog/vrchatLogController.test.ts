@@ -75,9 +75,10 @@ describe('vrchatLogController', () => {
           outputPath: '/custom/path',
         },
         ctx: createMockContext(),
-        rawInput: { outputPath: '/custom/path' },
         path: 'exportLogStoreData',
         type: 'mutation',
+        getRawInput: () => Promise.resolve({ outputPath: '/custom/path' }),
+        signal: new AbortController().signal,
       });
 
       expect(result).toEqual(mockExportResult);
@@ -117,13 +118,11 @@ describe('vrchatLogController', () => {
           outputPath: '/custom/path',
         },
         ctx: createMockContext(),
-        rawInput: {
-          startDate,
-          endDate,
-          outputPath: '/custom/path',
-        },
         path: 'exportLogStoreData',
         type: 'mutation',
+        getRawInput: () =>
+          Promise.resolve({ startDate, endDate, outputPath: '/custom/path' }),
+        signal: new AbortController().signal,
       });
 
       expect(result).toEqual(mockExportResult);
@@ -153,12 +152,14 @@ describe('vrchatLogController', () => {
             endDate: new Date('2023-10-08T23:59:59'),
           },
           ctx: createMockContext(),
-          rawInput: {
-            startDate: new Date('2023-10-08T00:00:00'),
-            endDate: new Date('2023-10-08T23:59:59'),
-          },
           path: 'exportLogStoreData',
           type: 'mutation',
+          getRawInput: () =>
+            Promise.resolve({
+              startDate: new Date('2023-10-08T00:00:00'),
+              endDate: new Date('2023-10-08T23:59:59'),
+            }),
+          signal: new AbortController().signal,
         }),
       ).rejects.toThrow('Export failed: Database connection error');
     });
@@ -183,9 +184,10 @@ describe('vrchatLogController', () => {
       await mutation({
         input: {},
         ctx: createMockContext(),
-        rawInput: {},
         path: 'exportLogStoreData',
         type: 'mutation',
+        getRawInput: () => Promise.resolve({}),
+        signal: new AbortController().signal,
       });
 
       // exportLogStoreFromDBが期間指定なしで呼ばれることを確認
@@ -226,9 +228,10 @@ describe('vrchatLogController', () => {
           endDate,
         },
         ctx: createMockContext(),
-        rawInput: { startDate, endDate },
         path: 'exportLogStoreData',
         type: 'mutation',
+        getRawInput: () => Promise.resolve({ startDate, endDate }),
+        signal: new AbortController().signal,
       });
 
       // getDBLogsFromDatabase関数が期待される引数で呼ばれることを確認
