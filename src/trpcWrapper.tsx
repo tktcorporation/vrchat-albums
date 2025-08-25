@@ -40,7 +40,6 @@ export const TrpcWrapper: FC<Props> = ({ children }) => {
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
       links: [ipcLink()],
-      transformer: superjson,
     }),
   );
   return (
@@ -77,7 +76,6 @@ export const TrpcWrapperForServerError: FC<Props> = ({ children }) => {
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
       links: [ipcLink()],
-      transformer: superjson,
     }),
   );
   return (
@@ -115,7 +113,6 @@ export const TrpcWrapperDev: FC<DevProps> = ({ children }) => {
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
       links: [ipcLink()],
-      transformer: superjson,
     }),
   );
   return (
