@@ -451,7 +451,7 @@ const Contents = () => {
   }
 
   if (stage === 'syncing') {
-    const currentStage = 'アプリケーションを初期化中...';
+    const currentStage = '読み込み中...';
 
     return (
       <div className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]">
