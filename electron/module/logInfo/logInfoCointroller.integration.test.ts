@@ -105,9 +105,10 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const result = await router.getFrequentPlayerNames({
       ctx: {} as unknown,
       input: { limit: 3 },
-      rawInput: { limit: 3 },
       path: '',
       type: 'query',
+      getRawInput: () => Promise.resolve({ limit: 3 }),
+      signal: new AbortController().signal,
     });
 
     // 頻度順で返されることを確認
@@ -176,9 +177,10 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const result = await router.getFrequentPlayerNames({
       ctx: {} as unknown,
       input: { limit: 2 },
-      rawInput: { limit: 2 },
       path: '',
       type: 'query',
+      getRawInput: () => Promise.resolve({ limit: 2 }),
+      signal: new AbortController().signal,
     });
 
     expect(result).toHaveLength(2);
@@ -192,9 +194,10 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const result = await router.getFrequentPlayerNames({
       ctx: {} as unknown,
       input: { limit: 5 },
-      rawInput: { limit: 5 },
       path: '',
       type: 'query',
+      getRawInput: () => Promise.resolve({ limit: 5 }),
+      signal: new AbortController().signal,
     });
 
     expect(result).toEqual([]);
@@ -250,9 +253,10 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
     const result = await router.getFrequentPlayerNames({
       ctx: {} as unknown,
       input: { limit: 5 }, // Explicitly pass default limit since we're bypassing zod parsing
-      rawInput: { limit: 5 },
       path: '',
       type: 'query',
+      getRawInput: () => Promise.resolve({ limit: 5 }),
+      signal: new AbortController().signal,
     });
 
     expect(result).toHaveLength(5); // デフォルトの5件
