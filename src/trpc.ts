@@ -1,7 +1,6 @@
 import { createTRPCProxyClient } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
 import { ipcLink } from 'electron-trpc/renderer';
-import superjson from 'superjson';
 import type { AppRouter } from '../electron/api';
 
 /**
@@ -18,7 +17,7 @@ export const trpcReact = createTRPCReact<AppRouter>();
  * Reactフックを使用せず、直接 `.query()` や `.mutate()` メソッドを呼び出してデータを操作します。
  * バックグラウンド処理や特定のタイミングでのデータ操作が主目的の場合に適しています。
  *
- * `trpcReact` と `trpcClient` は同じ `AppRouter` と `transformer` (`superjson`) を共有し、
+ * `trpcReact` と `trpcClient` は同じ `AppRouter` を共有し、
  * `ipcLink` を通じてメインプロセスと通信します。
  */
 export const trpcClient = createTRPCProxyClient<AppRouter>({
