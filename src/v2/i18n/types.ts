@@ -112,6 +112,10 @@ export interface Translations {
       removeExtraDirectory: string;
       validate: string;
       validating: string;
+      addonInfo: {
+        title: string;
+        description: string;
+      };
       logFormat: {
         title: string;
         description: string;
@@ -123,6 +127,10 @@ export interface Translations {
       name: string;
       dependencies: string;
       openLog: string;
+      addonType: {
+        title: string;
+        description: string;
+      };
       licenses: {
         title: string;
         viewLicense: string;
