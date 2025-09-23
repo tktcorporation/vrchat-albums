@@ -23,7 +23,17 @@ runs:
       shell: bash
       run: npm i -g @antfu/ni
 
-    - name: Install dependencies with ni
+    - name: Enable Corepack
+      shell: bash
+      run: corepack enable
+
+    - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: nci
+      run: |
+        # Use yarn install for workspaces to ensure all dependencies are installed
+        if [ -f "yarn.lock" ]; then
+          yarn install --frozen-lockfile
+        else
+          nci
+        fi
