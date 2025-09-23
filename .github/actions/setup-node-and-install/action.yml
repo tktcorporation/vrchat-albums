@@ -1,0 +1,29 @@
+name: 'Setup Node.js and Install Dependencies'
+description: 'Common setup for Node.js and dependency installation'
+inputs:
+  node-version:
+    description: 'Node.js version to use (defaults to reading from package.json)'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Working directory for the installation'
+    required: false
+    default: '.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version == '' && 'package.json' || '' }}
+        node-version: ${{ inputs.node-version != '' && inputs.node-version || '' }}
+
+    - name: Install ni globally
+      shell: bash
+      run: npm i -g @antfu/ni
+
+    - name: Install dependencies with ni
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: nci
