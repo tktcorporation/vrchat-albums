@@ -15,15 +15,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'package.json'
-
-      - run: npm i -g @antfu/ni
-
-      - name: install dependencies
-        run: nci
+      - name: Setup Node and Install Dependencies
+        uses: ./.github/actions/setup-node-and-install
 
       - name: lint
         run: nr lint

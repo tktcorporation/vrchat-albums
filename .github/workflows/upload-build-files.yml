@@ -104,15 +104,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'package.json'
-
-      - run: npm i -g @antfu/ni
-
-      - name: Install dependencies
-        run: nci
+      - name: Setup Node and Install Dependencies
+        uses: ./.github/actions/setup-node-and-install
 
       - name: Build and Publish Electron App
         env:
