@@ -337,12 +337,13 @@ export const settingsRouter = () =>
             }
             return migrationResult;
           })
-          .otherwise(() => {
+          .with(P.instanceOf(neverthrow.Err), () => {
             // Result<T, never> のため、ここには到達しない
             throw new Error(
               'Unreachable: performMigration should never return an error',
             );
-          });
+          })
+          .exhaustive();
       } catch (error) {
         logger.error({
           message: `Failed to perform migration: ${match(error)

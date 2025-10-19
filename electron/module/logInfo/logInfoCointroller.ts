@@ -601,12 +601,13 @@ export const logInfoRouter = () =>
             );
             return sessionDates;
           })
-          .otherwise(() => {
+          .with(P.instanceOf(neverthrow.Err), () => {
             // Result<T, never> のため、ここには到達しない
             throw new Error(
               'Unreachable: searchSessionsByPlayerName should never return an error',
             );
-          });
+          })
+          .exhaustive();
       }),
 
     /**
