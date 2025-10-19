@@ -1,0 +1,34 @@
+name: Test Landing Page Build
+
+on:
+  pull_request:
+    paths:
+      - 'pages/**'
+      - '.github/workflows/deploy-landing-page.yml'
+      - '.github/workflows/test-landing-page-build.yml'
+      - '.github/actions/setup-node-and-install/**'
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node and Install Dependencies
+        uses: ./.github/actions/setup-node-and-install
+
+      - name: Build landing page
+        run: yarn run build:landing
+
+      - name: Verify build output
+        run: |
+          if [ ! -d "./pages/dist" ]; then
+            echo "Error: pages/dist directory was not created"
+            exit 1
+          fi
+          if [ ! -f "./pages/dist/index.html" ]; then
+            echo "Error: pages/dist/index.html was not created"
+            exit 1
+          fi
+          echo "✓ Landing page build successful"
