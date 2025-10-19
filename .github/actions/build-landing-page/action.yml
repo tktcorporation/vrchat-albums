@@ -4,24 +4,13 @@ description: 'Build the landing page and verify output'
 runs:
   using: 'composite'
   steps:
-    - name: Ensure .pnp.cjs exists
-      shell: bash
-      run: |
-        cd "${GITHUB_WORKSPACE}"
-        if [ ! -f ".pnp.cjs" ]; then
-          echo "⚠️ .pnp.cjs not found. Running yarn install to generate it..."
-          yarn install --immutable
-          echo "✓ yarn install completed"
-          ls -la .pnp.cjs 2>/dev/null || echo "ERROR: .pnp.cjs still not found after yarn install"
-        else
-          echo "✓ .pnp.cjs found"
-        fi
-
     - name: Build landing page
       shell: bash
       run: |
         cd "${GITHUB_WORKSPACE}"
-        yarn run build:landing
+        # Use nr (from @antfu/ni) which is already installed globally
+        # This avoids yarn workspace state file issues in GitHub Actions PR environment
+        nr build:landing
 
     - name: Verify build output
       shell: bash
