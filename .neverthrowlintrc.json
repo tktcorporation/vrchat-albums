@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "rules": [
+    {
+      "name": "Service layer must use neverthrow Result type",
+      "path": "electron/module/**/service.ts",
+      "enforceResult": true,
+      "apply": "async-functions",
+      "exceptions": [
+        "getAppVersion",
+        "clearMigrationCache",
+        "clearAllStoredSettings",
+        "clearStoredSetting",
+        "getApplicationLogPath",
+        "installUpdate",
+        "handlePngBase64WithCallback",
+        "showSavePngDialog",
+        "saveFileToPath",
+        "getStoredVRChatLogFilesDirPath",
+        "getVRChatLogFileDir",
+        "getVRChatLogFilesDir",
+        "createVRChatWorldJoinLogFromPhoto",
+        "findVRChatWorldJoinLogFromPhotoList",
+        "getVRChaLogInfoByLogFilePathListWithPartialSuccess",
+        "getElectronUpdaterInfo",
+        "createVRChatWorldJoinLogModel",
+        "findAllVRChatWorldJoinLogList",
+        "findVRChatWorldJoinLogList",
+        "performMigrationIfNeeded",
+        "isMigrationNeeded",
+        "syncLogsInBackground",
+        "findLatestWorldJoinLog",
+        "findNextVRChatWorldJoinLog",
+        "findRecentVRChatWorldJoinLog",
+        "getFrequentPlayerNames",
+        "_getLogStoreFilePaths",
+        "getOldAppUserDataPath",
+        "getPlayerNameSuggestions",
+        "getWorldNameSuggestions",
+        "processQueue",
+        "searchSessionsByPlayerName",
+        "copyImageByBase64",
+        "getVrcUserInfoByUserName",
+        "newLogs",
+        "latestPhotoDate",
+        "importResult"
+      ]
+    }
+  ]
+}

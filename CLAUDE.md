@@ -87,6 +87,12 @@
         <map category="DATABASE_ERROR" variant="destructive" jp="重大エラー"/>
         <map category="NETWORK_ERROR" variant="destructive" jp="重大エラー"/>
       </toast-variant-mapping>
+      <lint-enforcement>
+        <command>yarn lint:neverthrow</command>
+        <description>Enforces Result type usage in service layer functions</description>
+        <config-file>.neverthrowlintrc.json</config-file>
+        <reference>docs/lint-neverthrow.md</reference>
+      </lint-enforcement>
     </pattern>
 
     <pattern name="ts-pattern Usage" priority="critical" jp="型安全・表現力向上必須">
