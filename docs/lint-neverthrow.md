@@ -193,11 +193,87 @@ export async function getWorldNameSuggestions(
 
 ## リンターの仕組み
 
+このリンターは2種類のチェックを実行します:
+
+### 1. Result型の強制チェック
+
 1. TypeScript Compiler APIを使用してソースコードを解析
 2. 設定ファイルのルールに一致するファイルを検査
 3. 各関数の戻り値の型を確認
 4. `Result<T, E>` または `Promise<Result<T, E>>` を返しているかチェック
 5. 違反を検出したらエラーを報告
+
+### 2. catch-errアンチパターンの検出
+
+Result型を返す関数に対して、以下のアンチパターンを検出します:
+
+- `catch` ブロック内でエラーを `err()` でラップしているが、エラーの分類を行っていない
+- エラーの分類とは:
+  - `match()` や `if` 文でエラーの種類（エラーコード、型など）を判定すること
+  - **注意**: `instanceof Error` だけのチェックは分類とみなされません
+  - または予期しないエラーを `throw` で再スローすること
+
+#### アンチパターンの例
+
+```typescript
+// ❌ Bad: エラーの分類なしでそのままラップ
+try {
+  const result = await someOperation();
+  return ok(result);
+} catch (error) {
+  // instanceof Error だけのチェックは分類ではない
+  return err(
+    match(error)
+      .with(P.instanceOf(Error), (err) => err)
+      .otherwise(() => new Error('Unknown error'))
+  );
+}
+```
+
+#### 正しい実装
+
+```typescript
+// ✅ Good: エラーコード/タイプで分類
+try {
+  const result = await someOperation();
+  return ok(result);
+} catch (error) {
+  return match(error)
+    .with({ code: 'ENOENT' }, (e) =>
+      err({ type: 'FILE_NOT_FOUND', message: e.message })
+    )
+    .with({ code: 'EACCES' }, (e) =>
+      err({ type: 'PERMISSION_DENIED', message: e.message })
+    )
+    .otherwise((e) => {
+      // 予期しないエラーはre-throw
+      throw e;
+    });
+}
+```
+
+### ⚠️ 要注意: 汎用的なエラー型
+
+`Result<T, Error>`、`Result<T, any>`、`Result<T, unknown>` のように、エラー型が汎用的な場合は特に注意が必要です。これらは適切なエラー分類が行われていない兆候である可能性があります。
+
+理想的には、エラー型は具体的な型（ユニオン型など）であるべきです:
+
+```typescript
+// ✅ Good: 具体的なエラー型
+type MyFunctionError =
+  | { type: 'FILE_NOT_FOUND'; path: string }
+  | { type: 'VALIDATION_ERROR'; message: string }
+  | { type: 'PERMISSION_DENIED'; resource: string };
+
+export function myFunction(): Result<Data, MyFunctionError> {
+  // ...
+}
+
+// ❌ Bad: 汎用的なエラー型
+export function myFunction(): Result<Data, Error> {
+  // ...
+}
+```
 
 ## テスト
 

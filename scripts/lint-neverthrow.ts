@@ -161,6 +161,36 @@ class NeverthrowLinter {
               ruleName: rule.name,
             });
           }
+        } else {
+          // If function returns Result type, check for generic error types
+          const hasGenericError = this.hasGenericErrorType(node);
+          if (hasGenericError) {
+            const { line, character } =
+              sourceFile.getLineAndCharacterOfPosition(node.getStart());
+            const functionNameDisplay = functionName || '(anonymous)';
+
+            const isDuplicate = this.issues.some(
+              (issue) =>
+                issue.file === sourceFile.fileName &&
+                issue.line === line + 1 &&
+                issue.column === character + 1 &&
+                issue.ruleName === 'Generic error type',
+            );
+
+            if (!isDuplicate) {
+              this.issues.push({
+                file: sourceFile.fileName,
+                line: line + 1,
+                column: character + 1,
+                message: `Function '${functionNameDisplay}' uses generic error type (Error, any, or unknown). Use specific error union types for proper error classification.`,
+                severity: 'warning',
+                ruleName: 'Generic error type',
+              });
+            }
+          }
+
+          // If function returns Result type, check for catch-err anti-pattern
+          this.checkCatchBlockAntiPattern(node, sourceFile, functionName);
         }
       }
     }
@@ -263,10 +293,133 @@ class NeverthrowLinter {
 
     return false;
   }
+
+  /**
+   * Check if Result type uses generic error types (Error, any, unknown)
+   * These are red flags indicating improper error classification
+   */
+  private hasGenericErrorType(
+    node: ts.FunctionDeclaration | ts.ArrowFunction,
+  ): boolean {
+    if (!node.type) return false;
+
+    const typeText = node.type.getText();
+
+    // Extract error type from Result<T, E> or Promise<Result<T, E>>
+    // Match patterns like Result<string, Error>, Result<Data, any>, etc.
+    const resultPattern =
+      /(?:neverthrow\.)?(?:Result|ResultAsync)<[^,>]+,\s*([^>]+)>/;
+    const match = typeText.match(resultPattern);
+
+    if (!match) return false;
+
+    const errorType = match[1].trim();
+
+    // Check if error type is generic
+    return (
+      errorType === 'Error' ||
+      errorType === 'any' ||
+      errorType === 'unknown' ||
+      // Also catch wrapped versions
+      errorType === 'Promise<Error>' ||
+      errorType === 'Promise<any>' ||
+      errorType === 'Promise<unknown>'
+    );
+  }
+
+  /**
+   * Check for anti-pattern: catching errors and wrapping them in err() without classification
+   */
+  private checkCatchBlockAntiPattern(
+    node: ts.FunctionDeclaration | ts.ArrowFunction,
+    sourceFile: ts.SourceFile,
+    functionName: string | undefined,
+  ) {
+    if (!node.body) return;
+
+    const visit = (n: ts.Node) => {
+      // Look for try-catch statements
+      if (ts.isTryStatement(n) && n.catchClause) {
+        const catchClause = n.catchClause;
+        const catchBlock = catchClause.block;
+
+        // Check if catch block contains err() call without error classification
+        let hasErrCall = false;
+        let hasThrow = false;
+        let hasIfStatement = false;
+
+        const visitCatchBlock = (catchNode: ts.Node) => {
+          // Check for err() or neverthrow.err() calls
+          if (ts.isCallExpression(catchNode)) {
+            const expr = catchNode.expression;
+            if (
+              (ts.isIdentifier(expr) && expr.text === 'err') ||
+              (ts.isPropertyAccessExpression(expr) &&
+                expr.name.text === 'err' &&
+                ts.isIdentifier(expr.expression) &&
+                expr.expression.text === 'neverthrow')
+            ) {
+              hasErrCall = true;
+            }
+          }
+
+          // Check for throw statements
+          if (ts.isThrowStatement(catchNode)) {
+            hasThrow = true;
+          }
+
+          // Check for if statements (error classification)
+          if (ts.isIfStatement(catchNode)) {
+            hasIfStatement = true;
+          }
+
+          ts.forEachChild(catchNode, visitCatchBlock);
+        };
+
+        ts.forEachChild(catchBlock, visitCatchBlock);
+
+        // Report issue if err() is called without proper error classification
+        // Even if match() exists, if it's only checking instanceof Error, it's not real classification
+        if (hasErrCall && !hasThrow && !hasIfStatement) {
+          const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+            catchBlock.getStart(),
+          );
+          const functionNameDisplay = functionName || '(anonymous)';
+
+          // Avoid duplicate issues
+          const isDuplicate = this.issues.some(
+            (issue) =>
+              issue.file === sourceFile.fileName &&
+              issue.line === line + 1 &&
+              issue.column === character + 1 &&
+              issue.ruleName === 'No catch-err anti-pattern',
+          );
+
+          if (!isDuplicate) {
+            this.issues.push({
+              file: sourceFile.fileName,
+              line: line + 1,
+              column: character + 1,
+              message: `Function '${functionNameDisplay}' catches errors and wraps them in err() without proper classification. Expected errors should be classified by error type/code (not just instanceof Error), unexpected errors should be re-thrown.`,
+              severity: 'error',
+              ruleName: 'No catch-err anti-pattern',
+            });
+          }
+        }
+      }
+
+      ts.forEachChild(n, visit);
+    };
+
+    ts.forEachChild(node.body, visit);
+  }
 }
 
-async function loadConfig(): Promise<NeverthrowLintConfig> {
-  const configPath = path.join(process.cwd(), '.neverthrowlintrc.json');
+async function loadConfig(
+  customConfigPath?: string,
+): Promise<NeverthrowLintConfig> {
+  const configPath =
+    customConfigPath || path.join(process.cwd(), '.neverthrowlintrc.json');
 
   if (!fs.existsSync(configPath)) {
     consola.warn('No .neverthrowlintrc.json found, using default config');
@@ -290,7 +443,15 @@ async function loadConfig(): Promise<NeverthrowLintConfig> {
 async function main() {
   consola.start('Linting neverthrow usage...');
 
-  const config = await loadConfig();
+  // Parse command line arguments
+  const args = process.argv.slice(2);
+  const configIndex = args.indexOf('--config');
+  const customConfigPath =
+    configIndex !== -1 && args[configIndex + 1]
+      ? args[configIndex + 1]
+      : undefined;
+
+  const config = await loadConfig(customConfigPath);
 
   // Collect all unique path patterns
   const patterns = new Set<string>();

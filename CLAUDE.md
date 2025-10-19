@@ -148,10 +148,27 @@
 
       <lint-enforcement>
         <command>yarn lint:neverthrow</command>
-        <description>Enforces Result type usage in service layer functions</description>
+        <description>Enforces Result type usage in service layer functions and detects anti-patterns</description>
         <config-file>.neverthrowlintrc.json</config-file>
         <reference>docs/lint-neverthrow.md</reference>
         <best-practice-warning>Linter output includes reminder about expected vs unexpected errors</best-practice-warning>
+
+        <checks>
+          <check name="Result type enforcement">
+            Ensures configured functions return Result&lt;T, E&gt; or Promise&lt;Result&lt;T, E&gt;&gt;
+          </check>
+          <check name="catch-err anti-pattern detection" priority="critical">
+            Detects catch blocks that wrap errors in err() without proper classification.
+            Error classification means:
+            - Using match()/if to check error code/type (NOT just instanceof Error)
+            - OR re-throwing unexpected errors with throw
+          </check>
+        </checks>
+
+        <generic-error-types-warning jp="要注意">
+          Result&lt;T, Error&gt;, Result&lt;T, any&gt;, Result&lt;T, unknown&gt; are red flags.
+          Use specific error union types instead for proper error handling.
+        </generic-error-types-warning>
       </lint-enforcement>
     </pattern>
 
