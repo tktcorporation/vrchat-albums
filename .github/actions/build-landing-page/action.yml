@@ -6,10 +6,12 @@ runs:
   steps:
     - name: Build landing page
       shell: bash
+      working-directory: ${{ github.workspace }}
       run: yarn run build:landing
 
     - name: Verify build output
       shell: bash
+      working-directory: ${{ github.workspace }}
       run: |
         if [ ! -d "./pages/dist" ]; then
           echo "Error: pages/dist directory was not created"
