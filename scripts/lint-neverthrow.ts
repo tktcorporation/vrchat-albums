@@ -182,7 +182,7 @@ class NeverthrowLinter {
                 file: sourceFile.fileName,
                 line: line + 1,
                 column: character + 1,
-                message: `Function '${functionNameDisplay}' uses generic error type (Error, any, or unknown). Use specific error union types for proper error classification.`,
+                message: `Function '${functionNameDisplay}' uses generic error type (Error, any, or unknown). Use specific error union types for proper error classification. Exception: If error is logged to Sentry with logger.error() before returning, generic Error type is acceptable.`,
                 severity: 'warning',
                 ruleName: 'Generic error type',
               });
@@ -498,6 +498,12 @@ async function main() {
     );
     consola.info(
       '   Unexpected errors should be re-thrown to ensure Sentry reporting.',
+    );
+    consola.info(
+      '   Exception: If error is logged with logger.error() before returning,',
+    );
+    consola.info(
+      '   generic Error type is acceptable (Sentry-notified error).',
     );
     consola.info('   See: docs/lint-neverthrow.md for best practices.');
     process.exit(0);

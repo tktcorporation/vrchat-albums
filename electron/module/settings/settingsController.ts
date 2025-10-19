@@ -315,19 +315,21 @@ export const settingsRouter = () =>
         const { performMigration } = await import('../migration/service');
         const result = await performMigration();
 
-        if (result.isErr()) {
+        // performMigration は Result<MigrationResult, never> を返すため、
+        // エラーは MigrationResult.errors 配列に格納される
+        const migrationResult = result._unsafeUnwrap();
+        if (migrationResult.errors.length > 0) {
           logger.error({
-            message: `Migration failed: ${result.error.message}`,
-            stack: match(result.error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise(() => undefined),
+            message: `Migration failed with errors: ${migrationResult.errors.join(
+              ', ',
+            )}`,
           });
           throw new UserFacingError(
-            `データ移行に失敗しました: ${result.error.message}`,
+            `データ移行に失敗しました: ${migrationResult.errors.join(', ')}`,
           );
         }
 
-        return result.value;
+        return migrationResult;
       } catch (error) {
         logger.error({
           message: `Failed to perform migration: ${match(error)

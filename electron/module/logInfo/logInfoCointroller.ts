@@ -590,28 +590,15 @@ export const logInfoRouter = () =>
         }),
       )
       .query(async ({ input }) => {
+        // searchSessionsByPlayerName は Result<Date[], never> を返すため、
+        // エラーハンドリングは不要（データベースエラーは例外として伝播）
         const result = await searchSessionsByPlayerName(input.playerName);
-        return result.match(
-          (sessionDates) => {
-            logger.debug(
-              `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
-            );
-            return sessionDates;
-          },
-          (error) => {
-            logger.error({
-              message: `Failed to search sessions by player name: ${error}`,
-              stack: error instanceof Error ? error : new Error(String(error)),
-            });
-            throw UserFacingError.withStructuredInfo({
-              code: ERROR_CODES.DATABASE_ERROR,
-              category: ERROR_CATEGORIES.DATABASE_ERROR,
-              message: `Failed to search sessions by player name: ${error}`,
-              userMessage: 'プレイヤー検索中にエラーが発生しました。',
-              cause: error,
-            });
-          },
+        const sessionDates = result._unsafeUnwrap();
+
+        logger.debug(
+          `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
         );
+        return sessionDates;
       }),
 
     /**

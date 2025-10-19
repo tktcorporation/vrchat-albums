@@ -168,6 +168,9 @@
         <generic-error-types-warning jp="要注意">
           Result&lt;T, Error&gt;, Result&lt;T, any&gt;, Result&lt;T, unknown&gt; are red flags.
           Use specific error union types instead for proper error handling.
+
+          Exception: Generic Error type is acceptable if error is logged to Sentry
+          with logger.error() before returning (Sentry-notified error pattern).
         </generic-error-types-warning>
       </lint-enforcement>
     </pattern>

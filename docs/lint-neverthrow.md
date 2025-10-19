@@ -269,11 +269,31 @@ export function myFunction(): Result<Data, MyFunctionError> {
   // ...
 }
 
-// ❌ Bad: 汎用的なエラー型
+// ⚠️ 可能な限り避ける: 汎用的なエラー型
 export function myFunction(): Result<Data, Error> {
   // ...
 }
 ```
+
+#### 例外: Sentry通知済みエラー
+
+ただし、以下のケースでは `Error` 型の使用が許容されます：
+
+```typescript
+// ✅ 許容: logger.error()でSentryに通知済みのエラー
+export async function processData(): Promise<Result<Data, Error>> {
+  try {
+    const result = await complexOperation();
+    return ok(result);
+  } catch (error) {
+    // Sentryに通知してからErrorとして返す
+    logger.error('Unexpected error in processData', error);
+    return err(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+```
+
+**重要**: このパターンを使う場合でも、可能であれば予期されたエラーは具体的な型で分類し、予期しないエラーのみをSentry通知してから返すようにしてください。
 
 ## テスト
 

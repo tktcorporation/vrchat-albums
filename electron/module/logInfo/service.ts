@@ -458,7 +458,7 @@ export async function loadLogInfoIndexFromVRChatLog({
 export const getWorldNameSuggestions = async (
   query: string,
   limit: number,
-): Promise<neverthrow.Result<string[], Error>> => {
+): Promise<neverthrow.Result<string[], never>> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
     attributes: ['worldName'],
@@ -484,7 +484,7 @@ export const getWorldNameSuggestions = async (
 export const getPlayerNameSuggestions = async (
   query: string,
   limit: number,
-): Promise<neverthrow.Result<string[], Error>> => {
+): Promise<neverthrow.Result<string[], never>> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
     attributes: ['playerName'],
@@ -508,7 +508,7 @@ export const getPlayerNameSuggestions = async (
  */
 export const getFrequentPlayerNames = async (
   limit: number,
-): Promise<neverthrow.Result<string[], Error>> => {
+): Promise<neverthrow.Result<string[], never>> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   const playerCounts = await VRChatPlayerJoinLogModel.findAll({
     attributes: ['playerName', [fn('COUNT', col('playerName')), 'count']],
@@ -531,7 +531,7 @@ export const getFrequentPlayerNames = async (
  */
 export const searchSessionsByPlayerName = async (
   playerName: string,
-): Promise<neverthrow.Result<Date[], Error>> => {
+): Promise<neverthrow.Result<Date[], never>> => {
   const startTime = performance.now();
 
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
