@@ -57,7 +57,7 @@ export default defineConfig({
     timeout: 60000,
     env: {
       NODE_OPTIONS: `--max-old-space-size=${
-        process.env.PLAYWRIGHT_MAX_MEMORY || '4096'
+        process.env.PLAYWRIGHT_MAX_MEMORY || '2048'
       }`,
     },
   },

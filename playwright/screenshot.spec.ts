@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const XVFB_STARTUP_DELAY_MS = 1000; // Xvfb起動待機時間
 const SERVER_CHECK_INTERVAL_MS = 1000; // サーバーチェック間隔
 const SERVER_MAX_ATTEMPTS = 10; // サーバーチェック最大試行回数
-const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY || '4096'; // メモリ上限設定
+const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY || '2048'; // メモリ上限設定（デフォルト2GB）
 
 const launchElectronApp = async () => {
   // Start Xvfb if not running

@@ -63,7 +63,7 @@ export const ShareDialog = ({
     trpcReact.vrchatApi.convertImageToBase64.useQuery(imageUrl || '', {
       enabled: !!imageUrl && isOpen,
       staleTime: 1000 * 60 * 5, // 5分間キャッシュ
-      cacheTime: 1000 * 60 * 30, // 30分間キャッシュを保持
+      gcTime: 1000 * 60 * 30, // 30分間キャッシュを保持
     });
 
   const copyImageMutation =
