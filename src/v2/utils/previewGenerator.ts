@@ -7,7 +7,7 @@ interface GeneratePreviewParams {
 
 import { P, match } from 'ts-pattern';
 import { extractDominantColorsFromBase64 } from './colorExtractor';
-import { loadInterFonts } from './fontLoader';
+import { renderSvgToCanvas } from './svgToCanvas';
 
 /**
  * プレイヤー名リストを SVG 用に整形する内部関数。
@@ -341,39 +341,6 @@ export async function generatePreviewPng(
 ): Promise<string> {
   const { svg, height } = await generatePreviewSvg(params);
 
-  // SVGをデータURLに変換
-  const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-  const svgUrl = URL.createObjectURL(svgBlob);
-
-  try {
-    // フォントを読み込む
-    await loadInterFonts();
-
-    // SVGをPNGに変換
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = svgUrl;
-    await new Promise<void>((resolve) => {
-      img.onload = () => resolve();
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 800 * 2; // 2倍のサイズで描画
-    canvas.height = height * 2;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Failed to get canvas context');
-    }
-
-    // 背景を白に設定
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 画像を描画
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    return canvas.toDataURL('image/png').split(',')[1];
-  } finally {
-    URL.revokeObjectURL(svgUrl);
-  }
+  const canvas = await renderSvgToCanvas(svg, 800, height);
+  return canvas.toDataURL('image/png').split(',')[1];
 }
