@@ -26,7 +26,7 @@ jobs:
         uses: ./.github/actions/setup-node-and-install
 
       - name: Build landing page
-        run: nr build:landing
+        run: yarn run build:landing
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
