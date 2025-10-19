@@ -6,11 +6,10 @@ runs:
   steps:
     - name: Build landing page
       shell: bash
+      working-directory: ./pages
       run: |
-        cd "${GITHUB_WORKSPACE}"
-        # Use nr (from @antfu/ni) which is already installed globally
-        # This avoids yarn workspace state file issues in GitHub Actions PR environment
-        nr build:landing
+        # Run build commands directly with npx to avoid yarn workspace state file issues
+        npx tsc -b && npx vite build
 
     - name: Verify build output
       shell: bash
