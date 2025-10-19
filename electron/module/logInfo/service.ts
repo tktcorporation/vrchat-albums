@@ -459,29 +459,20 @@ export const getWorldNameSuggestions = async (
   query: string,
   limit: number,
 ): Promise<neverthrow.Result<string[], Error>> => {
-  try {
-    const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
-      attributes: ['worldName'],
-      where: {
-        worldName: {
-          [Op.like]: `%${query}%`,
-        },
+  // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
+  const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
+    attributes: ['worldName'],
+    where: {
+      worldName: {
+        [Op.like]: `%${query}%`,
       },
-      group: ['worldName'],
-      order: [['worldName', 'ASC']],
-      limit,
-    });
+    },
+    group: ['worldName'],
+    order: [['worldName', 'ASC']],
+    limit,
+  });
 
-    return neverthrow.ok(worldJoinLogs.map((log) => log.worldName));
-  } catch (error) {
-    logger.error({
-      message: `Error getting world name suggestions: ${error}`,
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-    return neverthrow.err(
-      error instanceof Error ? error : new Error(String(error)),
-    );
-  }
+  return neverthrow.ok(worldJoinLogs.map((log) => log.worldName));
 };
 
 /**
@@ -494,29 +485,20 @@ export const getPlayerNameSuggestions = async (
   query: string,
   limit: number,
 ): Promise<neverthrow.Result<string[], Error>> => {
-  try {
-    const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
-      attributes: ['playerName'],
-      where: {
-        playerName: {
-          [Op.like]: `%${query}%`,
-        },
+  // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
+  const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
+    attributes: ['playerName'],
+    where: {
+      playerName: {
+        [Op.like]: `%${query}%`,
       },
-      group: ['playerName'],
-      order: [['playerName', 'ASC']],
-      limit,
-    });
+    },
+    group: ['playerName'],
+    order: [['playerName', 'ASC']],
+    limit,
+  });
 
-    return neverthrow.ok(playerJoinLogs.map((log) => log.playerName));
-  } catch (error) {
-    logger.error({
-      message: `Error getting player name suggestions: ${error}`,
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-    return neverthrow.err(
-      error instanceof Error ? error : new Error(String(error)),
-    );
-  }
+  return neverthrow.ok(playerJoinLogs.map((log) => log.playerName));
 };
 
 /**
@@ -527,24 +509,15 @@ export const getPlayerNameSuggestions = async (
 export const getFrequentPlayerNames = async (
   limit: number,
 ): Promise<neverthrow.Result<string[], Error>> => {
-  try {
-    const playerCounts = await VRChatPlayerJoinLogModel.findAll({
-      attributes: ['playerName', [fn('COUNT', col('playerName')), 'count']],
-      group: ['playerName'],
-      order: [[literal('count'), 'DESC']],
-      limit,
-    });
+  // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
+  const playerCounts = await VRChatPlayerJoinLogModel.findAll({
+    attributes: ['playerName', [fn('COUNT', col('playerName')), 'count']],
+    group: ['playerName'],
+    order: [[literal('count'), 'DESC']],
+    limit,
+  });
 
-    return neverthrow.ok(playerCounts.map((player) => player.playerName));
-  } catch (error) {
-    logger.error({
-      message: `Error getting frequent player names: ${error}`,
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-    return neverthrow.err(
-      error instanceof Error ? error : new Error(String(error)),
-    );
-  }
+  return neverthrow.ok(playerCounts.map((player) => player.playerName));
 };
 
 /**
@@ -561,70 +534,61 @@ export const searchSessionsByPlayerName = async (
 ): Promise<neverthrow.Result<Date[], Error>> => {
   const startTime = performance.now();
 
-  try {
-    // プレイヤー名で部分一致検索（大文字小文字を区別しない）
-    const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
+  // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
+  // プレイヤー名で部分一致検索（大文字小文字を区別しない）
+  const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
+    where: {
+      playerName: {
+        [Op.like]: `%${playerName}%`,
+      },
+    },
+    order: [['joinDateTime', 'DESC']],
+  });
+
+  if (playerJoinLogs.length === 0) {
+    logger.debug(
+      `searchSessionsByPlayerName: No players found for query "${playerName}"`,
+    );
+    return neverthrow.ok([]);
+  }
+
+  // 各プレイヤー参加ログに対して、対応するワールド参加ログを探す
+  const sessionJoinDates: Date[] = [];
+  const processedWorldJoins = new Set<string>();
+
+  for (const playerLog of playerJoinLogs) {
+    // このプレイヤーが参加した時点での最新のワールド参加ログを取得
+    const worldJoinLog = await VRChatWorldJoinLogModel.findOne({
       where: {
-        playerName: {
-          [Op.like]: `%${playerName}%`,
+        joinDateTime: {
+          [Op.lte]: playerLog.joinDateTime,
         },
       },
       order: [['joinDateTime', 'DESC']],
     });
 
-    if (playerJoinLogs.length === 0) {
-      logger.debug(
-        `searchSessionsByPlayerName: No players found for query "${playerName}"`,
-      );
-      return neverthrow.ok([]);
-    }
+    if (worldJoinLog) {
+      const worldJoinKey = worldJoinLog.joinDateTime.toISOString();
 
-    // 各プレイヤー参加ログに対して、対応するワールド参加ログを探す
-    const sessionJoinDates: Date[] = [];
-    const processedWorldJoins = new Set<string>();
-
-    for (const playerLog of playerJoinLogs) {
-      // このプレイヤーが参加した時点での最新のワールド参加ログを取得
-      const worldJoinLog = await VRChatWorldJoinLogModel.findOne({
-        where: {
-          joinDateTime: {
-            [Op.lte]: playerLog.joinDateTime,
-          },
-        },
-        order: [['joinDateTime', 'DESC']],
-      });
-
-      if (worldJoinLog) {
-        const worldJoinKey = worldJoinLog.joinDateTime.toISOString();
-
-        // 同じワールドセッションを重複して追加しないようにする
-        if (!processedWorldJoins.has(worldJoinKey)) {
-          processedWorldJoins.add(worldJoinKey);
-          sessionJoinDates.push(worldJoinLog.joinDateTime);
-        }
+      // 同じワールドセッションを重複して追加しないようにする
+      if (!processedWorldJoins.has(worldJoinKey)) {
+        processedWorldJoins.add(worldJoinKey);
+        sessionJoinDates.push(worldJoinLog.joinDateTime);
       }
     }
-
-    const endTime = performance.now();
-    logger.debug(
-      `searchSessionsByPlayerName: Found ${
-        sessionJoinDates.length
-      } unique sessions for player "${playerName}" in ${(
-        endTime - startTime
-      ).toFixed(2)}ms`,
-    );
-
-    // 新しい順にソートして返す
-    return neverthrow.ok(
-      sessionJoinDates.sort((a, b) => b.getTime() - a.getTime()),
-    );
-  } catch (error) {
-    logger.error({
-      message: `Error searching sessions by player name: ${error}`,
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-    return neverthrow.err(
-      error instanceof Error ? error : new Error(String(error)),
-    );
   }
+
+  const endTime = performance.now();
+  logger.debug(
+    `searchSessionsByPlayerName: Found ${
+      sessionJoinDates.length
+    } unique sessions for player "${playerName}" in ${(
+      endTime - startTime
+    ).toFixed(2)}ms`,
+  );
+
+  // 新しい順にソートして返す
+  return neverthrow.ok(
+    sessionJoinDates.sort((a, b) => b.getTime() - a.getTime()),
+  );
 };

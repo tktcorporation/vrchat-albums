@@ -78,7 +78,8 @@ describe('logInfo service', () => {
 
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
-      const result = await getFrequentPlayerNames(3);
+      const resultWrapper = await getFrequentPlayerNames(3);
+      const result = resultWrapper._unsafeUnwrap();
 
       // 頻度順（Player1: 3回, Player2: 2回, Player3: 1回）で返されることを確認
       expect(result).toEqual(['Player1', 'Player2', 'Player3']);
@@ -216,14 +217,16 @@ describe('logInfo service', () => {
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
       // 上位2名のみ取得
-      const result = await getFrequentPlayerNames(2);
+      const resultWrapper = await getFrequentPlayerNames(2);
+      const result = resultWrapper._unsafeUnwrap();
 
       expect(result).toHaveLength(2);
       expect(result).toEqual(['Player1', 'Player2']);
     });
 
     it('プレイヤーログが存在しない場合は空配列を返す', async () => {
-      const result = await getFrequentPlayerNames(5);
+      const resultWrapper = await getFrequentPlayerNames(5);
+      const result = resultWrapper._unsafeUnwrap();
 
       expect(result).toEqual([]);
     });
@@ -332,7 +335,8 @@ describe('logInfo service', () => {
         await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
       expect(createdEntries).toHaveLength(4); // 全て異なる時刻なので4つ作成される
 
-      const result = await getFrequentPlayerNames(2);
+      const resultWrapper = await getFrequentPlayerNames(2);
+      const result = resultWrapper._unsafeUnwrap();
 
       // FrequentPlayerは3回、SinglePlayerは1回なので、この順序で返される
       expect(result).toEqual(['FrequentPlayer', 'SinglePlayer']);
