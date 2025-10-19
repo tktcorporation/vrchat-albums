@@ -1,11 +1,5 @@
 {
   "image": "mcr.microsoft.com/devcontainers/base:bookworm",
-  "mounts": [
-    "source=${env:SSH_AUTH_SOCK},target=/ssh-agent,type=bind,readOnly=true"
-  ],
-  "remoteEnv": {
-    "SSH_AUTH_SOCK": "/ssh-agent"
-  },
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/desktop-lite:1": {
@@ -47,11 +41,6 @@
     "install-packages": ["sudo", "apt-get", "install", "-y", "ripgrep", "bc"]
   },
   "postCreateCommand": {
-    "add-new-node-gpg-key": [
-      "bash",
-      "-c",
-      "gpg --keyserver hkps://keyserver.ubuntu.com --recv-keys 5BE8A3F6C8A5C01D106C0AD820B1A390B168D356"
-    ],
     "setup-mise-bash": [
       "bash",
       "-c",

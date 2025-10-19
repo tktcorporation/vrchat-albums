@@ -281,7 +281,7 @@
     "path": "node_modules/@gar/promisify",
     "licenseFile": "node_modules/@gar/promisify/LICENSE.md"
   },
-  "@img/sharp-libvips-linux-arm64@1.0.4": {
+  "@img/sharp-libvips-linux-arm64@1.2.0": {
     "licenses": "LGPL-3.0-or-later",
     "repository": "https://github.com/lovell/sharp-libvips",
     "publisher": "Lovell Fuller",
@@ -289,7 +289,7 @@
     "path": "node_modules/sharp/node_modules/@img/sharp-libvips-linux-arm64",
     "licenseFile": "node_modules/sharp/node_modules/@img/sharp-libvips-linux-arm64/README.md"
   },
-  "@img/sharp-linux-arm64@0.33.5": {
+  "@img/sharp-linux-arm64@0.34.3": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/lovell/sharp",
     "publisher": "Lovell Fuller",
@@ -390,12 +390,19 @@
     "path": "node_modules/@npmcli/move-file",
     "licenseFile": "node_modules/@npmcli/move-file/LICENSE.md"
   },
-  "@opentelemetry/api-logs@0.57.2": {
+  "@opentelemetry/api-logs@0.203.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/api-logs",
     "licenseFile": "node_modules/@opentelemetry/api-logs/LICENSE"
+  },
+  "@opentelemetry/api-logs@0.57.2": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/open-telemetry/opentelemetry-js",
+    "publisher": "OpenTelemetry Authors",
+    "path": "node_modules/@prisma/instrumentation/node_modules/@opentelemetry/api-logs",
+    "licenseFile": "node_modules/@prisma/instrumentation/node_modules/@opentelemetry/api-logs/LICENSE"
   },
   "@opentelemetry/api@1.9.0": {
     "licenses": "Apache-2.0",
@@ -404,208 +411,215 @@
     "path": "node_modules/@opentelemetry/api",
     "licenseFile": "node_modules/@opentelemetry/api/LICENSE"
   },
-  "@opentelemetry/context-async-hooks@1.30.1": {
+  "@opentelemetry/context-async-hooks@2.1.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/context-async-hooks",
     "licenseFile": "node_modules/@opentelemetry/context-async-hooks/LICENSE"
   },
-  "@opentelemetry/core@1.30.1": {
+  "@opentelemetry/core@2.0.1": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/open-telemetry/opentelemetry-js",
+    "publisher": "OpenTelemetry Authors",
+    "path": "node_modules/@opentelemetry/instrumentation-http/node_modules/@opentelemetry/core",
+    "licenseFile": "node_modules/@opentelemetry/instrumentation-http/node_modules/@opentelemetry/core/LICENSE"
+  },
+  "@opentelemetry/core@2.1.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/core",
     "licenseFile": "node_modules/@opentelemetry/core/LICENSE"
   },
-  "@opentelemetry/instrumentation-amqplib@0.46.1": {
+  "@opentelemetry/instrumentation-amqplib@0.50.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-amqplib",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-amqplib/LICENSE"
   },
-  "@opentelemetry/instrumentation-connect@0.43.1": {
+  "@opentelemetry/instrumentation-connect@0.47.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-connect",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-connect/LICENSE"
   },
-  "@opentelemetry/instrumentation-dataloader@0.16.1": {
+  "@opentelemetry/instrumentation-dataloader@0.21.1": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-dataloader",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-dataloader/LICENSE"
   },
-  "@opentelemetry/instrumentation-express@0.47.1": {
+  "@opentelemetry/instrumentation-express@0.52.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-express",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-express/LICENSE"
   },
-  "@opentelemetry/instrumentation-fs@0.19.1": {
+  "@opentelemetry/instrumentation-fs@0.23.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-fs",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-fs/LICENSE"
   },
-  "@opentelemetry/instrumentation-generic-pool@0.43.1": {
+  "@opentelemetry/instrumentation-generic-pool@0.47.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-generic-pool",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-generic-pool/LICENSE"
   },
-  "@opentelemetry/instrumentation-graphql@0.47.1": {
+  "@opentelemetry/instrumentation-graphql@0.51.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-graphql",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-graphql/LICENSE"
   },
-  "@opentelemetry/instrumentation-hapi@0.45.2": {
+  "@opentelemetry/instrumentation-hapi@0.50.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-hapi",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-hapi/LICENSE"
   },
-  "@opentelemetry/instrumentation-http@0.57.2": {
+  "@opentelemetry/instrumentation-http@0.203.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-http",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-http/LICENSE"
   },
-  "@opentelemetry/instrumentation-ioredis@0.47.1": {
+  "@opentelemetry/instrumentation-ioredis@0.51.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-ioredis",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-ioredis/LICENSE"
   },
-  "@opentelemetry/instrumentation-kafkajs@0.7.1": {
+  "@opentelemetry/instrumentation-kafkajs@0.13.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-kafkajs",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-kafkajs/LICENSE"
   },
-  "@opentelemetry/instrumentation-knex@0.44.1": {
+  "@opentelemetry/instrumentation-knex@0.48.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-knex",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-knex/LICENSE"
   },
-  "@opentelemetry/instrumentation-koa@0.47.1": {
+  "@opentelemetry/instrumentation-koa@0.51.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-koa",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-koa/LICENSE"
   },
-  "@opentelemetry/instrumentation-lru-memoizer@0.44.1": {
+  "@opentelemetry/instrumentation-lru-memoizer@0.48.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-lru-memoizer",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-lru-memoizer/LICENSE"
   },
-  "@opentelemetry/instrumentation-mongodb@0.52.0": {
+  "@opentelemetry/instrumentation-mongodb@0.56.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-mongodb",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-mongodb/LICENSE"
   },
-  "@opentelemetry/instrumentation-mongoose@0.46.1": {
+  "@opentelemetry/instrumentation-mongoose@0.50.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-mongoose",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-mongoose/LICENSE"
   },
-  "@opentelemetry/instrumentation-mysql2@0.45.2": {
+  "@opentelemetry/instrumentation-mysql2@0.50.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-mysql2",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-mysql2/LICENSE"
   },
-  "@opentelemetry/instrumentation-mysql@0.45.1": {
+  "@opentelemetry/instrumentation-mysql@0.49.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-mysql",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-mysql/LICENSE"
   },
-  "@opentelemetry/instrumentation-pg@0.51.1": {
+  "@opentelemetry/instrumentation-pg@0.55.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-pg",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-pg/LICENSE"
   },
-  "@opentelemetry/instrumentation-redis-4@0.46.1": {
+  "@opentelemetry/instrumentation-redis@0.51.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/instrumentation-redis-4",
-    "licenseFile": "node_modules/@opentelemetry/instrumentation-redis-4/LICENSE"
+    "path": "node_modules/@opentelemetry/instrumentation-redis",
+    "licenseFile": "node_modules/@opentelemetry/instrumentation-redis/LICENSE"
   },
-  "@opentelemetry/instrumentation-tedious@0.18.1": {
+  "@opentelemetry/instrumentation-tedious@0.22.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-tedious",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-tedious/LICENSE"
   },
-  "@opentelemetry/instrumentation-undici@0.10.1": {
+  "@opentelemetry/instrumentation-undici@0.14.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation-undici",
     "licenseFile": "node_modules/@opentelemetry/instrumentation-undici/LICENSE"
   },
-  "@opentelemetry/instrumentation@0.57.2": {
+  "@opentelemetry/instrumentation@0.203.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/instrumentation",
     "licenseFile": "node_modules/@opentelemetry/instrumentation/LICENSE"
   },
-  "@opentelemetry/redis-common@0.36.2": {
+  "@opentelemetry/instrumentation@0.57.2": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/open-telemetry/opentelemetry-js",
+    "publisher": "OpenTelemetry Authors",
+    "path": "node_modules/@prisma/instrumentation/node_modules/@opentelemetry/instrumentation",
+    "licenseFile": "node_modules/@prisma/instrumentation/node_modules/@opentelemetry/instrumentation/LICENSE"
+  },
+  "@opentelemetry/redis-common@0.38.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/redis-common",
     "licenseFile": "node_modules/@opentelemetry/redis-common/LICENSE"
   },
-  "@opentelemetry/resources@1.30.1": {
+  "@opentelemetry/resources@2.1.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/resources",
     "licenseFile": "node_modules/@opentelemetry/resources/LICENSE"
   },
-  "@opentelemetry/sdk-trace-base@1.30.1": {
+  "@opentelemetry/sdk-trace-base@2.1.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
     "path": "node_modules/@opentelemetry/sdk-trace-base",
     "licenseFile": "node_modules/@opentelemetry/sdk-trace-base/LICENSE"
-  },
-  "@opentelemetry/semantic-conventions@1.28.0": {
-    "licenses": "Apache-2.0",
-    "repository": "https://github.com/open-telemetry/opentelemetry-js",
-    "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions",
-    "licenseFile": "node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions/LICENSE"
   },
   "@opentelemetry/semantic-conventions@1.34.0": {
     "licenses": "Apache-2.0",
@@ -621,7 +635,14 @@
     "path": "node_modules/@opentelemetry/semantic-conventions",
     "licenseFile": "node_modules/@opentelemetry/semantic-conventions/LICENSE"
   },
-  "@opentelemetry/sql-common@0.40.1": {
+  "@opentelemetry/semantic-conventions@1.37.0": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/open-telemetry/opentelemetry-js",
+    "publisher": "OpenTelemetry Authors",
+    "path": "node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions",
+    "licenseFile": "node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions/LICENSE"
+  },
+  "@opentelemetry/sql-common@0.41.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js-contrib",
     "publisher": "OpenTelemetry Authors",
@@ -642,7 +663,7 @@
     "path": "node_modules/@pkgjs/parseargs",
     "licenseFile": "node_modules/@pkgjs/parseargs/LICENSE"
   },
-  "@prisma/instrumentation@6.11.1": {
+  "@prisma/instrumentation@6.14.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/prisma/prisma",
     "path": "node_modules/@prisma/instrumentation",
@@ -883,49 +904,49 @@
     "path": "node_modules/@rollup/rollup-linux-arm64-gnu",
     "licenseFile": "node_modules/@rollup/rollup-linux-arm64-gnu/README.md"
   },
-  "@sentry-internal/browser-utils@9.45.0": {
+  "@sentry-internal/browser-utils@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry-internal/browser-utils",
     "licenseFile": "node_modules/@sentry-internal/browser-utils/LICENSE"
   },
-  "@sentry-internal/feedback@9.45.0": {
+  "@sentry-internal/feedback@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry-internal/feedback",
     "licenseFile": "node_modules/@sentry-internal/feedback/LICENSE"
   },
-  "@sentry-internal/replay-canvas@9.45.0": {
+  "@sentry-internal/replay-canvas@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry-internal/replay-canvas",
     "licenseFile": "node_modules/@sentry-internal/replay-canvas/LICENSE"
   },
-  "@sentry-internal/replay@9.45.0": {
+  "@sentry-internal/replay@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry-internal/replay",
     "licenseFile": "node_modules/@sentry-internal/replay/LICENSE"
   },
-  "@sentry/babel-plugin-component-annotate@4.1.1": {
+  "@sentry/babel-plugin-component-annotate@4.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/babel-plugin-component-annotate",
     "licenseFile": "node_modules/@sentry/babel-plugin-component-annotate/LICENSE"
   },
-  "@sentry/browser@9.45.0": {
+  "@sentry/browser@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/browser",
     "licenseFile": "node_modules/@sentry/browser/LICENSE"
   },
-  "@sentry/bundler-plugin-core@4.1.1": {
+  "@sentry/bundler-plugin-core@4.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -935,6 +956,12 @@
   "@sentry/cli-linux-arm64@2.52.0": {
     "licenses": "BSD-3-Clause",
     "repository": "https://github.com/getsentry/sentry-cli",
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64/README.md"
+  },
+  "@sentry/cli-linux-arm64@2.53.0": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/getsentry/sentry-cli",
     "path": "node_modules/@sentry/cli-linux-arm64",
     "licenseFile": "node_modules/@sentry/cli-linux-arm64/README.md"
   },
@@ -942,45 +969,52 @@
     "licenses": "BSD-3-Clause",
     "repository": "https://github.com/getsentry/sentry-cli",
     "publisher": "Sentry",
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli/LICENSE"
+  },
+  "@sentry/cli@2.53.0": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/getsentry/sentry-cli",
+    "publisher": "Sentry",
     "path": "node_modules/@sentry/cli",
     "licenseFile": "node_modules/@sentry/cli/LICENSE"
   },
-  "@sentry/core@9.45.0": {
+  "@sentry/core@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/core",
     "licenseFile": "node_modules/@sentry/core/LICENSE"
   },
-  "@sentry/electron@6.10.0": {
+  "@sentry/electron@7.0.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-electron",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/electron",
     "licenseFile": "node_modules/@sentry/electron/LICENSE"
   },
-  "@sentry/node-core@9.45.0": {
+  "@sentry/node-core@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/node-core",
     "licenseFile": "node_modules/@sentry/node-core/LICENSE"
   },
-  "@sentry/node@9.45.0": {
+  "@sentry/node@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/node",
     "licenseFile": "node_modules/@sentry/node/LICENSE"
   },
-  "@sentry/opentelemetry@9.45.0": {
+  "@sentry/opentelemetry@10.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/opentelemetry",
     "licenseFile": "node_modules/@sentry/opentelemetry/LICENSE"
   },
-  "@sentry/vite-plugin@4.1.1": {
+  "@sentry/vite-plugin@4.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -1156,7 +1190,7 @@
     "path": "node_modules/@types/ms",
     "licenseFile": "node_modules/@types/ms/LICENSE"
   },
-  "@types/mysql@2.15.26": {
+  "@types/mysql@2.15.27": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/mysql",
@@ -1187,12 +1221,6 @@
     "licenseFile": "node_modules/@types/pg-pool/LICENSE"
   },
   "@types/pg@8.15.4": {
-    "licenses": "MIT",
-    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
-    "path": "node_modules/@types/pg-pool/node_modules/@types/pg",
-    "licenseFile": "node_modules/@types/pg-pool/node_modules/@types/pg/LICENSE"
-  },
-  "@types/pg@8.6.1": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/pg",
@@ -1934,7 +1962,7 @@
     "path": "node_modules/electron-is-dev",
     "licenseFile": "node_modules/electron-is-dev/license"
   },
-  "electron-log@5.4.2": {
+  "electron-log@5.4.3": {
     "licenses": "MIT",
     "repository": "https://github.com/megahertz/electron-log",
     "publisher": "Alexey Prokhorov",
@@ -2908,7 +2936,7 @@
     "path": "node_modules/sqlite3/node_modules/lru-cache",
     "licenseFile": "node_modules/sqlite3/node_modules/lru-cache/LICENSE"
   },
-  "lucide-react@0.539.0": {
+  "lucide-react@0.542.0": {
     "licenses": "ISC",
     "repository": "https://github.com/lucide-icons/lucide",
     "publisher": "Eric Fennis",
@@ -3449,7 +3477,7 @@
     "path": "node_modules/path-scurry",
     "licenseFile": "node_modules/path-scurry/LICENSE.md"
   },
-  "pathe@1.1.2": {
+  "pathe@2.0.3": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/pathe",
     "path": "node_modules/pathe",
@@ -3978,7 +4006,7 @@
     "path": "node_modules/set-blocking",
     "licenseFile": "node_modules/set-blocking/LICENSE.txt"
   },
-  "sharp@0.33.5": {
+  "sharp@0.34.3": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/lovell/sharp",
     "publisher": "Lovell Fuller",
@@ -4623,7 +4651,7 @@
     "path": "node_modules/yocto-queue",
     "licenseFile": "node_modules/yocto-queue/license"
   },
-  "zod@4.0.17": {
+  "zod@4.1.5": {
     "licenses": "MIT",
     "repository": "https://github.com/colinhacks/zod",
     "publisher": "Colin McDonnell",
