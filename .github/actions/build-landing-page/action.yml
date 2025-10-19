@@ -4,27 +4,23 @@ description: 'Build the landing page and verify output'
 runs:
   using: 'composite'
   steps:
-    - name: Debug environment
+    - name: Ensure .pnp.cjs exists
       shell: bash
       run: |
-        echo "Current directory: $(pwd)"
-        echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE}"
-        echo "Checking for .pnp.cjs in current directory:"
-        ls -la .pnp.cjs 2>/dev/null || echo ".pnp.cjs not found in $(pwd)"
-        echo "Checking for .pnp.cjs in GITHUB_WORKSPACE:"
-        ls -la "${GITHUB_WORKSPACE}/.pnp.cjs" 2>/dev/null || echo ".pnp.cjs not found in ${GITHUB_WORKSPACE}"
-        echo "Checking for yarn.lock:"
-        ls -la yarn.lock 2>/dev/null || echo "yarn.lock not found in $(pwd)"
-        ls -la "${GITHUB_WORKSPACE}/yarn.lock" 2>/dev/null || echo "yarn.lock not found in ${GITHUB_WORKSPACE}"
+        cd "${GITHUB_WORKSPACE}"
+        if [ ! -f ".pnp.cjs" ]; then
+          echo "⚠️ .pnp.cjs not found. Running yarn install to generate it..."
+          yarn install --immutable
+          echo "✓ yarn install completed"
+          ls -la .pnp.cjs 2>/dev/null || echo "ERROR: .pnp.cjs still not found after yarn install"
+        else
+          echo "✓ .pnp.cjs found"
+        fi
 
     - name: Build landing page
       shell: bash
       run: |
-        # Ensure we're in the workspace root where .pnp.cjs exists
         cd "${GITHUB_WORKSPACE}"
-        echo "Changed to directory: $(pwd)"
-        echo "Files in current directory:"
-        ls -la .pnp.cjs yarn.lock package.json 2>/dev/null || true
         yarn run build:landing
 
     - name: Verify build output
