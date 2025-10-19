@@ -65,6 +65,116 @@ yarn lint
 - void を返す副作用のみの関数（例：`clearMigrationCache`）
 - サードパーティAPIの型に合わせる必要がある関数
 
+## ⚠️ 重要：予期されたエラー vs 予期しないエラー
+
+### 基本原則
+
+**neverthrowを使うべきなのは「ハンドリング可能な予期されたエラー」のみです。**
+
+- ✅ **予期されたエラー** → `Result<T, E>` でラップして返す
+- ❌ **予期しないエラー** → `throw` して、Sentryに送信させる
+
+### なぜこれが重要なのか？
+
+全てのエラーをneverthrowでラップすると：
+- 予期しないエラーがユーザーに静かに返される
+- Sentryに送信されず、バグの検知が遅れる
+- デバッグが困難になる
+
+### エラーの分類
+
+#### 予期されたエラー（Result型で返すべき）
+
+- ファイルが見つからない（`ENOENT`）
+- バリデーションエラー
+- 権限エラー（ユーザー操作で解決可能）
+- ネットワークタイムアウト（リトライ可能）
+- ビジネスロジック上の制約違反
+
+#### 予期しないエラー（throwすべき）
+
+- データベース接続エラー
+- メモリ不足
+- 型が想定外（プログラミングエラー）
+- 外部ライブラリの内部エラー
+- **原因不明のエラー全般**
+
+### 正しい実装パターン
+
+#### ❌ Bad：全てのエラーをラップ（Sentryに送信されない）
+
+```typescript
+export async function getWorldNameSuggestions(
+  query: string
+): Promise<Result<string[], Error>> {
+  try {
+    const results = await db.query(...);
+    return ok(results.map(r => r.name));
+  } catch (error) {
+    // ❌ 予期しないエラーもラップしてしまう
+    return err(error instanceof Error ? error : new Error(String(error)));
+  }
+}
+```
+
+#### ✅ Good：予期されたエラーのみラップ
+
+```typescript
+import { Result, ok, err } from 'neverthrow';
+import { match } from 'ts-pattern';
+
+// 予期されたエラー型を定義
+type WorldNameSuggestionsError =
+  | { type: 'VALIDATION_ERROR'; message: string }
+  | { type: 'DATABASE_TIMEOUT'; message: string };
+
+export async function getWorldNameSuggestions(
+  query: string
+): Promise<Result<string[], WorldNameSuggestionsError>> {
+  try {
+    // バリデーション（予期されたエラー）
+    if (query.length < 2) {
+      return err({
+        type: 'VALIDATION_ERROR',
+        message: 'Query must be at least 2 characters'
+      });
+    }
+
+    const results = await db.query(...);
+    return ok(results.map(r => r.name));
+  } catch (error) {
+    // エラーを分類
+    return match(error)
+      .with({ code: 'ETIMEDOUT' }, (e) =>
+        // ✅ 予期されたエラー → Resultで返す
+        err({ type: 'DATABASE_TIMEOUT', message: e.message })
+      )
+      .otherwise((e) => {
+        // ✅ 予期しないエラー → re-throw（Sentryに送信される）
+        throw e;
+      });
+  }
+}
+```
+
+#### ✅ Good（簡略版）：データベースエラーは基本的にthrow
+
+```typescript
+export async function getWorldNameSuggestions(
+  query: string
+): Promise<Result<string[], ValidationError>> {
+  // バリデーションエラーのみResult型で返す
+  if (query.length < 2) {
+    return err(new ValidationError('Query too short'));
+  }
+
+  // データベースエラーは予期しないエラーとしてthrow
+  // （Sentryに送信される）
+  const results = await db.query(...);
+  return ok(results.map(r => r.name));
+}
+```
+
 ## エラーの修正方法
 
 ### エラー例
@@ -74,35 +184,12 @@ yarn lint
   ❌ 458:40 - Function 'getWorldNameSuggestions' should return Result<T, E> type from neverthrow (Rule: Service layer must use neverthrow Result type)
 ```
 
-### 修正方法
+### 修正手順
 
-#### Before（エラー）
-
-```typescript
-export async function getWorldNameSuggestions(
-  query: string
-): Promise<string[]> {
-  const results = await db.query(...);
-  return results.map(r => r.name);
-}
-```
-
-#### After（修正）
-
-```typescript
-import { Result, ok, err } from 'neverthrow';
-
-export async function getWorldNameSuggestions(
-  query: string
-): Promise<Result<string[], Error>> {
-  try {
-    const results = await db.query(...);
-    return ok(results.map(r => r.name));
-  } catch (error) {
-    return err(new Error('Failed to get world name suggestions'));
-  }
-}
-```
+1. **エラーを分類する**：この関数で発生しうる予期されたエラーは何か？
+2. **予期されたエラー型を定義する**（または既存の型を使う）
+3. **予期されたエラーのみResult型でラップする**
+4. **予期しないエラーはre-throwする**
 
 ## リンターの仕組み
 

@@ -331,6 +331,14 @@ async function main() {
 
   if (issues.length === 0) {
     consola.success('All functions follow neverthrow error handling pattern!');
+    console.log('');
+    consola.info(
+      '⚠️  Important: Only wrap expected/handleable errors in Result types.',
+    );
+    consola.info(
+      '   Unexpected errors should be re-thrown to ensure Sentry reporting.',
+    );
+    consola.info('   See: docs/lint-neverthrow.md for best practices.');
     process.exit(0);
   } else {
     consola.error(`Found ${issues.length} issues:`);
