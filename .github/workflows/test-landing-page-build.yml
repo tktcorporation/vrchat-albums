@@ -2,11 +2,6 @@ name: Test Landing Page Build
 
 on:
   pull_request:
-    paths:
-      - 'pages/**'
-      - '.github/workflows/deploy-landing-page.yml'
-      - '.github/workflows/test-landing-page-build.yml'
-      - '.github/actions/setup-node-and-install/**'
 
 jobs:
   test-build:
