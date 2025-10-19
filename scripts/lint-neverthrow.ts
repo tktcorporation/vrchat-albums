@@ -491,21 +491,21 @@ async function main() {
   const issues = linter.lint();
 
   if (issues.length === 0) {
-    consola.success('All functions follow neverthrow error handling pattern!');
+    console.log('✔ All functions follow neverthrow error handling pattern!');
     console.log('');
-    consola.info(
-      '⚠️  Important: Only wrap expected/handleable errors in Result types.',
+    console.log(
+      'ℹ ⚠️  Important: Only wrap expected/handleable errors in Result types.',
     );
-    consola.info(
-      '   Unexpected errors should be re-thrown to ensure Sentry reporting.',
+    console.log(
+      'ℹ    Unexpected errors should be re-thrown to ensure Sentry reporting.',
     );
-    consola.info(
-      '   Exception: If error is logged with logger.error() before returning,',
+    console.log(
+      'ℹ    Exception: If error is logged with logger.error() before returning,',
     );
-    consola.info(
-      '   generic Error type is acceptable (Sentry-notified error).',
+    console.log(
+      'ℹ    generic Error type is acceptable (Sentry-notified error).',
     );
-    consola.info('   See: docs/lint-neverthrow.md for best practices.');
+    console.log('ℹ    See: docs/lint-neverthrow.md for best practices.');
     process.exit(0);
   } else {
     consola.error(`Found ${issues.length} issues:`);

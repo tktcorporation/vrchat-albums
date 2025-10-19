@@ -390,8 +390,8 @@ async function main() {
   const issues = linter.lint();
 
   if (issues.length === 0) {
-    consola.success(
-      'All ValueObject implementations follow the correct pattern!',
+    console.log(
+      '✔ All ValueObject implementations follow the correct pattern!',
     );
     process.exit(0);
   } else {
