@@ -591,14 +591,22 @@ export const logInfoRouter = () =>
       )
       .query(async ({ input }) => {
         // searchSessionsByPlayerName は Result<Date[], never> を返すため、
-        // エラーハンドリングは不要（データベースエラーは例外として伝播）
+        // エラーは発生しないが、match()で型安全に値を取り出す
         const result = await searchSessionsByPlayerName(input.playerName);
-        const sessionDates = result._unsafeUnwrap();
-
-        logger.debug(
-          `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
+        return result.match(
+          (sessionDates) => {
+            logger.debug(
+              `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
+            );
+            return sessionDates;
+          },
+          () => {
+            // never型のため、ここには到達しない
+            throw new Error(
+              'Unreachable: searchSessionsByPlayerName should never return an error',
+            );
+          },
         );
-        return sessionDates;
       }),
 
     /**

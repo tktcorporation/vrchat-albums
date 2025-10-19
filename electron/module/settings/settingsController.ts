@@ -316,20 +316,31 @@ export const settingsRouter = () =>
         const result = await performMigration();
 
         // performMigration は Result<MigrationResult, never> を返すため、
-        // エラーは MigrationResult.errors 配列に格納される
-        const migrationResult = result._unsafeUnwrap();
-        if (migrationResult.errors.length > 0) {
-          logger.error({
-            message: `Migration failed with errors: ${migrationResult.errors.join(
-              ', ',
-            )}`,
-          });
-          throw new UserFacingError(
-            `データ移行に失敗しました: ${migrationResult.errors.join(', ')}`,
-          );
-        }
-
-        return migrationResult;
+        // エラーは発生しないが、match()で型安全に値を取り出す
+        return result.match(
+          (migrationResult) => {
+            // エラーは MigrationResult.errors 配列に格納される
+            if (migrationResult.errors.length > 0) {
+              logger.error({
+                message: `Migration failed with errors: ${migrationResult.errors.join(
+                  ', ',
+                )}`,
+              });
+              throw new UserFacingError(
+                `データ移行に失敗しました: ${migrationResult.errors.join(
+                  ', ',
+                )}`,
+              );
+            }
+            return migrationResult;
+          },
+          () => {
+            // never型のため、ここには到達しない
+            throw new Error(
+              'Unreachable: performMigration should never return an error',
+            );
+          },
+        );
       } catch (error) {
         logger.error({
           message: `Failed to perform migration: ${match(error)
