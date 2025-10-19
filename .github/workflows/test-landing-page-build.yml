@@ -1,0 +1,20 @@
+name: Test Landing Page Build
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node and Install Dependencies
+        uses: ./.github/actions/setup-node-and-install
+
+      - name: Build Landing Page
+        uses: ./.github/actions/build-landing-page

@@ -25,8 +25,8 @@ jobs:
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
 
-      - name: Build landing page
-        run: nr build:landing
+      - name: Build Landing Page
+        uses: ./.github/actions/build-landing-page
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

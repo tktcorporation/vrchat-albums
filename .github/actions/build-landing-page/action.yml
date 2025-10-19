@@ -1,0 +1,26 @@
+name: 'Build Landing Page'
+description: 'Build the landing page and verify output'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Build landing page
+      shell: bash
+      working-directory: ./pages
+      run: |
+        # Run build commands directly with npx to avoid yarn workspace state file issues
+        npx tsc -b && npx vite build
+
+    - name: Verify build output
+      shell: bash
+      run: |
+        cd "${GITHUB_WORKSPACE}"
+        if [ ! -d "./pages/dist" ]; then
+          echo "Error: pages/dist directory was not created"
+          exit 1
+        fi
+        if [ ! -f "./pages/dist/index.html" ]; then
+          echo "Error: pages/dist/index.html was not created"
+          exit 1
+        fi
+        echo "✓ Landing page build successful"
