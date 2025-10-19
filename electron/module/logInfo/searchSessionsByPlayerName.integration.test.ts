@@ -51,7 +51,8 @@ describe('searchSessionsByPlayerName integration test', () => {
       });
 
       // "TestPlayer"で検索
-      const results = await searchSessionsByPlayerName('TestPlayer');
+      const result = await searchSessionsByPlayerName('TestPlayer');
+      const results = result._unsafeUnwrap();
 
       // 2つのセッションが見つかるはず
       expect(results).toHaveLength(2);
@@ -73,7 +74,8 @@ describe('searchSessionsByPlayerName integration test', () => {
       });
 
       // 小文字で検索しても見つかる
-      const results = await searchSessionsByPlayerName('casesensitive');
+      const result = await searchSessionsByPlayerName('casesensitive');
+      const results = result._unsafeUnwrap();
       expect(results).toHaveLength(1);
     });
 
@@ -96,7 +98,8 @@ describe('searchSessionsByPlayerName integration test', () => {
       });
 
       // "DuplicateTest"で検索
-      const results = await searchSessionsByPlayerName('DuplicateTest');
+      const result = await searchSessionsByPlayerName('DuplicateTest');
+      const results = result._unsafeUnwrap();
 
       // 1つのセッションのみ返される
       expect(results).toHaveLength(1);
@@ -104,7 +107,8 @@ describe('searchSessionsByPlayerName integration test', () => {
     });
 
     it('該当するプレイヤーが存在しない場合、空の配列を返す', async () => {
-      const results = await searchSessionsByPlayerName('NonExistentPlayer');
+      const result = await searchSessionsByPlayerName('NonExistentPlayer');
+      const results = result._unsafeUnwrap();
       expect(results).toEqual([]);
     });
 
@@ -114,7 +118,8 @@ describe('searchSessionsByPlayerName integration test', () => {
         joinDateTime: parseISO('2024-01-04T10:00:00'),
       });
 
-      const results = await searchSessionsByPlayerName('PlayerWithoutWorld');
+      const result = await searchSessionsByPlayerName('PlayerWithoutWorld');
+      const results = result._unsafeUnwrap();
       expect(results).toEqual([]);
     });
   });

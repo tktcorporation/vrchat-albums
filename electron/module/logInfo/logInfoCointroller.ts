@@ -464,8 +464,19 @@ export const logInfoRouter = () =>
     getFrequentPlayerNames: procedure
       .input(z.object({ limit: z.number().min(1).max(20).default(5) }))
       .query(async ({ input }) => {
-        const frequentPlayerNames = await getFrequentPlayerNames(input.limit);
-        return frequentPlayerNames;
+        const result = await getFrequentPlayerNames(input.limit);
+        return result.match(
+          (value) => value,
+          (error) => {
+            throw UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.DATABASE_ERROR,
+              category: ERROR_CATEGORIES.DATABASE_ERROR,
+              message: `Failed to get frequent player names: ${error}`,
+              userMessage: 'よく一緒に遊ぶプレイヤーの取得に失敗しました。',
+              cause: error,
+            });
+          },
+        );
       }),
     getRecentVRChatWorldJoinLogByVRChatPhotoName: procedure
       .input(VRChatPhotoFileNameWithExtSchema)
@@ -522,11 +533,19 @@ export const logInfoRouter = () =>
         }),
       )
       .query(async ({ input }) => {
-        const suggestions = await getWorldNameSuggestions(
-          input.query,
-          input.limit,
+        const result = await getWorldNameSuggestions(input.query, input.limit);
+        return result.match(
+          (value) => value,
+          (error) => {
+            throw UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.DATABASE_ERROR,
+              category: ERROR_CATEGORIES.DATABASE_ERROR,
+              message: `Failed to get world name suggestions: ${error}`,
+              userMessage: 'ワールド名の検索候補の取得に失敗しました。',
+              cause: error,
+            });
+          },
         );
-        return suggestions;
       }),
 
     /**
@@ -543,11 +562,19 @@ export const logInfoRouter = () =>
         }),
       )
       .query(async ({ input }) => {
-        const suggestions = await getPlayerNameSuggestions(
-          input.query,
-          input.limit,
+        const result = await getPlayerNameSuggestions(input.query, input.limit);
+        return result.match(
+          (value) => value,
+          (error) => {
+            throw UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.DATABASE_ERROR,
+              category: ERROR_CATEGORIES.DATABASE_ERROR,
+              message: `Failed to get player name suggestions: ${error}`,
+              userMessage: 'プレイヤー名の検索候補の取得に失敗しました。',
+              cause: error,
+            });
+          },
         );
-        return suggestions;
       }),
 
     /**
@@ -563,31 +590,28 @@ export const logInfoRouter = () =>
         }),
       )
       .query(async ({ input }) => {
-        try {
-          const sessionDates = await searchSessionsByPlayerName(
-            input.playerName,
-          );
-          logger.debug(
-            `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
-          );
-          return sessionDates;
-        } catch (error) {
-          logger.error({
-            message: `Failed to search sessions by player name: ${error}`,
-            stack: match(error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise((err) => new Error(String(err))),
-          });
-          throw UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.DATABASE_ERROR,
-            category: ERROR_CATEGORIES.DATABASE_ERROR,
-            message: `Failed to search sessions by player name: ${error}`,
-            userMessage: 'プレイヤー検索中にエラーが発生しました。',
-            cause: match(error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise((err) => new Error(String(err))),
-          });
-        }
+        const result = await searchSessionsByPlayerName(input.playerName);
+        return result.match(
+          (sessionDates) => {
+            logger.debug(
+              `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
+            );
+            return sessionDates;
+          },
+          (error) => {
+            logger.error({
+              message: `Failed to search sessions by player name: ${error}`,
+              stack: error instanceof Error ? error : new Error(String(error)),
+            });
+            throw UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.DATABASE_ERROR,
+              category: ERROR_CATEGORIES.DATABASE_ERROR,
+              message: `Failed to search sessions by player name: ${error}`,
+              userMessage: 'プレイヤー検索中にエラーが発生しました。',
+              cause: error,
+            });
+          },
+        );
       }),
 
     /**

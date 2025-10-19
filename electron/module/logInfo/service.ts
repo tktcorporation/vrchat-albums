@@ -458,20 +458,30 @@ export async function loadLogInfoIndexFromVRChatLog({
 export const getWorldNameSuggestions = async (
   query: string,
   limit: number,
-): Promise<string[]> => {
-  const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
-    attributes: ['worldName'],
-    where: {
-      worldName: {
-        [Op.like]: `%${query}%`,
+): Promise<neverthrow.Result<string[], Error>> => {
+  try {
+    const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
+      attributes: ['worldName'],
+      where: {
+        worldName: {
+          [Op.like]: `%${query}%`,
+        },
       },
-    },
-    group: ['worldName'],
-    order: [['worldName', 'ASC']],
-    limit,
-  });
+      group: ['worldName'],
+      order: [['worldName', 'ASC']],
+      limit,
+    });
 
-  return worldJoinLogs.map((log) => log.worldName);
+    return neverthrow.ok(worldJoinLogs.map((log) => log.worldName));
+  } catch (error) {
+    logger.error({
+      message: `Error getting world name suggestions: ${error}`,
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+    return neverthrow.err(
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  }
 };
 
 /**
@@ -483,20 +493,30 @@ export const getWorldNameSuggestions = async (
 export const getPlayerNameSuggestions = async (
   query: string,
   limit: number,
-): Promise<string[]> => {
-  const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
-    attributes: ['playerName'],
-    where: {
-      playerName: {
-        [Op.like]: `%${query}%`,
+): Promise<neverthrow.Result<string[], Error>> => {
+  try {
+    const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
+      attributes: ['playerName'],
+      where: {
+        playerName: {
+          [Op.like]: `%${query}%`,
+        },
       },
-    },
-    group: ['playerName'],
-    order: [['playerName', 'ASC']],
-    limit,
-  });
+      group: ['playerName'],
+      order: [['playerName', 'ASC']],
+      limit,
+    });
 
-  return playerJoinLogs.map((log) => log.playerName);
+    return neverthrow.ok(playerJoinLogs.map((log) => log.playerName));
+  } catch (error) {
+    logger.error({
+      message: `Error getting player name suggestions: ${error}`,
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+    return neverthrow.err(
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  }
 };
 
 /**
@@ -506,15 +526,25 @@ export const getPlayerNameSuggestions = async (
  */
 export const getFrequentPlayerNames = async (
   limit: number,
-): Promise<string[]> => {
-  const playerCounts = await VRChatPlayerJoinLogModel.findAll({
-    attributes: ['playerName', [fn('COUNT', col('playerName')), 'count']],
-    group: ['playerName'],
-    order: [[literal('count'), 'DESC']],
-    limit,
-  });
+): Promise<neverthrow.Result<string[], Error>> => {
+  try {
+    const playerCounts = await VRChatPlayerJoinLogModel.findAll({
+      attributes: ['playerName', [fn('COUNT', col('playerName')), 'count']],
+      group: ['playerName'],
+      order: [[literal('count'), 'DESC']],
+      limit,
+    });
 
-  return playerCounts.map((player) => player.playerName);
+    return neverthrow.ok(playerCounts.map((player) => player.playerName));
+  } catch (error) {
+    logger.error({
+      message: `Error getting frequent player names: ${error}`,
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+    return neverthrow.err(
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  }
 };
 
 /**
@@ -528,7 +558,7 @@ export const getFrequentPlayerNames = async (
  */
 export const searchSessionsByPlayerName = async (
   playerName: string,
-): Promise<Date[]> => {
+): Promise<neverthrow.Result<Date[], Error>> => {
   const startTime = performance.now();
 
   try {
@@ -546,7 +576,7 @@ export const searchSessionsByPlayerName = async (
       logger.debug(
         `searchSessionsByPlayerName: No players found for query "${playerName}"`,
       );
-      return [];
+      return neverthrow.ok([]);
     }
 
     // 各プレイヤー参加ログに対して、対応するワールド参加ログを探す
@@ -585,12 +615,16 @@ export const searchSessionsByPlayerName = async (
     );
 
     // 新しい順にソートして返す
-    return sessionJoinDates.sort((a, b) => b.getTime() - a.getTime());
+    return neverthrow.ok(
+      sessionJoinDates.sort((a, b) => b.getTime() - a.getTime()),
+    );
   } catch (error) {
     logger.error({
       message: `Error searching sessions by player name: ${error}`,
       stack: error instanceof Error ? error : new Error(String(error)),
     });
-    throw error;
+    return neverthrow.err(
+      error instanceof Error ? error : new Error(String(error)),
+    );
   }
 };

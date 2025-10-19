@@ -277,7 +277,8 @@ describe('logInfo service', () => {
 
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
-      const result = await getFrequentPlayerNames(3);
+      const resultWrapper = await getFrequentPlayerNames(3);
+      const result = resultWrapper._unsafeUnwrap();
 
       expect(result).toHaveLength(3);
       expect(result).toContain('PlayerA');
