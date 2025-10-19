@@ -13,17 +13,5 @@ jobs:
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
 
-      - name: Build landing page
-        run: yarn run build:landing
-
-      - name: Verify build output
-        run: |
-          if [ ! -d "./pages/dist" ]; then
-            echo "Error: pages/dist directory was not created"
-            exit 1
-          fi
-          if [ ! -f "./pages/dist/index.html" ]; then
-            echo "Error: pages/dist/index.html was not created"
-            exit 1
-          fi
-          echo "✓ Landing page build successful"
+      - name: Build Landing Page
+        uses: ./.github/actions/build-landing-page

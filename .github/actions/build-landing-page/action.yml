@@ -1,0 +1,22 @@
+name: 'Build Landing Page'
+description: 'Build the landing page and verify output'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Build landing page
+      shell: bash
+      run: yarn run build:landing
+
+    - name: Verify build output
+      shell: bash
+      run: |
+        if [ ! -d "./pages/dist" ]; then
+          echo "Error: pages/dist directory was not created"
+          exit 1
+        fi
+        if [ ! -f "./pages/dist/index.html" ]; then
+          echo "Error: pages/dist/index.html was not created"
+          exit 1
+        fi
+        echo "✓ Landing page build successful"
