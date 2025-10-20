@@ -4,6 +4,7 @@ import { trpcReact } from '@/trpc';
 import {
   AlertCircle,
   FolderOpen,
+  Info,
   Plus,
   RefreshCw,
   Save,
@@ -283,6 +284,19 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
+        {/* Addon Information */}
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-blue-700 dark:text-blue-300">
+              <p className="font-medium mb-1">
+                {t('settings.paths.addonInfo.title')}
+              </p>
+              <p>{t('settings.paths.addonInfo.description')}</p>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
           {/* Photo Directory Section */}
           <div className="space-y-2">
