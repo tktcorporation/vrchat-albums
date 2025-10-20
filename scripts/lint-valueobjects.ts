@@ -20,7 +20,10 @@ export class ValueObjectLinter {
   private checker: ts.TypeChecker;
   private resolvedTypes = new Map<ts.Type, boolean>();
 
-  constructor(private files: string[]) {
+  constructor(
+    private files: string[],
+    private sourceMap?: Map<string, string>, // For testing with virtual files
+  ) {
     const compilerOptions: ts.CompilerOptions = {
       target: ts.ScriptTarget.ESNext,
       module: ts.ModuleKind.ESNext,
@@ -32,8 +35,51 @@ export class ValueObjectLinter {
       resolveJsonModule: true,
     };
 
-    this.program = ts.createProgram(files, compilerOptions);
+    // If sourceMap is provided (for testing), create a custom compiler host
+    if (this.sourceMap) {
+      const host = this.createVirtualCompilerHost(
+        compilerOptions,
+        this.sourceMap,
+      );
+      this.program = ts.createProgram(files, compilerOptions, host);
+    } else {
+      // Production mode: use real files
+      this.program = ts.createProgram(files, compilerOptions);
+    }
     this.checker = this.program.getTypeChecker();
+  }
+
+  private createVirtualCompilerHost(
+    options: ts.CompilerOptions,
+    sourceMap: Map<string, string>,
+  ): ts.CompilerHost {
+    const defaultHost = ts.createCompilerHost(options);
+
+    return {
+      ...defaultHost,
+      fileExists: (fileName: string) => {
+        return sourceMap.has(fileName) || defaultHost.fileExists(fileName);
+      },
+      readFile: (fileName: string) => {
+        const virtualContent = sourceMap.get(fileName);
+        if (virtualContent !== undefined) {
+          return virtualContent;
+        }
+        return defaultHost.readFile(fileName);
+      },
+      getSourceFile: (fileName: string, languageVersion: ts.ScriptTarget) => {
+        const virtualContent = sourceMap.get(fileName);
+        if (virtualContent !== undefined) {
+          return ts.createSourceFile(
+            fileName,
+            virtualContent,
+            languageVersion,
+            true,
+          );
+        }
+        return defaultHost.getSourceFile(fileName, languageVersion);
+      },
+    };
   }
 
   lint(): ValueObjectIssue[] {
@@ -356,6 +402,31 @@ export class ValueObjectLinter {
       });
     }
   }
+}
+
+// Export for testing with virtual files
+export async function lintValueObjectsFromSource(
+  sources: Map<string, string>,
+): Promise<{
+  issues: ValueObjectIssue[];
+  success: boolean;
+  message?: string;
+}> {
+  const files = Array.from(sources.keys());
+  const linter = new ValueObjectLinter(files, sources);
+  const issues = linter.lint();
+
+  const success = issues.filter((i) => i.severity === 'error').length === 0;
+  const message =
+    issues.length === 0
+      ? '✔ All ValueObject implementations follow the correct pattern!'
+      : undefined;
+
+  return {
+    issues,
+    success,
+    message,
+  };
 }
 
 // Export for testing
