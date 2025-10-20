@@ -179,9 +179,10 @@ export const performMigrationIfNeeded = async (): Promise<void> => {
 
 /**
  * Perform the migration from old app to new app
+ * Note: All errors are captured in result.errors array, function never throws
  */
 export const performMigration = async (): Promise<
-  Result<MigrationResult, Error>
+  Result<MigrationResult, never>
 > => {
   const { app } = await import('electron');
   const oldAppPath = await getOldAppUserDataPath();

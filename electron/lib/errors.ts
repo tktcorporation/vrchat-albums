@@ -127,6 +127,83 @@ export class UserFacingError extends Error {
   }
 }
 
+/**
+ * Sentry通知済みエラークラス
+ *
+ * 予期しないエラーが発生したが、logger.error()でSentryに通知済みであることを示す。
+ * neverthrowのResult型でgeneric Error型を避けつつ、Sentry通知を保証するために使用。
+ *
+ * ⚠️ 使用は最小限に：ユーザビリティ上本当に必要な場合のみ使用してください。
+ * 基本的にはエラーを伝播させ、予期しないエラーは自然にSentryに送られるようにします。
+ *
+ * ⚠️ 直接 new SentryNotifiedError() しないでください。
+ * 必ず createSentryNotifiedError() ヘルパー関数を使用してください。
+ */
+class SentryNotifiedError extends Error {
+  public readonly originalError: Error;
+
+  constructor(message: string, originalError: Error) {
+    super(message);
+    this.name = 'SentryNotifiedError';
+    this.originalError = originalError;
+
+    // TypeScriptのカスタムエラーで instanceof が正しく動作するための設定
+    Object.setPrototypeOf(this, SentryNotifiedError.prototype);
+
+    // Stack traceを適切に設定
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, SentryNotifiedError);
+    }
+  }
+}
+
+// 型のみエクスポート（直接インスタンス化を防ぐ）
+export type { SentryNotifiedError };
+
+/**
+ * SentryNotifiedErrorを作成し、自動的にSentryに通知する
+ *
+ * @example
+ * ```typescript
+ * import { createSentryNotifiedError } from '../../lib/errors';
+ *
+ * export async function getData(): Promise<Result<Data, SentryNotifiedError>> {
+ *   try {
+ *     const data = await database.query(...);
+ *     return ok(data);
+ *   } catch (error) {
+ *     // 自動的にSentryに通知される
+ *     return err(createSentryNotifiedError(
+ *       'Unexpected error in getData',
+ *       error
+ *     ));
+ *   }
+ * }
+ * ```
+ */
+export function createSentryNotifiedError(
+  message: string,
+  error: unknown,
+): SentryNotifiedError {
+  // logger を動的インポートして循環依存を回避
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { logger } = require('./logger');
+
+  const originalError =
+    error instanceof Error ? error : new Error(String(error));
+
+  // Sentryに通知
+  logger.error({
+    message,
+    stack: originalError,
+  });
+
+  return new SentryNotifiedError(
+    error instanceof Error ? error.message : String(error),
+    originalError,
+  );
+}
+
 // 特定の操作に失敗したことを示すエラーなど、より具体的なエラーも定義可能
 // export class OperationFailedError extends UserFacingError {
 //   constructor(operationName: string, details?: string, options?: ErrorOptions) {

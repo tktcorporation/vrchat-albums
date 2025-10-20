@@ -1,4 +1,5 @@
 import type { UpdateCheckResult } from 'electron-updater';
+import * as neverthrow from 'neverthrow';
 import { P, match } from 'ts-pattern';
 import { reloadMainWindow } from '../../electronUtil';
 import {
@@ -315,19 +316,34 @@ export const settingsRouter = () =>
         const { performMigration } = await import('../migration/service');
         const result = await performMigration();
 
-        if (result.isErr()) {
-          logger.error({
-            message: `Migration failed: ${result.error.message}`,
-            stack: match(result.error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise(() => undefined),
-          });
-          throw new UserFacingError(
-            `データ移行に失敗しました: ${result.error.message}`,
-          );
-        }
-
-        return result.value;
+        // performMigration は Result<MigrationResult, never> を返すため、
+        // エラーは発生しないが、ts-pattern の match() で型安全に値を取り出す
+        return match(result)
+          .with(P.instanceOf(neverthrow.Ok), (r) => {
+            const migrationResult =
+              r.value as import('../migration/service').MigrationResult;
+            // エラーは MigrationResult.errors 配列に格納される
+            if (migrationResult.errors.length > 0) {
+              logger.error({
+                message: `Migration failed with errors: ${migrationResult.errors.join(
+                  ', ',
+                )}`,
+              });
+              throw new UserFacingError(
+                `データ移行に失敗しました: ${migrationResult.errors.join(
+                  ', ',
+                )}`,
+              );
+            }
+            return migrationResult;
+          })
+          .with(P.instanceOf(neverthrow.Err), () => {
+            // Result<T, never> のため、ここには到達しない
+            throw new Error(
+              'Unreachable: performMigration should never return an error',
+            );
+          })
+          .exhaustive();
       } catch (error) {
         logger.error({
           message: `Failed to perform migration: ${match(error)

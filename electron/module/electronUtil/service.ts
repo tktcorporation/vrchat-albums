@@ -7,24 +7,25 @@ import * as neverthrow from 'neverthrow';
 import sharp from 'sharp';
 import { P, match } from 'ts-pattern';
 
+// Error types for electronUtil operations
+type OpenPathError = { type: 'OPEN_PATH_FAILED'; message: string };
+
 /**
  * OS のエクスプローラーで指定パスを開くユーティリティ。
  * main プロセスの service モジュール各所から利用される。
  */
 const openPathInExplorer = async (
   path: string,
-): Promise<neverthrow.Result<string, Error>> => {
-  // ネイティブの機能を使う
-  try {
-    const result = await shell.openPath(path);
-    return neverthrow.ok(result);
-  } catch (error) {
-    return match(error)
-      .with(P.instanceOf(Error), (err) => neverthrow.err(err))
-      .otherwise((err) => {
-        throw err;
-      });
+): Promise<neverthrow.Result<string, OpenPathError>> => {
+  // shell.openPath() returns error message string on failure
+  const errorMsg = await shell.openPath(path);
+  if (errorMsg) {
+    return neverthrow.err({
+      type: 'OPEN_PATH_FAILED',
+      message: errorMsg,
+    });
   }
+  return neverthrow.ok('');
 };
 
 /**
@@ -96,20 +97,17 @@ const openUrlInDefaultBrowser = (url: string) => {
  */
 const openPhotoPathWithPhotoApp = async (
   filePath: string,
-): Promise<neverthrow.Result<string, Error>> => {
-  try {
-    const errorMsg = await shell.openPath(filePath);
-    if (errorMsg) {
-      return neverthrow.err(new Error(`Failed to open path: ${errorMsg}`));
-    }
-    return neverthrow.ok('');
-  } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise(() => new Error('Unknown error opening path')),
-    );
+): Promise<neverthrow.Result<string, OpenPathError>> => {
+  // shell.openPath() returns error message string on failure
+  // Any exceptions thrown are unexpected and should propagate
+  const errorMsg = await shell.openPath(filePath);
+  if (errorMsg) {
+    return neverthrow.err({
+      type: 'OPEN_PATH_FAILED',
+      message: errorMsg,
+    });
   }
+  return neverthrow.ok('');
 };
 
 /**
@@ -118,21 +116,18 @@ const openPhotoPathWithPhotoApp = async (
  */
 const openPathWithAssociatedApp = async (
   filePath: string,
-): Promise<neverthrow.Result<string, Error>> => {
-  try {
-    // openPath はデフォルトアプリで開くので、これで代用可能
-    const errorMsg = await shell.openPath(filePath);
-    if (errorMsg) {
-      return neverthrow.err(new Error(`Failed to open path: ${errorMsg}`));
-    }
-    return neverthrow.ok('');
-  } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise(() => new Error('Unknown error opening path')),
-    );
+): Promise<neverthrow.Result<string, OpenPathError>> => {
+  // openPath はデフォルトアプリで開くので、これで代用可能
+  // shell.openPath() returns error message string on failure
+  // Any exceptions thrown are unexpected and should propagate
+  const errorMsg = await shell.openPath(filePath);
+  if (errorMsg) {
+    return neverthrow.err({
+      type: 'OPEN_PATH_FAILED',
+      message: errorMsg,
+    });
   }
+  return neverthrow.ok('');
 };
 
 /**
@@ -141,20 +136,14 @@ const openPathWithAssociatedApp = async (
  */
 const copyImageDataByPath = async (
   filePath: string,
-): Promise<neverthrow.Result<void, Error>> => {
-  try {
-    const photoBuf = await sharp(filePath).toBuffer();
-    const image = nativeImage.createFromBuffer(photoBuf);
-    clipboard.writeImage(image);
-    // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
-    return neverthrow.ok(undefined);
-  } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise(() => new Error('Failed to copy image data')),
-    );
-  }
+): Promise<neverthrow.Result<void, never>> => {
+  // All errors from sharp() and clipboard operations are unexpected
+  // and should propagate to Sentry
+  const photoBuf = await sharp(filePath).toBuffer();
+  const image = nativeImage.createFromBuffer(photoBuf);
+  clipboard.writeImage(image);
+  // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
+  return neverthrow.ok(undefined);
 };
 
 /**
@@ -319,7 +308,8 @@ export const saveFileToPath = async (
  */
 const copyMultipleFilesToClipboard = async (
   filePaths: string[],
-): Promise<neverthrow.Result<void, Error>> => {
+): Promise<neverthrow.Result<void, never>> => {
+  // All errors are unexpected and should propagate
   if (filePaths.length === 0) {
     return neverthrow.ok(undefined);
   }
