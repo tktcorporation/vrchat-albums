@@ -22,7 +22,7 @@ describe('ValueObject Linter', () => {
   });
 
   it('should detect indirect inheritance from BaseValueObject', async () => {
-    // Run linter on both PathObject and SpecialPathObject
+    // Run linter on pathObject and specialPathObject (both properly type-only exported)
     const result = await lintValueObjects(false, [
       path.join(fixturesDir, 'pathObject.ts'),
       path.join(fixturesDir, 'specialPathObject.ts'),
@@ -38,7 +38,6 @@ describe('ValueObject Linter', () => {
   it('should fail when indirect ValueObject is exported as class', async () => {
     // Run linter on invalidPathObject
     const result = await lintValueObjects(false, [
-      path.join(fixturesDir, 'pathObject.ts'),
       path.join(fixturesDir, 'invalidPathObject.ts'),
     ]);
 
