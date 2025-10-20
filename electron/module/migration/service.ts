@@ -1,6 +1,7 @@
 import * as nodeFsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { type Result, ok } from 'neverthrow';
+import { P, match } from 'ts-pattern';
 import { logger } from '../../lib/logger';
 
 export interface MigrationResult {
@@ -100,7 +101,9 @@ export const isMigrationNeeded = async (): Promise<boolean> => {
   } catch (error) {
     logger.error({
       message: 'Error checking migration status',
-      stack: error instanceof Error ? error : new Error(String(error)),
+      stack: match(error)
+        .with(P.instanceOf(Error), (err) => err)
+        .otherwise(() => new Error(String(error))),
     });
     const result = false;
     // エラー時もキャッシュに保存（頻繁なファイルアクセスを防ぐ）
@@ -140,7 +143,9 @@ const getOldAppUserDataPath = async (): Promise<string> => {
   } catch (error) {
     logger.error({
       message: 'Failed to get old app path',
-      stack: error instanceof Error ? error : new Error(String(error)),
+      stack: match(error)
+        .with(P.instanceOf(Error), (err) => err)
+        .otherwise(() => new Error(String(error))),
     });
     return '';
   }
@@ -172,7 +177,9 @@ export const performMigrationIfNeeded = async (): Promise<void> => {
   } catch (error) {
     logger.error({
       message: 'Error during migration check',
-      stack: error instanceof Error ? error : new Error(String(error)),
+      stack: match(error)
+        .with(P.instanceOf(Error), (err) => err)
+        .otherwise(() => new Error(String(error))),
     });
   }
 };
