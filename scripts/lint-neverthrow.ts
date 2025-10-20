@@ -105,6 +105,11 @@ export class NeverthrowLinter {
 
   private lintFile(sourceFile: ts.SourceFile) {
     const applicableRules = this.config.rules.filter((rule) => {
+      // If rule.path is an absolute path, compare directly
+      if (path.isAbsolute(rule.path)) {
+        return sourceFile.fileName === rule.path;
+      }
+      // Otherwise, use minimatch with relative path
       const relativePath = path.relative(process.cwd(), sourceFile.fileName);
       return minimatch(relativePath, rule.path);
     });
@@ -511,10 +516,7 @@ export async function lintNeverthrowFromSource(
 }
 
 // Export for testing
-export async function lintNeverthrow(
-  config: NeverthrowLintConfig,
-  testMode = false,
-): Promise<{
+export async function lintNeverthrow(config: NeverthrowLintConfig): Promise<{
   issues: NeverthrowIssue[];
   success: boolean;
   message?: string;
@@ -525,40 +527,54 @@ export async function lintNeverthrow(
     patterns.add(rule.path);
   }
 
-  // Find all TypeScript files matching the patterns
-  // In test mode, don't ignore test files since we're testing files in test-neverthrow directory
-  const ignorePatterns = testMode
-    ? ['node_modules/**', 'dist/**', 'main/**', 'out/**']
-    : [
+  // Convert Set to Array for processing
+  const patternArray = Array.from(patterns).map((pattern) => {
+    // Normalize path separators for cross-platform compatibility
+    return pattern.replace(/\\/g, '/');
+  });
+
+  // Check if all patterns are specific files (not glob patterns)
+  const isSpecificFiles = patternArray.every(
+    (p) => !p.includes('*') && !p.includes('!'),
+  );
+
+  let allFiles: string[];
+
+  if (isSpecificFiles) {
+    // Use specific files directly (for testing)
+    // Ensure they are absolute paths
+    allFiles = patternArray.map((file) => {
+      if (path.isAbsolute(file)) {
+        return file;
+      }
+      return path.join(process.cwd(), file);
+    });
+  } else {
+    // Use glob for patterns
+    const files = await glob(patternArray, {
+      cwd: process.cwd(),
+      absolute: true,
+      ignore: [
         'node_modules/**',
         'dist/**',
         'main/**',
         'out/**',
         '**/*.test.ts',
         '**/*.spec.ts',
-      ];
-
-  // Convert Set to Array for glob and handle Windows paths
-  const patternArray = Array.from(patterns).map((pattern) => {
-    // Normalize path separators for cross-platform compatibility
-    return pattern.replace(/\\/g, '/');
-  });
-
-  const files = await glob(patternArray, {
-    cwd: process.cwd(),
-    absolute: true,
-    ignore: ignorePatterns,
-    // Important for Windows: don't escape special characters
-    windowsPathsNoEscape: true,
-  });
-
-  const allFiles = [...files];
+      ],
+      // Important for Windows: don't escape special characters
+      windowsPathsNoEscape: true,
+    });
+    allFiles = [...files];
+  }
 
   if (allFiles.length === 0) {
-    if (!testMode) {
-      consola.warn('No files found matching the configured patterns');
-    }
-    return { issues: [], success: true };
+    consola.warn('No files found matching the configured patterns');
+    return {
+      issues: [],
+      success: true,
+      message: '✔ All functions follow neverthrow error handling pattern!',
+    };
   }
 
   const linter = new NeverthrowLinter(allFiles, config);

@@ -430,39 +430,55 @@ export async function lintValueObjectsFromSource(
 }
 
 // Export for testing
-export async function lintValueObjects(testMode = false): Promise<{
+export async function lintValueObjects(
+  testMode = false,
+  specificFiles?: string[],
+): Promise<{
   issues: ValueObjectIssue[];
   success: boolean;
   message?: string;
 }> {
-  // Find all TypeScript files that might contain ValueObjects
-  let patterns: string[];
+  let files: string[];
 
-  if (testMode) {
-    // In test mode, ONLY scan the test directory
-    patterns = ['test-valueobjects/**/*.ts'];
+  if (specificFiles) {
+    // Use specific files if provided (for testing)
+    // Ensure they are absolute paths
+    files = specificFiles.map((file) => {
+      if (path.isAbsolute(file)) {
+        return file;
+      }
+      return path.join(process.cwd(), file);
+    });
   } else {
-    patterns = [
-      'electron/**/*.ts',
-      'src/**/*.ts',
-      '!electron/**/*.test.ts',
-      '!electron/**/*.spec.ts',
-      '!src/**/*.test.ts',
-      '!src/**/*.spec.ts',
-      '!node_modules/**/*',
-      '!dist/**/*',
-      '!main/**/*',
-      '!out/**/*',
-    ];
-  }
+    // Find all TypeScript files that might contain ValueObjects
+    let patterns: string[];
 
-  const files = await glob(patterns, {
-    cwd: process.cwd(),
-    absolute: true,
-    ignore: ['node_modules/**', 'dist/**', 'main/**', 'out/**'],
-    // Important for Windows: don't escape special characters
-    windowsPathsNoEscape: true,
-  });
+    if (testMode) {
+      // In test mode, ONLY scan the test directory
+      patterns = ['test-valueobjects/**/*.ts'];
+    } else {
+      patterns = [
+        'electron/**/*.ts',
+        'src/**/*.ts',
+        '!electron/**/*.test.ts',
+        '!electron/**/*.spec.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        '!node_modules/**/*',
+        '!dist/**/*',
+        '!main/**/*',
+        '!out/**/*',
+      ];
+    }
+
+    files = await glob(patterns, {
+      cwd: process.cwd(),
+      absolute: true,
+      ignore: ['node_modules/**', 'dist/**', 'main/**', 'out/**'],
+      // Important for Windows: don't escape special characters
+      windowsPathsNoEscape: true,
+    });
+  }
 
   const linter = new ValueObjectLinter(files);
   const issues = linter.lint();
