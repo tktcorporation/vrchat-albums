@@ -14,7 +14,7 @@ interface ValueObjectIssue {
   severity: 'error' | 'warning';
 }
 
-class ValueObjectLinter {
+export class ValueObjectLinter {
   private issues: ValueObjectIssue[] = [];
   private program: ts.Program;
   private checker: ts.TypeChecker;
@@ -358,26 +358,31 @@ class ValueObjectLinter {
   }
 }
 
-async function main() {
-  consola.start('Linting ValueObject implementations...');
-
+// Export for testing
+export async function lintValueObjects(testMode = false): Promise<{
+  issues: ValueObjectIssue[];
+  success: boolean;
+  message?: string;
+}> {
   // Find all TypeScript files that might contain ValueObjects
-  const patterns = [
-    'electron/**/*.ts',
-    'src/**/*.ts',
-    '!electron/**/*.test.ts',
-    '!electron/**/*.spec.ts',
-    '!src/**/*.test.ts',
-    '!src/**/*.spec.ts',
-    '!node_modules/**/*',
-    '!dist/**/*',
-    '!main/**/*',
-    '!out/**/*',
-  ];
+  let patterns: string[];
 
-  // Add test directory patterns if in test environment
-  if (process.env.NODE_ENV === 'test') {
-    patterns.unshift('test-valueobjects/**/*.ts');
+  if (testMode) {
+    // In test mode, ONLY scan the test directory
+    patterns = ['test-valueobjects/**/*.ts'];
+  } else {
+    patterns = [
+      'electron/**/*.ts',
+      'src/**/*.ts',
+      '!electron/**/*.test.ts',
+      '!electron/**/*.spec.ts',
+      '!src/**/*.test.ts',
+      '!src/**/*.spec.ts',
+      '!node_modules/**/*',
+      '!dist/**/*',
+      '!main/**/*',
+      '!out/**/*',
+    ];
   }
 
   const files = await glob(patterns, {
@@ -388,6 +393,26 @@ async function main() {
 
   const linter = new ValueObjectLinter(files);
   const issues = linter.lint();
+
+  const success = issues.filter((i) => i.severity === 'error').length === 0;
+  const message =
+    issues.length === 0
+      ? '✔ All ValueObject implementations follow the correct pattern!'
+      : undefined;
+
+  return {
+    issues,
+    success,
+    message,
+  };
+}
+
+async function main() {
+  consola.start('Linting ValueObject implementations...');
+
+  const { issues, success } = await lintValueObjects(
+    process.env.LINT_VALUEOBJECTS_TEST_MODE === 'true',
+  );
 
   if (issues.length === 0) {
     console.log(
@@ -406,12 +431,15 @@ async function main() {
       );
     }
 
-    const errorCount = issues.filter((i) => i.severity === 'error').length;
-    process.exit(errorCount > 0 ? 1 : 0);
+    process.exit(success ? 0 : 1);
   }
 }
 
-main().catch((error) => {
-  consola.error('Linter failed:', error);
-  process.exit(1);
-});
+// Only run main if this file is being executed directly
+// Check if running as main module (ES module compatible)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    consola.error('Linter failed:', error);
+    process.exit(1);
+  });
+}

@@ -7,7 +7,7 @@ import { glob } from 'glob';
 import { minimatch } from 'minimatch';
 import * as ts from 'typescript';
 
-interface NeverthrowLintConfig {
+export interface NeverthrowLintConfig {
   rules: Array<{
     name: string;
     path: string;
@@ -17,7 +17,7 @@ interface NeverthrowLintConfig {
   }>;
 }
 
-interface NeverthrowIssue {
+export interface NeverthrowIssue {
   file: string;
   line: number;
   column: number;
@@ -26,7 +26,7 @@ interface NeverthrowIssue {
   ruleName: string;
 }
 
-class NeverthrowLinter {
+export class NeverthrowLinter {
   private issues: NeverthrowIssue[] = [];
   private program: ts.Program;
   private checker: ts.TypeChecker;
@@ -415,7 +415,7 @@ class NeverthrowLinter {
   }
 }
 
-async function loadConfig(
+export async function loadConfig(
   customConfigPath?: string,
 ): Promise<NeverthrowLintConfig> {
   const configPath =
@@ -440,19 +440,15 @@ async function loadConfig(
   return JSON.parse(configContent);
 }
 
-async function main() {
-  consola.start('Linting neverthrow usage...');
-
-  // Parse command line arguments
-  const args = process.argv.slice(2);
-  const configIndex = args.indexOf('--config');
-  const customConfigPath =
-    configIndex !== -1 && args[configIndex + 1]
-      ? args[configIndex + 1]
-      : undefined;
-
-  const config = await loadConfig(customConfigPath);
-
+// Export for testing
+export async function lintNeverthrow(
+  config: NeverthrowLintConfig,
+  testMode = false,
+): Promise<{
+  issues: NeverthrowIssue[];
+  success: boolean;
+  message?: string;
+}> {
   // Collect all unique path patterns
   const patterns = new Set<string>();
   for (const rule of config.rules) {
@@ -472,23 +468,45 @@ async function main() {
         'out/**',
         '**/*.test.ts',
         '**/*.spec.ts',
-        '**/*.integration.test.ts',
       ],
     });
     allFiles.push(...files);
   }
 
-  const uniqueFiles = [...new Set(allFiles)];
-
-  if (uniqueFiles.length === 0) {
+  if (allFiles.length === 0 && !testMode) {
     consola.warn('No files found matching the configured patterns');
-    process.exit(0);
+    return { issues: [], success: true };
   }
 
-  consola.info(`Checking ${uniqueFiles.length} files...`);
-
-  const linter = new NeverthrowLinter(uniqueFiles, config);
+  const linter = new NeverthrowLinter(allFiles, config);
   const issues = linter.lint();
+
+  const success = issues.filter((i) => i.severity === 'error').length === 0;
+  const message =
+    issues.length === 0
+      ? '✔ All functions follow neverthrow error handling pattern!'
+      : undefined;
+
+  return {
+    issues,
+    success,
+    message,
+  };
+}
+
+async function main() {
+  consola.start('Linting neverthrow usage...');
+
+  // Parse command line arguments
+  const args = process.argv.slice(2);
+  const configIndex = args.indexOf('--config');
+  const customConfigPath =
+    configIndex !== -1 && args[configIndex + 1]
+      ? args[configIndex + 1]
+      : undefined;
+
+  const config = await loadConfig(customConfigPath);
+  const { issues, success } = await lintNeverthrow(config);
 
   if (issues.length === 0) {
     console.log('✔ All functions follow neverthrow error handling pattern!');
@@ -534,11 +552,15 @@ async function main() {
     console.log(
       `\n❌ ${errorCount} errors, ${issues.length - errorCount} warnings`,
     );
-    process.exit(errorCount > 0 ? 1 : 0);
+    process.exit(success ? 0 : 1);
   }
 }
 
-main().catch((error) => {
-  consola.error('Linter failed:', error);
-  process.exit(1);
-});
+// Only run main if this file is being executed directly
+// Check if running as main module (ES module compatible)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    consola.error('Linter failed:', error);
+    process.exit(1);
+  });
+}

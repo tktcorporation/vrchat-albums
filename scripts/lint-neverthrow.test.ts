@@ -1,14 +1,13 @@
-import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-
-// タイムアウトを15秒に設定（npx tsxの実行が遅いため）
-const TEST_TIMEOUT = 15000;
+import {
+  type NeverthrowLintConfig,
+  lintNeverthrow,
+} from './lint-neverthrow.js';
 
 describe('Neverthrow Linter', () => {
   const testDir = path.join(process.cwd(), 'test-neverthrow');
-  const configPath = path.join(testDir, '.neverthrowlintrc.json');
 
   beforeAll(() => {
     // Create test directory
@@ -30,23 +29,20 @@ describe('Neverthrow Linter', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
-  it(
-    'should pass for function with Result return type',
-    { timeout: TEST_TIMEOUT },
-    () => {
-      const testConfig = {
-        rules: [
-          {
-            name: 'Test rule',
-            path: 'test-neverthrow/**/*.ts',
-            enforceResult: true,
-            apply: 'async-functions',
-            exceptions: [],
-          },
-        ],
-      };
+  it('should pass for function with Result return type', async () => {
+    const testConfig: NeverthrowLintConfig = {
+      rules: [
+        {
+          name: 'Test rule',
+          path: 'test-neverthrow/**/*.ts',
+          enforceResult: true,
+          apply: 'async-functions',
+          exceptions: [],
+        },
+      ],
+    };
 
-      const validService = `
+    const validService = `
 import { Result, ok, err } from 'neverthrow';
 
 type DataError = { type: 'NOT_FOUND' } | { type: 'TIMEOUT' };
@@ -56,64 +52,48 @@ export async function loadData(): Promise<Result<string, DataError>> {
 }
 `;
 
-      fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-      fs.writeFileSync(path.join(testDir, 'valid-service.ts'), validService);
+    fs.writeFileSync(path.join(testDir, 'valid-service.ts'), validService);
 
-      // Run linter
-      const result = execSync(
-        `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
+    // Run linter with the imported function
+    const result = await lintNeverthrow(testConfig, true);
+
+    expect(result.success).toBe(true);
+    expect(result.issues).toHaveLength(0);
+    expect(result.message).toContain(
+      'All functions follow neverthrow error handling pattern!',
+    );
+  });
+
+  it('should fail for async function without Result return type', async () => {
+    const testConfig: NeverthrowLintConfig = {
+      rules: [
         {
-          cwd: process.cwd(),
-          encoding: 'utf-8',
+          name: 'Test rule',
+          path: 'test-neverthrow/**/*.ts',
+          enforceResult: true,
+          apply: 'async-functions',
+          exceptions: [],
         },
-      );
+      ],
+    };
 
-      expect(result).toContain(
-        'All functions follow neverthrow error handling pattern!',
-      );
-    },
-  );
-
-  it(
-    'should fail for async function without Result return type',
-    { timeout: TEST_TIMEOUT },
-    () => {
-      const testConfig = {
-        rules: [
-          {
-            name: 'Test rule',
-            path: 'test-neverthrow/**/*.ts',
-            enforceResult: true,
-            apply: 'async-functions',
-            exceptions: [],
-          },
-        ],
-      };
-
-      const invalidService = `
+    const invalidService = `
 export async function loadData(): Promise<string> {
   return 'data';
 }
 `;
 
-      fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-      fs.writeFileSync(
-        path.join(testDir, 'invalid-service.ts'),
-        invalidService,
-      );
+    fs.writeFileSync(path.join(testDir, 'invalid-service.ts'), invalidService);
 
-      // Run linter and expect failure
-      expect(() => {
-        execSync(`npx tsx scripts/lint-neverthrow.ts --config ${configPath}`, {
-          cwd: process.cwd(),
-          encoding: 'utf-8',
-        });
-      }).toThrow();
-    },
-  );
+    // Run linter and expect failure
+    const result = await lintNeverthrow(testConfig, true);
 
-  it('should respect exceptions list', { timeout: TEST_TIMEOUT }, () => {
-    const testConfig = {
+    expect(result.success).toBe(false);
+    expect(result.issues.length).toBeGreaterThan(0);
+  });
+
+  it('should respect exceptions list', async () => {
+    const testConfig: NeverthrowLintConfig = {
       rules: [
         {
           name: 'Test rule with exceptions',
@@ -139,43 +119,32 @@ export async function loadData(): Promise<neverthrow.Result<string, DataError>> 
 }
 `;
 
-    fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
     fs.writeFileSync(
       path.join(testDir, 'service-with-exception.ts'),
       serviceWithException,
     );
 
     // Run linter - should pass because getAppVersion is in exceptions
-    const result = execSync(
-      `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
-      {
-        cwd: process.cwd(),
-        encoding: 'utf-8',
-      },
-    );
+    const result = await lintNeverthrow(testConfig, true);
 
-    expect(result).toContain(
-      'All functions follow neverthrow error handling pattern!',
-    );
+    expect(result.success).toBe(true);
+    expect(result.issues).toHaveLength(0);
   });
 
-  it(
-    'should check only exported functions when apply is "exported-functions"',
-    { timeout: TEST_TIMEOUT },
-    () => {
-      const testConfig = {
-        rules: [
-          {
-            name: 'Test exported functions',
-            path: 'test-neverthrow/**/*.ts',
-            enforceResult: true,
-            apply: 'exported-functions',
-            exceptions: [],
-          },
-        ],
-      };
+  it('should check only exported functions when apply is "exported-functions"', async () => {
+    const testConfig: NeverthrowLintConfig = {
+      rules: [
+        {
+          name: 'Test exported functions',
+          path: 'test-neverthrow/**/*.ts',
+          enforceResult: true,
+          apply: 'exported-functions',
+          exceptions: [],
+        },
+      ],
+    };
 
-      const serviceWithPrivateFunction = `
+    const serviceWithPrivateFunction = `
 import { Result, ok } from 'neverthrow';
 
 type DataError = { type: 'ERROR' };
@@ -191,29 +160,20 @@ export async function publicFunction(): Promise<Result<string, DataError>> {
 }
 `;
 
-      fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-      fs.writeFileSync(
-        path.join(testDir, 'service-private.ts'),
-        serviceWithPrivateFunction,
-      );
+    fs.writeFileSync(
+      path.join(testDir, 'service-private.ts'),
+      serviceWithPrivateFunction,
+    );
 
-      // Run linter - should pass
-      const result = execSync(
-        `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
-        {
-          cwd: process.cwd(),
-          encoding: 'utf-8',
-        },
-      );
+    // Run linter - should pass
+    const result = await lintNeverthrow(testConfig, true);
 
-      expect(result).toContain(
-        'All functions follow neverthrow error handling pattern!',
-      );
-    },
-  );
+    expect(result.success).toBe(true);
+    expect(result.issues).toHaveLength(0);
+  });
 
-  it('should detect ResultAsync return type', { timeout: TEST_TIMEOUT }, () => {
-    const testConfig = {
+  it('should detect ResultAsync return type', async () => {
+    const testConfig: NeverthrowLintConfig = {
       rules: [
         {
           name: 'Test ResultAsync',
@@ -235,43 +195,32 @@ export async function loadDataAsync(): Promise<ResultAsync<string, DataError>> {
 }
 `;
 
-    fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
     fs.writeFileSync(
       path.join(testDir, 'service-result-async.ts'),
       serviceWithResultAsync,
     );
 
     // Run linter
-    const result = execSync(
-      `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
-      {
-        cwd: process.cwd(),
-        encoding: 'utf-8',
-      },
-    );
+    const result = await lintNeverthrow(testConfig, true);
 
-    expect(result).toContain(
-      'All functions follow neverthrow error handling pattern!',
-    );
+    expect(result.success).toBe(true);
+    expect(result.issues).toHaveLength(0);
   });
 
-  it(
-    'should check arrow functions assigned to exported const',
-    { timeout: TEST_TIMEOUT },
-    () => {
-      const testConfig = {
-        rules: [
-          {
-            name: 'Test arrow functions',
-            path: 'test-neverthrow/**/*.ts',
-            enforceResult: true,
-            apply: 'async-functions',
-            exceptions: [],
-          },
-        ],
-      };
+  it('should check arrow functions assigned to exported const', async () => {
+    const testConfig: NeverthrowLintConfig = {
+      rules: [
+        {
+          name: 'Test arrow functions',
+          path: 'test-neverthrow/**/*.ts',
+          enforceResult: true,
+          apply: 'async-functions',
+          exceptions: [],
+        },
+      ],
+    };
 
-      const serviceWithArrowFunction = `
+    const serviceWithArrowFunction = `
 import { Result, ok } from 'neverthrow';
 
 type DataError = { type: 'ERROR' };
@@ -281,45 +230,33 @@ export const loadData = async (): Promise<Result<string, DataError>> => {
 };
 `;
 
-      fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-      fs.writeFileSync(
-        path.join(testDir, 'service-arrow.ts'),
-        serviceWithArrowFunction,
-      );
+    fs.writeFileSync(
+      path.join(testDir, 'service-arrow.ts'),
+      serviceWithArrowFunction,
+    );
 
-      // Run linter
-      const result = execSync(
-        `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
-        {
-          cwd: process.cwd(),
-          encoding: 'utf-8',
-        },
-      );
+    // Run linter
+    const result = await lintNeverthrow(testConfig, true);
 
-      expect(result).toContain(
-        'All functions follow neverthrow error handling pattern!',
-      );
-    },
-  );
+    expect(result.success).toBe(true);
+    expect(result.issues).toHaveLength(0);
+  });
 
   describe('Anti-pattern detection: catch-err without classification', () => {
-    it(
-      'should detect catch block wrapping errors without classification',
-      { timeout: TEST_TIMEOUT },
-      () => {
-        const testConfig = {
-          rules: [
-            {
-              name: 'Test anti-pattern',
-              path: 'test-neverthrow/**/*.ts',
-              enforceResult: true,
-              apply: 'async-functions',
-              exceptions: [],
-            },
-          ],
-        };
+    it('should detect catch block wrapping errors without classification', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [
+          {
+            name: 'Test anti-pattern',
+            path: 'test-neverthrow/**/*.ts',
+            enforceResult: true,
+            apply: 'async-functions',
+            exceptions: [],
+          },
+        ],
+      };
 
-        const serviceWithAntiPattern = `
+      const serviceWithAntiPattern = `
 import { Result, ok, err } from 'neverthrow';
 
 type DataError = { type: 'ERROR' };
@@ -334,42 +271,31 @@ export async function loadData(): Promise<Result<string, DataError>> {
 }
 `;
 
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-        fs.writeFileSync(
-          path.join(testDir, 'anti-pattern.ts'),
-          serviceWithAntiPattern,
-        );
+      fs.writeFileSync(
+        path.join(testDir, 'anti-pattern.ts'),
+        serviceWithAntiPattern,
+      );
 
-        // Run linter and expect failure
-        expect(() => {
-          execSync(
-            `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
-            {
-              cwd: process.cwd(),
-              encoding: 'utf-8',
-            },
-          );
-        }).toThrow();
-      },
-    );
+      // Run linter and expect failure
+      const result = await lintNeverthrow(testConfig, true);
+      expect(result.success).toBe(false);
+      expect(result.issues.length).toBeGreaterThan(0);
+    });
 
-    it(
-      'should pass when errors are properly classified with match()',
-      { timeout: TEST_TIMEOUT },
-      () => {
-        const testConfig = {
-          rules: [
-            {
-              name: 'Test proper classification',
-              path: 'test-neverthrow/**/*.ts',
-              enforceResult: true,
-              apply: 'async-functions',
-              exceptions: [],
-            },
-          ],
-        };
+    it('should pass when errors are properly classified with match()', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [
+          {
+            name: 'Test proper classification',
+            path: 'test-neverthrow/**/*.ts',
+            enforceResult: true,
+            apply: 'async-functions',
+            exceptions: [],
+          },
+        ],
+      };
 
-        const serviceWithProperClassification = `
+      const serviceWithProperClassification = `
 import { Result, ok, err } from 'neverthrow';
 import { match } from 'ts-pattern';
 
@@ -396,44 +322,35 @@ export async function loadData(): Promise<Result<string, DataError>> {
 }
 `;
 
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-        fs.writeFileSync(
-          path.join(testDir, 'proper-classification.ts'),
-          serviceWithProperClassification,
-        );
+      fs.writeFileSync(
+        path.join(testDir, 'proper-classification.ts'),
+        serviceWithProperClassification,
+      );
 
-        // Run linter - should pass
-        const result = execSync(
-          `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
+      // Run linter - should pass
+      const result = await lintNeverthrow(testConfig, true);
+
+      expect(result.success).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.message).toContain(
+        'All functions follow neverthrow error handling pattern!',
+      );
+    });
+
+    it('should pass when unexpected errors are re-thrown', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [
           {
-            cwd: process.cwd(),
-            encoding: 'utf-8',
+            name: 'Test re-throw',
+            path: 'test-neverthrow/**/*.ts',
+            enforceResult: true,
+            apply: 'async-functions',
+            exceptions: [],
           },
-        );
+        ],
+      };
 
-        expect(result).toContain(
-          'All functions follow neverthrow error handling pattern!',
-        );
-      },
-    );
-
-    it(
-      'should pass when unexpected errors are re-thrown',
-      { timeout: TEST_TIMEOUT },
-      () => {
-        const testConfig = {
-          rules: [
-            {
-              name: 'Test re-throw',
-              path: 'test-neverthrow/**/*.ts',
-              enforceResult: true,
-              apply: 'async-functions',
-              exceptions: [],
-            },
-          ],
-        };
-
-        const serviceWithReThrow = `
+      const serviceWithReThrow = `
 import { Result, ok } from 'neverthrow';
 
 export async function loadData(): Promise<Result<string, never>> {
@@ -446,41 +363,32 @@ export async function loadData(): Promise<Result<string, never>> {
 }
 `;
 
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-        fs.writeFileSync(path.join(testDir, 're-throw.ts'), serviceWithReThrow);
+      fs.writeFileSync(path.join(testDir, 're-throw.ts'), serviceWithReThrow);
 
-        // Run linter - should pass
-        const result = execSync(
-          `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
+      // Run linter - should pass
+      const result = await lintNeverthrow(testConfig, true);
+
+      expect(result.success).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.message).toContain(
+        'All functions follow neverthrow error handling pattern!',
+      );
+    });
+
+    it('should pass when using if statements for error classification', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [
           {
-            cwd: process.cwd(),
-            encoding: 'utf-8',
+            name: 'Test if classification',
+            path: 'test-neverthrow/**/*.ts',
+            enforceResult: true,
+            apply: 'async-functions',
+            exceptions: [],
           },
-        );
+        ],
+      };
 
-        expect(result).toContain(
-          'All functions follow neverthrow error handling pattern!',
-        );
-      },
-    );
-
-    it(
-      'should pass when using if statements for error classification',
-      { timeout: TEST_TIMEOUT },
-      () => {
-        const testConfig = {
-          rules: [
-            {
-              name: 'Test if classification',
-              path: 'test-neverthrow/**/*.ts',
-              enforceResult: true,
-              apply: 'async-functions',
-              exceptions: [],
-            },
-          ],
-        };
-
-        const serviceWithIfClassification = `
+      const serviceWithIfClassification = `
 import { Result, ok, err } from 'neverthrow';
 
 type FileError = { type: 'NOT_FOUND' } | { type: 'ACCESS_DENIED' };
@@ -501,44 +409,35 @@ export async function readFile(): Promise<Result<string, FileError>> {
 }
 `;
 
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-        fs.writeFileSync(
-          path.join(testDir, 'if-classification.ts'),
-          serviceWithIfClassification,
-        );
+      fs.writeFileSync(
+        path.join(testDir, 'if-classification.ts'),
+        serviceWithIfClassification,
+      );
 
-        // Run linter - should pass
-        const result = execSync(
-          `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
+      // Run linter - should pass
+      const result = await lintNeverthrow(testConfig, true);
+
+      expect(result.success).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.message).toContain(
+        'All functions follow neverthrow error handling pattern!',
+      );
+    });
+
+    it('should detect anti-pattern even with match() that only checks instanceof', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [
           {
-            cwd: process.cwd(),
-            encoding: 'utf-8',
+            name: 'Test instanceof-only match',
+            path: 'test-neverthrow/**/*.ts',
+            enforceResult: true,
+            apply: 'async-functions',
+            exceptions: [],
           },
-        );
+        ],
+      };
 
-        expect(result).toContain(
-          'All functions follow neverthrow error handling pattern!',
-        );
-      },
-    );
-
-    it(
-      'should detect anti-pattern even with match() that only checks instanceof',
-      { timeout: TEST_TIMEOUT },
-      () => {
-        const testConfig = {
-          rules: [
-            {
-              name: 'Test instanceof-only match',
-              path: 'test-neverthrow/**/*.ts',
-              enforceResult: true,
-              apply: 'async-functions',
-              exceptions: [],
-            },
-          ],
-        };
-
-        const serviceWithInstanceOfOnly = `
+      const serviceWithInstanceOfOnly = `
 import { Result, ok, err } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 
@@ -558,44 +457,33 @@ export async function loadData(): Promise<Result<string, DataError>> {
 }
 `;
 
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-        fs.writeFileSync(
-          path.join(testDir, 'instanceof-only.ts'),
-          serviceWithInstanceOfOnly,
-        );
+      fs.writeFileSync(
+        path.join(testDir, 'instanceof-only.ts'),
+        serviceWithInstanceOfOnly,
+      );
 
-        // Run linter and expect failure
-        expect(() => {
-          execSync(
-            `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
-            {
-              cwd: process.cwd(),
-              encoding: 'utf-8',
-            },
-          );
-        }).toThrow();
-      },
-    );
+      // Run linter and expect failure
+      const result = await lintNeverthrow(testConfig, true);
+      expect(result.success).toBe(false);
+      expect(result.issues.length).toBeGreaterThan(0);
+    });
   });
 
   describe('Generic error type detection', () => {
-    it(
-      'should warn when using Result<T, Error>',
-      { timeout: TEST_TIMEOUT },
-      () => {
-        const testConfig = {
-          rules: [
-            {
-              name: 'Test generic error',
-              path: 'test-neverthrow/**/*.ts',
-              enforceResult: true,
-              apply: 'async-functions',
-              exceptions: [],
-            },
-          ],
-        };
+    it('should warn when using Result<T, Error>', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [
+          {
+            name: 'Test generic error',
+            path: 'test-neverthrow/**/*.ts',
+            enforceResult: true,
+            apply: 'async-functions',
+            exceptions: [],
+          },
+        ],
+      };
 
-        const serviceWithGenericError = `
+      const serviceWithGenericError = `
 import { Result, ok } from 'neverthrow';
 
 export async function loadData(): Promise<Result<string, Error>> {
@@ -603,43 +491,34 @@ export async function loadData(): Promise<Result<string, Error>> {
 }
 `;
 
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-        fs.writeFileSync(
-          path.join(testDir, 'generic-error.ts'),
-          serviceWithGenericError,
-        );
+      fs.writeFileSync(
+        path.join(testDir, 'generic-error.ts'),
+        serviceWithGenericError,
+      );
 
-        // Run linter - should have warnings
-        const result = execSync(
-          `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
+      // Run linter - should have warnings
+      const result = await lintNeverthrow(testConfig, true);
+
+      expect(result.issues.some((i) => i.severity === 'warning')).toBe(true);
+      expect(
+        result.issues.some((i) => i.message.includes('generic error type')),
+      ).toBe(true);
+    });
+
+    it('should warn when using Result<T, any>', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [
           {
-            cwd: process.cwd(),
-            encoding: 'utf-8',
+            name: 'Test any error',
+            path: 'test-neverthrow/**/*.ts',
+            enforceResult: true,
+            apply: 'async-functions',
+            exceptions: [],
           },
-        );
+        ],
+      };
 
-        expect(result).toContain('warning');
-        expect(result).toContain('generic error type');
-      },
-    );
-
-    it(
-      'should warn when using Result<T, any>',
-      { timeout: TEST_TIMEOUT },
-      () => {
-        const testConfig = {
-          rules: [
-            {
-              name: 'Test any error',
-              path: 'test-neverthrow/**/*.ts',
-              enforceResult: true,
-              apply: 'async-functions',
-              exceptions: [],
-            },
-          ],
-        };
-
-        const serviceWithAnyError = `
+      const serviceWithAnyError = `
 import { Result, ok } from 'neverthrow';
 
 export async function loadData(): Promise<Result<string, any>> {
@@ -647,43 +526,31 @@ export async function loadData(): Promise<Result<string, any>> {
 }
 `;
 
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-        fs.writeFileSync(
-          path.join(testDir, 'any-error.ts'),
-          serviceWithAnyError,
-        );
+      fs.writeFileSync(path.join(testDir, 'any-error.ts'), serviceWithAnyError);
 
-        // Run linter - should have warnings
-        const result = execSync(
-          `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
+      // Run linter - should have warnings
+      const result = await lintNeverthrow(testConfig, true);
+
+      expect(result.issues.some((i) => i.severity === 'warning')).toBe(true);
+      expect(
+        result.issues.some((i) => i.message.includes('generic error type')),
+      ).toBe(true);
+    });
+
+    it('should pass when using specific error union types', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [
           {
-            cwd: process.cwd(),
-            encoding: 'utf-8',
+            name: 'Test specific error',
+            path: 'test-neverthrow/**/*.ts',
+            enforceResult: true,
+            apply: 'async-functions',
+            exceptions: [],
           },
-        );
+        ],
+      };
 
-        expect(result).toContain('warning');
-        expect(result).toContain('generic error type');
-      },
-    );
-
-    it(
-      'should pass when using specific error union types',
-      { timeout: TEST_TIMEOUT },
-      () => {
-        const testConfig = {
-          rules: [
-            {
-              name: 'Test specific error',
-              path: 'test-neverthrow/**/*.ts',
-              enforceResult: true,
-              apply: 'async-functions',
-              exceptions: [],
-            },
-          ],
-        };
-
-        const serviceWithSpecificError = `
+      const serviceWithSpecificError = `
 import { Result, ok } from 'neverthrow';
 
 type DataError =
@@ -695,26 +562,16 @@ export async function loadData(): Promise<Result<string, DataError>> {
 }
 `;
 
-        fs.writeFileSync(configPath, JSON.stringify(testConfig, null, 2));
-        fs.writeFileSync(
-          path.join(testDir, 'specific-error.ts'),
-          serviceWithSpecificError,
-        );
+      fs.writeFileSync(
+        path.join(testDir, 'specific-error.ts'),
+        serviceWithSpecificError,
+      );
 
-        // Run linter - should pass without warnings
-        const result = execSync(
-          `npx tsx scripts/lint-neverthrow.ts --config ${configPath}`,
-          {
-            cwd: process.cwd(),
-            encoding: 'utf-8',
-          },
-        );
+      // Run linter - should pass without warnings
+      const result = await lintNeverthrow(testConfig, true);
 
-        expect(result).toContain(
-          'All functions follow neverthrow error handling pattern!',
-        );
-        expect(result).not.toContain('warning');
-      },
-    );
+      expect(result.success).toBe(true);
+      expect(result.issues).toHaveLength(0);
+    });
   });
 });
