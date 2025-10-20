@@ -389,6 +389,8 @@ export async function lintValueObjects(testMode = false): Promise<{
     cwd: process.cwd(),
     absolute: true,
     ignore: ['node_modules/**', 'dist/**', 'main/**', 'out/**'],
+    // Important for Windows: don't escape special characters
+    windowsPathsNoEscape: true,
   });
 
   const linter = new ValueObjectLinter(files);

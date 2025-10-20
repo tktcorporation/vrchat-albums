@@ -468,14 +468,18 @@ export async function lintNeverthrow(
         '**/*.spec.ts',
       ];
 
-  // Convert Set to Array for glob
-  const patternArray = Array.from(patterns);
+  // Convert Set to Array for glob and handle Windows paths
+  const patternArray = Array.from(patterns).map((pattern) => {
+    // Normalize path separators for cross-platform compatibility
+    return pattern.replace(/\\/g, '/');
+  });
 
   const files = await glob(patternArray, {
     cwd: process.cwd(),
     absolute: true,
     ignore: ignorePatterns,
-    windowsPathsNoEscape: process.platform === 'win32',
+    // Important for Windows: don't escape special characters
+    windowsPathsNoEscape: true,
   });
 
   const allFiles = [...files];
