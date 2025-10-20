@@ -456,27 +456,29 @@ export async function lintNeverthrow(
   }
 
   // Find all TypeScript files matching the patterns
-  const allFiles: string[] = [];
-  for (const pattern of patterns) {
-    // In test mode, don't ignore test files since we're testing files in test-neverthrow directory
-    const ignorePatterns = testMode
-      ? ['node_modules/**', 'dist/**', 'main/**', 'out/**']
-      : [
-          'node_modules/**',
-          'dist/**',
-          'main/**',
-          'out/**',
-          '**/*.test.ts',
-          '**/*.spec.ts',
-        ];
+  // In test mode, don't ignore test files since we're testing files in test-neverthrow directory
+  const ignorePatterns = testMode
+    ? ['node_modules/**', 'dist/**', 'main/**', 'out/**']
+    : [
+        'node_modules/**',
+        'dist/**',
+        'main/**',
+        'out/**',
+        '**/*.test.ts',
+        '**/*.spec.ts',
+      ];
 
-    const files = await glob(pattern, {
-      cwd: process.cwd(),
-      absolute: true,
-      ignore: ignorePatterns,
-    });
-    allFiles.push(...files);
-  }
+  // Convert Set to Array for glob
+  const patternArray = Array.from(patterns);
+
+  const files = await glob(patternArray, {
+    cwd: process.cwd(),
+    absolute: true,
+    ignore: ignorePatterns,
+    windowsPathsNoEscape: process.platform === 'win32',
+  });
+
+  const allFiles = [...files];
 
   if (allFiles.length === 0) {
     if (!testMode) {
