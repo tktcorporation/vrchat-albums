@@ -13,6 +13,9 @@ uv = "latest"
 "npm:@antfu/ni" = "latest"
 "npm:fxp-cli" = "latest"
 
+# GritQL - code search and transformation tool
+"npm:@getgrit/cli" = "latest"
+
 
 [settings]
 # Enable automatic installation of tools
