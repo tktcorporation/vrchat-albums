@@ -84,12 +84,12 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
         joinDate: worldJoinDate,
       };
 
-      const worldJoinResult =
+      const worldJoinResultAsync =
         await worldJoinLogService.createVRChatWorldJoinLogModel([
           worldJoinData,
         ]);
 
-      const nextWorldJoinResult =
+      const nextWorldJoinResultAsync =
         await worldJoinLogService.createVRChatWorldJoinLogModel([
           {
             logType: 'worldJoin' as const,
@@ -101,6 +101,13 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             joinDate: nextWorldJoinDate,
           },
         ]);
+
+      const worldJoinResult = worldJoinResultAsync.isOk()
+        ? worldJoinResultAsync.value
+        : [];
+      const nextWorldJoinResult = nextWorldJoinResultAsync.isOk()
+        ? nextWorldJoinResultAsync.value
+        : [];
 
       if (worldJoinResult.length > 0 && nextWorldJoinResult.length > 0) {
         // プレイヤー参加ログを作成（セッション期間内）
@@ -179,12 +186,12 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
         joinDate: worldJoinDate,
       };
 
-      const worldJoinResult =
+      const worldJoinResultAsync =
         await worldJoinLogService.createVRChatWorldJoinLogModel([
           worldJoinData,
         ]);
 
-      const nextWorldJoinResult =
+      const nextWorldJoinResultAsync =
         await worldJoinLogService.createVRChatWorldJoinLogModel([
           {
             logType: 'worldJoin' as const,
@@ -198,6 +205,13 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             joinDate: nextWorldJoinDate,
           },
         ]);
+
+      const worldJoinResult = worldJoinResultAsync.isOk()
+        ? worldJoinResultAsync.value
+        : [];
+      const nextWorldJoinResult = nextWorldJoinResultAsync.isOk()
+        ? nextWorldJoinResultAsync.value
+        : [];
 
       if (worldJoinResult.length > 0 && nextWorldJoinResult.length > 0) {
         // プレイヤー参加ログを作成（セッション期間内）

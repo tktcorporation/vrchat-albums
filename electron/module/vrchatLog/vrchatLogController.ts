@@ -45,10 +45,10 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   // DBから最新のログ日時を取得（processAllがfalseの場合のみ）
   let startDate = new Date(0); // デフォルトは最古の日時
   if (!processAll) {
-    const latestWorldJoinLog =
+    const latestWorldJoinLogResult =
       await worldJoinLogService.findLatestWorldJoinLog();
-    if (latestWorldJoinLog) {
-      startDate = latestWorldJoinLog.joinDateTime;
+    if (latestWorldJoinLogResult.isOk() && latestWorldJoinLogResult.value) {
+      startDate = latestWorldJoinLogResult.value.joinDateTime;
       logger.info(`Processing logs after ${startDate.toISOString()}`);
     } else {
       logger.info('No existing logs found in DB, processing all logs');

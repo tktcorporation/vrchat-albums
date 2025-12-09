@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { Op, col, fn, literal } from '@sequelize/core';
 import * as datefns from 'date-fns';
 import * as neverthrow from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import { match } from 'ts-pattern';
 import { logger } from '../../lib/logger';
 import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
@@ -35,7 +36,7 @@ interface LogProcessingResults {
  * @param excludeOldLogLoad trueの場合、DBに保存されている最新のログ日時以降のログのみを処理します。
  *                           falseの場合、2000年1月1日からすべてのログを処理します。
  */
-async function _getLogStoreFilePaths(
+async function _getLogStoreFilePathsImpl(
   excludeOldLogLoad: boolean,
 ): Promise<VRChatLogStoreFilePath[]> {
   const startTime = performance.now();
@@ -46,7 +47,7 @@ async function _getLogStoreFilePaths(
     const findLatestStartTime = performance.now();
     // DBに保存されている最新のログ日時を取得
     const [
-      latestWorldJoinDate,
+      latestWorldJoinDateResult,
       latestPlayerJoinDateResult,
       latestPlayerLeaveDate,
     ] = await Promise.all([
@@ -60,6 +61,10 @@ async function _getLogStoreFilePaths(
         findLatestEndTime - findLatestStartTime
       } ms`,
     );
+
+    const latestWorldJoinDate = latestWorldJoinDateResult.isOk()
+      ? latestWorldJoinDateResult.value
+      : null;
 
     const latestPlayerJoinDate = latestPlayerJoinDateResult.isOk()
       ? latestPlayerJoinDateResult.value?.joinDateTime
@@ -113,6 +118,14 @@ async function _getLogStoreFilePaths(
   logger.debug(`_getLogStoreFilePaths took ${endTime - startTime} ms`);
 
   return logStoreFilePaths;
+}
+
+function _getLogStoreFilePaths(
+  excludeOldLogLoad: boolean,
+): ResultAsync<VRChatLogStoreFilePath[], never> {
+  return ResultAsync.fromSafePromise(
+    _getLogStoreFilePathsImpl(excludeOldLogLoad),
+  );
 }
 
 /**
@@ -174,7 +187,10 @@ export async function loadLogInfoIndexFromVRChatLog({
 
   // 1. 処理対象となるログファイルパスを取得
   const getLogPathsStartTime = performance.now();
-  const logStoreFilePaths = await _getLogStoreFilePaths(excludeOldLogLoad);
+  const logStoreFilePathsResult =
+    await _getLogStoreFilePaths(excludeOldLogLoad);
+  // _getLogStoreFilePaths は never エラーなので常に成功
+  const logStoreFilePaths = logStoreFilePathsResult._unsafeUnwrap();
   const getLogPathsEndTime = performance.now();
   logger.debug(
     `Get log store file paths took ${
@@ -189,10 +205,12 @@ export async function loadLogInfoIndexFromVRChatLog({
 
   // 3. ログファイルからログ情報を取得（部分的な成功を許容）
   const getLogInfoStartTime = performance.now();
-  const logInfoListFromLogFile =
+  const logInfoListFromLogFileResult =
     await vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess(
       logStoreFilePaths,
     );
+  // この関数は never エラーなので常に成功
+  const logInfoListFromLogFile = logInfoListFromLogFileResult._unsafeUnwrap();
   const getLogInfoEndTime = performance.now();
   logger.debug(
     `Get VRChat log info from log files took ${
@@ -245,7 +263,7 @@ export async function loadLogInfoIndexFromVRChatLog({
       const findLatestStartTime = performance.now();
       // ログの最新日時を取得
       const [
-        latestWorldJoinDate,
+        latestWorldJoinDateResult,
         latestPlayerJoinDateResult,
         latestPlayerLeaveDate,
       ] = await Promise.all([
@@ -259,6 +277,11 @@ export async function loadLogInfoIndexFromVRChatLog({
           findLatestEndTime - findLatestStartTime
         } ms`,
       );
+
+      // latestWorldJoinDateResultからvalueを取得
+      const latestWorldJoinDate = latestWorldJoinDateResult.isOk()
+        ? latestWorldJoinDateResult.value
+        : null;
 
       // playerJoinDateResultからvalueを取得
       let latestPlayerJoinDate = null;
@@ -356,7 +379,7 @@ export async function loadLogInfoIndexFromVRChatLog({
 
     const dbInsertStartTime = performance.now();
     const [
-      worldJoinResults,
+      worldJoinResultsResult,
       playerJoinResults,
       playerLeaveResults,
       // TODO: アプリイベントの処理は今後実装
@@ -382,6 +405,17 @@ export async function loadLogInfoIndexFromVRChatLog({
         dbInsertEndTime - dbInsertStartTime
       } ms`,
     );
+
+    // worldJoinResultsResultがResultAsyncなので展開
+    const worldJoinResults = worldJoinResultsResult.isOk()
+      ? worldJoinResultsResult.value
+      : [];
+    if (worldJoinResultsResult.isErr()) {
+      logger.error({
+        message: 'ワールド参加ログのDB保存中にエラーが発生しました',
+        stack: new Error(JSON.stringify(worldJoinResultsResult.error)),
+      });
+    }
 
     results.createdWorldJoinLogModelList =
       results.createdWorldJoinLogModelList.concat(worldJoinResults);

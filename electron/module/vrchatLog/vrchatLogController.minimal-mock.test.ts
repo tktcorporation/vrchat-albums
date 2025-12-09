@@ -124,7 +124,7 @@ describe('vrchatLogController integration test with minimal mocks', () => {
   // };
 
   const createTestWorldJoinLog = async (joinDateTime: Date) => {
-    const logs = await worldJoinLogService.createVRChatWorldJoinLogModel([
+    const logsResult = await worldJoinLogService.createVRChatWorldJoinLogModel([
       {
         logType: 'worldJoin' as const,
         joinDate: joinDateTime,
@@ -133,7 +133,12 @@ describe('vrchatLogController integration test with minimal mocks', () => {
         worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
       },
     ]);
-    return logs[0];
+    if (logsResult.isErr()) {
+      throw new Error(
+        `Failed to create world join log: ${logsResult.error.message}`,
+      );
+    }
+    return logsResult.value[0];
   };
 
   const createTestPlayerJoinLog = async (joinDateTime: Date) => {

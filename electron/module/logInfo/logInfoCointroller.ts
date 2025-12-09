@@ -68,8 +68,17 @@ const fetchAndMergeSortedWorldJoinLogs = async (
 };
 
 const getVRCWorldJoinLogList = async () => {
-  const joinLogList = await worldJoinLogService.findAllVRChatWorldJoinLogList();
-  return joinLogList.map((joinLog) => {
+  const result = await worldJoinLogService.findAllVRChatWorldJoinLogList();
+  if (result.isErr()) {
+    throw UserFacingError.withStructuredInfo({
+      code: ERROR_CODES.DATABASE_ERROR,
+      category: ERROR_CATEGORIES.DATABASE_ERROR,
+      message: `Failed to get world join log list: ${result.error.message}`,
+      userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
+      cause: new Error(result.error.message),
+    });
+  }
+  return result.value.map((joinLog) => {
     return {
       id: joinLog.id as string,
       worldId: joinLog.worldId,
@@ -189,19 +198,34 @@ const getRecentVRChatWorldJoinLogByVRChatPhotoName = async (
         updatedAt: Date;
       } | null;
     },
-    'RECENT_JOIN_LOG_NOT_FOUND'
+    'RECENT_JOIN_LOG_NOT_FOUND' | 'DATABASE_ERROR'
   >
 > => {
-  const joinLog = await worldJoinLogService.findRecentVRChatWorldJoinLog(
+  const joinLogResult = await worldJoinLogService.findRecentVRChatWorldJoinLog(
     vrchatPhotoName.photoTakenDateTime,
   );
+  if (joinLogResult.isErr()) {
+    logger.error({
+      message: '直近のワールド参加ログ取得中にエラーが発生しました',
+      stack: new Error(JSON.stringify(joinLogResult.error)),
+    });
+    return neverthrow.err('DATABASE_ERROR' as const);
+  }
+  const joinLog = joinLogResult.value;
   if (joinLog === null) {
     return neverthrow.err('RECENT_JOIN_LOG_NOT_FOUND' as const);
   }
 
-  const nextJoinLog = await worldJoinLogService.findNextVRChatWorldJoinLog(
-    joinLog.joinDateTime,
-  );
+  const nextJoinLogResult =
+    await worldJoinLogService.findNextVRChatWorldJoinLog(joinLog.joinDateTime);
+  if (nextJoinLogResult.isErr()) {
+    logger.error({
+      message: '次のワールド参加ログ取得中にエラーが発生しました',
+      stack: new Error(JSON.stringify(nextJoinLogResult.error)),
+    });
+    return neverthrow.err('DATABASE_ERROR' as const);
+  }
+  const nextJoinLog = nextJoinLogResult.value;
 
   return neverthrow.ok({
     id: joinLog.id as string,

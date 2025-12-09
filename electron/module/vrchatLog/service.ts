@@ -1,4 +1,5 @@
 import * as neverthrow from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import { match } from 'ts-pattern';
 import type {
   VRChatLogFilePath,
@@ -129,48 +130,52 @@ export const getVRChaLogInfoByLogFilePathList = async (
   return neverthrow.ok(parseResult.logInfos);
 };
 
+export type LogInfoPartialSuccessResult = PartialSuccessResult<
+  (
+    | VRChatWorldJoinLog
+    | VRChatWorldLeaveLog
+    | VRChatPlayerJoinLog
+    | VRChatPlayerLeaveLog
+  )[],
+  { path: string; error: VRChatLogFileError }
+>;
+
 /**
  * 複数のVRChatログファイルからログ情報を取得（部分的な成功を許容）
  * エラーが発生しても処理を継続し、成功した部分のデータを返す
  * @param logFilePathList ログファイルパスのリスト
  * @returns 部分的な成功結果（成功したログ情報とエラー情報）
  */
-export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = async (
+export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
   logFilePathList: (VRChatLogFilePath | VRChatLogStoreFilePath)[],
-): Promise<
-  PartialSuccessResult<
-    (
-      | VRChatWorldJoinLog
-      | VRChatWorldLeaveLog
-      | VRChatPlayerJoinLog
-      | VRChatPlayerLeaveLog
-    )[],
-    { path: string; error: VRChatLogFileError }
-  >
-> => {
-  const logLineListResult =
-    await getLogLinesByLogFilePathListWithPartialSuccess({
-      logFilePathList,
-      includesList: [
-        'VRC Analytics Initialized', // TODO: 今後実装
-        '[Behaviour] Joining ',
-        '[Behaviour] OnPlayerJoined ',
-        '[Behaviour] OnPlayerLeft ',
-        'VRCApplication: HandleApplicationQuit', // worldLeaveParserで処理
-      ],
-    });
+): ResultAsync<LogInfoPartialSuccessResult, never> => {
+  return ResultAsync.fromSafePromise(
+    (async (): Promise<LogInfoPartialSuccessResult> => {
+      const logLineListResult =
+        await getLogLinesByLogFilePathListWithPartialSuccess({
+          logFilePathList,
+          includesList: [
+            'VRC Analytics Initialized', // TODO: 今後実装
+            '[Behaviour] Joining ',
+            '[Behaviour] OnPlayerJoined ',
+            '[Behaviour] OnPlayerLeft ',
+            'VRCApplication: HandleApplicationQuit', // worldLeaveParserで処理
+          ],
+        });
 
-  const parseResult = convertLogLinesToWorldAndPlayerJoinLogInfos(
-    logLineListResult.data,
+      const parseResult = convertLogLinesToWorldAndPlayerJoinLogInfos(
+        logLineListResult.data,
+      );
+
+      return {
+        data: parseResult.logInfos,
+        errors: logLineListResult.errors,
+        totalProcessed: logLineListResult.totalProcessed,
+        successCount: logLineListResult.successCount,
+        errorCount: logLineListResult.errorCount,
+      };
+    })(),
   );
-
-  return {
-    data: parseResult.logInfos,
-    errors: logLineListResult.errors,
-    totalProcessed: logLineListResult.totalProcessed,
-    successCount: logLineListResult.successCount,
-    errorCount: logLineListResult.errorCount,
-  };
 };
 
 // ファイルハンドラー機能の再エクスポート

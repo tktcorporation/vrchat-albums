@@ -375,9 +375,11 @@ vi.mock('../../logInfo/service', async (importOriginal) => {
       if (mockState.importedWorldLogs.length > 0) {
         // Create actual world join logs in the database
         for (const logData of mockState.importedWorldLogs) {
-          const createdLogs =
+          const createdLogsResult =
             await worldJoinLogService.createVRChatWorldJoinLogModel([logData]);
-          worldLogs.push(...createdLogs);
+          if (createdLogsResult.isOk()) {
+            worldLogs.push(...createdLogsResult.value);
+          }
         }
       }
 
@@ -466,7 +468,7 @@ describe('vrchatLogController integration - Import and Rollback', () => {
   };
 
   const createTestWorldJoinLog = async (joinDateTime: Date) => {
-    const logs = await worldJoinLogService.createVRChatWorldJoinLogModel([
+    const logsResult = await worldJoinLogService.createVRChatWorldJoinLogModel([
       {
         logType: 'worldJoin' as const,
         joinDate: joinDateTime,
@@ -475,7 +477,12 @@ describe('vrchatLogController integration - Import and Rollback', () => {
         worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
       },
     ]);
-    return logs[0];
+    if (logsResult.isErr()) {
+      throw new Error(
+        `Failed to create world join log: ${logsResult.error.message}`,
+      );
+    }
+    return logsResult.value[0];
   };
 
   const createTestPlayerJoinLog = async (joinDateTime: Date) => {
