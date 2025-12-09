@@ -7,31 +7,18 @@
       "enforceResult": true,
       "apply": "async-functions",
       "exceptions": [
-        "(anonymous)",
         "getAppVersion",
         "clearMigrationCache",
         "clearAllStoredSettings",
         "clearStoredSetting",
         "getApplicationLogPath",
         "showSavePngDialog",
-        "getStoredVRChatLogFilesDirPath",
-        "getVRChatLogFileDir",
         "createVRChatWorldJoinLogFromPhoto",
         "findVRChatWorldJoinLogFromPhotoList",
-        "getVRChaLogInfoByLogFilePathListWithPartialSuccess",
-        "findAllVRChatWorldJoinLogList",
         "findVRChatWorldJoinLogList",
-        "performMigrationIfNeeded",
-        "isMigrationNeeded",
         "syncLogsInBackground",
-        "findNextVRChatWorldJoinLog",
-        "findRecentVRChatWorldJoinLog",
-        "getOldAppUserDataPath",
         "processQueue",
-        "getVrcUserInfoByUserName",
-        "newLogs",
-        "latestPhotoDate",
-        "importResult"
+        "getVrcUserInfoByUserName"
       ]
     }
   ]
