@@ -315,4 +315,3 @@ yarn test scripts/lint-neverthrow.test.ts
 
 - [CLAUDE.md - Error Handling パターン](../CLAUDE.md#error-handling)
 - [neverthrow 公式ドキュメント](https://github.com/supermacro/neverthrow)
-- [エラーハンドリング設計](./error-handling-design.md)（存在する場合）

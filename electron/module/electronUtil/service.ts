@@ -11,14 +11,16 @@ import { P, match } from 'ts-pattern';
 type OpenPathError = { type: 'OPEN_PATH_FAILED'; message: string };
 
 /**
- * OS のエクスプローラーで指定パスを開くユーティリティ。
- * main プロセスの service モジュール各所から利用される。
+ * shell.openPath() をラップした共通ヘルパー関数。
+ * エクスプローラー、フォトビューア、関連付けアプリでの開く操作で共通利用される。
+ * shell.openPath() はエラー時に文字列を返し、成功時は空文字列を返す。
  */
-const openPathInExplorer = async (
-  path: string,
+const openPathWithShell = async (
+  targetPath: string,
 ): Promise<neverthrow.Result<string, OpenPathError>> => {
-  // shell.openPath() returns error message string on failure
-  const errorMsg = await shell.openPath(path);
+  // shell.openPath() returns error message string on failure, empty string on success
+  // Any exceptions thrown are unexpected and should propagate to Sentry
+  const errorMsg = await shell.openPath(targetPath);
   if (errorMsg) {
     return neverthrow.err({
       type: 'OPEN_PATH_FAILED',
@@ -27,6 +29,12 @@ const openPathInExplorer = async (
   }
   return neverthrow.ok('');
 };
+
+/**
+ * OS のエクスプローラーで指定パスを開くユーティリティ。
+ * main プロセスの service モジュール各所から利用される。
+ */
+const openPathInExplorer = openPathWithShell;
 
 /**
  * アプリケーションのログ保存ディレクトリを取得する。
@@ -95,40 +103,13 @@ const openUrlInDefaultBrowser = (url: string) => {
  * 写真ファイルを OS 標準のフォトビューアで開く関数。
  * PhotoCard の"画像で開く"操作などから利用される。
  */
-const openPhotoPathWithPhotoApp = async (
-  filePath: string,
-): Promise<neverthrow.Result<string, OpenPathError>> => {
-  // shell.openPath() returns error message string on failure
-  // Any exceptions thrown are unexpected and should propagate
-  const errorMsg = await shell.openPath(filePath);
-  if (errorMsg) {
-    return neverthrow.err({
-      type: 'OPEN_PATH_FAILED',
-      message: errorMsg,
-    });
-  }
-  return neverthrow.ok('');
-};
+const openPhotoPathWithPhotoApp = openPathWithShell;
 
 /**
  * 拡張子に関連付けられたアプリケーションでファイルを開く関数。
  * エクスプローラーから開く機能などで利用される。
  */
-const openPathWithAssociatedApp = async (
-  filePath: string,
-): Promise<neverthrow.Result<string, OpenPathError>> => {
-  // openPath はデフォルトアプリで開くので、これで代用可能
-  // shell.openPath() returns error message string on failure
-  // Any exceptions thrown are unexpected and should propagate
-  const errorMsg = await shell.openPath(filePath);
-  if (errorMsg) {
-    return neverthrow.err({
-      type: 'OPEN_PATH_FAILED',
-      message: errorMsg,
-    });
-  }
-  return neverthrow.ok('');
-};
+const openPathWithAssociatedApp = openPathWithShell;
 
 /**
  * 画像ファイルを読み込み、クリップボードへ転送する。

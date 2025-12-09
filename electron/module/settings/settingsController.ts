@@ -1,5 +1,4 @@
 import type { UpdateCheckResult } from 'electron-updater';
-import * as neverthrow from 'neverthrow';
 import { P, match } from 'ts-pattern';
 import { reloadMainWindow } from '../../electronUtil';
 import {
@@ -336,11 +335,9 @@ export const settingsRouter = () =>
         const result = await performMigration();
 
         // performMigration は Result<MigrationResult, never> を返すため、
-        // エラーは発生しないが、ts-pattern の match() で型安全に値を取り出す
-        return match(result)
-          .with(P.instanceOf(neverthrow.Ok), (r) => {
-            const migrationResult =
-              r.value as import('../migration/service').MigrationResult;
+        // エラーは発生しない。neverthrow標準の.match()を使用
+        return result.match(
+          (migrationResult) => {
             // エラーは MigrationResult.errors 配列に格納される
             if (migrationResult.errors.length > 0) {
               logger.error({
@@ -355,14 +352,14 @@ export const settingsRouter = () =>
               );
             }
             return migrationResult;
-          })
-          .with(P.instanceOf(neverthrow.Err), () => {
-            // Result<T, never> のため、ここには到達しない
+          },
+          // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
+          () => {
             throw new Error(
               'Unreachable: performMigration should never return an error',
             );
-          })
-          .exhaustive();
+          },
+        );
       } catch (error) {
         logger.error({
           message: `Failed to perform migration: ${match(error)

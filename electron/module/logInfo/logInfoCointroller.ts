@@ -615,23 +615,22 @@ export const logInfoRouter = () =>
       )
       .query(async ({ input }) => {
         // searchSessionsByPlayerName は Result<Date[], never> を返すため、
-        // エラーは発生しないが、ts-pattern の match() で型安全に値を取り出す
+        // エラーは発生しない。neverthrow標準の.match()を使用
         const result = await searchSessionsByPlayerName(input.playerName);
-        return match(result)
-          .with(P.instanceOf(neverthrow.Ok), (r) => {
-            const sessionDates = r.value as Date[];
+        return result.match(
+          (sessionDates) => {
             logger.debug(
               `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
             );
             return sessionDates;
-          })
-          .with(P.instanceOf(neverthrow.Err), () => {
-            // Result<T, never> のため、ここには到達しない
+          },
+          // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
+          () => {
             throw new Error(
               'Unreachable: searchSessionsByPlayerName should never return an error',
             );
-          })
-          .exhaustive();
+          },
+        );
       }),
 
     /**
@@ -841,7 +840,11 @@ export const logInfoRouter = () =>
 
           return results;
         } catch (error) {
-          logger.error({
+          // バッチ処理のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
+          // ユーザーにはUserFacingErrorで適切なメッセージを表示
+          throw UserFacingError.withStructuredInfo({
+            code: ERROR_CODES.DATABASE_ERROR,
+            category: ERROR_CATEGORIES.DATABASE_ERROR,
             message: `[SessionInfoBatch] バッチ処理でエラーが発生しました: ${match(
               error,
             )
@@ -849,21 +852,9 @@ export const logInfoRouter = () =>
               .otherwise((err) => String(err))} (requested sessions: ${
               ctx.input.length
             })`,
-            stack: match(error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise(() => undefined),
+            userMessage: 'セッション情報の取得中にエラーが発生しました。',
+            cause: error instanceof Error ? error : new Error(String(error)),
           });
-
-          // エラーの場合は空の結果を返す
-          for (const datetime of ctx.input) {
-            results[datetime.toISOString()] = {
-              worldId: null,
-              worldName: null,
-              worldInstanceId: null,
-              players: [],
-            };
-          }
-          return results;
         }
       }),
   });

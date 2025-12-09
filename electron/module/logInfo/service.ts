@@ -62,13 +62,19 @@ async function _getLogStoreFilePathsImpl(
       } ms`,
     );
 
-    const latestWorldJoinDate = latestWorldJoinDateResult.isOk()
-      ? latestWorldJoinDateResult.value
-      : null;
-
-    const latestPlayerJoinDate = latestPlayerJoinDateResult.isOk()
-      ? latestPlayerJoinDateResult.value?.joinDateTime
-      : null;
+    // DBエラーは予期しないエラーなのでthrowして上位に伝播（Sentryに送信される）
+    if (latestWorldJoinDateResult.isErr()) {
+      throw new Error(
+        `Failed to get latest world join log: ${latestWorldJoinDateResult.error.message}`,
+      );
+    }
+    if (latestPlayerJoinDateResult.isErr()) {
+      throw new Error(
+        `Failed to get latest player join log: ${latestPlayerJoinDateResult.error.message}`,
+      );
+    }
+    const latestWorldJoinDate = latestWorldJoinDateResult.value;
+    const latestPlayerJoinDate = latestPlayerJoinDateResult.value?.joinDateTime;
 
     // 最新の日時をフィルタリングしてソート
     const dates = [
@@ -278,16 +284,19 @@ export async function loadLogInfoIndexFromVRChatLog({
         } ms`,
       );
 
-      // latestWorldJoinDateResultからvalueを取得
-      const latestWorldJoinDate = latestWorldJoinDateResult.isOk()
-        ? latestWorldJoinDateResult.value
-        : null;
-
-      // playerJoinDateResultからvalueを取得
-      let latestPlayerJoinDate = null;
-      if (latestPlayerJoinDateResult.isOk()) {
-        latestPlayerJoinDate = latestPlayerJoinDateResult.value;
+      // DBエラーは予期しないエラーなのでthrowして上位に伝播（Sentryに送信される）
+      if (latestWorldJoinDateResult.isErr()) {
+        throw new Error(
+          `Failed to get latest world join log: ${latestWorldJoinDateResult.error.message}`,
+        );
       }
+      if (latestPlayerJoinDateResult.isErr()) {
+        throw new Error(
+          `Failed to get latest player join log: ${latestPlayerJoinDateResult.error.message}`,
+        );
+      }
+      const latestWorldJoinDate = latestWorldJoinDateResult.value;
+      const latestPlayerJoinDate = latestPlayerJoinDateResult.value;
 
       const filterStartTime = performance.now();
       const filtered = logInfoList.filter((log) => {
@@ -406,16 +415,13 @@ export async function loadLogInfoIndexFromVRChatLog({
       } ms`,
     );
 
-    // worldJoinResultsResultがResultAsyncなので展開
-    const worldJoinResults = worldJoinResultsResult.isOk()
-      ? worldJoinResultsResult.value
-      : [];
+    // DBエラーは予期しないエラーなのでthrowして上位に伝播（Sentryに送信される）
     if (worldJoinResultsResult.isErr()) {
-      logger.error({
-        message: 'ワールド参加ログのDB保存中にエラーが発生しました',
-        stack: new Error(JSON.stringify(worldJoinResultsResult.error)),
-      });
+      throw new Error(
+        `Failed to save world join logs: ${worldJoinResultsResult.error.message}`,
+      );
     }
+    const worldJoinResults = worldJoinResultsResult.value;
 
     results.createdWorldJoinLogModelList =
       results.createdWorldJoinLogModelList.concat(worldJoinResults);

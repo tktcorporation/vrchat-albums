@@ -110,25 +110,12 @@ export const appendLoglinesToFileFromLogFilePathList = async (
       }
     }
   } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(VRChatLogFileError), (err) => err)
-        .with(
-          P.instanceOf(Error),
-          (err) =>
-            new VRChatLogFileError({
-              code: 'LOG_PARSE_ERROR',
-              message: err.message,
-            }),
-        )
-        .otherwise(
-          () =>
-            new VRChatLogFileError({
-              code: 'UNKNOWN',
-              message: 'Unknown error occurred during log processing',
-            }),
-        ),
-    );
+    // VRChatLogFileError は予期されたエラーなのでそのまま返す
+    if (error instanceof VRChatLogFileError) {
+      return neverthrow.err(error);
+    }
+    // その他のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
+    throw error;
   }
 
   if (!hasProcessedAnyLines) {
