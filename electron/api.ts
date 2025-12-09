@@ -62,22 +62,29 @@ export const router = trpcRouter({
     });
   }),
   getVRChatLogFilesDir: procedure.query(async () => {
-    const logFilesDir = service.getVRChatLogFilesDir();
-    return logFilesDir;
+    const logFilesDirResult = await service.getVRChatLogFilesDir();
+    // tRPC レスポンス用に変換（後方互換性のため error フィールドを含める）
+    if (logFilesDirResult.isErr()) {
+      return {
+        storedPath: null,
+        path: '',
+        error: logFilesDirResult.error,
+      };
+    }
+    return {
+      ...logFilesDirResult.value,
+      error: null,
+    };
   }),
   getStatusToUseVRChatLogFilesDir: procedure.query(async () => {
-    const vrchatLogFilesDir = await service.getVRChatLogFilesDir();
-    let status:
-      | 'ready'
-      | 'logFilesDirNotSet'
-      | 'logFilesNotFound'
-      | 'logFileDirNotFound' = 'ready';
-    if (vrchatLogFilesDir.path === null) {
-      status = 'logFilesDirNotSet';
-    } else if (vrchatLogFilesDir.error !== null) {
-      status = vrchatLogFilesDir.error;
+    const vrchatLogFilesDirResult = await service.getVRChatLogFilesDir();
+    if (vrchatLogFilesDirResult.isErr()) {
+      return vrchatLogFilesDirResult.error;
     }
-    return status;
+    if (vrchatLogFilesDirResult.value.path === null) {
+      return 'logFilesDirNotSet';
+    }
+    return 'ready';
   }),
   clearAllStoredSettings: procedure.mutation(async () => {
     service.clearAllStoredSettings();
