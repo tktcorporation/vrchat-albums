@@ -4,28 +4,39 @@ import * as path from 'node:path';
 import { writeClipboardFilePaths } from 'clip-filepaths';
 import { app, clipboard, dialog, nativeImage, shell } from 'electron';
 import * as neverthrow from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import sharp from 'sharp';
 import { P, match } from 'ts-pattern';
+import { FileIOError } from './error';
+
+// Error types for electronUtil operations
+type OpenPathError = { type: 'OPEN_PATH_FAILED'; message: string };
+
+/**
+ * shell.openPath() をラップした共通ヘルパー関数。
+ * エクスプローラー、フォトビューア、関連付けアプリでの開く操作で共通利用される。
+ * shell.openPath() はエラー時に文字列を返し、成功時は空文字列を返す。
+ */
+const openPathWithShell = async (
+  targetPath: string,
+): Promise<neverthrow.Result<string, OpenPathError>> => {
+  // shell.openPath() returns error message string on failure, empty string on success
+  // Any exceptions thrown are unexpected and should propagate to Sentry
+  const errorMsg = await shell.openPath(targetPath);
+  if (errorMsg) {
+    return neverthrow.err({
+      type: 'OPEN_PATH_FAILED',
+      message: errorMsg,
+    });
+  }
+  return neverthrow.ok('');
+};
 
 /**
  * OS のエクスプローラーで指定パスを開くユーティリティ。
  * main プロセスの service モジュール各所から利用される。
  */
-const openPathInExplorer = async (
-  path: string,
-): Promise<neverthrow.Result<string, Error>> => {
-  // ネイティブの機能を使う
-  try {
-    const result = await shell.openPath(path);
-    return neverthrow.ok(result);
-  } catch (error) {
-    return match(error)
-      .with(P.instanceOf(Error), (err) => neverthrow.err(err))
-      .otherwise((err) => {
-        throw err;
-      });
-  }
-};
+const openPathInExplorer = openPathWithShell;
 
 /**
  * アプリケーションのログ保存ディレクトリを取得する。
@@ -94,46 +105,13 @@ const openUrlInDefaultBrowser = (url: string) => {
  * 写真ファイルを OS 標準のフォトビューアで開く関数。
  * PhotoCard の"画像で開く"操作などから利用される。
  */
-const openPhotoPathWithPhotoApp = async (
-  filePath: string,
-): Promise<neverthrow.Result<string, Error>> => {
-  try {
-    const errorMsg = await shell.openPath(filePath);
-    if (errorMsg) {
-      return neverthrow.err(new Error(`Failed to open path: ${errorMsg}`));
-    }
-    return neverthrow.ok('');
-  } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise(() => new Error('Unknown error opening path')),
-    );
-  }
-};
+const openPhotoPathWithPhotoApp = openPathWithShell;
 
 /**
  * 拡張子に関連付けられたアプリケーションでファイルを開く関数。
  * エクスプローラーから開く機能などで利用される。
  */
-const openPathWithAssociatedApp = async (
-  filePath: string,
-): Promise<neverthrow.Result<string, Error>> => {
-  try {
-    // openPath はデフォルトアプリで開くので、これで代用可能
-    const errorMsg = await shell.openPath(filePath);
-    if (errorMsg) {
-      return neverthrow.err(new Error(`Failed to open path: ${errorMsg}`));
-    }
-    return neverthrow.ok('');
-  } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise(() => new Error('Unknown error opening path')),
-    );
-  }
-};
+const openPathWithAssociatedApp = openPathWithShell;
 
 /**
  * 画像ファイルを読み込み、クリップボードへ転送する。
@@ -141,49 +119,34 @@ const openPathWithAssociatedApp = async (
  */
 const copyImageDataByPath = async (
   filePath: string,
-): Promise<neverthrow.Result<void, Error>> => {
-  try {
-    const photoBuf = await sharp(filePath).toBuffer();
-    const image = nativeImage.createFromBuffer(photoBuf);
-    clipboard.writeImage(image);
-    // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
-    return neverthrow.ok(undefined);
-  } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise(() => new Error('Failed to copy image data')),
-    );
-  }
+): Promise<neverthrow.Result<void, never>> => {
+  // All errors from sharp() and clipboard operations are unexpected
+  // and should propagate to Sentry
+  const photoBuf = await sharp(filePath).toBuffer();
+  const image = nativeImage.createFromBuffer(photoBuf);
+  clipboard.writeImage(image);
+  // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
+  return neverthrow.ok(undefined);
 };
 
 /**
  * Base64 形式の画像を一時保存してからクリップボードへコピーする。
  * ShareDialog の画像コピー機能で利用される。
  */
-const copyImageByBase64 = async (options: {
+const copyImageByBase64 = (options: {
   pngBase64: string;
-}): Promise<neverthrow.Result<void, Error>> => {
-  try {
-    await handlePngBase64WithCallback(
-      {
-        filenameWithoutExt: 'clipboard_image', // 一時ファイル名
-        pngBase64: options.pngBase64,
-      },
-      async (tempPngPath) => {
-        const image = nativeImage.createFromPath(tempPngPath);
-        clipboard.writeImage(image);
-        // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
-      },
-    );
-    return neverthrow.ok(undefined);
-  } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise(() => new Error('Failed to copy base64 image')),
-    );
-  }
+}): ResultAsync<void, FileIOError> => {
+  return handlePngBase64WithCallback(
+    {
+      filenameWithoutExt: 'clipboard_image', // 一時ファイル名
+      pngBase64: options.pngBase64,
+    },
+    async (tempPngPath) => {
+      const image = nativeImage.createFromPath(tempPngPath);
+      clipboard.writeImage(image);
+      // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
+    },
+  );
 };
 
 /**
@@ -217,7 +180,15 @@ const downloadImageAsPng = async (options: {
       return neverthrow.err('canceled');
     }
 
-    await saveFileToPath(tempFilePath, dialogResult.filePath);
+    const saveResult = await saveFileToPath(
+      tempFilePath,
+      dialogResult.filePath,
+    );
+    if (saveResult.isErr()) {
+      return neverthrow.err(
+        new Error('Failed to save file', { cause: saveResult.error }),
+      );
+    }
 
     return neverthrow.ok(undefined);
   } catch (error) {
@@ -251,36 +222,50 @@ interface SavePngFileOptions {
  * Base64 PNG を一時ファイルとして保存し、指定コールバックへパスを渡す。
  * 画像コピーやダウンロード処理の共通部分として利用される。
  */
-export const handlePngBase64WithCallback = async (
+export const handlePngBase64WithCallback = (
   options: SavePngFileOptions,
   callback: (tempPngPath: string) => Promise<void>,
-): Promise<void> => {
-  let tempDir = '';
-  try {
-    const base64Data = options.pngBase64.replace(
-      /^data:image\/[^;]+;base64,/,
-      '',
-    );
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-'));
-    const tempFilePath = path.join(
-      tempDir,
-      `${options.filenameWithoutExt}.png`,
-    );
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    await fs.writeFile(tempFilePath, new Uint8Array(imageBuffer));
-    await callback(tempFilePath);
-  } catch (error) {
-    console.error('Failed to handle png file:', error);
-    throw new Error('Failed to handle png file', { cause: error });
-  } finally {
-    if (tempDir) {
+): ResultAsync<void, FileIOError> => {
+  return ResultAsync.fromPromise(
+    (async () => {
+      let tempDir = '';
       try {
-        await fs.rm(tempDir, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.error('Failed to cleanup temporary directory:', cleanupError);
+        const base64Data = options.pngBase64.replace(
+          /^data:image\/[^;]+;base64,/,
+          '',
+        );
+        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-'));
+        const tempFilePath = path.join(
+          tempDir,
+          `${options.filenameWithoutExt}.png`,
+        );
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        await fs.writeFile(tempFilePath, new Uint8Array(imageBuffer));
+        await callback(tempFilePath);
+      } finally {
+        if (tempDir) {
+          try {
+            await fs.rm(tempDir, { recursive: true, force: true });
+          } catch (cleanupError) {
+            console.error(
+              'Failed to cleanup temporary directory:',
+              cleanupError,
+            );
+          }
+        }
       }
-    }
-  }
+    })(),
+    (error) =>
+      new FileIOError({
+        code: match(error)
+          .with(
+            { code: P.union('EACCES', 'EPERM') },
+            () => 'PERMISSION_DENIED' as const,
+          )
+          .otherwise(() => 'FILE_CREATE_FAILED' as const),
+        message: error instanceof Error ? error.message : String(error),
+      }),
+  );
 };
 
 /**
@@ -305,11 +290,18 @@ export const showSavePngDialog = async (filenameWithoutExt: string) => {
  * 一時ファイルから指定パスへファイルを保存する単純なヘルパー。
  * downloadImageAsPng 内部で利用される。
  */
-export const saveFileToPath = async (
+export const saveFileToPath = (
   sourcePath: string,
   destinationPath: string,
-): Promise<void> => {
-  await fs.copyFile(sourcePath, destinationPath);
+): ResultAsync<void, FileIOError> => {
+  return ResultAsync.fromPromise(
+    fs.copyFile(sourcePath, destinationPath),
+    (error) =>
+      new FileIOError({
+        code: 'FILE_COPY_FAILED',
+        message: error instanceof Error ? error.message : String(error),
+      }),
+  );
 };
 
 // 複数ファイルをクリップボードにコピーする (クロスプラットフォーム対応)
@@ -319,7 +311,8 @@ export const saveFileToPath = async (
  */
 const copyMultipleFilesToClipboard = async (
   filePaths: string[],
-): Promise<neverthrow.Result<void, Error>> => {
+): Promise<neverthrow.Result<void, never>> => {
+  // All errors are unexpected and should propagate
   if (filePaths.length === 0) {
     return neverthrow.ok(undefined);
   }

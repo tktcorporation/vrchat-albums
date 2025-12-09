@@ -30,6 +30,11 @@
     // This improves issue grouping in Sentry.
     "sourceRoot": "/"
   },
-  "exclude": ["node_modules", "vite.config.ts", "electron/vite.config.ts"],
+  "exclude": [
+    "node_modules",
+    "vite.config.ts",
+    "electron/vite.config.ts",
+    "worktrees"
+  ],
   "include": ["**/*.ts", "**/*.tsx", "**/*.js"]
 }

@@ -1,6 +1,18 @@
 import { app } from 'electron';
 import { type UpdateCheckResult, autoUpdater } from 'electron-updater';
+import { ResultAsync, err, ok } from 'neverthrow';
 import { logger } from '../../lib/logger';
+import { UpdateError } from './error';
+
+export type UpdateCheckError = {
+  type: 'UPDATE_CHECK_FAILED';
+  message: string;
+};
+
+export type UpdaterInfo = {
+  isUpdateAvailable: boolean;
+  updateInfo: UpdateCheckResult | null;
+};
 
 /**
  * アプリのバージョン文字列を取得するユーティリティ。
@@ -27,35 +39,62 @@ export const getAppVersion = (): string => {
  * アップデートの有無と更新情報を取得する関数。
  * SettingsModal から呼び出される。
  */
-export const getElectronUpdaterInfo = async (): Promise<{
-  isUpdateAvailable: boolean;
-  updateInfo: UpdateCheckResult | null;
-}> => {
-  const updateInfo = await autoUpdater.checkForUpdates().catch((error) => {
-    console.error('Failed to check for updates', error);
-    return null;
-  });
-  if (!updateInfo) {
+export const getElectronUpdaterInfo = (): ResultAsync<
+  UpdaterInfo,
+  UpdateCheckError
+> => {
+  return ResultAsync.fromPromise(
+    autoUpdater.checkForUpdates(),
+    (error): UpdateCheckError => ({
+      type: 'UPDATE_CHECK_FAILED',
+      message:
+        error instanceof Error ? error.message : 'Unknown update check error',
+    }),
+  ).map((updateInfo) => {
+    if (!updateInfo) {
+      return {
+        isUpdateAvailable: false,
+        updateInfo: null,
+      };
+    }
+    logger.debug('Update info:', updateInfo);
     return {
-      isUpdateAvailable: false,
-      updateInfo: null,
+      isUpdateAvailable: updateInfo.updateInfo.version !== app.getVersion(),
+      updateInfo: updateInfo as UpdateCheckResult,
     };
-  }
-  logger.debug('Update info:', updateInfo);
-  return {
-    isUpdateAvailable: updateInfo.updateInfo.version !== app.getVersion(),
-    updateInfo: updateInfo as UpdateCheckResult,
-  };
+  });
 };
 
 /**
  * ダウンロード済みの更新をインストールしアプリを再起動する。
  */
-export const installUpdate = async (): Promise<void> => {
-  const updateInfo = await getElectronUpdaterInfo();
-  if (!updateInfo.isUpdateAvailable) {
-    throw new Error('No updates available');
-  }
-  await autoUpdater.downloadUpdate();
-  await autoUpdater.quitAndInstall();
+export const installUpdate = (): ResultAsync<void, UpdateError> => {
+  return getElectronUpdaterInfo()
+    .mapErr(
+      (error) =>
+        new UpdateError({
+          code: 'UPDATE_CHECK_FAILED',
+          message: error.message,
+        }),
+    )
+    .andThen((updateInfo) => {
+      if (!updateInfo.isUpdateAvailable) {
+        return err(new UpdateError('NO_UPDATE_AVAILABLE'));
+      }
+      return ok(updateInfo);
+    })
+    .andThen(() =>
+      ResultAsync.fromPromise(
+        autoUpdater.downloadUpdate(),
+        (error) =>
+          new UpdateError({
+            code: 'DOWNLOAD_FAILED',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+      ),
+    )
+    .map(() => {
+      // quitAndInstall は void を返すので、同期的に呼び出し
+      autoUpdater.quitAndInstall();
+    });
 };

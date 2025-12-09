@@ -45,10 +45,10 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   // DBから最新のログ日時を取得（processAllがfalseの場合のみ）
   let startDate = new Date(0); // デフォルトは最古の日時
   if (!processAll) {
-    const latestWorldJoinLog =
+    const latestWorldJoinLogResult =
       await worldJoinLogService.findLatestWorldJoinLog();
-    if (latestWorldJoinLog) {
-      startDate = latestWorldJoinLog.joinDateTime;
+    if (latestWorldJoinLogResult.isOk() && latestWorldJoinLogResult.value) {
+      startDate = latestWorldJoinLogResult.value.joinDateTime;
       logger.info(`Processing logs after ${startDate.toISOString()}`);
     } else {
       logger.info('No existing logs found in DB, processing all logs');
@@ -110,25 +110,12 @@ export const appendLoglinesToFileFromLogFilePathList = async (
       }
     }
   } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(VRChatLogFileError), (err) => err)
-        .with(
-          P.instanceOf(Error),
-          (err) =>
-            new VRChatLogFileError({
-              code: 'LOG_PARSE_ERROR',
-              message: err.message,
-            }),
-        )
-        .otherwise(
-          () =>
-            new VRChatLogFileError({
-              code: 'UNKNOWN',
-              message: 'Unknown error occurred during log processing',
-            }),
-        ),
-    );
+    // VRChatLogFileError は予期されたエラーなのでそのまま返す
+    if (error instanceof VRChatLogFileError) {
+      return neverthrow.err(error);
+    }
+    // その他のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
+    throw error;
   }
 
   if (!hasProcessedAnyLines) {

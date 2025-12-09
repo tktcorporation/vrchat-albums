@@ -46,7 +46,7 @@ vi.mock('../vrchatLog/service', () => ({
   getVRChaLogInfoByLogFilePathListWithPartialSuccess: vi
     .fn()
     .mockImplementation(() => {
-      return Promise.resolve({
+      return neverthrow.okAsync({
         data: [],
         errors: [],
         totalProcessed: 0,
@@ -66,8 +66,10 @@ vi.mock('../vrchatLog/service', () => ({
 }));
 
 vi.mock('../vrchatWorldJoinLog/service', () => ({
-  findLatestWorldJoinLog: vi.fn().mockResolvedValue(null),
-  createVRChatWorldJoinLogModel: vi.fn().mockResolvedValue([]),
+  findLatestWorldJoinLog: vi.fn().mockReturnValue(neverthrow.okAsync(null)),
+  createVRChatWorldJoinLogModel: vi
+    .fn()
+    .mockReturnValue(neverthrow.okAsync([])),
 }));
 
 vi.mock('../VRChatPlayerJoinLogModel/playerJoinLog.service', () => ({
@@ -190,16 +192,16 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     // このテスト用にgetVRChaLogInfoByLogFilePathListをカスタマイズ
     vi.mocked(
       vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
-    ).mockImplementation(async (paths) => {
+    ).mockImplementation((paths) => {
       // パスにlegacyPathが含まれていることを確認するためのカスタムモック
       expect(paths.some((p) => p.value === legacyPath)).toBe(true);
-      return {
+      return neverthrow.okAsync({
         data: [],
         errors: [],
         totalProcessed: paths.length,
         successCount: paths.length,
         errorCount: 0,
-      };
+      });
     });
 
     try {
@@ -229,14 +231,14 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     // getVRChaLogInfoByLogFilePathListのモックをリセット
     vi.mocked(
       vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
-    ).mockImplementation(async () => {
-      return {
+    ).mockImplementation(() => {
+      return neverthrow.okAsync({
         data: [],
         errors: [],
         totalProcessed: 0,
         successCount: 0,
         errorCount: 0,
-      };
+      });
     });
 
     // テスト用にgetLogStoreFilePathsInRangeの実装を修正してパスを記録
@@ -322,14 +324,14 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     // getVRChaLogInfoByLogFilePathListのモックをリセット
     vi.mocked(
       vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
-    ).mockImplementation(async () => {
-      return {
+    ).mockImplementation(() => {
+      return neverthrow.okAsync({
         data: [],
         errors: [],
         totalProcessed: 0,
         successCount: 0,
         errorCount: 0,
-      };
+      });
     });
 
     // テスト用にgetLogStoreFilePathsInRangeの実装を修正してパスを記録
@@ -409,8 +411,8 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     vi.mocked(getAppUserDataPath).mockReturnValue('/mock/user/data');
 
     // _getLogStoreFilePaths の依存関係のモックを再設定
-    vi.mocked(worldJoinLogService.findLatestWorldJoinLog).mockResolvedValue(
-      null,
+    vi.mocked(worldJoinLogService.findLatestWorldJoinLog).mockReturnValue(
+      neverthrow.okAsync(null),
     );
     vi.mocked(playerJoinLogService.findLatestPlayerJoinLog).mockResolvedValue(
       neverthrow.ok(null),
@@ -428,13 +430,15 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     // getVRChaLogInfoByLogFilePathList は空の成功結果を返すように設定
     vi.mocked(
       vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
-    ).mockResolvedValue({
-      data: [],
-      errors: [],
-      totalProcessed: 0,
-      successCount: 0,
-      errorCount: 0,
-    });
+    ).mockImplementation(() =>
+      neverthrow.okAsync({
+        data: [],
+        errors: [],
+        totalProcessed: 0,
+        successCount: 0,
+        errorCount: 0,
+      }),
+    );
     // 写真関連のモックも設定（必要に応じて）
     vi.mocked(vrchatPhotoService.getVRChatPhotoDirPath).mockResolvedValue(
       VRChatPhotoDirPathSchema.parse('/mock/photos'),
@@ -553,9 +557,11 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     const latestPlayerLeaveDate = datefns.subDays(mockDate, 7); // 2024-02-08
 
     // このテストケース用にモックを上書き
-    vi.mocked(worldJoinLogService.findLatestWorldJoinLog).mockResolvedValue({
-      joinDateTime: latestWorldJoinDate,
-    } as VRChatWorldJoinLogModel); // as any で型チェックを回避
+    vi.mocked(worldJoinLogService.findLatestWorldJoinLog).mockReturnValue(
+      neverthrow.okAsync({
+        joinDateTime: latestWorldJoinDate,
+      } as VRChatWorldJoinLogModel),
+    );
     vi.mocked(playerJoinLogService.findLatestPlayerJoinLog).mockResolvedValue(
       neverthrow.ok({
         joinDateTime: latestPlayerJoinDate,

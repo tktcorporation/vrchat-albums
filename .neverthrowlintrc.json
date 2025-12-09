@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "rules": [
+    {
+      "name": "Service layer must use neverthrow Result type",
+      "path": "electron/module/**/service.ts",
+      "enforceResult": true,
+      "apply": "async-functions",
+      "exceptions": [
+        "getAppVersion",
+        "clearMigrationCache",
+        "clearAllStoredSettings",
+        "clearStoredSetting",
+        "getApplicationLogPath",
+        "showSavePngDialog",
+        "createVRChatWorldJoinLogFromPhoto",
+        "findVRChatWorldJoinLogFromPhotoList",
+        "findVRChatWorldJoinLogList",
+        "syncLogsInBackground",
+        "processQueue",
+        "getVrcUserInfoByUserName"
+      ]
+    }
+  ]
+}

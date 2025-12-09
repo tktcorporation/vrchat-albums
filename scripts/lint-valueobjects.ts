@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import consola from 'consola';
 import { glob } from 'glob';
+import path from 'pathe';
 import * as ts from 'typescript';
+import { type NormalizedPath, NormalizedPathArraySchema } from './lib/paths';
 
 interface ValueObjectIssue {
   file: string;
@@ -14,13 +15,18 @@ interface ValueObjectIssue {
   severity: 'error' | 'warning';
 }
 
-class ValueObjectLinter {
+export class ValueObjectLinter {
   private issues: ValueObjectIssue[] = [];
   private program: ts.Program;
   private checker: ts.TypeChecker;
   private resolvedTypes = new Map<ts.Type, boolean>();
+  private files: NormalizedPath[];
 
-  constructor(private files: string[]) {
+  constructor(
+    files: string[],
+    private sourceMap?: Map<string, string>, // For testing with virtual files
+  ) {
+    this.files = NormalizedPathArraySchema.parse(files);
     const compilerOptions: ts.CompilerOptions = {
       target: ts.ScriptTarget.ESNext,
       module: ts.ModuleKind.ESNext,
@@ -32,13 +38,57 @@ class ValueObjectLinter {
       resolveJsonModule: true,
     };
 
-    this.program = ts.createProgram(files, compilerOptions);
+    // If sourceMap is provided (for testing), create a custom compiler host
+    if (this.sourceMap) {
+      const host = this.createVirtualCompilerHost(
+        compilerOptions,
+        this.sourceMap,
+      );
+      this.program = ts.createProgram(this.files, compilerOptions, host);
+    } else {
+      // Production mode: use real files
+      this.program = ts.createProgram(this.files, compilerOptions);
+    }
     this.checker = this.program.getTypeChecker();
+  }
+
+  private createVirtualCompilerHost(
+    options: ts.CompilerOptions,
+    sourceMap: Map<string, string>,
+  ): ts.CompilerHost {
+    const defaultHost = ts.createCompilerHost(options);
+
+    return {
+      ...defaultHost,
+      fileExists: (fileName: string) => {
+        return sourceMap.has(fileName) || defaultHost.fileExists(fileName);
+      },
+      readFile: (fileName: string) => {
+        const virtualContent = sourceMap.get(fileName);
+        if (virtualContent !== undefined) {
+          return virtualContent;
+        }
+        return defaultHost.readFile(fileName);
+      },
+      getSourceFile: (fileName: string, languageVersion: ts.ScriptTarget) => {
+        const virtualContent = sourceMap.get(fileName);
+        if (virtualContent !== undefined) {
+          return ts.createSourceFile(
+            fileName,
+            virtualContent,
+            languageVersion,
+            true,
+          );
+        }
+        return defaultHost.getSourceFile(fileName, languageVersion);
+      },
+    };
   }
 
   lint(): ValueObjectIssue[] {
     for (const sourceFile of this.program.getSourceFiles()) {
-      if (this.files.includes(sourceFile.fileName)) {
+      // TypeScript compiler always returns forward slashes, so sourceFile.fileName is already normalized
+      if (this.files.includes(sourceFile.fileName as NormalizedPath)) {
         this.lintFile(sourceFile);
       }
     }
@@ -358,40 +408,108 @@ class ValueObjectLinter {
   }
 }
 
-async function main() {
-  consola.start('Linting ValueObject implementations...');
+// Export for testing with virtual files
+export async function lintValueObjectsFromSource(
+  sources: Map<string, string>,
+): Promise<{
+  issues: ValueObjectIssue[];
+  success: boolean;
+  message?: string;
+}> {
+  const files = Array.from(sources.keys());
+  const linter = new ValueObjectLinter(files, sources);
+  const issues = linter.lint();
 
-  // Find all TypeScript files that might contain ValueObjects
-  const patterns = [
-    'electron/**/*.ts',
-    'src/**/*.ts',
-    '!electron/**/*.test.ts',
-    '!electron/**/*.spec.ts',
-    '!src/**/*.test.ts',
-    '!src/**/*.spec.ts',
-    '!node_modules/**/*',
-    '!dist/**/*',
-    '!main/**/*',
-    '!out/**/*',
-  ];
+  const success = issues.filter((i) => i.severity === 'error').length === 0;
+  const message =
+    issues.length === 0
+      ? '✔ All ValueObject implementations follow the correct pattern!'
+      : undefined;
 
-  // Add test directory patterns if in test environment
-  if (process.env.NODE_ENV === 'test') {
-    patterns.unshift('test-valueobjects/**/*.ts');
+  return {
+    issues,
+    success,
+    message,
+  };
+}
+
+// Export for testing
+export async function lintValueObjects(
+  testMode = false,
+  specificFiles?: string[],
+): Promise<{
+  issues: ValueObjectIssue[];
+  success: boolean;
+  message?: string;
+}> {
+  let files: string[];
+
+  if (specificFiles) {
+    // Use specific files if provided (for testing)
+    // Ensure they are absolute paths
+    files = specificFiles.map((file) => {
+      if (path.isAbsolute(file)) {
+        return file;
+      }
+      return path.join(process.cwd(), file);
+    });
+  } else {
+    // Find all TypeScript files that might contain ValueObjects
+    let patterns: string[];
+
+    if (testMode) {
+      // In test mode, ONLY scan the test directory
+      patterns = ['test-valueobjects/**/*.ts'];
+    } else {
+      patterns = [
+        'electron/**/*.ts',
+        'src/**/*.ts',
+        '!electron/**/*.test.ts',
+        '!electron/**/*.spec.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        '!node_modules/**/*',
+        '!dist/**/*',
+        '!main/**/*',
+        '!out/**/*',
+      ];
+    }
+
+    files = await glob(patterns, {
+      cwd: process.cwd(),
+      absolute: true,
+      ignore: ['node_modules/**', 'dist/**', 'main/**', 'out/**'],
+      // Important for Windows: don't escape special characters
+      windowsPathsNoEscape: true,
+    });
   }
-
-  const files = await glob(patterns, {
-    cwd: process.cwd(),
-    absolute: true,
-    ignore: ['node_modules/**', 'dist/**', 'main/**', 'out/**'],
-  });
 
   const linter = new ValueObjectLinter(files);
   const issues = linter.lint();
 
+  const success = issues.filter((i) => i.severity === 'error').length === 0;
+  const message =
+    issues.length === 0
+      ? '✔ All ValueObject implementations follow the correct pattern!'
+      : undefined;
+
+  return {
+    issues,
+    success,
+    message,
+  };
+}
+
+async function main() {
+  consola.start('Linting ValueObject implementations...');
+
+  const { issues, success } = await lintValueObjects(
+    process.env.LINT_VALUEOBJECTS_TEST_MODE === 'true',
+  );
+
   if (issues.length === 0) {
-    consola.success(
-      'All ValueObject implementations follow the correct pattern!',
+    console.log(
+      '✔ All ValueObject implementations follow the correct pattern!',
     );
     process.exit(0);
   } else {
@@ -406,12 +524,15 @@ async function main() {
       );
     }
 
-    const errorCount = issues.filter((i) => i.severity === 'error').length;
-    process.exit(errorCount > 0 ? 1 : 0);
+    process.exit(success ? 0 : 1);
   }
 }
 
-main().catch((error) => {
-  consola.error('Linter failed:', error);
-  process.exit(1);
-});
+// Only run main if this file is being executed directly
+// Check if running as main module (ES module compatible)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    consola.error('Linter failed:', error);
+    process.exit(1);
+  });
+}

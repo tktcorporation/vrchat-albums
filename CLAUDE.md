@@ -87,6 +87,92 @@
         <map category="DATABASE_ERROR" variant="destructive" jp="重大エラー"/>
         <map category="NETWORK_ERROR" variant="destructive" jp="重大エラー"/>
       </toast-variant-mapping>
+
+      <expected-vs-unexpected-errors priority="critical" jp="エラー分類必須">
+        <principle>neverthrowは予期されたエラーのみに使用、予期しないエラーはre-throw</principle>
+
+        <expected-errors jp="Result型でラップすべき">
+          <error>バリデーションエラー</error>
+          <error>ファイル未検出（ENOENT）</error>
+          <error>権限エラー（ユーザー操作で解決可能）</error>
+          <error>ネットワークタイムアウト（リトライ可能）</error>
+          <error>ビジネスロジック制約違反</error>
+        </expected-errors>
+
+        <unexpected-errors jp="throwすべき（Sentry送信のため）">
+          <error>データベース接続エラー</error>
+          <error>メモリ不足</error>
+          <error>型が想定外（プログラミングエラー）</error>
+          <error>外部ライブラリの内部エラー</error>
+          <error>原因不明のエラー全般</error>
+        </unexpected-errors>
+
+        <implementation-pattern>
+          <![CDATA[
+          // ✅ Good: 予期されたエラーのみResult型で返す
+          try {
+            const result = await db.query(...);
+            return ok(result);
+          } catch (error) {
+            return match(error)
+              .with({ code: 'ETIMEDOUT' }, (e) =>
+                // 予期されたエラー → Resultで返す
+                err({ type: 'TIMEOUT', message: e.message })
+              )
+              .otherwise((e) => {
+                // 予期しないエラー → re-throw（Sentryに送信）
+                throw e;
+              });
+          }
+          ]]>
+        </implementation-pattern>
+
+        <anti-pattern>
+          <![CDATA[
+          // ❌ Bad: 全てのエラーをラップ（Sentryに送信されない）
+          try {
+            const result = await db.query(...);
+            return ok(result);
+          } catch (error) {
+            // 予期しないエラーもラップしてしまう
+            return err(error);
+          }
+          ]]>
+        </anti-pattern>
+
+        <rationale>
+          全エラーをneverthrowでラップすると予期しないバグがSentryに報告されず検知が遅れる。
+          ユーザーにエラーを返すべきは「ユーザー操作で解決可能なエラー」のみ。
+        </rationale>
+      </expected-vs-unexpected-errors>
+
+      <lint-enforcement>
+        <command>yarn lint:neverthrow</command>
+        <description>Enforces Result type usage in service layer functions and detects anti-patterns</description>
+        <config-file>.neverthrowlintrc.json</config-file>
+        <reference>docs/lint-neverthrow.md</reference>
+        <best-practice-warning>Linter output includes reminder about expected vs unexpected errors</best-practice-warning>
+
+        <checks>
+          <check name="Result type enforcement">
+            Ensures configured functions return Result&lt;T, E&gt; or Promise&lt;Result&lt;T, E&gt;&gt;
+          </check>
+          <check name="catch-err anti-pattern detection" priority="critical">
+            Detects catch blocks that wrap errors in err() without proper classification.
+            Error classification means:
+            - Using match()/if to check error code/type (NOT just instanceof Error)
+            - OR re-throwing unexpected errors with throw
+          </check>
+        </checks>
+
+        <generic-error-types-warning jp="要注意">
+          Result&lt;T, Error&gt;, Result&lt;T, any&gt;, Result&lt;T, unknown&gt; are red flags.
+          Use specific error union types instead for proper error handling.
+
+          Exception: Generic Error type is acceptable if error is logged to Sentry
+          with logger.error() before returning (Sentry-notified error pattern).
+        </generic-error-types-warning>
+      </lint-enforcement>
     </pattern>
 
     <pattern name="ts-pattern Usage" priority="critical" jp="型安全・表現力向上必須">

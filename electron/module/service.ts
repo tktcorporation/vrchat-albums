@@ -1,4 +1,5 @@
 import type * as neverthrow from 'neverthrow';
+import type { ResultAsync } from 'neverthrow';
 
 import path from 'node:path';
 import { logger } from './../lib/logger';
@@ -14,21 +15,25 @@ import { getSettingStore } from './settingStore';
 import * as vrchatLogFileDirService from './vrchatLogFileDir/service';
 // import type VRChatLogFileError from './vrchatLog/error';
 
-/**
- * VRChat ログディレクトリ設定を取得する
- * 設定画面や起動時の検証で使用
- */
-export const getVRChatLogFilesDir = async (): Promise<{
+export type VRChatLogFilesDirError = 'logFilesNotFound' | 'logFileDirNotFound';
+
+export type VRChatLogFilesDirResult = {
   storedPath: string | null;
   path: string;
-  error: null | 'logFilesNotFound' | 'logFileDirNotFound';
-}> => {
-  const result = await vrchatLogFileDirService.getVRChatLogFileDir();
-  return {
+};
+
+/**
+ * VRChat ログディレクトリ設定を取得する（Result型）
+ * 設定画面や起動時の検証で使用
+ */
+export const getVRChatLogFilesDir = (): ResultAsync<
+  VRChatLogFilesDirResult,
+  VRChatLogFilesDirError
+> => {
+  return vrchatLogFileDirService.getVRChatLogFileDir().map((result) => ({
     storedPath: result.storedPath?.value ?? null,
     path: result.path.value,
-    error: result.error,
-  };
+  }));
 };
 
 /** すべての設定値をクリアする */

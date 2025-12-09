@@ -84,7 +84,7 @@ export const electronUtilRouter = () =>
           'yyyy-MM-dd_HH-mm-ss.SSS',
         )}_${ctx.input.worldId}`;
 
-        await utilsService.handlePngBase64WithCallback(
+        const result = await utilsService.handlePngBase64WithCallback(
           {
             filenameWithoutExt: filename,
             pngBase64: ctx.input.imageBase64,
@@ -108,14 +108,22 @@ export const electronUtilRouter = () =>
             });
 
             // Move the temp file to the final destination
-            await utilsService.saveFileToPath(
+            const saveResult = await utilsService.saveFileToPath(
               tempPngPath,
               dialogResult.filePath,
             );
+            if (saveResult.isErr()) {
+              throw new Error('Failed to save file', {
+                cause: saveResult.error,
+              });
+            }
 
             eventEmitter.emit('toast', 'downloaded');
           },
         );
+        if (result.isErr()) {
+          throw new Error('Failed to handle image', { cause: result.error });
+        }
       }),
     copyImageDataByBase64: procedure
       .input(

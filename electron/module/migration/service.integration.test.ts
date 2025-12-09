@@ -65,8 +65,8 @@ describe('migration service integration', () => {
       // Remove the old app directory
       await nodeFsPromises.rm(mockOldAppPath, { recursive: true, force: true });
 
-      const result = await migrationService.isMigrationNeeded();
-      expect(result).toBe(false);
+      const resultAsync = await migrationService.isMigrationNeeded();
+      expect(resultAsync._unsafeUnwrap()).toBe(false);
     });
 
     it('should return false if migration marker already exists', async () => {
@@ -74,13 +74,13 @@ describe('migration service integration', () => {
       const markerPath = path.join(mockCurrentAppPath, '.migration-completed');
       await nodeFsPromises.writeFile(markerPath, '{}');
 
-      const result = await migrationService.isMigrationNeeded();
-      expect(result).toBe(false);
+      const resultAsync = await migrationService.isMigrationNeeded();
+      expect(resultAsync._unsafeUnwrap()).toBe(false);
     });
 
     it('should return true if migration is needed', async () => {
-      const result = await migrationService.isMigrationNeeded();
-      expect(result).toBe(true);
+      const resultAsync = await migrationService.isMigrationNeeded();
+      expect(resultAsync._unsafeUnwrap()).toBe(true);
     });
 
     it('should detect old app with alternate directory name (VRChatPhotoJourney)', async () => {
@@ -91,8 +91,8 @@ describe('migration service integration', () => {
       const alternateOldAppPath = path.join(testDir, 'VRChatPhotoJourney');
       await nodeFsPromises.mkdir(alternateOldAppPath, { recursive: true });
 
-      const result = await migrationService.isMigrationNeeded();
-      expect(result).toBe(true);
+      const resultAsync = await migrationService.isMigrationNeeded();
+      expect(resultAsync._unsafeUnwrap()).toBe(true);
     });
   });
 
@@ -326,10 +326,9 @@ describe('migration service integration', () => {
         err(new Error('Critical failure')),
       );
 
-      // Should not throw
-      await expect(
-        migrationService.performMigrationIfNeeded(),
-      ).resolves.toBeUndefined();
+      // Should succeed (Result type with void value)
+      const result = await migrationService.performMigrationIfNeeded();
+      expect(result.isOk()).toBe(true);
     });
   });
 });

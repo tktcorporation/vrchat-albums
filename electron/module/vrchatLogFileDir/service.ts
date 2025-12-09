@@ -1,5 +1,6 @@
 import path from 'node:path';
 import * as neverthrow from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import { P, match } from 'ts-pattern';
 // import type * as vrchatLogService from '../service/vrchatLog/vrchatLog';
 import * as fs from '../../lib/wrappedFs';
@@ -14,22 +15,27 @@ import {
   VRChatLogFilesDirPathSchema,
 } from './model';
 
+type VRChatLogFileDirError = 'logFilesNotFound' | 'logFileDirNotFound';
+
 /**
  * 設定ストアに保存されているログディレクトリパスを取得する
  * getValidVRChatLogFileDir から呼び出される内部処理
  */
-const getStoredVRChatLogFilesDirPath =
-  async (): Promise<NotValidatedVRChatLogFilesDirPath | null> => {
-    const settingStore = getSettingStore();
-    return match(settingStore.getLogFilesDir())
-      .with(null, () => {
-        return null;
-      })
-      .with(P.string, (path) => {
-        return NotValidatedVRChatLogFilesDirPathSchema.parse(path);
-      })
-      .exhaustive();
-  };
+const getStoredVRChatLogFilesDirPath = (): ResultAsync<
+  NotValidatedVRChatLogFilesDirPath | null,
+  never
+> => {
+  return ResultAsync.fromSafePromise(
+    Promise.resolve(
+      match(getSettingStore().getLogFilesDir())
+        .with(null, () => null)
+        .with(P.string, (path) =>
+          NotValidatedVRChatLogFilesDirPathSchema.parse(path),
+        )
+        .exhaustive(),
+    ),
+  );
+};
 
 /**
  * 実際に存在するVRChatログディレクトリを検証して返す
@@ -48,13 +54,15 @@ export const getValidVRChatLogFileDir = async (): Promise<
     }
   >
 > => {
-  const storedVRChatLogFilesDirPath = await getStoredVRChatLogFilesDirPath();
-  let vrChatlogFilesDir: NotValidatedVRChatLogFilesDirPath;
-  if (storedVRChatLogFilesDirPath === null) {
-    vrChatlogFilesDir = getDefaultVRChatVRChatLogFilesDir();
-  } else {
-    vrChatlogFilesDir = storedVRChatLogFilesDirPath;
-  }
+  const storedVRChatLogFilesDirPathResult =
+    await getStoredVRChatLogFilesDirPath();
+  // getStoredVRChatLogFilesDirPath は never エラーなので常に成功
+  const storedVRChatLogFilesDirPath =
+    storedVRChatLogFilesDirPathResult._unsafeUnwrap();
+  const vrChatlogFilesDir = match(storedVRChatLogFilesDirPath)
+    .with(null, () => getDefaultVRChatVRChatLogFilesDir())
+    .with(P.not(null), (path) => path)
+    .exhaustive();
   const logFileNamesResult = await getVRChatLogFilePathList(vrChatlogFilesDir);
   if (logFileNamesResult.isErr()) {
     return neverthrow.err({
@@ -81,28 +89,30 @@ export const getValidVRChatLogFileDir = async (): Promise<
   });
 };
 
-/**
- * ログディレクトリ検証結果をシンプルなオブジェクトに整形して返す
- * 設定画面や初期化処理から直接呼び出される
- */
-export const getVRChatLogFileDir = async (): Promise<{
+export type VRChatLogFileDirResult = {
   storedPath: NotValidatedVRChatLogFilesDirPath | null;
   path: NotValidatedVRChatLogFilesDirPath | VRChatLogFilesDirPath;
-  error: null | 'logFilesNotFound' | 'logFileDirNotFound';
-}> => {
-  const validatedResult = await getValidVRChatLogFileDir();
-  if (validatedResult.isErr()) {
-    return {
-      storedPath: validatedResult.error.storedPath,
-      path: validatedResult.error.path,
-      error: validatedResult.error.error,
-    };
-  }
-  return {
-    storedPath: validatedResult.value.storedPath,
-    path: validatedResult.value.path,
-    error: null,
-  };
+};
+
+/**
+ * ログディレクトリ検証結果を返す（Result型）
+ * 設定画面や初期化処理から直接呼び出される
+ */
+export const getVRChatLogFileDir = (): ResultAsync<
+  VRChatLogFileDirResult,
+  VRChatLogFileDirError
+> => {
+  return ResultAsync.fromSafePromise(getValidVRChatLogFileDir()).andThen(
+    (validatedResult) => {
+      if (validatedResult.isErr()) {
+        return neverthrow.err(validatedResult.error.error);
+      }
+      return neverthrow.ok({
+        storedPath: validatedResult.value.storedPath,
+        path: validatedResult.value.path,
+      });
+    },
+  );
 };
 
 /**

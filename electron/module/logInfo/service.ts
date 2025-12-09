@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { Op, col, fn, literal } from '@sequelize/core';
 import * as datefns from 'date-fns';
 import * as neverthrow from 'neverthrow';
+import { ResultAsync, err } from 'neverthrow';
 import { match } from 'ts-pattern';
 import { logger } from '../../lib/logger';
 import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
@@ -20,6 +21,7 @@ import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.
 import * as vrchatPhotoService from '../vrchatPhoto/vrchatPhoto.service';
 import { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
+import { LogInfoError } from './error';
 
 interface LogProcessingResults {
   createdWorldJoinLogModelList: VRChatWorldJoinLogModel[];
@@ -35,84 +37,114 @@ interface LogProcessingResults {
  * @param excludeOldLogLoad trueの場合、DBに保存されている最新のログ日時以降のログのみを処理します。
  *                           falseの場合、2000年1月1日からすべてのログを処理します。
  */
-async function _getLogStoreFilePaths(
+function _getLogStoreFilePathsImpl(
   excludeOldLogLoad: boolean,
-): Promise<VRChatLogStoreFilePath[]> {
-  const startTime = performance.now();
-  let startDate: Date;
-  const logStoreFilePaths: VRChatLogStoreFilePath[] = [];
+): ResultAsync<VRChatLogStoreFilePath[], LogInfoError> {
+  return ResultAsync.fromPromise(
+    (async () => {
+      const startTime = performance.now();
+      let startDate: Date;
+      const logStoreFilePaths: VRChatLogStoreFilePath[] = [];
 
-  if (excludeOldLogLoad) {
-    const findLatestStartTime = performance.now();
-    // DBに保存されている最新のログ日時を取得
-    const [
-      latestWorldJoinDate,
-      latestPlayerJoinDateResult,
-      latestPlayerLeaveDate,
-    ] = await Promise.all([
-      worldJoinLogService.findLatestWorldJoinLog(),
-      playerJoinLogService.findLatestPlayerJoinLog(),
-      playerLeaveLogService.findLatestPlayerLeaveLog(),
-    ]);
-    const findLatestEndTime = performance.now();
-    logger.debug(
-      `_getLogStoreFilePaths: Find latest logs took ${
-        findLatestEndTime - findLatestStartTime
-      } ms`,
-    );
+      if (excludeOldLogLoad) {
+        const findLatestStartTime = performance.now();
+        // DBに保存されている最新のログ日時を取得
+        const [
+          latestWorldJoinDateResult,
+          latestPlayerJoinDateResult,
+          latestPlayerLeaveDate,
+        ] = await Promise.all([
+          worldJoinLogService.findLatestWorldJoinLog(),
+          playerJoinLogService.findLatestPlayerJoinLog(),
+          playerLeaveLogService.findLatestPlayerLeaveLog(),
+        ]);
+        const findLatestEndTime = performance.now();
+        logger.debug(
+          `_getLogStoreFilePaths: Find latest logs took ${
+            findLatestEndTime - findLatestStartTime
+          } ms`,
+        );
 
-    const latestPlayerJoinDate = latestPlayerJoinDateResult.isOk()
-      ? latestPlayerJoinDateResult.value?.joinDateTime
-      : null;
+        // DBエラーは予期されたエラーとしてResultで返す
+        if (latestWorldJoinDateResult.isErr()) {
+          throw new LogInfoError({
+            code: 'DATABASE_QUERY_FAILED',
+            message: `Failed to get latest world join log: ${latestWorldJoinDateResult.error.message}`,
+          });
+        }
+        if (latestPlayerJoinDateResult.isErr()) {
+          throw new LogInfoError({
+            code: 'DATABASE_QUERY_FAILED',
+            message: `Failed to get latest player join log: ${latestPlayerJoinDateResult.error.message}`,
+          });
+        }
+        const latestWorldJoinDate = latestWorldJoinDateResult.value;
+        const latestPlayerJoinDate =
+          latestPlayerJoinDateResult.value?.joinDateTime;
 
-    // 最新の日時をフィルタリングしてソート
-    const dates = [
-      latestWorldJoinDate?.joinDateTime,
-      latestPlayerJoinDate,
-      latestPlayerLeaveDate?.leaveDateTime,
-    ]
-      .filter((d): d is Date => d instanceof Date) // Date型のみをフィルタリング
-      .sort(datefns.compareAsc);
-    logger.debug(`_getLogStoreFilePaths: latest dates: ${dates}`);
+        // 最新の日時をフィルタリングしてソート
+        const dates = [
+          latestWorldJoinDate?.joinDateTime,
+          latestPlayerJoinDate,
+          latestPlayerLeaveDate?.leaveDateTime,
+        ]
+          .filter((d): d is Date => d instanceof Date) // Date型のみをフィルタリング
+          .sort(datefns.compareAsc);
+        logger.debug(`_getLogStoreFilePaths: latest dates: ${dates}`);
 
-    // 最新の日付を取得、なければ1年前
-    startDate = dates.at(-1) ?? datefns.subYears(new Date(), 1);
-  } else {
-    // すべてのログを読み込む場合は、非常に古い日付から
-    startDate = datefns.parseISO('2000-01-01');
-    const getLegacyPathStartTime = performance.now();
-    // 旧形式のログファイルも追加 (excludeOldLogLoadがfalseの場合のみ)
-    const legacyLogStoreFilePath =
-      await vrchatLogService.getLegacyLogStoreFilePath();
-    const getLegacyPathEndTime = performance.now();
-    logger.debug(
-      `_getLogStoreFilePaths: Get legacy log path took ${
-        getLegacyPathEndTime - getLegacyPathStartTime
-      } ms`,
-    );
-    if (legacyLogStoreFilePath) {
-      logStoreFilePaths.push(legacyLogStoreFilePath);
-    }
-  }
+        // 最新の日付を取得、なければ1年前
+        startDate = dates.at(-1) ?? datefns.subYears(new Date(), 1);
+      } else {
+        // すべてのログを読み込む場合は、非常に古い日付から
+        startDate = datefns.parseISO('2000-01-01');
+        const getLegacyPathStartTime = performance.now();
+        // 旧形式のログファイルも追加 (excludeOldLogLoadがfalseの場合のみ)
+        const legacyLogStoreFilePath =
+          await vrchatLogService.getLegacyLogStoreFilePath();
+        const getLegacyPathEndTime = performance.now();
+        logger.debug(
+          `_getLogStoreFilePaths: Get legacy log path took ${
+            getLegacyPathEndTime - getLegacyPathStartTime
+          } ms`,
+        );
+        if (legacyLogStoreFilePath) {
+          logStoreFilePaths.push(legacyLogStoreFilePath);
+        }
+      }
 
-  const getPathsInRangeStartTime = performance.now();
-  // 日付範囲内のすべてのログファイルパスを取得して追加
-  const pathsInRange = await vrchatLogService.getLogStoreFilePathsInRange(
-    startDate,
-    new Date(),
+      const getPathsInRangeStartTime = performance.now();
+      // 日付範囲内のすべてのログファイルパスを取得して追加
+      const pathsInRange = await vrchatLogService.getLogStoreFilePathsInRange(
+        startDate,
+        new Date(),
+      );
+      const getPathsInRangeEndTime = performance.now();
+      logger.debug(
+        `_getLogStoreFilePaths: Get paths in range took ${
+          getPathsInRangeEndTime - getPathsInRangeStartTime
+        } ms`,
+      );
+      logStoreFilePaths.push(...pathsInRange);
+
+      const endTime = performance.now();
+      logger.debug(`_getLogStoreFilePaths took ${endTime - startTime} ms`);
+
+      return logStoreFilePaths;
+    })(),
+    (error) =>
+      error instanceof LogInfoError
+        ? error
+        : new LogInfoError({
+            code: 'UNKNOWN',
+            message: error instanceof Error ? error.message : String(error),
+          }),
   );
-  const getPathsInRangeEndTime = performance.now();
-  logger.debug(
-    `_getLogStoreFilePaths: Get paths in range took ${
-      getPathsInRangeEndTime - getPathsInRangeStartTime
-    } ms`,
-  );
-  logStoreFilePaths.push(...pathsInRange);
+}
 
-  const endTime = performance.now();
-  logger.debug(`_getLogStoreFilePaths took ${endTime - startTime} ms`);
-
-  return logStoreFilePaths;
+function _getLogStoreFilePaths(
+  excludeOldLogLoad: boolean,
+): ResultAsync<VRChatLogStoreFilePath[], LogInfoError> {
+  return _getLogStoreFilePathsImpl(excludeOldLogLoad);
 }
 
 /**
@@ -168,13 +200,20 @@ export async function loadLogInfoIndexFromVRChatLog({
   excludeOldLogLoad = false,
 }: {
   excludeOldLogLoad?: boolean;
-} = {}): Promise<neverthrow.Result<LogProcessingResults, VRChatLogFileError>> {
+} = {}): Promise<
+  neverthrow.Result<LogProcessingResults, VRChatLogFileError | LogInfoError>
+> {
   const totalStartTime = performance.now();
   logger.info('loadLogInfoIndexFromVRChatLog start');
 
   // 1. 処理対象となるログファイルパスを取得
   const getLogPathsStartTime = performance.now();
-  const logStoreFilePaths = await _getLogStoreFilePaths(excludeOldLogLoad);
+  const logStoreFilePathsResult =
+    await _getLogStoreFilePaths(excludeOldLogLoad);
+  if (logStoreFilePathsResult.isErr()) {
+    return err(logStoreFilePathsResult.error);
+  }
+  const logStoreFilePaths = logStoreFilePathsResult.value;
   const getLogPathsEndTime = performance.now();
   logger.debug(
     `Get log store file paths took ${
@@ -189,10 +228,12 @@ export async function loadLogInfoIndexFromVRChatLog({
 
   // 3. ログファイルからログ情報を取得（部分的な成功を許容）
   const getLogInfoStartTime = performance.now();
-  const logInfoListFromLogFile =
+  const logInfoListFromLogFileResult =
     await vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess(
       logStoreFilePaths,
     );
+  // この関数は never エラーなので常に成功
+  const logInfoListFromLogFile = logInfoListFromLogFileResult._unsafeUnwrap();
   const getLogInfoEndTime = performance.now();
   logger.debug(
     `Get VRChat log info from log files took ${
@@ -245,7 +286,7 @@ export async function loadLogInfoIndexFromVRChatLog({
       const findLatestStartTime = performance.now();
       // ログの最新日時を取得
       const [
-        latestWorldJoinDate,
+        latestWorldJoinDateResult,
         latestPlayerJoinDateResult,
         latestPlayerLeaveDate,
       ] = await Promise.all([
@@ -260,11 +301,19 @@ export async function loadLogInfoIndexFromVRChatLog({
         } ms`,
       );
 
-      // playerJoinDateResultからvalueを取得
-      let latestPlayerJoinDate = null;
-      if (latestPlayerJoinDateResult.isOk()) {
-        latestPlayerJoinDate = latestPlayerJoinDateResult.value;
+      // DBエラーは予期しないエラーなのでthrowして上位に伝播（Sentryに送信される）
+      if (latestWorldJoinDateResult.isErr()) {
+        throw new Error(
+          `Failed to get latest world join log: ${latestWorldJoinDateResult.error.message}`,
+        );
       }
+      if (latestPlayerJoinDateResult.isErr()) {
+        throw new Error(
+          `Failed to get latest player join log: ${latestPlayerJoinDateResult.error.message}`,
+        );
+      }
+      const latestWorldJoinDate = latestWorldJoinDateResult.value;
+      const latestPlayerJoinDate = latestPlayerJoinDateResult.value;
 
       const filterStartTime = performance.now();
       const filtered = logInfoList.filter((log) => {
@@ -356,7 +405,7 @@ export async function loadLogInfoIndexFromVRChatLog({
 
     const dbInsertStartTime = performance.now();
     const [
-      worldJoinResults,
+      worldJoinResultsResult,
       playerJoinResults,
       playerLeaveResults,
       // TODO: アプリイベントの処理は今後実装
@@ -382,6 +431,14 @@ export async function loadLogInfoIndexFromVRChatLog({
         dbInsertEndTime - dbInsertStartTime
       } ms`,
     );
+
+    // DBエラーは予期しないエラーなのでthrowして上位に伝播（Sentryに送信される）
+    if (worldJoinResultsResult.isErr()) {
+      throw new Error(
+        `Failed to save world join logs: ${worldJoinResultsResult.error.message}`,
+      );
+    }
+    const worldJoinResults = worldJoinResultsResult.value;
 
     results.createdWorldJoinLogModelList =
       results.createdWorldJoinLogModelList.concat(worldJoinResults);
@@ -458,7 +515,8 @@ export async function loadLogInfoIndexFromVRChatLog({
 export const getWorldNameSuggestions = async (
   query: string,
   limit: number,
-): Promise<string[]> => {
+): Promise<neverthrow.Result<string[], never>> => {
+  // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
     attributes: ['worldName'],
     where: {
@@ -471,7 +529,7 @@ export const getWorldNameSuggestions = async (
     limit,
   });
 
-  return worldJoinLogs.map((log) => log.worldName);
+  return neverthrow.ok(worldJoinLogs.map((log) => log.worldName));
 };
 
 /**
@@ -483,7 +541,8 @@ export const getWorldNameSuggestions = async (
 export const getPlayerNameSuggestions = async (
   query: string,
   limit: number,
-): Promise<string[]> => {
+): Promise<neverthrow.Result<string[], never>> => {
+  // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
     attributes: ['playerName'],
     where: {
@@ -496,7 +555,7 @@ export const getPlayerNameSuggestions = async (
     limit,
   });
 
-  return playerJoinLogs.map((log) => log.playerName);
+  return neverthrow.ok(playerJoinLogs.map((log) => log.playerName));
 };
 
 /**
@@ -506,7 +565,8 @@ export const getPlayerNameSuggestions = async (
  */
 export const getFrequentPlayerNames = async (
   limit: number,
-): Promise<string[]> => {
+): Promise<neverthrow.Result<string[], never>> => {
+  // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   const playerCounts = await VRChatPlayerJoinLogModel.findAll({
     attributes: ['playerName', [fn('COUNT', col('playerName')), 'count']],
     group: ['playerName'],
@@ -514,7 +574,7 @@ export const getFrequentPlayerNames = async (
     limit,
   });
 
-  return playerCounts.map((player) => player.playerName);
+  return neverthrow.ok(playerCounts.map((player) => player.playerName));
 };
 
 /**
@@ -528,69 +588,64 @@ export const getFrequentPlayerNames = async (
  */
 export const searchSessionsByPlayerName = async (
   playerName: string,
-): Promise<Date[]> => {
+): Promise<neverthrow.Result<Date[], never>> => {
   const startTime = performance.now();
 
-  try {
-    // プレイヤー名で部分一致検索（大文字小文字を区別しない）
-    const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
+  // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
+  // プレイヤー名で部分一致検索（大文字小文字を区別しない）
+  const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
+    where: {
+      playerName: {
+        [Op.like]: `%${playerName}%`,
+      },
+    },
+    order: [['joinDateTime', 'DESC']],
+  });
+
+  if (playerJoinLogs.length === 0) {
+    logger.debug(
+      `searchSessionsByPlayerName: No players found for query "${playerName}"`,
+    );
+    return neverthrow.ok([]);
+  }
+
+  // 各プレイヤー参加ログに対して、対応するワールド参加ログを探す
+  const sessionJoinDates: Date[] = [];
+  const processedWorldJoins = new Set<string>();
+
+  for (const playerLog of playerJoinLogs) {
+    // このプレイヤーが参加した時点での最新のワールド参加ログを取得
+    const worldJoinLog = await VRChatWorldJoinLogModel.findOne({
       where: {
-        playerName: {
-          [Op.like]: `%${playerName}%`,
+        joinDateTime: {
+          [Op.lte]: playerLog.joinDateTime,
         },
       },
       order: [['joinDateTime', 'DESC']],
     });
 
-    if (playerJoinLogs.length === 0) {
-      logger.debug(
-        `searchSessionsByPlayerName: No players found for query "${playerName}"`,
-      );
-      return [];
-    }
+    if (worldJoinLog) {
+      const worldJoinKey = worldJoinLog.joinDateTime.toISOString();
 
-    // 各プレイヤー参加ログに対して、対応するワールド参加ログを探す
-    const sessionJoinDates: Date[] = [];
-    const processedWorldJoins = new Set<string>();
-
-    for (const playerLog of playerJoinLogs) {
-      // このプレイヤーが参加した時点での最新のワールド参加ログを取得
-      const worldJoinLog = await VRChatWorldJoinLogModel.findOne({
-        where: {
-          joinDateTime: {
-            [Op.lte]: playerLog.joinDateTime,
-          },
-        },
-        order: [['joinDateTime', 'DESC']],
-      });
-
-      if (worldJoinLog) {
-        const worldJoinKey = worldJoinLog.joinDateTime.toISOString();
-
-        // 同じワールドセッションを重複して追加しないようにする
-        if (!processedWorldJoins.has(worldJoinKey)) {
-          processedWorldJoins.add(worldJoinKey);
-          sessionJoinDates.push(worldJoinLog.joinDateTime);
-        }
+      // 同じワールドセッションを重複して追加しないようにする
+      if (!processedWorldJoins.has(worldJoinKey)) {
+        processedWorldJoins.add(worldJoinKey);
+        sessionJoinDates.push(worldJoinLog.joinDateTime);
       }
     }
-
-    const endTime = performance.now();
-    logger.debug(
-      `searchSessionsByPlayerName: Found ${
-        sessionJoinDates.length
-      } unique sessions for player "${playerName}" in ${(
-        endTime - startTime
-      ).toFixed(2)}ms`,
-    );
-
-    // 新しい順にソートして返す
-    return sessionJoinDates.sort((a, b) => b.getTime() - a.getTime());
-  } catch (error) {
-    logger.error({
-      message: `Error searching sessions by player name: ${error}`,
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-    throw error;
   }
+
+  const endTime = performance.now();
+  logger.debug(
+    `searchSessionsByPlayerName: Found ${
+      sessionJoinDates.length
+    } unique sessions for player "${playerName}" in ${(
+      endTime - startTime
+    ).toFixed(2)}ms`,
+  );
+
+  // 新しい順にソートして返す
+  return neverthrow.ok(
+    sessionJoinDates.sort((a, b) => b.getTime() - a.getTime()),
+  );
 };

@@ -65,21 +65,58 @@ export const settingsRouter = () =>
       return sequelizeClient.checkMigrationRDBClient(appVersion);
     }),
     getAppUpdateInfo: procedure.query(async () => {
-      return await settingService.getElectronUpdaterInfo();
+      const result = await settingService.getElectronUpdaterInfo();
+      if (result.isErr()) {
+        // ネットワークエラーなど。クライアントにはアップデートなしとして返す
+        return { isUpdateAvailable: false, updateInfo: null };
+      }
+      return result.value;
     }),
     installUpdate: procedure.mutation(async () => {
-      const updateInfo = await settingService.getElectronUpdaterInfo();
-      if (!updateInfo.isUpdateAvailable) {
-        throw new UserFacingError('アップデートはありません。');
+      const result = await settingService.installUpdate();
+      if (result.isErr()) {
+        throw match(result.error.code)
+          .with('NO_UPDATE_AVAILABLE', () =>
+            UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.VALIDATION_ERROR,
+              category: ERROR_CATEGORIES.VALIDATION_ERROR,
+              message: result.error.message,
+              userMessage: 'アップデートはありません。',
+            }),
+          )
+          .with(P.union('UPDATE_CHECK_FAILED', 'DOWNLOAD_FAILED'), () =>
+            UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.UNKNOWN,
+              category: ERROR_CATEGORIES.NETWORK_ERROR,
+              message: result.error.message,
+              userMessage: `アップデートに失敗しました: ${result.error.message}`,
+            }),
+          )
+          .otherwise(() =>
+            UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.UNKNOWN,
+              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+              message: result.error.message,
+              userMessage: `アップデートに失敗しました: ${result.error.message}`,
+            }),
+          );
       }
-      await settingService.installUpdate();
       reloadMainWindow();
     }),
     checkForUpdates: procedure.query(async () => {
-      return await settingService.getElectronUpdaterInfo();
+      const result = await settingService.getElectronUpdaterInfo();
+      if (result.isErr()) {
+        return { isUpdateAvailable: false, updateInfo: null };
+      }
+      return result.value;
     }),
     installUpdatesAndReload: procedure.mutation(async () => {
-      await settingService.installUpdate();
+      const result = await settingService.installUpdate();
+      if (result.isErr()) {
+        throw new UserFacingError(
+          `アップデートに失敗しました: ${result.error.message}`,
+        );
+      }
       reloadMainWindow();
     }),
     checkForUpdatesAndReturnResult: procedure.query(
@@ -87,15 +124,23 @@ export const settingsRouter = () =>
         isUpdateAvailable: boolean;
         updateInfo: UpdateCheckResult | null;
       }> => {
-        const updateInfo = await settingService.getElectronUpdaterInfo();
+        const updateInfoResult = await settingService.getElectronUpdaterInfo();
+        if (updateInfoResult.isErr()) {
+          return { isUpdateAvailable: false, updateInfo: null };
+        }
         return {
-          isUpdateAvailable: updateInfo.isUpdateAvailable,
-          updateInfo: updateInfo.updateInfo,
+          isUpdateAvailable: updateInfoResult.value.isUpdateAvailable,
+          updateInfo: updateInfoResult.value.updateInfo,
         };
       },
     ),
     installUpdatesAndReloadApp: procedure.mutation(async () => {
-      await settingService.installUpdate();
+      const result = await settingService.installUpdate();
+      if (result.isErr()) {
+        throw new UserFacingError(
+          `アップデートに失敗しました: ${result.error.message}`,
+        );
+      }
       reloadMainWindow();
     }),
     openApplicationLogInExploler: procedure.mutation(async () => {
@@ -288,7 +333,9 @@ export const settingsRouter = () =>
       try {
         // 動的インポートで移行サービスを読み込む
         const { isMigrationNeeded } = await import('../migration/service');
-        const needed = await isMigrationNeeded();
+        const neededResult = await isMigrationNeeded();
+        // isMigrationNeeded は never エラーなので常に成功
+        const needed = neededResult._unsafeUnwrap();
 
         return {
           migrationNeeded: needed,
@@ -315,19 +362,32 @@ export const settingsRouter = () =>
         const { performMigration } = await import('../migration/service');
         const result = await performMigration();
 
-        if (result.isErr()) {
-          logger.error({
-            message: `Migration failed: ${result.error.message}`,
-            stack: match(result.error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise(() => undefined),
-          });
-          throw new UserFacingError(
-            `データ移行に失敗しました: ${result.error.message}`,
-          );
-        }
-
-        return result.value;
+        // performMigration は Result<MigrationResult, never> を返すため、
+        // エラーは発生しない。neverthrow標準の.match()を使用
+        return result.match(
+          (migrationResult) => {
+            // エラーは MigrationResult.errors 配列に格納される
+            if (migrationResult.errors.length > 0) {
+              logger.error({
+                message: `Migration failed with errors: ${migrationResult.errors.join(
+                  ', ',
+                )}`,
+              });
+              throw new UserFacingError(
+                `データ移行に失敗しました: ${migrationResult.errors.join(
+                  ', ',
+                )}`,
+              );
+            }
+            return migrationResult;
+          },
+          // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
+          () => {
+            throw new Error(
+              'Unreachable: performMigration should never return an error',
+            );
+          },
+        );
       } catch (error) {
         logger.error({
           message: `Failed to perform migration: ${match(error)

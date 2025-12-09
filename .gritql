@@ -1,0 +1,31 @@
+// GritQL patterns for VRChat Albums project
+
+// Pattern: Check for direct export of ValueObject classes
+// ValueObject classes should be exported as type only
+pattern valueobject_export() {
+  `export class $name extends BaseValueObject<$_, $_> {}`
+}
+
+// Pattern: Check for catch blocks without proper error classification
+pattern neverthrow_catch_all() {
+  `catch ($error) { return err($error) }` where {
+    // The error is directly wrapped without classification
+    not or {
+      $error <: within `match($error)`,
+      $error <: within `if (`,
+      $error <: within `$error.code`
+    }
+  }
+}
+
+// Pattern: Check async functions that should return Result type
+pattern async_without_result() {
+  or {
+    `async function $name($_): Promise<$return> { $_ }` where {
+      not $return <: contains `Result`
+    },
+    `const $name = async ($_): Promise<$return> => { $_ }` where {
+      not $return <: contains `Result`
+    }
+  }
+}

@@ -58,6 +58,14 @@ export default defineConfig({
           },
         },
       },
+      // Scripts用の設定
+      {
+        test: {
+          name: 'scripts',
+          environment: 'node',
+          include: ['scripts/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+        },
+      },
     ],
   },
   resolve: {

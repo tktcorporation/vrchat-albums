@@ -2,9 +2,7 @@
 # https://mise.jdx.dev/configuration.html
 
 [tools]
-jq = "latest"
-
-node = "{{ exec(command='jq -r .engines.node package.json') | default(value='lts') }}"
+node = "20"
 yarn = "latest"
 uv = "latest"
 
@@ -13,12 +11,13 @@ uv = "latest"
 "npm:@antfu/ni" = "latest"
 "npm:fxp-cli" = "latest"
 
+# GritQL - code search and transformation tool
+"npm:@getgrit/cli" = "latest"
+
 
 [settings]
 # Enable automatic installation of tools
 experimental = true
-# Explicitly enable idiomatic version files for node
-idiomatic_version_file_enable_tools = ["node"]
 
 [tasks]
 "lint:xml" = "cat CLAUDE.md | fxp val"

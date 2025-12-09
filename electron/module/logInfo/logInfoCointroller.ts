@@ -68,8 +68,17 @@ const fetchAndMergeSortedWorldJoinLogs = async (
 };
 
 const getVRCWorldJoinLogList = async () => {
-  const joinLogList = await worldJoinLogService.findAllVRChatWorldJoinLogList();
-  return joinLogList.map((joinLog) => {
+  const result = await worldJoinLogService.findAllVRChatWorldJoinLogList();
+  if (result.isErr()) {
+    throw UserFacingError.withStructuredInfo({
+      code: ERROR_CODES.DATABASE_ERROR,
+      category: ERROR_CATEGORIES.DATABASE_ERROR,
+      message: `Failed to get world join log list: ${result.error.message}`,
+      userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
+      cause: new Error(result.error.message),
+    });
+  }
+  return result.value.map((joinLog) => {
     return {
       id: joinLog.id as string,
       worldId: joinLog.worldId,
@@ -189,19 +198,34 @@ const getRecentVRChatWorldJoinLogByVRChatPhotoName = async (
         updatedAt: Date;
       } | null;
     },
-    'RECENT_JOIN_LOG_NOT_FOUND'
+    'RECENT_JOIN_LOG_NOT_FOUND' | 'DATABASE_ERROR'
   >
 > => {
-  const joinLog = await worldJoinLogService.findRecentVRChatWorldJoinLog(
+  const joinLogResult = await worldJoinLogService.findRecentVRChatWorldJoinLog(
     vrchatPhotoName.photoTakenDateTime,
   );
+  if (joinLogResult.isErr()) {
+    logger.error({
+      message: '直近のワールド参加ログ取得中にエラーが発生しました',
+      stack: new Error(JSON.stringify(joinLogResult.error)),
+    });
+    return neverthrow.err('DATABASE_ERROR' as const);
+  }
+  const joinLog = joinLogResult.value;
   if (joinLog === null) {
     return neverthrow.err('RECENT_JOIN_LOG_NOT_FOUND' as const);
   }
 
-  const nextJoinLog = await worldJoinLogService.findNextVRChatWorldJoinLog(
-    joinLog.joinDateTime,
-  );
+  const nextJoinLogResult =
+    await worldJoinLogService.findNextVRChatWorldJoinLog(joinLog.joinDateTime);
+  if (nextJoinLogResult.isErr()) {
+    logger.error({
+      message: '次のワールド参加ログ取得中にエラーが発生しました',
+      stack: new Error(JSON.stringify(nextJoinLogResult.error)),
+    });
+    return neverthrow.err('DATABASE_ERROR' as const);
+  }
+  const nextJoinLog = nextJoinLogResult.value;
 
   return neverthrow.ok({
     id: joinLog.id as string,
@@ -464,8 +488,19 @@ export const logInfoRouter = () =>
     getFrequentPlayerNames: procedure
       .input(z.object({ limit: z.number().min(1).max(20).default(5) }))
       .query(async ({ input }) => {
-        const frequentPlayerNames = await getFrequentPlayerNames(input.limit);
-        return frequentPlayerNames;
+        const result = await getFrequentPlayerNames(input.limit);
+        return result.match(
+          (value) => value,
+          (error) => {
+            throw UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.DATABASE_ERROR,
+              category: ERROR_CATEGORIES.DATABASE_ERROR,
+              message: `Failed to get frequent player names: ${error}`,
+              userMessage: 'よく一緒に遊ぶプレイヤーの取得に失敗しました。',
+              cause: error,
+            });
+          },
+        );
       }),
     getRecentVRChatWorldJoinLogByVRChatPhotoName: procedure
       .input(VRChatPhotoFileNameWithExtSchema)
@@ -522,11 +557,19 @@ export const logInfoRouter = () =>
         }),
       )
       .query(async ({ input }) => {
-        const suggestions = await getWorldNameSuggestions(
-          input.query,
-          input.limit,
+        const result = await getWorldNameSuggestions(input.query, input.limit);
+        return result.match(
+          (value) => value,
+          (error) => {
+            throw UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.DATABASE_ERROR,
+              category: ERROR_CATEGORIES.DATABASE_ERROR,
+              message: `Failed to get world name suggestions: ${error}`,
+              userMessage: 'ワールド名の検索候補の取得に失敗しました。',
+              cause: error,
+            });
+          },
         );
-        return suggestions;
       }),
 
     /**
@@ -543,11 +586,19 @@ export const logInfoRouter = () =>
         }),
       )
       .query(async ({ input }) => {
-        const suggestions = await getPlayerNameSuggestions(
-          input.query,
-          input.limit,
+        const result = await getPlayerNameSuggestions(input.query, input.limit);
+        return result.match(
+          (value) => value,
+          (error) => {
+            throw UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.DATABASE_ERROR,
+              category: ERROR_CATEGORIES.DATABASE_ERROR,
+              message: `Failed to get player name suggestions: ${error}`,
+              userMessage: 'プレイヤー名の検索候補の取得に失敗しました。',
+              cause: error,
+            });
+          },
         );
-        return suggestions;
       }),
 
     /**
@@ -563,31 +614,23 @@ export const logInfoRouter = () =>
         }),
       )
       .query(async ({ input }) => {
-        try {
-          const sessionDates = await searchSessionsByPlayerName(
-            input.playerName,
-          );
-          logger.debug(
-            `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
-          );
-          return sessionDates;
-        } catch (error) {
-          logger.error({
-            message: `Failed to search sessions by player name: ${error}`,
-            stack: match(error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise((err) => new Error(String(err))),
-          });
-          throw UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.DATABASE_ERROR,
-            category: ERROR_CATEGORIES.DATABASE_ERROR,
-            message: `Failed to search sessions by player name: ${error}`,
-            userMessage: 'プレイヤー検索中にエラーが発生しました。',
-            cause: match(error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise((err) => new Error(String(err))),
-          });
-        }
+        // searchSessionsByPlayerName は Result<Date[], never> を返すため、
+        // エラーは発生しない。neverthrow標準の.match()を使用
+        const result = await searchSessionsByPlayerName(input.playerName);
+        return result.match(
+          (sessionDates) => {
+            logger.debug(
+              `searchSessionsByPlayerName: Found ${sessionDates.length} sessions for player "${input.playerName}"`,
+            );
+            return sessionDates;
+          },
+          // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
+          () => {
+            throw new Error(
+              'Unreachable: searchSessionsByPlayerName should never return an error',
+            );
+          },
+        );
       }),
 
     /**
@@ -797,7 +840,11 @@ export const logInfoRouter = () =>
 
           return results;
         } catch (error) {
-          logger.error({
+          // バッチ処理のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
+          // ユーザーにはUserFacingErrorで適切なメッセージを表示
+          throw UserFacingError.withStructuredInfo({
+            code: ERROR_CODES.DATABASE_ERROR,
+            category: ERROR_CATEGORIES.DATABASE_ERROR,
             message: `[SessionInfoBatch] バッチ処理でエラーが発生しました: ${match(
               error,
             )
@@ -805,21 +852,9 @@ export const logInfoRouter = () =>
               .otherwise((err) => String(err))} (requested sessions: ${
               ctx.input.length
             })`,
-            stack: match(error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise(() => undefined),
+            userMessage: 'セッション情報の取得中にエラーが発生しました。',
+            cause: error instanceof Error ? error : new Error(String(error)),
           });
-
-          // エラーの場合は空の結果を返す
-          for (const datetime of ctx.input) {
-            results[datetime.toISOString()] = {
-              worldId: null,
-              worldName: null,
-              worldInstanceId: null,
-              players: [],
-            };
-          }
-          return results;
         }
       }),
   });

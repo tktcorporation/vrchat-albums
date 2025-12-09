@@ -2,6 +2,7 @@ import * as neverthrow from 'neverthrow';
 import { logger } from '../../lib/logger';
 import type { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
+import type { LogInfoError } from '../logInfo/error';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
 import type { VRChatLogFileError } from '../vrchatLog/error';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
@@ -47,7 +48,9 @@ export type LogSyncMode = (typeof LOG_SYNC_MODE)[keyof typeof LOG_SYNC_MODE];
  */
 export async function syncLogs(
   mode: LogSyncMode,
-): Promise<neverthrow.Result<LogSyncResults, VRChatLogFileError>> {
+): Promise<
+  neverthrow.Result<LogSyncResults, VRChatLogFileError | LogInfoError>
+> {
   const isFullSync = mode === LOG_SYNC_MODE.FULL;
 
   logger.info(`Starting log sync with mode: ${mode}`);
@@ -88,7 +91,7 @@ export async function syncLogs(
  * 差分処理モードで実行される
  */
 export async function syncLogsInBackground(): Promise<
-  neverthrow.Result<LogSyncResults, VRChatLogFileError>
+  neverthrow.Result<LogSyncResults, VRChatLogFileError | LogInfoError>
 > {
   return syncLogs(LOG_SYNC_MODE.INCREMENTAL);
 }

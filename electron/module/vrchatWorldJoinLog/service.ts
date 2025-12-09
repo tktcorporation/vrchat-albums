@@ -1,5 +1,5 @@
-import { enqueueTask } from '../../lib/dbHelper';
-import { logger } from '../../lib/logger';
+import { ResultAsync } from 'neverthrow';
+import { type DBHelperError, enqueueTask } from '../../lib/dbHelper';
 import type { VRChatWorldJoinLog } from '../vrchatLog/service';
 import * as model from './VRChatWorldJoinLogModel/s_model';
 
@@ -7,20 +7,37 @@ import * as model from './VRChatWorldJoinLogModel/s_model';
  * ワールド参加ログをDBへ保存する
  * loadLogInfoIndexFromVRChatLog から利用される
  */
-export const createVRChatWorldJoinLogModel = async (
+export const createVRChatWorldJoinLogModel = (
   vrchatWorldJoinLogList: VRChatWorldJoinLog[],
-): Promise<model.VRChatWorldJoinLogModel[]> => {
-  return model.createVRChatWorldJoinLog(vrchatWorldJoinLogList);
+): ResultAsync<model.VRChatWorldJoinLogModel[], DBHelperError> => {
+  return ResultAsync.fromPromise(
+    model.createVRChatWorldJoinLog(vrchatWorldJoinLogList),
+    (error): DBHelperError => ({
+      type: 'BATCH_OPERATION_FAILED',
+      message: `Failed to create world join logs: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    }),
+  );
 };
 
 /**
  * すべてのワールド参加ログを取得する
  * デバッグ用のAPIから参照される
  */
-export const findAllVRChatWorldJoinLogList = async (): Promise<
-  model.VRChatWorldJoinLogModel[]
+export const findAllVRChatWorldJoinLogList = (): ResultAsync<
+  model.VRChatWorldJoinLogModel[],
+  DBHelperError
 > => {
-  return model.findAllVRChatWorldJoinLogList();
+  return ResultAsync.fromPromise(
+    model.findAllVRChatWorldJoinLogList(),
+    (error): DBHelperError => ({
+      type: 'BATCH_OPERATION_FAILED',
+      message: `Failed to find all world join logs: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    }),
+  );
 };
 
 export const findVRChatWorldJoinLogList = async ({
@@ -50,57 +67,37 @@ export const findVRChatWorldJoinLogList = async ({
   });
 };
 
-export const findRecentVRChatWorldJoinLog = async (
+export const findRecentVRChatWorldJoinLog = (
   joinDateTime: Date,
-): Promise<model.VRChatWorldJoinLogModel | null> => {
-  const result = await enqueueTask(() =>
-    model.findRecentVRChatWorldJoinLog({
-      dateTime: joinDateTime,
-    }),
-  );
-
-  if (result.isErr()) {
-    logger.error({
-      message: '直近のワールド参加ログ取得中にエラーが発生しました',
-      stack: new Error(JSON.stringify(result.error)),
-    });
-    return null;
-  }
-  return result.value;
+): ResultAsync<model.VRChatWorldJoinLogModel | null, DBHelperError> => {
+  return ResultAsync.fromSafePromise(
+    enqueueTask(() =>
+      model.findRecentVRChatWorldJoinLog({
+        dateTime: joinDateTime,
+      }),
+    ),
+  ).andThen((result) => result);
 };
 
-export const findNextVRChatWorldJoinLog = async (
+export const findNextVRChatWorldJoinLog = (
   joinDateTime: Date,
-): Promise<model.VRChatWorldJoinLogModel | null> => {
-  const result = await enqueueTask(() =>
-    model.findNextVRChatWorldJoinLog(joinDateTime),
-  );
-
-  if (result.isErr()) {
-    logger.error({
-      message: '次のワールド参加ログ取得中にエラーが発生しました',
-      stack: new Error(JSON.stringify(result.error)),
-    });
-    return null;
-  }
-  return result.value;
+): ResultAsync<model.VRChatWorldJoinLogModel | null, DBHelperError> => {
+  return ResultAsync.fromSafePromise(
+    enqueueTask(() => model.findNextVRChatWorldJoinLog(joinDateTime)),
+  ).andThen((result) => result);
 };
 
 /**
  * 最も新しいワールド参加ログを取得する
  * ログ同期処理で基準日時を求める際に使用
  */
-export const findLatestWorldJoinLog = async () => {
-  const result = await enqueueTask(() => model.findLatestWorldJoinLog());
-
-  if (result.isErr()) {
-    logger.error({
-      message: '最新のワールド参加ログ取得中にエラーが発生しました',
-      stack: new Error(JSON.stringify(result.error)),
-    });
-    return null;
-  }
-  return result.value;
+export const findLatestWorldJoinLog = (): ResultAsync<
+  model.VRChatWorldJoinLogModel | null,
+  DBHelperError
+> => {
+  return ResultAsync.fromSafePromise(
+    enqueueTask(() => model.findLatestWorldJoinLog()),
+  ).andThen((result) => result);
 };
 
 type VRChatWorldJoinLogWithSource = {
