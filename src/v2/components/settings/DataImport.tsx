@@ -221,7 +221,7 @@ const DataImport = memo(() => {
           >
             <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-              logStoreファイルやディレクトリをドラッグ&ドロップするか、下のボタンで選択してください
+              logStoreファイルやディレクトリをドラッグ&amp;ドロップするか、下のボタンで選択してください
             </p>
             <div className="flex gap-2 justify-center">
               <Button
