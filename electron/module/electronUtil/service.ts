@@ -4,8 +4,10 @@ import * as path from 'node:path';
 import { writeClipboardFilePaths } from 'clip-filepaths';
 import { app, clipboard, dialog, nativeImage, shell } from 'electron';
 import * as neverthrow from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import sharp from 'sharp';
 import { P, match } from 'ts-pattern';
+import { FileIOError } from './error';
 
 // Error types for electronUtil operations
 type OpenPathError = { type: 'OPEN_PATH_FAILED'; message: string };
@@ -131,29 +133,20 @@ const copyImageDataByPath = async (
  * Base64 形式の画像を一時保存してからクリップボードへコピーする。
  * ShareDialog の画像コピー機能で利用される。
  */
-const copyImageByBase64 = async (options: {
+const copyImageByBase64 = (options: {
   pngBase64: string;
-}): Promise<neverthrow.Result<void, Error>> => {
-  try {
-    await handlePngBase64WithCallback(
-      {
-        filenameWithoutExt: 'clipboard_image', // 一時ファイル名
-        pngBase64: options.pngBase64,
-      },
-      async (tempPngPath) => {
-        const image = nativeImage.createFromPath(tempPngPath);
-        clipboard.writeImage(image);
-        // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
-      },
-    );
-    return neverthrow.ok(undefined);
-  } catch (error) {
-    return neverthrow.err(
-      match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise(() => new Error('Failed to copy base64 image')),
-    );
-  }
+}): ResultAsync<void, FileIOError> => {
+  return handlePngBase64WithCallback(
+    {
+      filenameWithoutExt: 'clipboard_image', // 一時ファイル名
+      pngBase64: options.pngBase64,
+    },
+    async (tempPngPath) => {
+      const image = nativeImage.createFromPath(tempPngPath);
+      clipboard.writeImage(image);
+      // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
+    },
+  );
 };
 
 /**
@@ -187,7 +180,15 @@ const downloadImageAsPng = async (options: {
       return neverthrow.err('canceled');
     }
 
-    await saveFileToPath(tempFilePath, dialogResult.filePath);
+    const saveResult = await saveFileToPath(
+      tempFilePath,
+      dialogResult.filePath,
+    );
+    if (saveResult.isErr()) {
+      return neverthrow.err(
+        new Error('Failed to save file', { cause: saveResult.error }),
+      );
+    }
 
     return neverthrow.ok(undefined);
   } catch (error) {
@@ -221,36 +222,50 @@ interface SavePngFileOptions {
  * Base64 PNG を一時ファイルとして保存し、指定コールバックへパスを渡す。
  * 画像コピーやダウンロード処理の共通部分として利用される。
  */
-export const handlePngBase64WithCallback = async (
+export const handlePngBase64WithCallback = (
   options: SavePngFileOptions,
   callback: (tempPngPath: string) => Promise<void>,
-): Promise<void> => {
-  let tempDir = '';
-  try {
-    const base64Data = options.pngBase64.replace(
-      /^data:image\/[^;]+;base64,/,
-      '',
-    );
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-'));
-    const tempFilePath = path.join(
-      tempDir,
-      `${options.filenameWithoutExt}.png`,
-    );
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    await fs.writeFile(tempFilePath, new Uint8Array(imageBuffer));
-    await callback(tempFilePath);
-  } catch (error) {
-    console.error('Failed to handle png file:', error);
-    throw new Error('Failed to handle png file', { cause: error });
-  } finally {
-    if (tempDir) {
+): ResultAsync<void, FileIOError> => {
+  return ResultAsync.fromPromise(
+    (async () => {
+      let tempDir = '';
       try {
-        await fs.rm(tempDir, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.error('Failed to cleanup temporary directory:', cleanupError);
+        const base64Data = options.pngBase64.replace(
+          /^data:image\/[^;]+;base64,/,
+          '',
+        );
+        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-'));
+        const tempFilePath = path.join(
+          tempDir,
+          `${options.filenameWithoutExt}.png`,
+        );
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        await fs.writeFile(tempFilePath, new Uint8Array(imageBuffer));
+        await callback(tempFilePath);
+      } finally {
+        if (tempDir) {
+          try {
+            await fs.rm(tempDir, { recursive: true, force: true });
+          } catch (cleanupError) {
+            console.error(
+              'Failed to cleanup temporary directory:',
+              cleanupError,
+            );
+          }
+        }
       }
-    }
-  }
+    })(),
+    (error) =>
+      new FileIOError({
+        code: match(error)
+          .with(
+            { code: P.union('EACCES', 'EPERM') },
+            () => 'PERMISSION_DENIED' as const,
+          )
+          .otherwise(() => 'FILE_CREATE_FAILED' as const),
+        message: error instanceof Error ? error.message : String(error),
+      }),
+  );
 };
 
 /**
@@ -275,11 +290,18 @@ export const showSavePngDialog = async (filenameWithoutExt: string) => {
  * 一時ファイルから指定パスへファイルを保存する単純なヘルパー。
  * downloadImageAsPng 内部で利用される。
  */
-export const saveFileToPath = async (
+export const saveFileToPath = (
   sourcePath: string,
   destinationPath: string,
-): Promise<void> => {
-  await fs.copyFile(sourcePath, destinationPath);
+): ResultAsync<void, FileIOError> => {
+  return ResultAsync.fromPromise(
+    fs.copyFile(sourcePath, destinationPath),
+    (error) =>
+      new FileIOError({
+        code: 'FILE_COPY_FAILED',
+        message: error instanceof Error ? error.message : String(error),
+      }),
+  );
 };
 
 // 複数ファイルをクリップボードにコピーする (クロスプラットフォーム対応)

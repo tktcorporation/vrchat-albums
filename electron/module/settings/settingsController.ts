@@ -73,16 +73,34 @@ export const settingsRouter = () =>
       return result.value;
     }),
     installUpdate: procedure.mutation(async () => {
-      const updateInfoResult = await settingService.getElectronUpdaterInfo();
-      if (updateInfoResult.isErr()) {
-        throw new UserFacingError(
-          `アップデートの確認に失敗しました: ${updateInfoResult.error.message}`,
-        );
+      const result = await settingService.installUpdate();
+      if (result.isErr()) {
+        throw match(result.error.code)
+          .with('NO_UPDATE_AVAILABLE', () =>
+            UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.VALIDATION_ERROR,
+              category: ERROR_CATEGORIES.VALIDATION_ERROR,
+              message: result.error.message,
+              userMessage: 'アップデートはありません。',
+            }),
+          )
+          .with(P.union('UPDATE_CHECK_FAILED', 'DOWNLOAD_FAILED'), () =>
+            UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.UNKNOWN,
+              category: ERROR_CATEGORIES.NETWORK_ERROR,
+              message: result.error.message,
+              userMessage: `アップデートに失敗しました: ${result.error.message}`,
+            }),
+          )
+          .otherwise(() =>
+            UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.UNKNOWN,
+              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+              message: result.error.message,
+              userMessage: `アップデートに失敗しました: ${result.error.message}`,
+            }),
+          );
       }
-      if (!updateInfoResult.value.isUpdateAvailable) {
-        throw new UserFacingError('アップデートはありません。');
-      }
-      await settingService.installUpdate();
       reloadMainWindow();
     }),
     checkForUpdates: procedure.query(async () => {
@@ -93,7 +111,12 @@ export const settingsRouter = () =>
       return result.value;
     }),
     installUpdatesAndReload: procedure.mutation(async () => {
-      await settingService.installUpdate();
+      const result = await settingService.installUpdate();
+      if (result.isErr()) {
+        throw new UserFacingError(
+          `アップデートに失敗しました: ${result.error.message}`,
+        );
+      }
       reloadMainWindow();
     }),
     checkForUpdatesAndReturnResult: procedure.query(
@@ -112,7 +135,12 @@ export const settingsRouter = () =>
       },
     ),
     installUpdatesAndReloadApp: procedure.mutation(async () => {
-      await settingService.installUpdate();
+      const result = await settingService.installUpdate();
+      if (result.isErr()) {
+        throw new UserFacingError(
+          `アップデートに失敗しました: ${result.error.message}`,
+        );
+      }
       reloadMainWindow();
     }),
     openApplicationLogInExploler: procedure.mutation(async () => {

@@ -118,29 +118,138 @@ export class NeverthrowLinter {
       return;
     }
 
-    const visit = (node: ts.Node) => {
+    // Track functions that return ResultAsync to skip their inner callbacks
+    const resultAsyncFunctionNodes = new Set<ts.Node>();
+
+    const visit = (node: ts.Node, insideResultAsyncFunction = false) => {
       if (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node)) {
+        // Check if this function returns ResultAsync
+        const returnsResultAsync = this.hasResultReturnType(node);
+
+        // Skip checking nested arrow functions that are:
+        // 1. Inside a function that returns ResultAsync
+        // 2. Used as arguments to ResultAsync.fromPromise() or similar
+        // 3. Callbacks passed to other function calls (common pattern for utility functions)
+        if (insideResultAsyncFunction && ts.isArrowFunction(node)) {
+          // This is a nested async function inside a ResultAsync-returning function
+          // Skip checking it as it's likely an IIFE or callback for ResultAsync
+          if (
+            this.isInsideNeverthrowCall(node) ||
+            this.isCallbackArgument(node)
+          ) {
+            // Recurse but still mark as inside ResultAsync function
+            ts.forEachChild(node, (child) => visit(child, true));
+            return;
+          }
+        }
+
+        if (returnsResultAsync) {
+          resultAsyncFunctionNodes.add(node);
+        }
+
         this.checkFunction(node, sourceFile, applicableRules);
-      } else if (ts.isVariableStatement(node)) {
+
+        // Recurse with updated context
+        ts.forEachChild(node, (child) =>
+          visit(child, returnsResultAsync || insideResultAsyncFunction),
+        );
+        return;
+      }
+
+      if (ts.isVariableStatement(node)) {
         // Check for arrow function assignments
         for (const declaration of node.declarationList.declarations) {
           if (
             declaration.initializer &&
             ts.isArrowFunction(declaration.initializer)
           ) {
+            const returnsResultAsync = this.hasResultReturnType(
+              declaration.initializer,
+            );
+
+            if (returnsResultAsync) {
+              resultAsyncFunctionNodes.add(declaration.initializer);
+            }
+
             this.checkFunction(
               declaration.initializer,
               sourceFile,
               applicableRules,
               declaration.name,
             );
+
+            // Recurse into the arrow function body
+            ts.forEachChild(declaration.initializer, (child) =>
+              visit(child, returnsResultAsync || insideResultAsyncFunction),
+            );
+          }
+        }
+        // Continue visiting other children of the variable statement
+        ts.forEachChild(node, (child) => {
+          if (!ts.isVariableDeclarationList(child)) {
+            visit(child, insideResultAsyncFunction);
+          }
+        });
+        return;
+      }
+
+      ts.forEachChild(node, (child) => visit(child, insideResultAsyncFunction));
+    };
+
+    ts.forEachChild(sourceFile, (node) => visit(node, false));
+  }
+
+  /**
+   * Check if an arrow function is used as an argument to neverthrow utility functions
+   * like ResultAsync.fromPromise(), ResultAsync.fromSafePromise(), etc.
+   */
+  private isInsideNeverthrowCall(node: ts.ArrowFunction): boolean {
+    let parent = node.parent;
+
+    while (parent) {
+      if (ts.isCallExpression(parent)) {
+        const expr = parent.expression;
+
+        // Check for ResultAsync.fromPromise, ResultAsync.fromSafePromise, etc.
+        if (ts.isPropertyAccessExpression(expr)) {
+          const methodName = expr.name.text;
+          const neverthrowMethods = [
+            'fromPromise',
+            'fromSafePromise',
+            'fromThrowable',
+            'map',
+            'mapErr',
+            'andThen',
+            'orElse',
+            'match',
+          ];
+
+          if (neverthrowMethods.includes(methodName)) {
+            return true;
           }
         }
       }
-      ts.forEachChild(node, visit);
-    };
 
-    ts.forEachChild(sourceFile, visit);
+      parent = parent.parent;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if an arrow function is passed as an argument to any function call.
+   * This is common for callbacks that don't need to return Result themselves
+   * when the parent function handles error wrapping.
+   */
+  private isCallbackArgument(node: ts.ArrowFunction): boolean {
+    const parent = node.parent;
+
+    // Direct argument to a call expression
+    if (ts.isCallExpression(parent)) {
+      return parent.arguments.some((arg) => arg === node);
+    }
+
+    return false;
   }
 
   private checkFunction(

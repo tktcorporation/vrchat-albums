@@ -1,7 +1,8 @@
 import { app } from 'electron';
 import { type UpdateCheckResult, autoUpdater } from 'electron-updater';
-import { ResultAsync } from 'neverthrow';
+import { ResultAsync, err, ok } from 'neverthrow';
 import { logger } from '../../lib/logger';
+import { UpdateError } from './error';
 
 export type UpdateCheckError = {
   type: 'UPDATE_CHECK_FAILED';
@@ -67,16 +68,33 @@ export const getElectronUpdaterInfo = (): ResultAsync<
 /**
  * ダウンロード済みの更新をインストールしアプリを再起動する。
  */
-export const installUpdate = async (): Promise<void> => {
-  const updateInfoResult = await getElectronUpdaterInfo();
-  if (updateInfoResult.isErr()) {
-    throw new Error(
-      `Failed to check for updates: ${updateInfoResult.error.message}`,
-    );
-  }
-  if (!updateInfoResult.value.isUpdateAvailable) {
-    throw new Error('No updates available');
-  }
-  await autoUpdater.downloadUpdate();
-  await autoUpdater.quitAndInstall();
+export const installUpdate = (): ResultAsync<void, UpdateError> => {
+  return getElectronUpdaterInfo()
+    .mapErr(
+      (error) =>
+        new UpdateError({
+          code: 'UPDATE_CHECK_FAILED',
+          message: error.message,
+        }),
+    )
+    .andThen((updateInfo) => {
+      if (!updateInfo.isUpdateAvailable) {
+        return err(new UpdateError('NO_UPDATE_AVAILABLE'));
+      }
+      return ok(updateInfo);
+    })
+    .andThen(() =>
+      ResultAsync.fromPromise(
+        autoUpdater.downloadUpdate(),
+        (error) =>
+          new UpdateError({
+            code: 'DOWNLOAD_FAILED',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+      ),
+    )
+    .map(() => {
+      // quitAndInstall は void を返すので、同期的に呼び出し
+      autoUpdater.quitAndInstall();
+    });
 };
