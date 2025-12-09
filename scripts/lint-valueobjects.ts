@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import consola from 'consola';
 import { glob } from 'glob';
+import path from 'pathe';
 import * as ts from 'typescript';
+import { type NormalizedPath, NormalizedPathArraySchema } from './lib/paths';
 
 interface ValueObjectIssue {
   file: string;
@@ -19,11 +20,13 @@ export class ValueObjectLinter {
   private program: ts.Program;
   private checker: ts.TypeChecker;
   private resolvedTypes = new Map<ts.Type, boolean>();
+  private files: NormalizedPath[];
 
   constructor(
-    private files: string[],
+    files: string[],
     private sourceMap?: Map<string, string>, // For testing with virtual files
   ) {
+    this.files = NormalizedPathArraySchema.parse(files);
     const compilerOptions: ts.CompilerOptions = {
       target: ts.ScriptTarget.ESNext,
       module: ts.ModuleKind.ESNext,
@@ -41,10 +44,10 @@ export class ValueObjectLinter {
         compilerOptions,
         this.sourceMap,
       );
-      this.program = ts.createProgram(files, compilerOptions, host);
+      this.program = ts.createProgram(this.files, compilerOptions, host);
     } else {
       // Production mode: use real files
-      this.program = ts.createProgram(files, compilerOptions);
+      this.program = ts.createProgram(this.files, compilerOptions);
     }
     this.checker = this.program.getTypeChecker();
   }
@@ -84,7 +87,8 @@ export class ValueObjectLinter {
 
   lint(): ValueObjectIssue[] {
     for (const sourceFile of this.program.getSourceFiles()) {
-      if (this.files.includes(sourceFile.fileName)) {
+      // TypeScript compiler always returns forward slashes, so sourceFile.fileName is already normalized
+      if (this.files.includes(sourceFile.fileName as NormalizedPath)) {
         this.lintFile(sourceFile);
       }
     }

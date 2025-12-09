@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
 import consola from 'consola';
 import { glob } from 'glob';
 import { minimatch } from 'minimatch';
+import path from 'pathe';
 import * as ts from 'typescript';
+import {
+  type NormalizedPath,
+  NormalizedPathArraySchema,
+  NormalizedPathSchema,
+} from './lib/paths';
 
 export interface NeverthrowLintConfig {
   rules: Array<{
@@ -30,12 +35,14 @@ export class NeverthrowLinter {
   private issues: NeverthrowIssue[] = [];
   private program: ts.Program;
   private checker: ts.TypeChecker;
+  private files: NormalizedPath[];
 
   constructor(
-    private files: string[],
+    files: string[],
     private config: NeverthrowLintConfig,
     private sourceMap?: Map<string, string>, // For testing with virtual files
   ) {
+    this.files = NormalizedPathArraySchema.parse(files);
     const compilerOptions: ts.CompilerOptions = {
       target: ts.ScriptTarget.ESNext,
       module: ts.ModuleKind.ESNext,
@@ -53,10 +60,10 @@ export class NeverthrowLinter {
         compilerOptions,
         this.sourceMap,
       );
-      this.program = ts.createProgram(files, compilerOptions, host);
+      this.program = ts.createProgram(this.files, compilerOptions, host);
     } else {
       // Production mode: use real files
-      this.program = ts.createProgram(files, compilerOptions);
+      this.program = ts.createProgram(this.files, compilerOptions);
     }
     this.checker = this.program.getTypeChecker();
   }
@@ -96,7 +103,8 @@ export class NeverthrowLinter {
 
   lint(): NeverthrowIssue[] {
     for (const sourceFile of this.program.getSourceFiles()) {
-      if (this.files.includes(sourceFile.fileName)) {
+      // TypeScript compiler always returns forward slashes, so sourceFile.fileName is already normalized
+      if (this.files.includes(sourceFile.fileName as NormalizedPath)) {
         this.lintFile(sourceFile);
       }
     }
@@ -107,7 +115,8 @@ export class NeverthrowLinter {
     const applicableRules = this.config.rules.filter((rule) => {
       // If rule.path is an absolute path, compare directly
       if (path.isAbsolute(rule.path)) {
-        return sourceFile.fileName === rule.path;
+        // Normalize rule.path to handle Windows backslashes
+        return sourceFile.fileName === NormalizedPathSchema.parse(rule.path);
       }
       // Otherwise, use minimatch with relative path
       const relativePath = path.relative(process.cwd(), sourceFile.fileName);
