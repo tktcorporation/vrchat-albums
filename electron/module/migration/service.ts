@@ -1,6 +1,6 @@
 import * as nodeFsPromises from 'node:fs/promises';
 import * as path from 'node:path';
-import { type Result, ok } from 'neverthrow';
+import { type Result, ResultAsync, ok } from 'neverthrow';
 import { logger } from '../../lib/logger';
 
 export interface MigrationResult {
@@ -30,151 +30,171 @@ export const clearMigrationCache = (): void => {
 
 /**
  * Check if migration is needed
- * エラーが発生した場合はfalseを返して正常に動作を継続
+ * エラーが発生した場合はfalseを返して正常に動作を継続（エラーはログに記録）
+ * Result型で返すが、エラーは常にログ記録後にfalseとして成功扱い
  */
-export const isMigrationNeeded = async (): Promise<boolean> => {
-  // キャッシュチェック
-  if (migrationCheckCache !== null) {
-    const cacheAge = Date.now() - migrationCheckCache.timestamp;
-    if (cacheAge < CACHE_LIFETIME) {
-      return migrationCheckCache.result;
-    }
-  }
+export const isMigrationNeeded = (): ResultAsync<boolean, never> => {
+  return ResultAsync.fromSafePromise(
+    (async (): Promise<boolean> => {
+      // キャッシュチェック
+      if (migrationCheckCache !== null) {
+        const cacheAge = Date.now() - migrationCheckCache.timestamp;
+        if (cacheAge < CACHE_LIFETIME) {
+          return migrationCheckCache.result;
+        }
+      }
 
-  try {
-    const { app } = await import('electron');
-    const oldAppPath = await getOldAppUserDataPath();
-    const currentAppPath = app.getPath('userData');
+      try {
+        const { app } = await import('electron');
+        const oldAppPathResult = await getOldAppUserDataPath();
+        const oldAppPath = oldAppPathResult._unsafeUnwrap();
+        const currentAppPath = app.getPath('userData');
 
-    logger.debug('[Migration] Checking migration status:', {
-      oldAppPath,
-      currentAppPath,
-    });
+        logger.debug('[Migration] Checking migration status:', {
+          oldAppPath,
+          currentAppPath,
+        });
 
-    // Check if old app directory exists
-    const oldAppExists = await nodeFsPromises
-      .access(oldAppPath)
-      .then(() => true)
-      .catch(() => false);
+        // Check if old app directory exists
+        const oldAppExists = await nodeFsPromises
+          .access(oldAppPath)
+          .then(() => true)
+          .catch(() => false);
 
-    if (!oldAppExists) {
-      logger.debug('No old app data found, migration not needed');
-      const result = false;
-      // キャッシュに保存
-      migrationCheckCache = {
-        result,
-        timestamp: Date.now(),
-      };
-      return result;
-    }
+        if (!oldAppExists) {
+          logger.debug('No old app data found, migration not needed');
+          const result = false;
+          // キャッシュに保存
+          migrationCheckCache = {
+            result,
+            timestamp: Date.now(),
+          };
+          return result;
+        }
 
-    // Check if migration marker exists (to prevent re-migration)
-    const migrationMarkerPath = path.join(
-      currentAppPath,
-      '.migration-completed',
-    );
-    const markerExists = await nodeFsPromises
-      .access(migrationMarkerPath)
-      .then(() => true)
-      .catch(() => false);
+        // Check if migration marker exists (to prevent re-migration)
+        const migrationMarkerPath = path.join(
+          currentAppPath,
+          '.migration-completed',
+        );
+        const markerExists = await nodeFsPromises
+          .access(migrationMarkerPath)
+          .then(() => true)
+          .catch(() => false);
 
-    if (markerExists) {
-      logger.debug('Migration already completed, skipping');
-      const result = false;
-      // キャッシュに保存
-      migrationCheckCache = {
-        result,
-        timestamp: Date.now(),
-      };
-      return result;
-    }
+        if (markerExists) {
+          logger.debug('Migration already completed, skipping');
+          const result = false;
+          // キャッシュに保存
+          migrationCheckCache = {
+            result,
+            timestamp: Date.now(),
+          };
+          return result;
+        }
 
-    logger.info('Migration needed from old app directory');
-    const result = true;
-    // キャッシュに保存
-    migrationCheckCache = {
-      result,
-      timestamp: Date.now(),
-    };
-    return result;
-  } catch (error) {
-    logger.error({
-      message: 'Error checking migration status',
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-    const result = false;
-    // エラー時もキャッシュに保存（頻繁なファイルアクセスを防ぐ）
-    migrationCheckCache = {
-      result,
-      timestamp: Date.now(),
-    };
-    return result;
-  }
+        logger.info('Migration needed from old app directory');
+        const result = true;
+        // キャッシュに保存
+        migrationCheckCache = {
+          result,
+          timestamp: Date.now(),
+        };
+        return result;
+      } catch (error) {
+        logger.error({
+          message: 'Error checking migration status',
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
+        const result = false;
+        // エラー時もキャッシュに保存（頻繁なファイルアクセスを防ぐ）
+        migrationCheckCache = {
+          result,
+          timestamp: Date.now(),
+        };
+        return result;
+      }
+    })(),
+  );
 };
 
 /**
  * Get the path to the old app's user data directory
  * 同期的なファイルアクセスを避けて、パスのみ返す
+ * エラー時はデフォルトパスを返す（エラーはログに記録）
  */
-const getOldAppUserDataPath = async (): Promise<string> => {
-  try {
-    const { app } = await import('electron');
-    const currentUserDataPath = app.getPath('userData');
-    const parentDir = path.dirname(currentUserDataPath);
-
-    // Check for different variations of the old app name
-    const possibleOldAppNames = ['vrchat-photo-journey', 'VRChatPhotoJourney'];
-
-    for (const appName of possibleOldAppNames) {
-      const possiblePath = path.join(parentDir, appName);
+const getOldAppUserDataPath = (): ResultAsync<string, never> => {
+  return ResultAsync.fromSafePromise(
+    (async (): Promise<string> => {
       try {
-        await nodeFsPromises.access(possiblePath);
-        return possiblePath;
-      } catch {
-        // Continue to next possible name
-      }
-    }
+        const { app } = await import('electron');
+        const currentUserDataPath = app.getPath('userData');
+        const parentDir = path.dirname(currentUserDataPath);
 
-    // Return default if none exist
-    return path.join(parentDir, 'vrchat-photo-journey');
-  } catch (error) {
-    logger.error({
-      message: 'Failed to get old app path',
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-    return '';
-  }
+        // Check for different variations of the old app name
+        const possibleOldAppNames = [
+          'vrchat-photo-journey',
+          'VRChatPhotoJourney',
+        ];
+
+        for (const appName of possibleOldAppNames) {
+          const possiblePath = path.join(parentDir, appName);
+          try {
+            await nodeFsPromises.access(possiblePath);
+            return possiblePath;
+          } catch {
+            // Continue to next possible name
+          }
+        }
+
+        // Return default if none exist
+        return path.join(parentDir, 'vrchat-photo-journey');
+      } catch (error) {
+        logger.error({
+          message: 'Failed to get old app path',
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
+        return '';
+      }
+    })(),
+  );
 };
 
 /**
  * Perform the migration from old app to new app
+ * エラー時もログ記録後に正常終了（起動を妨げない）
  */
-export const performMigrationIfNeeded = async (): Promise<void> => {
-  try {
-    const needsMigration = await isMigrationNeeded();
+export const performMigrationIfNeeded = (): ResultAsync<void, never> => {
+  return ResultAsync.fromSafePromise(
+    (async (): Promise<void> => {
+      try {
+        const needsMigrationResult = await isMigrationNeeded();
+        const needsMigration = needsMigrationResult._unsafeUnwrap();
 
-    if (!needsMigration) {
-      logger.info('Migration not needed');
-      return;
-    }
+        if (!needsMigration) {
+          logger.info('Migration not needed');
+          return;
+        }
 
-    logger.info('Migration needed, starting migration process...');
-    const result = await performMigration();
+        logger.info('Migration needed, starting migration process...');
+        const result = await performMigration();
 
-    if (result.isErr()) {
-      logger.error({
-        message: 'Migration failed',
-        stack: result.error,
-      });
-    } else {
-      logger.info('Migration completed successfully');
-    }
-  } catch (error) {
-    logger.error({
-      message: 'Error during migration check',
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-  }
+        if (result.isErr()) {
+          logger.error({
+            message: 'Migration failed',
+            stack: result.error,
+          });
+        } else {
+          logger.info('Migration completed successfully');
+        }
+      } catch (error) {
+        logger.error({
+          message: 'Error during migration check',
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
+      }
+    })(),
+  );
 };
 
 /**
@@ -185,7 +205,8 @@ export const performMigration = async (): Promise<
   Result<MigrationResult, never>
 > => {
   const { app } = await import('electron');
-  const oldAppPath = await getOldAppUserDataPath();
+  const oldAppPathResult = await getOldAppUserDataPath();
+  const oldAppPath = oldAppPathResult._unsafeUnwrap();
   const currentAppPath = app.getPath('userData');
 
   logger.info('Starting migration process...');
