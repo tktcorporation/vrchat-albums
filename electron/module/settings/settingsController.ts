@@ -66,18 +66,32 @@ export const settingsRouter = () =>
       return sequelizeClient.checkMigrationRDBClient(appVersion);
     }),
     getAppUpdateInfo: procedure.query(async () => {
-      return await settingService.getElectronUpdaterInfo();
+      const result = await settingService.getElectronUpdaterInfo();
+      if (result.isErr()) {
+        // ネットワークエラーなど。クライアントにはアップデートなしとして返す
+        return { isUpdateAvailable: false, updateInfo: null };
+      }
+      return result.value;
     }),
     installUpdate: procedure.mutation(async () => {
-      const updateInfo = await settingService.getElectronUpdaterInfo();
-      if (!updateInfo.isUpdateAvailable) {
+      const updateInfoResult = await settingService.getElectronUpdaterInfo();
+      if (updateInfoResult.isErr()) {
+        throw new UserFacingError(
+          `アップデートの確認に失敗しました: ${updateInfoResult.error.message}`,
+        );
+      }
+      if (!updateInfoResult.value.isUpdateAvailable) {
         throw new UserFacingError('アップデートはありません。');
       }
       await settingService.installUpdate();
       reloadMainWindow();
     }),
     checkForUpdates: procedure.query(async () => {
-      return await settingService.getElectronUpdaterInfo();
+      const result = await settingService.getElectronUpdaterInfo();
+      if (result.isErr()) {
+        return { isUpdateAvailable: false, updateInfo: null };
+      }
+      return result.value;
     }),
     installUpdatesAndReload: procedure.mutation(async () => {
       await settingService.installUpdate();
@@ -88,10 +102,13 @@ export const settingsRouter = () =>
         isUpdateAvailable: boolean;
         updateInfo: UpdateCheckResult | null;
       }> => {
-        const updateInfo = await settingService.getElectronUpdaterInfo();
+        const updateInfoResult = await settingService.getElectronUpdaterInfo();
+        if (updateInfoResult.isErr()) {
+          return { isUpdateAvailable: false, updateInfo: null };
+        }
         return {
-          isUpdateAvailable: updateInfo.isUpdateAvailable,
-          updateInfo: updateInfo.updateInfo,
+          isUpdateAvailable: updateInfoResult.value.isUpdateAvailable,
+          updateInfo: updateInfoResult.value.updateInfo,
         };
       },
     ),
@@ -289,7 +306,9 @@ export const settingsRouter = () =>
       try {
         // 動的インポートで移行サービスを読み込む
         const { isMigrationNeeded } = await import('../migration/service');
-        const needed = await isMigrationNeeded();
+        const neededResult = await isMigrationNeeded();
+        // isMigrationNeeded は never エラーなので常に成功
+        const needed = neededResult._unsafeUnwrap();
 
         return {
           migrationNeeded: needed,
