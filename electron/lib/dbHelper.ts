@@ -10,7 +10,7 @@ import { type DBQueueError, getDBQueue } from './dbQueue';
 /**
  * データベースヘルパーのエラー型
  */
-type DBHelperError =
+export type DBHelperError =
   | { type: 'TRANSACTION_FAILED'; message: string }
   | { type: 'BATCH_OPERATION_FAILED'; message: string }
   | { type: 'RETRY_FAILED'; message: string }
