@@ -6,8 +6,9 @@ build/
 out/
 main/
 
-# Ignore test fixtures (optional - remove if you want to check them)
-# scripts/test-fixtures/
+# Ignore test fixtures
+**/test-fixtures/**
+scripts/test-fixtures/**
 
 # Ignore generated files
 *.min.js

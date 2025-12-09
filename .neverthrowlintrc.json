@@ -33,6 +33,7 @@
         "findNextVRChatWorldJoinLog",
         "findRecentVRChatWorldJoinLog",
         "_getLogStoreFilePaths",
+        "_getLogStoreFilePathsImpl",
         "getOldAppUserDataPath",
         "processQueue",
         "copyImageByBase64",
