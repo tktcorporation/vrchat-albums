@@ -1,11 +1,12 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { FileText, Shield, X } from 'lucide-react';
+import type React from 'react';
 import { useState } from 'react';
-import * as React from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '../../components/lib/utils';
 import { Button } from '../../components/ui/button';
 import {
-  DialogContent as BaseDialogContent,
   Dialog,
   DialogDescription,
   DialogFooter,
@@ -19,19 +20,55 @@ import { terms as jaTerms } from '../constants/terms/ja';
 import { useI18n } from '../i18n/store';
 
 /**
+ * Markdownコンテンツ用のカスタムコンポーネント定義
+ * Tailwindスタイリングを適用してリッチな表示を実現
+ */
+const markdownComponents = {
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-base font-bold text-gray-900 dark:text-gray-100 mt-6 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+      {children}
+    </h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-4 mb-2">
+      {children}
+    </h3>
+  ),
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-3">
+      {children}
+    </p>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc list-inside text-sm text-gray-700 dark:text-gray-300 mb-3 space-y-1 ml-2">
+      {children}
+    </ul>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => (
+    <li className="leading-relaxed">{children}</li>
+  ),
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="font-semibold text-gray-900 dark:text-gray-100">
+      {children}
+    </strong>
+  ),
+};
+
+/**
  * 規約表示用ダイアログの本体コンポーネント。
  * 閉じるボタンの表示を制御できる。
  */
-const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
-    showCloseButton?: boolean;
-  }
->(({ className, children, showCloseButton = true, ...props }, ref) => (
+const DialogContent = ({
+  className,
+  children,
+  showCloseButton = true,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  showCloseButton?: boolean;
+}) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
-      ref={ref}
       className={cn(
         'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg',
         className,
@@ -47,8 +84,7 @@ const DialogContent = React.forwardRef<
       )}
     </DialogPrimitive.Content>
   </DialogPortal>
-));
-DialogContent.displayName = DialogPrimitive.Content.displayName;
+);
 
 interface TermsModalProps {
   open: boolean;
@@ -60,6 +96,7 @@ interface TermsModalProps {
 /**
  * 利用規約とプライバシーポリシーを提示するモーダル。
  * アプリ初回起動時や更新時に表示される。
+ * Markdownコンテンツをリッチにレンダリングする。
  */
 export const TermsModal = ({
   open,
@@ -91,25 +128,40 @@ export const TermsModal = ({
           <DialogTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">
             {isUpdate ? t('terms.updateTitle') : t('terms.title')}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {t('terms.title')}
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="h-full pr-4">
           <div className="space-y-8">
             <section>
               <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                📋 {terms.sections.termsOfService.title}
+                <FileText className="h-5 w-5" />
+                {terms.sections.termsOfService.title}
               </h3>
-              <div className="terms-content whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50/80 dark:bg-gray-800/80 rounded-lg p-6 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
-                {terms.sections.termsOfService.content}
+              <div className="bg-gray-50/80 dark:bg-gray-800/80 rounded-lg p-6 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
+                <Markdown
+                  remarkPlugins={[remarkGfm]}
+                  components={markdownComponents}
+                >
+                  {terms.sections.termsOfService.content}
+                </Markdown>
               </div>
             </section>
 
             <section>
               <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                🔒 {terms.sections.privacyPolicy.title}
+                <Shield className="h-5 w-5" />
+                {terms.sections.privacyPolicy.title}
               </h3>
-              <div className="terms-content whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300 bg-gray-50/80 dark:bg-gray-800/80 rounded-lg p-6 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
-                {terms.sections.privacyPolicy.content}
+              <div className="bg-gray-50/80 dark:bg-gray-800/80 rounded-lg p-6 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
+                <Markdown
+                  remarkPlugins={[remarkGfm]}
+                  components={markdownComponents}
+                >
+                  {terms.sections.privacyPolicy.content}
+                </Markdown>
               </div>
             </section>
           </div>

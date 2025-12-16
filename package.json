@@ -137,6 +137,8 @@
     "react-dom": "^19.1.1",
     "react-error-boundary": "4.1.2",
     "react-hot-toast": "2.6.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "rxjs": "~7.8.2",
     "sharp": "0.34.3",
     "superjson": "1.13.3",
