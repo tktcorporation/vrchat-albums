@@ -24,7 +24,7 @@
   </architecture>
 
   <environment>
-    <nodejs>20 LTS</nodejs>
+    <nodejs>22 LTS</nodejs>
     <package-manager>Yarn 4 (npm禁止)</package-manager>
   </environment>
 
