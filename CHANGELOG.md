@@ -6,6 +6,39 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Claude Code v2のベストプラクティスとlinterシステムの実装 (#617)
+- 利用規約をMarkdown形式に変換しスタイル・内容を改善 (#619)
+- Upgrade Electron to v39 for Node.js 22 compatibility (#632)
+
+### 🐛 Bug Fixes
+
+- Restrict platform display to Windows only in landing page (#590)
+- プラットフォーム別アプリアイコンの自動生成システムを実装 (#597)
+- 初回起動時以外でも「初期化中」と表示される問題を修正 (#610)
+- GitHub Actionsワークフローの依存関係インストール処理を統一 (#612)
+- Yarn workspaceの依存関係インストール問題を修正 (#613)
+- Yarn workspaceの依存関係とLanding Pageデプロイワークフローを修正 (#614)
+- Grit CLIをdevDependenciesに追加してCIのlintエラーを修正 (#621)
+- TsxをdevDependenciesに追加してnpx依存を解消 (#622)
+
+### ⚙️ Miscellaneous Tasks
+
+- Remove unused icon files and update electron-builder configuration (#595)
+- 開発環境設定の改善とMCPサーバー統合 (#596)
+- ドキュメントの整理とXML検証ツールの追加 (#600)
+- 依存関係の包括的アップデートとバージョン管理改善 (#601)
+- Update dependencies to latest minor and patch versions (#603)
+- コンテナ環境でのElectron起動に--no-sandboxオプションを追加 (#604)
+- Update landing page dependencies to latest patch versions (#605)
+- Upgrade 12 major dependencies including React 19, tRPC v11, TanStack Query v5 (#606)
+- Chrome DevTools MCPサーバーと開発環境の設定追加 (#615)
+- 開発環境設定の改善 (#627)
+- *(release)* V0.20.0
+
+## [0.19.0] - 2025-08-11
+
+### 🚀 Features
+
 - Improve instance type display with confidence-based detection (#558)
 - Remove photo count display from LocationGroupHeader (#561)
 
@@ -32,7 +65,7 @@ All notable changes to this project will be documented in this file.
 
 - エラーハンドリングとプレイヤーアクションパーシングの堅牢性向上 (#565)
 - Upgrade Zod to v4.0.5 (#573)
-- Release v0.19.0
+- Release v0.19.0 (#592)
 
 ## [0.18.0] - 2025-06-30
 
