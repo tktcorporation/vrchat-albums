@@ -2405,10 +2405,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@photostructure/tz-lookup@npm:^11.2.0":
-  version: 11.2.0
-  resolution: "@photostructure/tz-lookup@npm:11.2.0"
-  checksum: 10c0/25cc546154b608f29ed80d0008cf44aef959f598a29978e6f3ad87280119a48b5981544b5f31df8750e50024069477751bc179cb7bfdb1ad1cce49828b3b66ce
+"@photostructure/tz-lookup@npm:^11.3.0":
+  version: 11.3.0
+  resolution: "@photostructure/tz-lookup@npm:11.3.0"
+  checksum: 10c0/cd5050075db6ef1716fdc71a6f0963bcba2716add2689f217a4abdddfc8779af4835eb9101f4fcead5a07bce444de146f4833cb087f43b3ed46d57650fb7ac86
   languageName: node
   linkType: hard
 
@@ -4450,7 +4450,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/luxon@npm:^3.6.2":
+"@types/luxon@npm:^3.7.1":
   version: 3.7.1
   resolution: "@types/luxon@npm:3.7.1"
   checksum: 10c0/2db30c13b58adcd86daa447faa3ba59515fe907ead8ee3e6bb716d662812af0619d712f6c1eb190cdd7f9d2c00444c3ecd80af0f36e8143eb0c5e7339d6b2aca
@@ -5433,10 +5433,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"batch-cluster@npm:^14.0.0":
-  version: 14.0.0
-  resolution: "batch-cluster@npm:14.0.0"
-  checksum: 10c0/be8fc1058abe727fe0f6a484b782f174bcc7c96c561a780363699ba390afbc526e5e8e98836e97dae5443510cfccd20843dfacfbc9d6f48b24ab7e4362f7eb3d
+"batch-cluster@npm:^16.0.0":
+  version: 16.0.0
+  resolution: "batch-cluster@npm:16.0.0"
+  checksum: 10c0/f080854c87cc4da211009966fa107c57e4ec110b911307d033454e9c84337064b6622bc82822a08b7379d94afc94109d835fc54aab3fb2f922ba073e14a70b72
   languageName: node
   linkType: hard
 
@@ -7281,39 +7281,39 @@ __metadata:
   languageName: node
   linkType: hard
 
-"exiftool-vendored.exe@npm:13.31.0":
-  version: 13.31.0
-  resolution: "exiftool-vendored.exe@npm:13.31.0"
+"exiftool-vendored.exe@npm:13.44.0":
+  version: 13.44.0
+  resolution: "exiftool-vendored.exe@npm:13.44.0"
   conditions: os=win32
   languageName: node
   linkType: hard
 
-"exiftool-vendored.pl@npm:13.31.0":
-  version: 13.31.0
-  resolution: "exiftool-vendored.pl@npm:13.31.0"
+"exiftool-vendored.pl@npm:13.44.0":
+  version: 13.44.0
+  resolution: "exiftool-vendored.pl@npm:13.44.0"
   bin:
     exiftool: bin/exiftool
   conditions: "!os=win32"
   languageName: node
   linkType: hard
 
-"exiftool-vendored@npm:^30.3.0":
-  version: 30.3.0
-  resolution: "exiftool-vendored@npm:30.3.0"
+"exiftool-vendored@npm:^34.1.0":
+  version: 34.1.0
+  resolution: "exiftool-vendored@npm:34.1.0"
   dependencies:
-    "@photostructure/tz-lookup": "npm:^11.2.0"
-    "@types/luxon": "npm:^3.6.2"
-    batch-cluster: "npm:^14.0.0"
-    exiftool-vendored.exe: "npm:13.31.0"
-    exiftool-vendored.pl: "npm:13.31.0"
+    "@photostructure/tz-lookup": "npm:^11.3.0"
+    "@types/luxon": "npm:^3.7.1"
+    batch-cluster: "npm:^16.0.0"
+    exiftool-vendored.exe: "npm:13.44.0"
+    exiftool-vendored.pl: "npm:13.44.0"
     he: "npm:^1.2.0"
-    luxon: "npm:^3.6.1"
+    luxon: "npm:^3.7.2"
   dependenciesMeta:
     exiftool-vendored.exe:
       optional: true
     exiftool-vendored.pl:
       optional: true
-  checksum: 10c0/60af10baace10c5ee594d34ba84284300da10e5b1db27cb05d57789140113ec0e9b40644ac3e5298c9abb372dba8d9b131c628610a480d7187a7c4b907b5cd7e
+  checksum: 10c0/683fd97162d1c61f23087c7be31c66cda0c0b7398c4f216b1f08d95fe1cf50c33f619c4942816e4ca6051f5580d67046b4806754036ce125b60543c1440c82cf
   languageName: node
   linkType: hard
 
@@ -7861,7 +7861,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"glob@npm:10.4.5, glob@npm:^10.2.2, glob@npm:^10.3.10, glob@npm:^10.3.7, glob@npm:^10.4.1":
+"glob@npm:^10.2.2, glob@npm:^10.3.10, glob@npm:^10.3.7, glob@npm:^10.4.1":
   version: 10.4.5
   resolution: "glob@npm:10.4.5"
   dependencies:
@@ -7890,6 +7890,17 @@ __metadata:
   bin:
     glob: dist/esm/bin.mjs
   checksum: 10c0/100705eddbde6323e7b35e1d1ac28bcb58322095bd8e63a7d0bef1a2cdafe0d0f7922a981b2b48369a4f8c1b077be5c171804534c3509dfe950dde15fbe6d828
+  languageName: node
+  linkType: hard
+
+"glob@npm:^13.0.0":
+  version: 13.0.0
+  resolution: "glob@npm:13.0.0"
+  dependencies:
+    minimatch: "npm:^10.1.1"
+    minipass: "npm:^7.1.2"
+    path-scurry: "npm:^2.0.0"
+  checksum: 10c0/8e2f5821f3f7c312dd102e23a15b80c79e0837a9872784293ba2e15ec73b3f3749a49a42a31bfcb4e52c84820a474e92331c2eebf18819d20308f5c33876630a
   languageName: node
   linkType: hard
 
@@ -9060,6 +9071,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lru-cache@npm:^11.0.0":
+  version: 11.2.4
+  resolution: "lru-cache@npm:11.2.4"
+  checksum: 10c0/4a24f9b17537619f9144d7b8e42cd5a225efdfd7076ebe7b5e7dc02b860a818455201e67fbf000765233fe7e339d3c8229fc815e9b58ee6ede511e07608c19b2
+  languageName: node
+  linkType: hard
+
 "lru-cache@npm:^5.1.1":
   version: 5.1.1
   resolution: "lru-cache@npm:5.1.1"
@@ -9094,10 +9112,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"luxon@npm:^3.6.1":
-  version: 3.7.1
-  resolution: "luxon@npm:3.7.1"
-  checksum: 10c0/f83bc23a4c09da9111bc2510d2f5346e1ced4938379ebff13e308fece2ea852eb6e8b9ed8053b8d82e0fce05d5dd46e4cd64d8831ca04cfe32c0954b6f087258
+"luxon@npm:^3.7.2":
+  version: 3.7.2
+  resolution: "luxon@npm:3.7.2"
+  checksum: 10c0/ed8f0f637826c08c343a29dd478b00628be93bba6f068417b1d8896b61cb61c6deacbe1df1e057dbd9298334044afa150f9aaabbeb3181418ac8520acfdc2ae2
   languageName: node
   linkType: hard
 
@@ -10249,6 +10267,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"path-scurry@npm:^2.0.0":
+  version: 2.0.1
+  resolution: "path-scurry@npm:2.0.1"
+  dependencies:
+    lru-cache: "npm:^11.0.0"
+    minipass: "npm:^7.1.2"
+  checksum: 10c0/2a16ed0e81fbc43513e245aa5763354e25e787dab0d539581a6c3f0f967461a159ed6236b2559de23aa5b88e7dc32b469b6c47568833dd142a4b24b4f5cd2620
+  languageName: node
+  linkType: hard
+
 "path-type@npm:^4.0.0":
   version: 4.0.0
   resolution: "path-type@npm:4.0.0"
@@ -10671,14 +10699,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-error-boundary@npm:4.1.2":
-  version: 4.1.2
-  resolution: "react-error-boundary@npm:4.1.2"
+"react-error-boundary@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "react-error-boundary@npm:6.0.0"
   dependencies:
     "@babel/runtime": "npm:^7.12.5"
   peerDependencies:
     react: ">=16.13.1"
-  checksum: 10c0/0737e5259bed40ce14eb0823b3c7b152171921f2179e604f48f3913490cdc594d6c22d43d7abb4ffb1512c832850228db07aa69d3b941db324953a5e393cb399
+  checksum: 10c0/1914d600dee95a14f14af4afe9867b0d35c26c4f7826d23208800ba2a99728659029aad60a6ef95e13430b4d79c2c4c9b3585f50bf508450478760d2e4e732d8
   languageName: node
   linkType: hard
 
@@ -12907,9 +12935,9 @@ __metadata:
     electron-trpc: "npm:0.7.1"
     electron-unhandled: "npm:4.0.1"
     electron-updater: "npm:6.6.2"
-    exiftool-vendored: "npm:^30.3.0"
+    exiftool-vendored: "npm:^34.1.0"
     git-cliff: "npm:~2.11.0"
-    glob: "npm:10.4.5"
+    glob: "npm:^13.0.0"
     jotai: "npm:~2.16.0"
     jsdom: "npm:~26.1.0"
     knip: "npm:~5.76.2"
@@ -12926,7 +12954,7 @@ __metadata:
     postcss: "npm:8.5.6"
     react: "npm:^19.2.3"
     react-dom: "npm:^19.2.3"
-    react-error-boundary: "npm:4.1.2"
+    react-error-boundary: "npm:^6.0.0"
     react-hot-toast: "npm:2.6.0"
     rimraf: "npm:5.0.10"
     rxjs: "npm:~7.8.2"
