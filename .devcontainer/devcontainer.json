@@ -11,7 +11,11 @@
   "customizations": {
     "vscode": {
       "extensions": [
+        "GitHub.copilot",
+        "steoates.autoimport",
+        "editorconfig.editorconfig",
         "WakaTime.vscode-wakatime",
+        "nemesv.copy-file-name",
         "YoavBls.pretty-ts-errors",
         "mhutchie.git-graph",
         "github.vscode-github-actions"
@@ -35,12 +39,18 @@
     "VNC_RESOLUTION": "1920x1080x24"
   },
   "onCreateCommand": {
-    "update-apt": ["sudo", "apt-get", "update"]
+    "install-packages": [
+      "bash",
+      "-c",
+      "set -e; sudo apt-get update && sudo apt-get install -y build-essential fzf ripgrep bc gpg ca-certificates curl"
+    ]
   },
   "updateContentCommand": {
-    "install-packages": ["sudo", "apt-get", "install", "-y", "ripgrep", "bc"]
-  },
-  "postCreateCommand": {
+    "add-node-gpg-key-mise": [
+      "bash",
+      "-c",
+      "set -e; curl -fsSL https://raw.githubusercontent.com/nodejs/release-keys/b362bd15f2ac7ce350d7563fc03e0c625e455e5f/cli.sh | bash -s import"
+    ],
     "setup-mise-bash": [
       "bash",
       "-c",
@@ -48,5 +58,14 @@
     ],
     "trust-mise": ["mise", "trust"]
   },
-  "postStartCommand": "mise install"
+  "postCreateCommand": {
+    "mise-install": "mise install"
+  },
+  "postStartCommand": {
+    "setup-chrome-devtools-mcp": [
+      "bash",
+      "-lc",
+      ".devcontainer/setup-chrome-devtools-mcp.sh"
+    ]
+  }
 }
