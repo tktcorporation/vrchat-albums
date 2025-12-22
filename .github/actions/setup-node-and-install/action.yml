@@ -28,3 +28,7 @@ runs:
         else
           nci
         fi
+
+    - name: Install Grit CLI
+      run: curl -fsSL https://docs.grit.io/install | bash
+
