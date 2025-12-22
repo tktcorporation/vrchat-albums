@@ -1,11 +1,11 @@
 import path from 'node:path';
 import * as neverthrow from 'neverthrow';
 import { ResultAsync } from 'neverthrow';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
+import { logger } from './../../lib/logger';
 // import type * as vrchatLogService from '../service/vrchatLog/vrchatLog';
 import * as fs from '../../lib/wrappedFs';
 import { getSettingStore } from '../settingStore';
-import { logger } from './../../lib/logger';
 import {
   type NotValidatedVRChatLogFilesDirPath,
   NotValidatedVRChatLogFilesDirPathSchema,

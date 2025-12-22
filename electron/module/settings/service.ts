@@ -1,6 +1,6 @@
 import { app } from 'electron';
-import { type UpdateCheckResult, autoUpdater } from 'electron-updater';
-import { ResultAsync, err, ok } from 'neverthrow';
+import { autoUpdater, type UpdateCheckResult } from 'electron-updater';
+import { err, ok, ResultAsync } from 'neverthrow';
 import { logger } from '../../lib/logger';
 import { UpdateError } from './error';
 

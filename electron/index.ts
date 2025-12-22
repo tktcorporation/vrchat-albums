@@ -1,12 +1,11 @@
 import path from 'node:path';
-import { type BrowserWindow, app, ipcMain } from 'electron';
-import isDev from 'electron-is-dev';
-
 import {
   type Event,
   type EventHint,
   init as initSentry,
 } from '@sentry/electron/main';
+import { app, type BrowserWindow, ipcMain } from 'electron';
+import isDev from 'electron-is-dev';
 // Packages
 import { createIPCHandler } from 'electron-trpc/main';
 import unhandled from 'electron-unhandled';

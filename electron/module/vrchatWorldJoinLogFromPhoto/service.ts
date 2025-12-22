@@ -1,5 +1,5 @@
-import * as Model from './vrchatWorldJoinLogFromPhoto.model';
 import type { VRChatWorldJoinLogFromPhoto } from './vrchatWorldJoinLogFromPhoto.model';
+import * as Model from './vrchatWorldJoinLogFromPhoto.model';
 
 /**
  * モデル層の createVRChatWorldJoinLogFromPhoto を呼び出し、

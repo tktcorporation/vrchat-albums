@@ -1,7 +1,7 @@
-import { trpcReact } from '@/trpc';
 import { ArrowUpRight, Info } from 'lucide-react';
 import type React from 'react';
 import { memo, useState } from 'react';
+import { trpcReact } from '@/trpc';
 import packageJson from '../../../../package.json';
 import { Button } from '../../../components/ui/button';
 import { useI18n } from '../../i18n/store';

@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { UserFacingError } from './../../lib/errors';
 import { logger } from './../../lib/logger';
 import { procedure, router as trpcRouter } from './../../trpc';
-import * as vrchatApiService from './service';
 import type { VRChatWorldInfoFromApi } from './service';
+import * as vrchatApiService from './service';
 import { type VRChatWorldId, VRChatWorldIdSchema } from './valueObject';
 
 const getVrcWorldInfoByWorldId = async (

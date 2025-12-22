@@ -6,9 +6,9 @@ import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import * as fs from '../../../lib/wrappedFs';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../model';
 import {
+  createTimestampedLogFilePath,
   VRChatLogStoreFilePathRegex,
   VRChatLogStoreFilePathSchema,
-  createTimestampedLogFilePath,
 } from '../model';
 
 /**

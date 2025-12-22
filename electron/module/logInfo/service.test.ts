@@ -13,9 +13,10 @@ import { VRChatLogStoreFilePathSchema } from '../vrchatLog/model';
 import * as vrchatLogService from '../vrchatLog/service';
 import { VRChatPhotoDirPathSchema } from '../vrchatPhoto/valueObjects';
 import * as vrchatPhotoService from '../vrchatPhoto/vrchatPhoto.service';
-import type { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
+import type { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import { loadLogInfoIndexFromVRChatLog } from './service';
+
 // 必要最小限のモックを設定
 vi.mock('../vrchatLog/service', () => ({
   importLogLinesFromLogPhotoDirPath: vi.fn().mockResolvedValue(undefined),

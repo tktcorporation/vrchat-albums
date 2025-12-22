@@ -1,4 +1,4 @@
-import { type Result, err, ok } from 'neverthrow';
+import { err, ok, type Result } from 'neverthrow';
 import { match } from 'ts-pattern';
 
 type DataError =

@@ -1,6 +1,6 @@
 import * as nodeFsPromises from 'node:fs/promises';
 import * as path from 'node:path';
-import { type Result, ResultAsync, ok } from 'neverthrow';
+import { ok, type Result, ResultAsync } from 'neverthrow';
 import { logger } from '../../lib/logger';
 
 export interface MigrationResult {

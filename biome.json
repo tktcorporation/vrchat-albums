@@ -1,8 +1,6 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.3.3/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
+  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,
     "rules": {
@@ -10,7 +8,20 @@
       "correctness": {
         "noUndeclaredVariables": "error",
         "noUnusedVariables": "error",
-        "useExhaustiveDependencies": "off"
+        "useExhaustiveDependencies": "off",
+        "useHookAtTopLevel": "off",
+        "noUnknownFunction": "off"
+      },
+      "a11y": {
+        "useSemanticElements": "off",
+        "useValidAriaRole": "off",
+        "noStaticElementInteractions": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "noLabelWithoutControl": "off"
+      },
+      "suspicious": {
+        "useIterableCallbackReturn": "off",
+        "noUnknownAtRules": "off"
       }
     }
   },
@@ -35,19 +46,26 @@
       "__SENTRY_RELEASE__"
     ]
   },
+  "css": {
+    "parser": {
+      "cssModules": true,
+      "tailwindDirectives": true
+    }
+  },
   "files": {
-    "ignore": [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/main/**",
-      "**/out/**",
-      "**/coverage/**",
-      "**/build/**",
-      "**/playwright-report/**",
-      "**/blob-report/**",
-      "**/playwright/.cache/**",
-      "**/.grit/**",
-      "package.json"
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/main",
+      "!**/out",
+      "!**/coverage",
+      "!**/build",
+      "!**/playwright-report",
+      "!**/blob-report",
+      "!**/playwright/.cache",
+      "!**/.grit",
+      "!**/package.json"
     ]
   }
 }

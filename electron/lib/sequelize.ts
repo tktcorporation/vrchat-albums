@@ -3,12 +3,12 @@ import { SqliteDialect } from '@sequelize/sqlite3';
 import path from 'pathe';
 import { match } from 'ts-pattern';
 import { uuidv7 } from 'uuidv7';
+import * as settingService from './../module/settings/service';
 import { VRChatPlayerJoinLogModel } from '../module/VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import { VRChatPlayerLeaveLogModel } from '../module/VRChatPlayerLeaveLogModel/playerLeaveLog.model';
 import { VRChatPhotoPathModel } from '../module/vrchatPhoto/model/vrchatPhotoPath.model';
 import { VRChatWorldJoinLogModel } from '../module/vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import { VRChatWorldJoinLogFromPhotoModel } from '../module/vrchatWorldJoinLogFromPhoto/vrchatWorldJoinLogFromPhoto.model';
-import * as settingService from './../module/settings/service';
 import { logger } from './logger';
 import { Migrations } from './sequelize/migrations.model';
 

@@ -1,13 +1,11 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { useState } from 'react';
 import * as React from 'react';
+import { useState } from 'react';
 import { cn } from '../../components/lib/utils';
 import { Button } from '../../components/ui/button';
 import {
-  DialogContent as BaseDialogContent,
   Dialog,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogOverlay,

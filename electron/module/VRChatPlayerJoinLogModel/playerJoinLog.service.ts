@@ -1,4 +1,4 @@
-import { type Result, err, ok } from 'neverthrow';
+import { err, ok, type Result } from 'neverthrow';
 import { enqueueTask } from '../../lib/dbHelper';
 import type { VRChatPlayerJoinLog } from '../vrchatLog/service';
 import * as model from './playerJoinInfoLog.model';

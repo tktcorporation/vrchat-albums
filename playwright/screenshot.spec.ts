@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type Page, _electron, expect, test } from '@playwright/test';
+import { _electron, expect, type Page, test } from '@playwright/test';
 import consola from 'consola';
 
 // ESモジュール環境で__dirnameの代わりに使用

@@ -1,14 +1,11 @@
-import { trpcReact } from '@/trpc';
 import { atom, useAtom } from 'jotai';
 import pathe from 'pathe';
 import { useMemo } from 'react';
+import { trpcReact } from '@/trpc';
 import { VRChatPhotoFileNameWithExtSchema } from '../../../valueObjects';
 import type { Photo } from '../../types/photo';
 import type { GroupedPhotos } from './useGroupPhotos';
-import {
-  type DebugInfo as GroupingDebugInfo,
-  useGroupPhotos,
-} from './useGroupPhotos';
+import { useGroupPhotos } from './useGroupPhotos';
 
 /**
  * ギャラリーのデバッグ情報

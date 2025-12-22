@@ -1,3 +1,6 @@
+import clsx from 'clsx';
+import { CheckCircle2, Circle } from 'lucide-react';
+import React, { memo, useCallback, useRef, useState } from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -5,16 +8,10 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { trpcReact } from '@/trpc';
-import clsx from 'clsx';
-import { CheckCircle2, Circle } from 'lucide-react';
-import pathe from 'pathe';
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { P, match } from 'ts-pattern';
 import { ICON_SIZE } from '../constants/ui';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
 import { useI18n } from '../i18n/store';
 import type { Photo } from '../types/photo';
-import { generatePreviewPng } from '../utils/previewGenerator';
 import ProgressiveImage from './ProgressiveImage';
 
 /**

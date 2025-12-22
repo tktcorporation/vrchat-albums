@@ -2,25 +2,24 @@
 import EventEmitter from 'node:events';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { type Result, err, ok } from 'neverthrow';
-
 // Packages
 import {
+  app,
   BrowserWindow,
   type Event,
+  ipcMain,
   Menu,
   Notification,
-  Tray,
-  app,
-  ipcMain,
   screen, // Ensure screen is imported
   shell,
+  Tray,
 } from 'electron';
 import isDev from 'electron-is-dev';
+import { err, ok, type Result } from 'neverthrow';
 
 import { logger } from './lib/logger';
 // Local
-import { type SettingStore, getSettingStore } from './module/settingStore'; // Import the type
+import { getSettingStore, type SettingStore } from './module/settingStore'; // Import the type
 
 let settingStore: SettingStore | null = null;
 
@@ -48,8 +47,8 @@ function createWindow(): BrowserWindow {
   // Default width and height if no saved bounds
   let width: number = WINDOW_CONFIG.DEFAULT_WIDTH;
   let height: number = WINDOW_CONFIG.DEFAULT_HEIGHT;
-  let x: number | undefined = undefined;
-  let y: number | undefined = undefined;
+  let x: number | undefined;
+  let y: number | undefined;
 
   if (savedBounds) {
     const primaryDisplay = screen.getPrimaryDisplay();
@@ -366,8 +365,10 @@ const setTray = () => {
 
   return createTray();
 };
+
 import { match } from 'ts-pattern';
 import { syncLogsInBackground } from './module/logSync/service';
+
 /**
  * 一定間隔でログ処理を実行するタイマーイベントを設定する。
  * バックグラウンド処理が有効な場合のみログを読み込み通知を送る。

@@ -137,77 +137,71 @@ export function BoldPreviewSvg({
     >
       <title>VRChat World Join Preview</title>
       <defs>
-        <>
-          <filter id="blur-effect">
-            <feGaussianBlur stdDeviation="40" />
-            <feColorMatrix type="saturate" values="1.2" />
-          </filter>
+        <filter id="blur-effect">
+          <feGaussianBlur stdDeviation="40" />
+          <feColorMatrix type="saturate" values="1.2" />
+        </filter>
 
-          <filter id="soft-shadow">
-            <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3" />
-          </filter>
+        <filter id="soft-shadow">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3" />
+        </filter>
 
-          {imageSource && (
-            <>
-              <pattern
-                id="bg-image"
-                patternUnits="userSpaceOnUse"
-                width="800"
-                height={previewHeight}
-              >
-                <g transform={`translate(400 ${previewHeight / 2})`}>
-                  <image
-                    href={imageSource}
-                    x="-600"
-                    y={-previewHeight}
-                    width="1200"
-                    height={previewHeight * 2}
-                    preserveAspectRatio="xMidYMid slice"
-                    crossOrigin="anonymous"
-                    style={{
-                      transformOrigin: 'center center',
-                    }}
-                  />
-                </g>
-              </pattern>
-
-              <pattern
-                id="main-image"
-                patternUnits="userSpaceOnUse"
-                x="80"
-                y="100"
-                width="640"
-                height="360"
-              >
+        {imageSource && (
+          <>
+            <pattern
+              id="bg-image"
+              patternUnits="userSpaceOnUse"
+              width="800"
+              height={previewHeight}
+            >
+              <g transform={`translate(400 ${previewHeight / 2})`}>
                 <image
                   href={imageSource}
-                  x="0"
-                  y="0"
-                  width="640"
-                  height="360"
+                  x="-600"
+                  y={-previewHeight}
+                  width="1200"
+                  height={previewHeight * 2}
                   preserveAspectRatio="xMidYMid slice"
                   crossOrigin="anonymous"
+                  style={{
+                    transformOrigin: 'center center',
+                  }}
                 />
-              </pattern>
-            </>
-          )}
+              </g>
+            </pattern>
 
-          <linearGradient
-            id="overlay-gradient"
-            x1="0"
-            y1="0"
-            x2="0"
-            y2={previewHeight}
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop offset="0%" stopColor={colors.primary} stopOpacity="0.4" />
-            <stop
-              offset="100%"
-              stopColor={colors.secondary}
-              stopOpacity="0.4"
-            />
-          </linearGradient>
-        </>
+            <pattern
+              id="main-image"
+              patternUnits="userSpaceOnUse"
+              x="80"
+              y="100"
+              width="640"
+              height="360"
+            >
+              <image
+                href={imageSource}
+                x="0"
+                y="0"
+                width="640"
+                height="360"
+                preserveAspectRatio="xMidYMid slice"
+                crossOrigin="anonymous"
+              />
+            </pattern>
+          </>
+        )}
+
+        <linearGradient
+          id="overlay-gradient"
+          x1="0"
+          y1="0"
+          x2="0"
+          y2={previewHeight}
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0%" stopColor={colors.primary} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={colors.secondary} stopOpacity="0.4" />
+        </linearGradient>
       </defs>
 
       {imageSource && (

@@ -18,9 +18,9 @@ type WorldId = `wrld_${string}`;
  */
 const getLogLinesFromLogPhotoDirPath = async ({
   vrChatPhotoDirPath,
-}: { vrChatPhotoDirPath: VRChatPhotoDirPath }): Promise<
-  VRChatWorldJoinLogFromPhoto[]
-> => {
+}: {
+  vrChatPhotoDirPath: VRChatPhotoDirPath;
+}): Promise<VRChatWorldJoinLogFromPhoto[]> => {
   // PathObjectを使用してクロスプラットフォーム対応のglobパターンを生成
   const photoPath = VRChatPhotoPathObjectSchema.parse(vrChatPhotoDirPath.value);
   const globPattern = photoPath.toPhotoGlobPattern();
@@ -53,7 +53,9 @@ const getLogLinesFromLogPhotoDirPath = async ({
  */
 export const importLogLinesFromLogPhotoDirPath = async ({
   vrChatPhotoDirPath,
-}: { vrChatPhotoDirPath: VRChatPhotoDirPath }): Promise<void> => {
+}: {
+  vrChatPhotoDirPath: VRChatPhotoDirPath;
+}): Promise<void> => {
   const logLines = await getLogLinesFromLogPhotoDirPath({
     vrChatPhotoDirPath,
   });

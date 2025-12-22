@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as datefns from 'date-fns';
 import * as neverthrow from 'neverthrow';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import {
   BackupPathObjectSchema,

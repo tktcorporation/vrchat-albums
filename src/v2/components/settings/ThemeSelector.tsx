@@ -1,8 +1,8 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import { useI18n } from '../../i18n/store';
-import { Theme, type ThemeOption } from '../../utils/theme';
+import type { ThemeOption } from '../../utils/theme';
 
 /**
  * テーマをシステム・ダーク・ライトから選択する UI。

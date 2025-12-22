@@ -1,5 +1,5 @@
 import * as datefns from 'date-fns';
-import { type Result, err, fromThrowable, ok } from 'neverthrow';
+import { err, fromThrowable, ok, type Result } from 'neverthrow';
 import type { VRChatLogLine, VRChatPlayerId, VRChatPlayerName } from '../model';
 import { OptionalVRChatPlayerIdSchema, VRChatPlayerNameSchema } from '../model';
 

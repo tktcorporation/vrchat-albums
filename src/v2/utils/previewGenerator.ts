@@ -5,7 +5,7 @@ interface GeneratePreviewParams {
   showAllPlayers: boolean;
 }
 
-import { P, match } from 'ts-pattern';
+import { match } from 'ts-pattern';
 import { extractDominantColorsFromBase64 } from './colorExtractor';
 import { loadInterFonts } from './fontLoader';
 
