@@ -8,6 +8,7 @@
       "correctness": {
         "noUndeclaredVariables": "error",
         "noUnusedVariables": "error",
+        "noUnusedPrivateClassMembers": "off",
         "useExhaustiveDependencies": "off",
         "useHookAtTopLevel": "off",
         "noUnknownFunction": "off"

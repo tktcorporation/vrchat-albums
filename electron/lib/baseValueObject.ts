@@ -1,5 +1,3 @@
-const _opaqueSymbol: unique symbol = Symbol('opaqueSymbol');
-
 /**
  * 値オブジェクトの基底クラス。
  *
