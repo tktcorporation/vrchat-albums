@@ -295,8 +295,8 @@
   "@esbuild/linux-x64@0.25.5": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/esbuild/node_modules/@esbuild/linux-x64",
-    "licenseFile": "node_modules/esbuild/node_modules/@esbuild/linux-x64/README.md"
+    "path": "node_modules/vite/node_modules/@esbuild/linux-x64",
+    "licenseFile": "node_modules/vite/node_modules/@esbuild/linux-x64/README.md"
   },
   "@esbuild/linux-x64@0.27.2": {
     "licenses": "MIT",
@@ -1296,7 +1296,7 @@
     "path": "node_modules/electron/node_modules/@types/node",
     "licenseFile": "node_modules/electron/node_modules/@types/node/LICENSE"
   },
-  "@types/node@22.17.2": {
+  "@types/node@24.0.15": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/node",
@@ -1416,8 +1416,8 @@
     "publisher": "Nathan Rajlich",
     "email": "nathan@tootallnate.net",
     "url": "http://n8.io/",
-    "path": "node_modules/agent-base",
-    "licenseFile": "node_modules/agent-base/README.md"
+    "path": "node_modules/@sentry/cli/node_modules/agent-base",
+    "licenseFile": "node_modules/@sentry/cli/node_modules/agent-base/README.md"
   },
   "agentkeepalive@4.6.0": {
     "licenses": "MIT",
@@ -2149,8 +2149,8 @@
   "dotenv@16.5.0": {
     "licenses": "BSD-2-Clause",
     "repository": "https://github.com/motdotla/dotenv",
-    "path": "node_modules/dotenv",
-    "licenseFile": "node_modules/dotenv/LICENSE"
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/dotenv",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/dotenv/LICENSE"
   },
   "dottie@2.0.6": {
     "licenses": "MIT",
@@ -2314,14 +2314,14 @@
   "esbuild@0.25.5": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/esbuild",
-    "licenseFile": "node_modules/esbuild/LICENSE.md"
+    "path": "node_modules/vite/node_modules/esbuild",
+    "licenseFile": "node_modules/vite/node_modules/esbuild/LICENSE.md"
   },
   "esbuild@0.27.2": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/tsx/node_modules/esbuild",
-    "licenseFile": "node_modules/tsx/node_modules/esbuild/LICENSE.md"
+    "path": "node_modules/esbuild",
+    "licenseFile": "node_modules/esbuild/LICENSE.md"
   },
   "escalade@3.2.0": {
     "licenses": "MIT",
@@ -2459,8 +2459,8 @@
     "repository": "https://github.com/thecodrr/fdir",
     "publisher": "thecodrr",
     "email": "thecodrr@protonmail.com",
-    "path": "node_modules/vite/node_modules/tinyglobby/node_modules/fdir",
-    "licenseFile": "node_modules/vite/node_modules/tinyglobby/node_modules/fdir/LICENSE"
+    "path": "node_modules/tinyglobby/node_modules/fdir",
+    "licenseFile": "node_modules/tinyglobby/node_modules/fdir/LICENSE"
   },
   "file-uri-to-path@1.0.0": {
     "licenses": "MIT",
@@ -2810,8 +2810,8 @@
     "publisher": "Nathan Rajlich",
     "email": "nathan@tootallnate.net",
     "url": "http://n8.io/",
-    "path": "node_modules/https-proxy-agent",
-    "licenseFile": "node_modules/https-proxy-agent/README.md"
+    "path": "node_modules/@sentry/cli/node_modules/https-proxy-agent",
+    "licenseFile": "node_modules/@sentry/cli/node_modules/https-proxy-agent/README.md"
   },
   "humanize-ms@1.2.1": {
     "licenses": "MIT",
@@ -3063,6 +3063,12 @@
   "jiti@1.21.7": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/jiti",
+    "path": "node_modules/tailwindcss/node_modules/jiti",
+    "licenseFile": "node_modules/tailwindcss/node_modules/jiti/LICENSE"
+  },
+  "jiti@2.6.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/unjs/jiti",
     "path": "node_modules/jiti",
     "licenseFile": "node_modules/jiti/LICENSE"
   },
@@ -3077,8 +3083,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/lydell/js-tokens",
     "publisher": "Simon Lydell",
-    "path": "node_modules/@babel/code-frame/node_modules/js-tokens",
-    "licenseFile": "node_modules/@babel/code-frame/node_modules/js-tokens/LICENSE"
+    "path": "node_modules/js-tokens",
+    "licenseFile": "node_modules/js-tokens/LICENSE"
   },
   "js-yaml@4.1.0": {
     "licenses": "MIT",
@@ -3879,8 +3885,8 @@
     "publisher": "Isaac Z. Schlueter",
     "email": "i@izs.me",
     "url": "http://blog.izs.me/",
-    "path": "node_modules/tar/node_modules/minipass",
-    "licenseFile": "node_modules/tar/node_modules/minipass/LICENSE"
+    "path": "node_modules/sqlite3/node_modules/tar/node_modules/minipass",
+    "licenseFile": "node_modules/sqlite3/node_modules/tar/node_modules/minipass/LICENSE"
   },
   "minipass@7.1.2": {
     "licenses": "ISC",
@@ -3897,8 +3903,8 @@
     "publisher": "Isaac Z. Schlueter",
     "email": "i@izs.me",
     "url": "http://blog.izs.me/",
-    "path": "node_modules/minizlib",
-    "licenseFile": "node_modules/minizlib/LICENSE"
+    "path": "node_modules/sqlite3/node_modules/minizlib",
+    "licenseFile": "node_modules/sqlite3/node_modules/minizlib/LICENSE"
   },
   "mkdirp-classic@0.5.3": {
     "licenses": "MIT",
@@ -3956,8 +3962,8 @@
   "negotiator@0.6.4": {
     "licenses": "MIT",
     "repository": "https://github.com/jshttp/negotiator",
-    "path": "node_modules/negotiator",
-    "licenseFile": "node_modules/negotiator/LICENSE"
+    "path": "node_modules/sqlite3/node_modules/negotiator",
+    "licenseFile": "node_modules/sqlite3/node_modules/negotiator/LICENSE"
   },
   "neverthrow@8.2.0": {
     "licenses": "MIT",
@@ -4143,8 +4149,8 @@
     "publisher": "Sindre Sorhus",
     "email": "sindresorhus@gmail.com",
     "url": "https://sindresorhus.com",
-    "path": "node_modules/p-map",
-    "licenseFile": "node_modules/p-map/license"
+    "path": "node_modules/sqlite3/node_modules/p-map",
+    "licenseFile": "node_modules/sqlite3/node_modules/p-map/license"
   },
   "p-queue@9.0.1": {
     "licenses": "MIT",
@@ -4311,8 +4317,8 @@
     "repository": "https://github.com/micromatch/picomatch",
     "publisher": "Jon Schlinkert",
     "url": "https://github.com/jonschlinkert",
-    "path": "node_modules/vite/node_modules/tinyglobby/node_modules/picomatch",
-    "licenseFile": "node_modules/vite/node_modules/tinyglobby/node_modules/picomatch/LICENSE"
+    "path": "node_modules/picomatch",
+    "licenseFile": "node_modules/picomatch/LICENSE"
   },
   "pify@2.3.0": {
     "licenses": "MIT",
@@ -4746,8 +4752,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/rollup/rollup",
     "publisher": "Rich Harris",
-    "path": "node_modules/rollup",
-    "licenseFile": "node_modules/rollup/LICENSE.md"
+    "path": "node_modules/vite/node_modules/rollup",
+    "licenseFile": "node_modules/vite/node_modules/rollup/LICENSE.md"
   },
   "run-parallel@1.2.0": {
     "licenses": "MIT",
@@ -5134,8 +5140,8 @@
     "licenses": "ISC",
     "repository": "https://github.com/isaacs/node-tar",
     "publisher": "GitHub Inc.",
-    "path": "node_modules/tar",
-    "licenseFile": "node_modules/tar/LICENSE"
+    "path": "node_modules/sqlite3/node_modules/tar",
+    "licenseFile": "node_modules/sqlite3/node_modules/tar/LICENSE"
   },
   "thenify-all@1.6.0": {
     "licenses": "MIT",
@@ -5167,8 +5173,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/SuperchupuDev/tinyglobby",
     "publisher": "Superchupu",
-    "path": "node_modules/vite/node_modules/tinyglobby",
-    "licenseFile": "node_modules/vite/node_modules/tinyglobby/LICENSE"
+    "path": "node_modules/tinyglobby",
+    "licenseFile": "node_modules/tinyglobby/LICENSE"
   },
   "tmp-promise@3.0.3": {
     "licenses": "MIT",
@@ -5308,14 +5314,14 @@
   "undici-types@6.21.0": {
     "licenses": "MIT",
     "repository": "https://github.com/nodejs/undici",
-    "path": "node_modules/undici-types",
-    "licenseFile": "node_modules/undici-types/LICENSE"
+    "path": "node_modules/electron/node_modules/undici-types",
+    "licenseFile": "node_modules/electron/node_modules/undici-types/LICENSE"
   },
   "undici-types@7.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/nodejs/undici",
-    "path": "node_modules/@types/connect/node_modules/undici-types",
-    "licenseFile": "node_modules/@types/connect/node_modules/undici-types/LICENSE"
+    "path": "node_modules/undici-types",
+    "licenseFile": "node_modules/undici-types/LICENSE"
   },
   "unified@11.0.5": {
     "licenses": "MIT",
@@ -5541,8 +5547,8 @@
     "publisher": "Isaac Z. Schlueter",
     "email": "i@izs.me",
     "url": "http://blog.izs.me",
-    "path": "node_modules/which",
-    "licenseFile": "node_modules/which/LICENSE"
+    "path": "node_modules/@sentry/cli/node_modules/which",
+    "licenseFile": "node_modules/@sentry/cli/node_modules/which/LICENSE"
   },
   "wide-align@1.1.5": {
     "licenses": "ISC",

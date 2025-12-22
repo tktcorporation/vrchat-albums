@@ -1,6 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { VRChatLogFilePathSchema } from '../../vrchatLogFileDir/model';
-import { VRChatLogLineSchema } from '../model';
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockedFunction,
+  vi,
+} from 'vitest';
+import {
+  type VRChatLogFilePath,
+  VRChatLogFilePathSchema,
+} from '../../vrchatLogFileDir/model';
+import { VRChatLogLineSchema, type VRChatLogStoreFilePath } from '../model';
+import type { getLogLinesByLogFilePathListStreaming as GetLogLinesByLogFilePathListStreamingType } from './logFileReader';
 
 vi.mock('./logFileReader', () => ({
   getLogLinesFromLogFile: vi.fn(),
@@ -8,7 +19,9 @@ vi.mock('./logFileReader', () => ({
 }));
 
 describe('logFileReader - Batch Processing', () => {
-  let getLogLinesByLogFilePathListStreaming: ReturnType<typeof vi.fn>;
+  let getLogLinesByLogFilePathListStreaming: MockedFunction<
+    typeof GetLogLinesByLogFilePathListStreamingType
+  >;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -372,7 +385,7 @@ describe('logFileReader - Batch Processing', () => {
 
   describe('空のデータセット処理', () => {
     it('空のファイルリストを処理してもエラーにならない', async () => {
-      const emptyFileList: unknown[] = [];
+      const emptyFileList: (VRChatLogFilePath | VRChatLogStoreFilePath)[] = [];
 
       // Mock generator to return no results
       async function* mockGenerator() {
