@@ -255,8 +255,8 @@
   "@esbuild/linux-x64@0.21.5": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/@esbuild/linux-x64",
-    "licenseFile": "node_modules/@esbuild/linux-x64/README.md"
+    "path": "node_modules/vite/node_modules/@esbuild/linux-x64",
+    "licenseFile": "node_modules/vite/node_modules/@esbuild/linux-x64/README.md"
   },
   "@floating-ui/core@1.7.1": {
     "licenses": "MIT",
@@ -315,6 +315,17 @@
     "email": "npm@lovell.info",
     "path": "node_modules/sharp/node_modules/@img/sharp-linux-x64",
     "licenseFile": "node_modules/sharp/node_modules/@img/sharp-linux-x64/LICENSE"
+  },
+  "@isaacs/balanced-match@4.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/isaacs/balanced-match",
+    "path": "node_modules/@isaacs/balanced-match",
+    "licenseFile": "node_modules/@isaacs/balanced-match/LICENSE.md"
+  },
+  "@isaacs/brace-expansion@5.0.0": {
+    "licenses": "MIT",
+    "path": "node_modules/@isaacs/brace-expansion",
+    "licenseFile": "node_modules/@isaacs/brace-expansion/LICENSE"
   },
   "@isaacs/cliui@8.0.2": {
     "licenses": "ISC",
@@ -661,7 +672,7 @@
     "path": "node_modules/@opentelemetry/sql-common",
     "licenseFile": "node_modules/@opentelemetry/sql-common/LICENSE"
   },
-  "@photostructure/tz-lookup@11.2.0": {
+  "@photostructure/tz-lookup@11.3.0": {
     "licenses": "CC0-1.0",
     "repository": "https://github.com/photostructure/tz-lookup",
     "publisher": "PhotoStructure, Inc.",
@@ -922,6 +933,13 @@
     "licenseFile": "node_modules/@rolldown/pluginutils/LICENSE"
   },
   "@rollup/rollup-linux-x64-gnu@4.43.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rollup/rollup",
+    "publisher": "Lukas Taegert-Atkinson",
+    "path": "node_modules/rollup/node_modules/@rollup/rollup-linux-x64-gnu",
+    "licenseFile": "node_modules/rollup/node_modules/@rollup/rollup-linux-x64-gnu/README.md"
+  },
+  "@rollup/rollup-linux-x64-gnu@4.54.0": {
     "licenses": "MIT",
     "repository": "https://github.com/rollup/rollup",
     "publisher": "Lukas Taegert-Atkinson",
@@ -1402,8 +1420,8 @@
     "licenses": "ISC",
     "repository": "https://github.com/webdiscus/ansis",
     "publisher": "webdiscus",
-    "path": "node_modules/ansis",
-    "licenseFile": "node_modules/ansis/LICENSE"
+    "path": "node_modules/@sequelize/core/node_modules/ansis",
+    "licenseFile": "node_modules/@sequelize/core/node_modules/ansis/LICENSE"
   },
   "any-promise@1.3.0": {
     "licenses": "MIT",
@@ -1482,7 +1500,7 @@
     "path": "node_modules/base64-js",
     "licenseFile": "node_modules/base64-js/LICENSE"
   },
-  "batch-cluster@14.0.0": {
+  "batch-cluster@16.0.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/batch-cluster.js",
     "publisher": "Matthew McEachen",
@@ -1780,10 +1798,11 @@
     "path": "node_modules/convert-source-map",
     "licenseFile": "node_modules/convert-source-map/LICENSE"
   },
-  "copy-anything@3.0.5": {
+  "copy-anything@4.0.5": {
     "licenses": "MIT",
     "repository": "https://github.com/mesqueeb/copy-anything",
     "publisher": "Luca Ban - Mesqueeb",
+    "url": "https://cycraft.co",
     "path": "node_modules/copy-anything",
     "licenseFile": "node_modules/copy-anything/LICENSE"
   },
@@ -2134,8 +2153,8 @@
   "esbuild@0.21.5": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/esbuild",
-    "licenseFile": "node_modules/esbuild/LICENSE.md"
+    "path": "node_modules/vite/node_modules/esbuild",
+    "licenseFile": "node_modules/vite/node_modules/esbuild/LICENSE.md"
   },
   "escalade@3.2.0": {
     "licenses": "MIT",
@@ -2162,15 +2181,15 @@
     "path": "node_modules/eventemitter3",
     "licenseFile": "node_modules/eventemitter3/LICENSE"
   },
-  "exiftool-vendored.pl@13.31.0": {
+  "exiftool-vendored.pl@13.44.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.pl",
     "publisher": "Matthew McEachen",
-    "email": "matthew-exiftoolvendored@mceachen.org",
+    "email": "exiftool-vendored-pl@photostructure.com",
     "path": "node_modules/exiftool-vendored.pl",
     "licenseFile": "node_modules/exiftool-vendored.pl/LICENSE"
   },
-  "exiftool-vendored@30.3.0": {
+  "exiftool-vendored@34.1.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.js",
     "publisher": "Matthew McEachen",
@@ -2399,8 +2418,8 @@
     "publisher": "Isaac Z. Schlueter",
     "email": "i@izs.me",
     "url": "https://blog.izs.me/",
-    "path": "node_modules/glob",
-    "licenseFile": "node_modules/glob/LICENSE"
+    "path": "node_modules/sucrase/node_modules/glob",
+    "licenseFile": "node_modules/sucrase/node_modules/glob/LICENSE"
   },
   "glob@10.5.0": {
     "licenses": "ISC",
@@ -2410,6 +2429,15 @@
     "url": "https://blog.izs.me/",
     "path": "node_modules/@sentry/bundler-plugin-core/node_modules/glob",
     "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/glob/LICENSE"
+  },
+  "glob@13.0.0": {
+    "licenses": "BlueOak-1.0.0",
+    "repository": "https://github.com/isaacs/node-glob",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "https://blog.izs.me/",
+    "path": "node_modules/glob",
+    "licenseFile": "node_modules/glob/LICENSE.md"
   },
   "glob@7.2.3": {
     "licenses": "ISC",
@@ -2711,10 +2739,11 @@
     "path": "node_modules/is-obj",
     "licenseFile": "node_modules/is-obj/license"
   },
-  "is-what@4.1.16": {
+  "is-what@5.5.0": {
     "licenses": "MIT",
     "repository": "https://github.com/mesqueeb/is-what",
     "publisher": "Luca Ban - Mesqueeb",
+    "url": "https://cycraft.co",
     "path": "node_modules/is-what",
     "licenseFile": "node_modules/is-what/LICENSE"
   },
@@ -2946,6 +2975,14 @@
     "path": "node_modules/lru-cache",
     "licenseFile": "node_modules/lru-cache/LICENSE"
   },
+  "lru-cache@11.2.4": {
+    "licenses": "BlueOak-1.0.0",
+    "repository": "https://github.com/isaacs/node-lru-cache",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "path": "node_modules/glob/node_modules/lru-cache",
+    "licenseFile": "node_modules/glob/node_modules/lru-cache/LICENSE.md"
+  },
   "lru-cache@5.1.1": {
     "licenses": "ISC",
     "repository": "https://github.com/isaacs/node-lru-cache",
@@ -2969,7 +3006,7 @@
     "path": "node_modules/lucide-react",
     "licenseFile": "node_modules/lucide-react/LICENSE"
   },
-  "luxon@3.7.1": {
+  "luxon@3.7.2": {
     "licenses": "MIT",
     "repository": "https://github.com/moment/luxon",
     "publisher": "Isaac Cambron",
@@ -3050,6 +3087,15 @@
     "path": "node_modules/mimic-response",
     "licenseFile": "node_modules/mimic-response/license"
   },
+  "minimatch@10.1.1": {
+    "licenses": "BlueOak-1.0.0",
+    "repository": "https://github.com/isaacs/minimatch",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me",
+    "path": "node_modules/minimatch",
+    "licenseFile": "node_modules/minimatch/LICENSE.md"
+  },
   "minimatch@3.1.2": {
     "licenses": "ISC",
     "repository": "https://github.com/isaacs/minimatch",
@@ -3123,8 +3169,8 @@
     "publisher": "Isaac Z. Schlueter",
     "email": "i@izs.me",
     "url": "http://blog.izs.me/",
-    "path": "node_modules/minipass",
-    "licenseFile": "node_modules/minipass/LICENSE"
+    "path": "node_modules/fs-minipass/node_modules/minipass",
+    "licenseFile": "node_modules/fs-minipass/node_modules/minipass/LICENSE"
   },
   "minipass@5.0.0": {
     "licenses": "ISC",
@@ -3141,8 +3187,8 @@
     "publisher": "Isaac Z. Schlueter",
     "email": "i@izs.me",
     "url": "http://blog.izs.me/",
-    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/minipass",
-    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/minipass/LICENSE"
+    "path": "node_modules/minipass",
+    "licenseFile": "node_modules/minipass/LICENSE"
   },
   "minizlib@2.1.2": {
     "licenses": "MIT",
@@ -3212,7 +3258,7 @@
     "path": "node_modules/negotiator",
     "licenseFile": "node_modules/negotiator/LICENSE"
   },
-  "neverthrow@6.2.2": {
+  "neverthrow@8.2.0": {
     "licenses": "MIT",
     "repository": "https://github.com/supermacro/neverthrow",
     "publisher": "Giorgio Delgado",
@@ -3485,6 +3531,15 @@
     "path": "node_modules/path-scurry",
     "licenseFile": "node_modules/path-scurry/LICENSE.md"
   },
+  "path-scurry@2.0.1": {
+    "licenses": "BlueOak-1.0.0",
+    "repository": "https://github.com/isaacs/path-scurry",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "https://blog.izs.me",
+    "path": "node_modules/glob/node_modules/path-scurry",
+    "licenseFile": "node_modules/glob/node_modules/path-scurry/LICENSE.md"
+  },
   "pathe@2.0.3": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/pathe",
@@ -3742,7 +3797,7 @@
     "path": "node_modules/react-dom",
     "licenseFile": "node_modules/react-dom/LICENSE"
   },
-  "react-error-boundary@4.1.2": {
+  "react-error-boundary@6.0.0": {
     "licenses": "MIT",
     "repository": "https://github.com/bvaughn/react-error-boundary",
     "publisher": "Brian Vaughn",
@@ -4202,7 +4257,7 @@
     "path": "node_modules/sumchecker",
     "licenseFile": "node_modules/sumchecker/LICENSE"
   },
-  "superjson@1.13.3": {
+  "superjson@2.2.6": {
     "licenses": "MIT",
     "repository": "https://github.com/blitz-js/superjson",
     "publisher": "Simon Knott",
@@ -4219,7 +4274,7 @@
     "path": "node_modules/supports-preserve-symlinks-flag",
     "licenseFile": "node_modules/supports-preserve-symlinks-flag/LICENSE"
   },
-  "tailwind-merge@2.6.0": {
+  "tailwind-merge@3.4.0": {
     "licenses": "MIT",
     "repository": "https://github.com/dcastil/tailwind-merge",
     "publisher": "Dany Castillo",
@@ -4472,12 +4527,6 @@
     "path": "node_modules/use-sidecar",
     "licenseFile": "node_modules/use-sidecar/LICENSE"
   },
-  "use-sync-external-store@1.5.0": {
-    "licenses": "MIT",
-    "repository": "https://github.com/facebook/react",
-    "path": "node_modules/zustand/node_modules/use-sync-external-store",
-    "licenseFile": "node_modules/zustand/node_modules/use-sync-external-store/LICENSE"
-  },
   "use-sync-external-store@1.6.0": {
     "licenses": "MIT",
     "repository": "https://github.com/facebook/react",
@@ -4664,7 +4713,7 @@
     "path": "node_modules/zod",
     "licenseFile": "node_modules/zod/LICENSE"
   },
-  "zustand@4.5.7": {
+  "zustand@5.0.9": {
     "licenses": "MIT",
     "repository": "https://github.com/pmndrs/zustand",
     "publisher": "Paul Henschel",
