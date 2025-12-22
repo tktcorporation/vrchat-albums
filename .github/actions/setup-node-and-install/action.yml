@@ -30,5 +30,6 @@ runs:
         fi
 
     - name: Install Grit CLI
+      shell: bash
       run: curl -fsSL https://docs.grit.io/install | bash
 
