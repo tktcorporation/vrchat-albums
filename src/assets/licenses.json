@@ -1303,17 +1303,17 @@
     "path": "node_modules/@types/mysql",
     "licenseFile": "node_modules/@types/mysql/LICENSE"
   },
-  "@types/node@20.19.1": {
-    "licenses": "MIT",
-    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
-    "path": "node_modules/electron/node_modules/@types/node",
-    "licenseFile": "node_modules/electron/node_modules/@types/node/LICENSE"
-  },
   "@types/node@22.17.2": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/node",
     "licenseFile": "node_modules/@types/node/LICENSE"
+  },
+  "@types/node@22.19.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "node_modules/electron/node_modules/@types/node",
+    "licenseFile": "node_modules/electron/node_modules/@types/node/LICENSE"
   },
   "@types/node@24.0.3": {
     "licenses": "MIT",
@@ -1693,8 +1693,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/electron-userland/electron-builder",
     "publisher": "Vladimir Krivosheev",
-    "path": "node_modules/electron-updater/node_modules/builder-util-runtime",
-    "licenseFile": "node_modules/electron-updater/node_modules/builder-util-runtime/LICENSE"
+    "path": "node_modules/builder-util-runtime",
+    "licenseFile": "node_modules/builder-util-runtime/LICENSE"
   },
   "cacache@15.3.0": {
     "licenses": "ISC",
@@ -2162,8 +2162,8 @@
   "dotenv@16.5.0": {
     "licenses": "BSD-2-Clause",
     "repository": "https://github.com/motdotla/dotenv",
-    "path": "node_modules/dotenv",
-    "licenseFile": "node_modules/dotenv/LICENSE"
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/dotenv",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/dotenv/LICENSE"
   },
   "dottie@2.0.6": {
     "licenses": "MIT",
@@ -2236,7 +2236,7 @@
     "path": "node_modules/electron-updater",
     "licenseFile": "node_modules/electron-updater/LICENSE"
   },
-  "electron@34.5.8": {
+  "electron@39.2.7": {
     "licenses": "MIT",
     "repository": "https://github.com/electron/electron",
     "publisher": "Electron Community",
@@ -2823,8 +2823,8 @@
     "publisher": "Nathan Rajlich",
     "email": "nathan@tootallnate.net",
     "url": "http://n8.io/",
-    "path": "node_modules/https-proxy-agent",
-    "licenseFile": "node_modules/https-proxy-agent/README.md"
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/https-proxy-agent",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/https-proxy-agent/README.md"
   },
   "humanize-ms@1.2.1": {
     "licenses": "MIT",
@@ -3789,8 +3789,8 @@
     "publisher": "Sindre Sorhus",
     "email": "sindresorhus@gmail.com",
     "url": "sindresorhus.com",
-    "path": "node_modules/clone-response/node_modules/mimic-response",
-    "licenseFile": "node_modules/clone-response/node_modules/mimic-response/license"
+    "path": "node_modules/mimic-response",
+    "licenseFile": "node_modules/mimic-response/license"
   },
   "mimic-response@3.1.0": {
     "licenses": "MIT",
@@ -3798,8 +3798,8 @@
     "publisher": "Sindre Sorhus",
     "email": "sindresorhus@gmail.com",
     "url": "https://sindresorhus.com",
-    "path": "node_modules/mimic-response",
-    "licenseFile": "node_modules/mimic-response/license"
+    "path": "node_modules/decompress-response/node_modules/mimic-response",
+    "licenseFile": "node_modules/decompress-response/node_modules/mimic-response/license"
   },
   "minimatch@10.1.1": {
     "licenses": "BlueOak-1.0.0",
@@ -3983,8 +3983,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/electron/node-abi",
     "publisher": "Lukas Geiger",
-    "path": "node_modules/node-abi",
-    "licenseFile": "node_modules/node-abi/LICENSE"
+    "path": "node_modules/prebuild-install/node_modules/node-abi",
+    "licenseFile": "node_modules/prebuild-install/node_modules/node-abi/LICENSE"
   },
   "node-addon-api@7.1.1": {
     "licenses": "MIT",

@@ -112,7 +112,10 @@ const DataImport = memo(() => {
     setIsDragOver(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const filePaths = files.map((file) => file.path);
+    // Electron adds 'path' property to File objects for drag & drop
+    const filePaths = files.map(
+      (file) => (file as File & { path: string }).path,
+    );
 
     if (filePaths.length === 0) {
       toast({
