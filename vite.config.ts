@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import type { ConfigEnv, UserConfig } from 'vite';
 
@@ -11,7 +12,7 @@ export default ({ command }: ConfigEnv): UserConfig => {
     return {
       root: srcRoot,
       base: '/',
-      plugins: [react()],
+      plugins: [react(), tailwindcss()],
       resolve: {
         alias: {
           '@': srcRoot,
@@ -50,6 +51,7 @@ export default ({ command }: ConfigEnv): UserConfig => {
     base: './',
     plugins: [
       react(),
+      tailwindcss(),
       sentryVitePlugin({
         authToken: process.env.SENTRY_AUTH_TOKEN,
         org: process.env.SENTRY_ORG,
