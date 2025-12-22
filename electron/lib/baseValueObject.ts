@@ -1,5 +1,3 @@
-const opaqueSymbol: unique symbol = Symbol('opaqueSymbol');
-
 /**
  * 値オブジェクトの基底クラス。
  *
@@ -16,8 +14,6 @@ const opaqueSymbol: unique symbol = Symbol('opaqueSymbol');
  * @see electron/lib/pathObject.ts - パス操作用ValueObjectの例
  */
 export abstract class BaseValueObject<T extends string, K> {
-  // @ts-ignore TS1338
-  private readonly [opaqueSymbol]: T;
   readonly value: K;
 
   constructor(value: K) {

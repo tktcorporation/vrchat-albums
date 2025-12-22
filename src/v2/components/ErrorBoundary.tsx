@@ -1,6 +1,6 @@
-import { trpcReact } from '@/trpc';
 import type React from 'react';
 import { ErrorBoundary as ReactErrorBoundary } from 'react-error-boundary';
+import { trpcReact } from '@/trpc';
 
 interface Props {
   children: React.ReactNode;

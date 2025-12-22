@@ -65,7 +65,6 @@ class DBQueue {
     this.queue = new PQueue({
       concurrency: this.options.concurrency,
       timeout: this.options.timeout,
-      throwOnTimeout: true,
     });
 
     // エラーが発生した場合のみログ出力

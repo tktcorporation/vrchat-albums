@@ -103,7 +103,7 @@ class VRChatWorldId extends BaseValueObject<'VRChatWorldId', string> {}
  * 英数字のみ、または英数字~region(region_code)形式を許可
  */
 export const isValidVRChatWorldInstanceId = (value: string): boolean => {
-  return /^[a-zA-Z0-9]+(\~.+)?$/.test(value);
+  return /^[a-zA-Z0-9]+(~.+)?$/.test(value);
 };
 
 /**

@@ -60,7 +60,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 
 // ES moduleでの__dirnameの代替
 const __filename = fileURLToPath(import.meta.url);

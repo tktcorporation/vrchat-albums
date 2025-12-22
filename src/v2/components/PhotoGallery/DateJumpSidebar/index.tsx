@@ -1,4 +1,3 @@
-import { cn } from '@/components/lib/utils';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import {
@@ -11,6 +10,7 @@ import {
   useState,
 } from 'react';
 import { match } from 'ts-pattern';
+import { cn } from '@/components/lib/utils';
 import type { GroupedPhoto } from '../useGroupPhotos';
 
 export interface DateIndex {
@@ -119,7 +119,7 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
 
       const summary: DateSummary = {
         date,
-        label: `${Number.parseInt(day)}日`,
+        label: `${Number.parseInt(day, 10)}日`,
         photoCount,
         groupIndices,
         normalizedHeight,
@@ -136,7 +136,7 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
       // 月が変わった場合
       match(month !== lastMonth)
         .with(true, () => {
-          summary.month = `${Number.parseInt(month)}月`;
+          summary.month = `${Number.parseInt(month, 10)}月`;
           lastMonth = month;
         })
         .otherwise(() => {});

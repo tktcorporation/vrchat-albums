@@ -1,9 +1,8 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import * as service from './playerJoinLog.service';
-
 import * as datefns from 'date-fns';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as client from '../../lib/sequelize';
 import { VRChatPlayerNameSchema } from '../vrchatLog/model';
+import * as service from './playerJoinLog.service';
 
 describe('VRChatPlayerJoinLogModel', () => {
   describe('createVRChatPlayerJoinLogModel', () => {

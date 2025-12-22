@@ -6,10 +6,10 @@ import { glob } from 'glob';
 import * as neverthrow from 'neverthrow';
 import * as path from 'pathe';
 import sharp from 'sharp';
-import { P, match } from 'ts-pattern';
-import { getSettingStore } from '../settingStore';
+import { match, P } from 'ts-pattern';
 import { logger } from './../../lib/logger';
 import * as fs from './../../lib/wrappedFs';
+import { getSettingStore } from '../settingStore';
 import * as model from './model/vrchatPhotoPath.model';
 import {
   type VRChatPhotoDirPath,
@@ -276,9 +276,7 @@ export const createVRChatPhotoPathIndex = async (
           const memUsage = process.memoryUsage();
           logger.debug(
             `Memory usage after batch ${batchNumber}: RSS=${(
-              memUsage.rss /
-              1024 /
-              1024
+              memUsage.rss / 1024 / 1024
             ).toFixed(2)}MB, Heap=${(memUsage.heapUsed / 1024 / 1024).toFixed(
               2,
             )}MB`,
@@ -330,9 +328,9 @@ export const getCountByYearMonthList = async () => {
  */
 export const validateVRChatPhotoPathModel = async ({
   fullpath,
-}: { fullpath: string }): Promise<
-  'MODEL_NOT_FOUND' | 'VALID' | 'FILE_NOT_FOUND_MODEL_DELETED'
-> => {
+}: {
+  fullpath: string;
+}): Promise<'MODEL_NOT_FOUND' | 'VALID' | 'FILE_NOT_FOUND_MODEL_DELETED'> => {
   const pathModel = await model.getVRChatPhotoPathByPhotoPath(fullpath);
   if (!pathModel) {
     return 'MODEL_NOT_FOUND';

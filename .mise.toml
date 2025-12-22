@@ -5,6 +5,7 @@
 node = "20"
 yarn = "latest"
 uv = "latest"
+python = "3.14"
 
 # Node.js global packages
 "npm:@anthropic-ai/claude-code" = "latest"

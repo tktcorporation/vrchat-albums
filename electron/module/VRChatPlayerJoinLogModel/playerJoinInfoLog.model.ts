@@ -9,11 +9,11 @@ import {
 import {
   AllowNull,
   Attribute,
+  createIndexDecorator,
   Default,
   NotNull,
   PrimaryKey,
   Table,
-  createIndexDecorator,
 } from '@sequelize/core/decorators-legacy';
 import * as dateFns from 'date-fns';
 import { uuidv7 } from 'uuidv7';

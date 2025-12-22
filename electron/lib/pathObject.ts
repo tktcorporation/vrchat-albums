@@ -82,9 +82,8 @@ class PathObject extends BaseValueObject<'PathObject', string> {
  * 絶対パスを保証するPathObject
  */
 class AbsolutePathObject extends PathObject {
-  // @ts-ignore TS1338
+  // @ts-expect-error TS1338
   private readonly [opaqueSymbol]: 'AbsolutePathObject';
-
   constructor(value: string) {
     const absolutePath = path.isAbsolute(value) ? value : path.resolve(value);
     super(absolutePath);
@@ -99,9 +98,8 @@ class AbsolutePathObject extends PathObject {
  * エクスポートパス専用のPathObject
  */
 class ExportPathObject extends PathObject {
-  // @ts-ignore TS1338
+  // @ts-expect-error TS1338
   private readonly [opaqueSymbol]: 'ExportPathObject';
-
   /**
    * エクスポートフォルダ名を抽出（vrchat-albums-export_YYYY-MM-DD_HH-mm-ss）
    */
@@ -134,9 +132,8 @@ class ExportPathObject extends PathObject {
  * バックアップパス専用のPathObject
  */
 class BackupPathObject extends PathObject {
-  // @ts-ignore TS1338
+  // @ts-expect-error TS1338
   private readonly [opaqueSymbol]: 'BackupPathObject';
-
   /**
    * バックアップIDからパスを生成
    */
@@ -158,9 +155,8 @@ class BackupPathObject extends PathObject {
  * VRChat写真ディレクトリ専用のPathObject
  */
 class VRChatPhotoPathObject extends PathObject {
-  // @ts-ignore TS1338
+  // @ts-expect-error TS1338
   private readonly [opaqueSymbol]: 'VRChatPhotoPathObject';
-
   /**
    * VRChat写真用のglobパターンを生成
    * @param pattern 写真ファイルのパターン（デフォルト: 'VRChat_*_wrld_*'）

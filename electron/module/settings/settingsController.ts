@@ -1,5 +1,5 @@
 import type { UpdateCheckResult } from 'electron-updater';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { reloadMainWindow } from '../../electronUtil';
 import {
   ERROR_CATEGORIES,
@@ -8,11 +8,11 @@ import {
 } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
+import { procedure, router as trpcRouter } from './../../trpc';
 import * as electronUtilService from '../electronUtil/service';
 import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
-import { procedure, router as trpcRouter } from './../../trpc';
 import * as settingService from './service';
 
 // 初期化処理の重複実行を防ぐためのフラグ

@@ -1,0 +1,9 @@
+{
+  "version": "0.1.0",
+  "installedAt": "2025-12-22T13:39:48.151Z",
+  "modules": [".", ".devcontainer", ".github", ".claude"],
+  "source": {
+    "owner": "tktcorporation",
+    "repo": ".github"
+  }
+}

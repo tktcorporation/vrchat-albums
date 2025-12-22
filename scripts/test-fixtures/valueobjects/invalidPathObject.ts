@@ -1,12 +1,9 @@
 import { z } from 'zod';
 import { BasePathObject } from './basePathObject.js';
 
-const opaqueSymbol: unique symbol = Symbol('opaqueSymbol');
+const _opaqueSymbol: unique symbol = Symbol('opaqueSymbol');
 
-export class InvalidPathObject extends BasePathObject {
-  // @ts-ignore
-  private readonly [opaqueSymbol]: 'InvalidPathObject';
-}
+export class InvalidPathObject extends BasePathObject {}
 
 export const InvalidPathObjectSchema = z
   .string()

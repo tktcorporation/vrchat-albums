@@ -44,7 +44,7 @@ type MockPhotoType = (typeof mockPhotos)[number];
  */
 const createMockState = () => {
   let isLoading = true;
-  let photoData: MockPhotoType[] | undefined = undefined;
+  let photoData: MockPhotoType[] | undefined;
 
   /**
    * モックの読み込み状態とデータを更新する補助関数。

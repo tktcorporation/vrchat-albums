@@ -1,6 +1,6 @@
-import { type Result, err, ok } from 'neverthrow';
+import { err, ok, type Result } from 'neverthrow';
 import { ofetch } from 'ofetch';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import type { QueryObject } from 'ufo';
 
 /**

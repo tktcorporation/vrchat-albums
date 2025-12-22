@@ -1,6 +1,6 @@
-import { trpcReact } from '@/trpc';
 import { AlertCircle } from 'lucide-react';
 import React from 'react';
+import { trpcReact } from '@/trpc';
 import { Button } from '../../../components/ui/button';
 import PathSettings from '../settings/PathSettings';
 

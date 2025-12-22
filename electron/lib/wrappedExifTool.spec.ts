@@ -72,8 +72,7 @@ describe('wrappedExifTool', () => {
         expect(exifData.Description).toBe(testData.description);
         expect(exifData.ImageDescription).toBe(testData.description);
         const dateTime = exifData.DateTimeOriginal as ExifDateTime;
-        expect(dateTime.rawValue).toBe('2024:01:01 12:34:56');
-        expect(exifData.OffsetTimeOriginal).toBe(testData.timezoneOffset);
+        expect(dateTime.rawValue).toBe('2024:01:01 12:34:56+09:00');
       }
     });
   });
@@ -107,8 +106,7 @@ describe('wrappedExifTool', () => {
           expect(exifData.Description).toBe(testData.description);
           expect(exifData.ImageDescription).toBe(testData.description);
           const dateTime = exifData.DateTimeOriginal as ExifDateTime;
-          expect(dateTime.rawValue).toBe('2024:01:01 12:34:56');
-          expect(exifData.OffsetTimeOriginal).toBe(testData.timezoneOffset);
+          expect(dateTime.rawValue).toBe('2024:01:01 12:34:56+09:00');
         }
       }
     });

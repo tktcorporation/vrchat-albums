@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  type NeverthrowLintConfig,
   lintNeverthrow,
+  type NeverthrowLintConfig,
 } from './lint-neverthrow.js';
 
 describe('Neverthrow Linter', () => {

@@ -1,6 +1,6 @@
-import { trpcReact } from '@/trpc';
 import { Globe, Search, User, X } from 'lucide-react';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { trpcReact } from '@/trpc';
 import { ICON_SIZE } from '../constants/ui';
 import { useI18n } from '../i18n/store';
 

@@ -3,8 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as client from '../../lib/sequelize';
 import { type getSettingStore, initSettingStoreForTest } from '../settingStore';
 import {
-  type VRChatPlayerLeaveLog,
   getVRChaLogInfoFromLogPath,
+  type VRChatPlayerLeaveLog,
 } from '../vrchatLog/service';
 import { getValidVRChatLogFileDir } from '../vrchatLogFileDir/service';
 import * as model from './playerLeaveLog.service';

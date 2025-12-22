@@ -8,11 +8,11 @@ import {
 } from '@sequelize/core';
 import {
   Attribute,
+  createIndexDecorator,
   Default,
   NotNull,
   PrimaryKey,
   Table,
-  createIndexDecorator,
 } from '@sequelize/core/decorators-legacy';
 import { uuidv7 } from 'uuidv7';
 

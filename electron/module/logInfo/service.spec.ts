@@ -7,6 +7,7 @@ import {
   VRChatPlayerNameSchema,
 } from '../vrchatLog/model';
 import { getFrequentPlayerNames } from './service';
+
 // Remove unused imports
 
 describe('logInfo service', () => {
