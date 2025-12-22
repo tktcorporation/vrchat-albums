@@ -11,11 +11,11 @@ import PhotoCard from './PhotoCard';
 interface PhotoGridProps {
   /** 表示する写真オブジェクトの配列 */
   photos: Photo[];
-  /** 現在選択されている写真のIDセット */
-  selectedPhotos: Set<string>;
-  /** 選択されている写真のIDセットを更新する関数 */
+  /** 現在選択されている写真のID配列（選択順序を保持） */
+  selectedPhotos: string[];
+  /** 選択されている写真のID配列を更新する関数 */
   setSelectedPhotos: (
-    update: Set<string> | ((prev: Set<string>) => Set<string>),
+    update: string[] | ((prev: string[]) => string[]),
   ) => void;
   /** 現在複数選択モードかどうか */
   isMultiSelectMode: boolean;
