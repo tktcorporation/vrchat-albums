@@ -124,10 +124,10 @@ describe('DataExport', () => {
     // useEffect完了を待つ - outputPathが設定されるまで待機
     await waitFor(
       () => {
-        const exportButton = screen.getByRole('button', {
-          name: 'エクスポート開始',
-        });
-        expect((exportButton as HTMLButtonElement).disabled).toBe(false);
+        const outputPathInput = screen.getByLabelText(/出力先ディレクトリ/);
+        expect((outputPathInput as HTMLInputElement).value).toBe(
+          '/home/user/Downloads',
+        );
       },
       { timeout: 3000 },
     );
@@ -152,10 +152,10 @@ describe('DataExport', () => {
     // useEffectの完了を待つ - outputPathが設定されるまで待機
     await waitFor(
       () => {
-        const exportButton = screen.getByRole('button', {
-          name: 'エクスポート開始',
-        });
-        expect((exportButton as HTMLButtonElement).disabled).toBe(false);
+        const outputPathInput = screen.getByLabelText(/出力先ディレクトリ/);
+        expect((outputPathInput as HTMLInputElement).value).toBe(
+          '/home/user/Downloads',
+        );
       },
       { timeout: 3000 },
     );
@@ -193,10 +193,10 @@ describe('DataExport', () => {
     // useEffectの完了を待つ - outputPathが設定されるまで待機
     await waitFor(
       () => {
-        const exportButton = screen.getByRole('button', {
-          name: 'エクスポート開始',
-        });
-        expect((exportButton as HTMLButtonElement).disabled).toBe(false);
+        const outputPathInput = screen.getByLabelText(/出力先ディレクトリ/);
+        expect((outputPathInput as HTMLInputElement).value).toBe(
+          '/home/user/Downloads',
+        );
       },
       { timeout: 3000 },
     );
