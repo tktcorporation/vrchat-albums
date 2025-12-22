@@ -1145,14 +1145,14 @@
     "path": "node_modules/@szmarczak/http-timer",
     "licenseFile": "node_modules/@szmarczak/http-timer/LICENSE"
   },
-  "@tanstack/query-core@4.40.0": {
+  "@tanstack/query-core@5.90.12": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
     "path": "node_modules/@tanstack/query-core",
     "licenseFile": "node_modules/@tanstack/query-core/LICENSE"
   },
-  "@tanstack/react-query@4.40.1": {
+  "@tanstack/react-query@5.90.12": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
@@ -1181,21 +1181,21 @@
     "url": "http://n8.io/",
     "path": "node_modules/@tootallnate/once"
   },
-  "@trpc/client@10.45.2": {
+  "@trpc/client@11.8.1": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/client",
     "licenseFile": "node_modules/@trpc/client/LICENSE"
   },
-  "@trpc/react-query@10.45.2": {
+  "@trpc/react-query@11.8.1": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/react-query",
     "licenseFile": "node_modules/@trpc/react-query/LICENSE"
   },
-  "@trpc/server@10.45.2": {
+  "@trpc/server@11.8.1": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
@@ -5297,6 +5297,13 @@
     "path": "node_modules/type-fest",
     "licenseFile": "node_modules/type-fest/license-cc0"
   },
+  "typescript@5.9.3": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/microsoft/TypeScript",
+    "publisher": "Microsoft Corp.",
+    "path": "node_modules/typescript",
+    "licenseFile": "node_modules/typescript/LICENSE.txt"
+  },
   "ufo@1.6.1": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/ufo",
@@ -5438,12 +5445,6 @@
     "email": "thekashey@gmail.com",
     "path": "node_modules/use-sidecar",
     "licenseFile": "node_modules/use-sidecar/LICENSE"
-  },
-  "use-sync-external-store@1.6.0": {
-    "licenses": "MIT",
-    "repository": "https://github.com/facebook/react",
-    "path": "node_modules/use-sync-external-store",
-    "licenseFile": "node_modules/use-sync-external-store/LICENSE"
   },
   "util-deprecate@1.0.2": {
     "licenses": "MIT",

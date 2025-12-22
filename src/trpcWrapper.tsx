@@ -3,7 +3,6 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ipcLink } from 'electron-trpc/renderer';
 import type { FC, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
-import superjson from 'superjson';
 import { trpcReact } from './trpc';
 
 const MOCK_API = import.meta.env.VITE_MOCK_API === 'true';
@@ -40,7 +39,6 @@ export const TrpcWrapper: FC<Props> = ({ children }) => {
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
       links: [ipcLink()],
-      transformer: superjson,
     }),
   );
   return (
@@ -77,7 +75,6 @@ export const TrpcWrapperForServerError: FC<Props> = ({ children }) => {
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
       links: [ipcLink()],
-      transformer: superjson,
     }),
   );
   return (
@@ -115,7 +112,6 @@ export const TrpcWrapperDev: FC<DevProps> = ({ children }) => {
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
       links: [ipcLink()],
-      transformer: superjson,
     }),
   );
   return (
