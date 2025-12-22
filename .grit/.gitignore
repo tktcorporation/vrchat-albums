@@ -1,2 +1,3 @@
-.gritmodules*
+.gritmodules/*
+!.gritmodules/.gitkeep
 *.log

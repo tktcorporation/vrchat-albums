@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Yarn workspaceの依存関係とLanding Pageデプロイワークフローを修正 (#614)
 - Grit CLIをdevDependenciesに追加してCIのlintエラーを修正 (#621)
 - TsxをdevDependenciesに追加してnpx依存を解消 (#622)
+- Prevent grit stdlib fetch by adding .gritmodules directory
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -33,7 +34,6 @@ All notable changes to this project will be documented in this file.
 - Upgrade 12 major dependencies including React 19, tRPC v11, TanStack Query v5 (#606)
 - Chrome DevTools MCPサーバーと開発環境の設定追加 (#615)
 - 開発環境設定の改善 (#627)
-- *(release)* V0.20.0
 
 ## [0.19.0] - 2025-08-11
 
