@@ -1146,6 +1146,22 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@getgrit/cli@npm:^0.1.0-alpha.1743007075":
+  version: 0.1.0-alpha.1743007075
+  resolution: "@getgrit/cli@npm:0.1.0-alpha.1743007075"
+  dependencies:
+    axios: "npm:^1.7.5"
+    axios-proxy-builder: "npm:^0.1.2"
+    console.table: "npm:^0.10.0"
+    detect-libc: "npm:^2.0.3"
+    rimraf: "npm:^5.0.8"
+    tar: "npm:^7.4.3"
+  bin:
+    grit: run-grit.js
+  checksum: 10c0/a31161a911284e0542727c53ce17cba500992e2cdbe2b5ff01eb92918d2dff1a8ce0ec8222240c36a216f352aa4c41d11cf1b44f0768f73590d862a6b4b3ff1e
+  languageName: node
+  linkType: hard
+
 "@humanfs/core@npm:^0.19.1":
   version: 0.19.1
   resolution: "@humanfs/core@npm:0.19.1"
@@ -5410,6 +5426,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"axios-proxy-builder@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "axios-proxy-builder@npm:0.1.2"
+  dependencies:
+    tunnel: "npm:^0.0.6"
+  checksum: 10c0/8724099b72efa1f114b1edf9b6dba7a5ea7518b30d0bdef93b5107ae147afb1bd94c10817580e7b53bfc675b37fe99c5c784bb9fe13481ebf9d9560c1ff68591
+  languageName: node
+  linkType: hard
+
+"axios@npm:^1.7.5":
+  version: 1.13.2
+  resolution: "axios@npm:1.13.2"
+  dependencies:
+    follow-redirects: "npm:^1.15.6"
+    form-data: "npm:^4.0.4"
+    proxy-from-env: "npm:^1.1.0"
+  checksum: 10c0/e8a42e37e5568ae9c7a28c348db0e8cf3e43d06fcbef73f0048669edfe4f71219664da7b6cc991b0c0f01c28a48f037c515263cb79be1f1ae8ff034cd813867b
+  languageName: node
+  linkType: hard
+
 "balanced-match@npm:^1.0.0":
   version: 1.0.2
   resolution: "balanced-match@npm:1.0.2"
@@ -6196,6 +6232,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"console.table@npm:^0.10.0":
+  version: 0.10.0
+  resolution: "console.table@npm:0.10.0"
+  dependencies:
+    easy-table: "npm:1.1.0"
+  checksum: 10c0/b1893a06b422c7e82dca03dec000beabebc26415df558a05e1b9778407a76e4caa1db286df40f72e3780ac5c5b5ef5f4b8a3bef2d22020abb86f6408dc357875
+  languageName: node
+  linkType: hard
+
 "convert-source-map@npm:^2.0.0":
   version: 2.0.0
   resolution: "convert-source-map@npm:2.0.0"
@@ -6620,6 +6665,18 @@ __metadata:
   version: 0.2.0
   resolution: "eastasianwidth@npm:0.2.0"
   checksum: 10c0/26f364ebcdb6395f95124fda411f63137a4bfb5d3a06453f7f23dfe52502905bd84e0488172e0f9ec295fdc45f05c23d5d91baf16bd26f0fe9acd777a188dc39
+  languageName: node
+  linkType: hard
+
+"easy-table@npm:1.1.0":
+  version: 1.1.0
+  resolution: "easy-table@npm:1.1.0"
+  dependencies:
+    wcwidth: "npm:>=1.0.1"
+  dependenciesMeta:
+    wcwidth:
+      optional: true
+  checksum: 10c0/0b7b03723e450c8286bd375bbe7d23247456dbb8f79df055adcfd745bfb91f7604c4e78204ff75d65d5229bec8867cbefca51c57938004f487ff800b587540bb
   languageName: node
   linkType: hard
 
@@ -7521,6 +7578,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"follow-redirects@npm:^1.15.6":
+  version: 1.15.11
+  resolution: "follow-redirects@npm:1.15.11"
+  peerDependenciesMeta:
+    debug:
+      optional: true
+  checksum: 10c0/d301f430542520a54058d4aeeb453233c564aaccac835d29d15e050beb33f339ad67d9bddbce01739c5dc46a6716dbe3d9d0d5134b1ca203effa11a7ef092343
+  languageName: node
+  linkType: hard
+
 "foreground-child@npm:^3.1.0":
   version: 3.3.1
   resolution: "foreground-child@npm:3.3.1"
@@ -7541,6 +7608,19 @@ __metadata:
     hasown: "npm:^2.0.2"
     mime-types: "npm:^2.1.12"
   checksum: 10c0/f0cf45873d600110b5fadf5804478377694f73a1ed97aaa370a74c90cebd7fe6e845a081171668a5476477d0d55a73a4e03d6682968fa8661eac2a81d651fcdb
+  languageName: node
+  linkType: hard
+
+"form-data@npm:^4.0.4":
+  version: 4.0.5
+  resolution: "form-data@npm:4.0.5"
+  dependencies:
+    asynckit: "npm:^0.4.0"
+    combined-stream: "npm:^1.0.8"
+    es-set-tostringtag: "npm:^2.1.0"
+    hasown: "npm:^2.0.2"
+    mime-types: "npm:^2.1.12"
+  checksum: 10c0/dd6b767ee0bbd6d84039db12a0fa5a2028160ffbfaba1800695713b46ae974a5f6e08b3356c3195137f8530dcd9dfcb5d5ae1eeff53d0db1e5aad863b619ce3b
   languageName: node
   linkType: hard
 
@@ -10980,7 +11060,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rimraf@npm:5.0.10":
+"rimraf@npm:5.0.10, rimraf@npm:^5.0.8":
   version: 5.0.10
   resolution: "rimraf@npm:5.0.10"
   dependencies:
@@ -12329,6 +12409,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"tunnel@npm:^0.0.6":
+  version: 0.0.6
+  resolution: "tunnel@npm:0.0.6"
+  checksum: 10c0/e27e7e896f2426c1c747325b5f54efebc1a004647d853fad892b46d64e37591ccd0b97439470795e5262b5c0748d22beb4489a04a0a448029636670bfd801b75
+  languageName: node
+  linkType: hard
+
 "type-check@npm:^0.4.0, type-check@npm:~0.4.0":
   version: 0.4.0
   resolution: "type-check@npm:0.4.0"
@@ -12856,6 +12943,7 @@ __metadata:
   resolution: "vrchat-albums@workspace:."
   dependencies:
     "@biomejs/biome": "npm:2.3.10"
+    "@getgrit/cli": "npm:^0.1.0-alpha.1743007075"
     "@playwright/test": "npm:1.57.0"
     "@radix-ui/react-checkbox": "npm:1.3.3"
     "@radix-ui/react-context-menu": "npm:~2.2.16"
@@ -12966,7 +13054,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"wcwidth@npm:^1.0.1":
+"wcwidth@npm:>=1.0.1, wcwidth@npm:^1.0.1":
   version: 1.0.1
   resolution: "wcwidth@npm:1.0.1"
   dependencies:
