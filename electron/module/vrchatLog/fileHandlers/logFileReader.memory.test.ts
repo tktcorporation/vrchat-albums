@@ -1,7 +1,19 @@
 import { ok } from 'neverthrow';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockedFunction,
+  vi,
+} from 'vitest';
 import { logger } from '../../../lib/logger';
 import { VRChatLogFilePathSchema } from '../../vrchatLogFileDir/model';
+import { VRChatLogLineSchema } from '../model';
+import type {
+  getLogLinesByLogFilePathListStreaming as GetLogLinesByLogFilePathListStreamingType,
+  getLogLinesByLogFilePathList as GetLogLinesByLogFilePathListType,
+} from './logFileReader';
 
 vi.mock('./logFileReader', () => ({
   getLogLinesFromLogFile: vi.fn(),
@@ -14,8 +26,12 @@ vi.mock('../../../lib/logger');
 const mockLogger = vi.mocked(logger);
 
 describe('logFileReader - Memory Management', () => {
-  let getLogLinesByLogFilePathListStreaming: ReturnType<typeof vi.fn>;
-  let getLogLinesByLogFilePathList: ReturnType<typeof vi.fn>;
+  let getLogLinesByLogFilePathListStreaming: MockedFunction<
+    typeof GetLogLinesByLogFilePathListStreamingType
+  >;
+  let getLogLinesByLogFilePathList: MockedFunction<
+    typeof GetLogLinesByLogFilePathListType
+  >;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -90,7 +106,9 @@ describe('logFileReader - Memory Management', () => {
         VRChatLogFilePathSchema.parse('/path/to/output_log_1.txt'),
       ];
 
-      const mockLogLines = [{ value: '2023-01-01 10:00:00 [Info] test line' }];
+      const mockLogLines = [
+        VRChatLogLineSchema.parse('2023-01-01 10:00:00 [Info] test line'),
+      ];
 
       // Mock generator that returns successful results
       async function* mockSuccessGenerator() {
@@ -179,7 +197,9 @@ describe('logFileReader - Memory Management', () => {
         VRChatLogFilePathSchema.parse('/path/to/output_log_1.txt'),
       ];
 
-      const mockLogLines = [{ value: '2023-01-01 10:00:00 [Info] test line' }];
+      const mockLogLines = [
+        VRChatLogLineSchema.parse('2023-01-01 10:00:00 [Info] test line'),
+      ];
 
       // Mock generator that yields results and triggers logging
       async function* mockLoggingGenerator() {
@@ -228,7 +248,9 @@ describe('logFileReader - Memory Management', () => {
         VRChatLogFilePathSchema.parse('/path/to/output_log_2.txt'),
       ];
 
-      const mockLogLines = [{ value: '2023-01-01 10:00:00 [Info] test line' }];
+      const mockLogLines = [
+        VRChatLogLineSchema.parse('2023-01-01 10:00:00 [Info] test line'),
+      ];
 
       // Mock generator that tracks memory usage
       async function* mockTrackingGenerator() {
@@ -272,12 +294,11 @@ describe('logFileReader - Memory Management', () => {
         VRChatLogFilePathSchema.parse('/path/to/output_log_1.txt'),
       ];
 
-      const manyVRChatLogLines = Array.from({ length: 5000 }, (_, i) => ({
-        value: `2023-01-01 10:${String(i % 60).padStart(
-          2,
-          '0',
-        )}:00 [Info] test line ${i}`,
-      }));
+      const manyVRChatLogLines = Array.from({ length: 5000 }, (_, i) =>
+        VRChatLogLineSchema.parse(
+          `2023-01-01 10:${String(i % 60).padStart(2, '0')}:00 [Info] test line ${i}`,
+        ),
+      );
 
       // Mock the function to return success with warning
       getLogLinesByLogFilePathList.mockImplementation(async () => {

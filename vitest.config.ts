@@ -34,7 +34,7 @@ export default defineConfig({
           name: 'web',
           environment: 'jsdom',
           include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
-          setupFiles: ['./vitest.setup.ts'],
+          setupFiles: ['./vitest.setup.web.ts'],
         },
         resolve: {
           alias: {

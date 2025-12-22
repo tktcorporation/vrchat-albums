@@ -1,5 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockedFunction,
+  vi,
+} from 'vitest';
 import { VRChatLogFilePathSchema } from '../../vrchatLogFileDir/model';
+import type { getLogLinesByLogFilePathListStreaming as GetLogLinesByLogFilePathListStreamingType } from './logFileReader';
 
 vi.mock('./logFileReader', () => ({
   getLogLinesFromLogFile: vi.fn(),
@@ -7,7 +15,9 @@ vi.mock('./logFileReader', () => ({
 }));
 
 describe('logFileReader - Error Handling', () => {
-  let getLogLinesByLogFilePathListStreaming: ReturnType<typeof vi.fn>;
+  let getLogLinesByLogFilePathListStreaming: MockedFunction<
+    typeof GetLogLinesByLogFilePathListStreamingType
+  >;
 
   beforeEach(async () => {
     vi.clearAllMocks();
