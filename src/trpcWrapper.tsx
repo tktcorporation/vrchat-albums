@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ipcLink } from 'electron-trpc/renderer';
 import type { FC, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
+import { ipcLink } from 'trpc-electron/renderer';
 import { trpcReact } from './trpc';
 
 const MOCK_API = import.meta.env.VITE_MOCK_API === 'true';

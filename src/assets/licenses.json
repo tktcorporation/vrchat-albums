@@ -2213,14 +2213,6 @@
     "path": "node_modules/electron-to-chromium",
     "licenseFile": "node_modules/electron-to-chromium/LICENSE"
   },
-  "electron-trpc@0.7.1": {
-    "licenses": "MIT",
-    "repository": "https://github.com/jsonnull/electron-trpc",
-    "publisher": "Jason Nall",
-    "email": "jsonnull@gmail.com",
-    "path": "node_modules/electron-trpc",
-    "licenseFile": "node_modules/electron-trpc/LICENSE"
-  },
   "electron-unhandled@4.0.1": {
     "licenses": "MIT",
     "repository": "https://github.com/sindresorhus/electron-unhandled",
@@ -5222,6 +5214,12 @@
     "url": "https://wooorm.com",
     "path": "node_modules/trough",
     "licenseFile": "node_modules/trough/license"
+  },
+  "trpc-electron@0.1.2": {
+    "licenses": "MIT",
+    "publisher": "Mat Sz",
+    "email": "contact@matsz.dev",
+    "path": "node_modules/trpc-electron"
   },
   "ts-interface-checker@0.1.13": {
     "licenses": "Apache-2.0",

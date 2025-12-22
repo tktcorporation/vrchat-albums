@@ -6908,19 +6908,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"electron-trpc@npm:0.7.1":
-  version: 0.7.1
-  resolution: "electron-trpc@npm:0.7.1"
-  dependencies:
-    debug: "npm:^4.3.4"
-  peerDependencies:
-    "@trpc/client": ">10.0.0"
-    "@trpc/server": ">10.0.0"
-    electron: ">19.0.0"
-  checksum: 10c0/c285403de2a5d854671f252ace9fa83155610efe98887c0002a9bdeac4899640c8adbd11668ac194c3fb1c800c75f8c1c9666f0e2b1444f68b544a7d0d756ad0
-  languageName: node
-  linkType: hard
-
 "electron-unhandled@npm:4.0.1":
   version: 4.0.1
   resolution: "electron-unhandled@npm:4.0.1"
@@ -13113,6 +13100,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"trpc-electron@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "trpc-electron@npm:0.1.2"
+  peerDependencies:
+    "@trpc/client": ">=11.0.0"
+    "@trpc/server": ">=11.0.0"
+    electron: ">19.0.0"
+  checksum: 10c0/e7196dbf0d5bd4bf43ab9649bf45a1e2ce44fd34a528c2c2794ce866e9ce7bcbcc6561ca9423cc5532712f064c064fbc124a1f893e84dd2e0a4c22e207892209
+  languageName: node
+  linkType: hard
+
 "true-myth@npm:^4.1.0":
   version: 4.1.1
   resolution: "true-myth@npm:4.1.1"
@@ -13857,7 +13855,6 @@ __metadata:
     electron-is-dev: "npm:2.0.0"
     electron-log: "npm:5.4.3"
     electron-store: "npm:8.2.0"
-    electron-trpc: "npm:0.7.1"
     electron-unhandled: "npm:4.0.1"
     electron-updater: "npm:6.6.2"
     exiftool-vendored: "npm:^34.1.0"
@@ -13892,6 +13889,7 @@ __metadata:
     tailwindcss: "npm:3.4.17"
     tailwindcss-animate: "npm:1.0.7"
     tmp-promise: "npm:~3.0.3"
+    trpc-electron: "npm:^0.1.2"
     ts-pattern: "npm:5.9.0"
     ts-prune: "npm:0.10.3"
     tsx: "npm:^4.21.0"

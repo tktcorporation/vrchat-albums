@@ -1,6 +1,6 @@
 import { createTRPCProxyClient } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
-import { ipcLink } from 'electron-trpc/renderer';
+import { ipcLink } from 'trpc-electron/renderer';
 import type { AppRouter } from '../electron/api';
 
 /**
