@@ -3445,13 +3445,13 @@
     "path": "node_modules/p-map",
     "licenseFile": "node_modules/p-map/license"
   },
-  "p-queue@8.1.0": {
+  "p-queue@9.0.1": {
     "licenses": "MIT",
     "repository": "https://github.com/sindresorhus/p-queue",
     "path": "node_modules/p-queue",
     "licenseFile": "node_modules/p-queue/license"
   },
-  "p-timeout@6.1.4": {
+  "p-timeout@7.0.1": {
     "licenses": "MIT",
     "repository": "https://github.com/sindresorhus/p-timeout",
     "publisher": "Sindre Sorhus",
