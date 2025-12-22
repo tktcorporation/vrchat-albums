@@ -762,6 +762,32 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@electron/rebuild@npm:^4.0.2":
+  version: 4.0.2
+  resolution: "@electron/rebuild@npm:4.0.2"
+  dependencies:
+    "@malept/cross-spawn-promise": "npm:^2.0.0"
+    debug: "npm:^4.1.1"
+    detect-libc: "npm:^2.0.1"
+    got: "npm:^11.7.0"
+    graceful-fs: "npm:^4.2.11"
+    node-abi: "npm:^4.2.0"
+    node-api-version: "npm:^0.2.1"
+    node-gyp: "npm:^11.2.0"
+    ora: "npm:^5.1.0"
+    read-binary-file-arch: "npm:^1.0.6"
+    semver: "npm:^7.3.5"
+    tar: "npm:^6.0.5"
+    yargs: "npm:^17.0.1"
+  dependenciesMeta:
+    electron:
+      built: true
+  bin:
+    electron-rebuild: lib/cli.js
+  checksum: 10c0/e74af1d22c7ed155e8326c97ff1c05ff0b508252f3f9a3c86d0eedb0dbf2f34768ed2accc468d94c755bdf4dabb5dee6a59f7719652697223afa13235c62297b
+  languageName: node
+  linkType: hard
+
 "@electron/universal@npm:2.0.3":
   version: 2.0.3
   resolution: "@electron/universal@npm:2.0.3"
@@ -4722,12 +4748,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:^20.9.0":
-  version: 20.19.1
-  resolution: "@types/node@npm:20.19.1"
+"@types/node@npm:^22.7.7":
+  version: 22.19.3
+  resolution: "@types/node@npm:22.19.3"
   dependencies:
     undici-types: "npm:~6.21.0"
-  checksum: 10c0/4f1c3c8ec24c79af6802b376fa307904abf19accb9ac291de0bfc02220494c8b027d3ef733dbf64cc09b37594f22f679a15eabb30f3785bcfcc13bd9bbd8c0e2
+  checksum: 10c0/a30a75d503da795ddbd5f8851014f3e91925c2a63fa3f14128d54c998f25d682dfba96dc9589c73cf478b87a16d88beb790b11697bb8cd5bee913079237a58f2
   languageName: node
   linkType: hard
 
@@ -7091,16 +7117,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"electron@npm:34.5.8":
-  version: 34.5.8
-  resolution: "electron@npm:34.5.8"
+"electron@npm:39":
+  version: 39.2.7
+  resolution: "electron@npm:39.2.7"
   dependencies:
     "@electron/get": "npm:^2.0.0"
-    "@types/node": "npm:^20.9.0"
+    "@types/node": "npm:^22.7.7"
     extract-zip: "npm:^2.0.1"
   bin:
     electron: cli.js
-  checksum: 10c0/1fd2975d41f3ef29e165f5677137c6ce6f69ec8e7f5db9db14cfd6859c8b28ea4bc91a83cc646551918f634034ffd2cde417a5ff7631e401ca5bcb711db1aa9f
+  checksum: 10c0/5923992063245f4b9593edd4186d9d7738f808120b60592bce16bd2e53815c551b2fc824a633597e7a542bd1b456760df0dbdf02d18dde5b1d77eb037979037c
   languageName: node
   linkType: hard
 
@@ -14117,6 +14143,7 @@ __metadata:
   dependencies:
     "@antfu/ni": "npm:^28.0.0"
     "@biomejs/biome": "npm:2.3.10"
+    "@electron/rebuild": "npm:^4.0.2"
     "@getgrit/cli": "npm:^0.1.0-alpha.1743007075"
     "@playwright/test": "npm:1.57.0"
     "@radix-ui/react-checkbox": "npm:1.3.3"
@@ -14160,7 +14187,7 @@ __metadata:
     clsx: "npm:2.1.1"
     consola: "npm:~3.4.2"
     date-fns: "npm:2.30.0"
-    electron: "npm:34.5.8"
+    electron: "npm:39"
     electron-builder: "npm:^26.0.12"
     electron-is-dev: "npm:2.0.0"
     electron-log: "npm:5.4.3"

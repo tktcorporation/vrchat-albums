@@ -87,7 +87,7 @@
   },
   "packageManager": "yarn@4.1.0",
   "engines": {
-    "node": "20",
+    "node": ">=20",
     "yarn": "4"
   },
   "dependencies": {
@@ -155,6 +155,7 @@
   "devDependencies": {
     "@antfu/ni": "^28.0.0",
     "@biomejs/biome": "2.3.10",
+    "@electron/rebuild": "^4.0.2",
     "@getgrit/cli": "^0.1.0-alpha.1743007075",
     "@playwright/test": "1.57.0",
     "@tanstack/react-query-devtools": "^4.36.1",
@@ -172,7 +173,7 @@
     "@vitest/coverage-v8": "^4.0.16",
     "@welldone-software/why-did-you-render": "^10.0.1",
     "autoprefixer": "10.4.23",
-    "electron": "34.5.8",
+    "electron": "39",
     "electron-builder": "^26.0.12",
     "git-cliff": "~2.11.0",
     "jsdom": "~27.3.0",
@@ -187,7 +188,7 @@
     "ts-prune": "0.10.3",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "vitest": "^4.0.16",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "vitest": "^4.0.16"
   }
 }
