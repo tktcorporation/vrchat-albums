@@ -292,12 +292,6 @@
     "path": "node_modules/@electron/get",
     "licenseFile": "node_modules/@electron/get/LICENSE"
   },
-  "@esbuild/linux-x64@0.25.5": {
-    "licenses": "MIT",
-    "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/vite/node_modules/@esbuild/linux-x64",
-    "licenseFile": "node_modules/vite/node_modules/@esbuild/linux-x64/README.md"
-  },
   "@esbuild/linux-x64@0.27.2": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
@@ -985,6 +979,13 @@
     "repository": "https://github.com/rolldown/rolldown",
     "path": "node_modules/@rolldown/pluginutils",
     "licenseFile": "node_modules/@rolldown/pluginutils/LICENSE"
+  },
+  "@rollup/rollup-linux-x64-gnu@4.46.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rollup/rollup",
+    "publisher": "Lukas Taegert-Atkinson",
+    "path": "node_modules/rollup/node_modules/@rollup/rollup-linux-x64-gnu",
+    "licenseFile": "node_modules/rollup/node_modules/@rollup/rollup-linux-x64-gnu/README.md"
   },
   "@rollup/rollup-linux-x64-gnu@4.54.0": {
     "licenses": "MIT",
@@ -1985,7 +1986,7 @@
     "path": "node_modules/@types/react/node_modules/csstype",
     "licenseFile": "node_modules/@types/react/node_modules/csstype/LICENSE"
   },
-  "date-fns@2.30.0": {
+  "date-fns@4.1.0": {
     "licenses": "MIT",
     "repository": "https://github.com/date-fns/date-fns",
     "path": "node_modules/date-fns",
@@ -2324,12 +2325,6 @@
     "path": "node_modules/es6-error",
     "licenseFile": "node_modules/es6-error/LICENSE.md"
   },
-  "esbuild@0.25.5": {
-    "licenses": "MIT",
-    "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/vite/node_modules/esbuild",
-    "licenseFile": "node_modules/vite/node_modules/esbuild/LICENSE.md"
-  },
   "esbuild@0.27.2": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
@@ -2459,21 +2454,13 @@
     "path": "node_modules/fd-slicer",
     "licenseFile": "node_modules/fd-slicer/LICENSE"
   },
-  "fdir@6.4.6": {
-    "licenses": "MIT",
-    "repository": "https://github.com/thecodrr/fdir",
-    "publisher": "thecodrr",
-    "email": "thecodrr@protonmail.com",
-    "path": "node_modules/vite/node_modules/fdir",
-    "licenseFile": "node_modules/vite/node_modules/fdir/LICENSE"
-  },
   "fdir@6.5.0": {
     "licenses": "MIT",
     "repository": "https://github.com/thecodrr/fdir",
     "publisher": "thecodrr",
     "email": "thecodrr@protonmail.com",
-    "path": "node_modules/tinyglobby/node_modules/fdir",
-    "licenseFile": "node_modules/tinyglobby/node_modules/fdir/LICENSE"
+    "path": "node_modules/fdir",
+    "licenseFile": "node_modules/fdir/LICENSE"
   },
   "file-uri-to-path@1.0.0": {
     "licenses": "MIT",
@@ -4317,14 +4304,6 @@
     "path": "node_modules/anymatch/node_modules/picomatch",
     "licenseFile": "node_modules/anymatch/node_modules/picomatch/LICENSE"
   },
-  "picomatch@4.0.2": {
-    "licenses": "MIT",
-    "repository": "https://github.com/micromatch/picomatch",
-    "publisher": "Jon Schlinkert",
-    "url": "https://github.com/jonschlinkert",
-    "path": "node_modules/vite/node_modules/picomatch",
-    "licenseFile": "node_modules/vite/node_modules/picomatch/LICENSE"
-  },
   "picomatch@4.0.3": {
     "licenses": "MIT",
     "repository": "https://github.com/micromatch/picomatch",
@@ -4761,12 +4740,12 @@
     "path": "node_modules/roarr",
     "licenseFile": "node_modules/roarr/LICENSE"
   },
-  "rollup@4.54.0": {
+  "rollup@4.46.2": {
     "licenses": "MIT",
     "repository": "https://github.com/rollup/rollup",
     "publisher": "Rich Harris",
-    "path": "node_modules/vite/node_modules/rollup",
-    "licenseFile": "node_modules/vite/node_modules/rollup/LICENSE.md"
+    "path": "node_modules/rollup",
+    "licenseFile": "node_modules/rollup/LICENSE.md"
   },
   "run-parallel@1.2.0": {
     "licenses": "MIT",
@@ -5515,7 +5494,7 @@
     "path": "node_modules/vfile",
     "licenseFile": "node_modules/vfile/license"
   },
-  "vite@6.4.1": {
+  "vite@7.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/vitejs/vite",
     "publisher": "Evan You",
