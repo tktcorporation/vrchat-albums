@@ -14,6 +14,9 @@ jobs:
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
 
+      - name: Install Grit CLI
+        run: curl -fsSL https://docs.grit.io/install | bash
+
       - name: lint
         run: nr lint
 

@@ -1045,10 +1045,23 @@
   "@sentry/cli-linux-x64@2.58.4": {
     "licenses": "MIT*",
     "repository": "https://github.com/getsentry/sentry-cli",
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-x64",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-x64/README.md"
+  },
+  "@sentry/cli-linux-x64@3.0.1": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/getsentry/sentry-cli",
     "path": "node_modules/@sentry/cli-linux-x64",
     "licenseFile": "node_modules/@sentry/cli-linux-x64/README.md"
   },
   "@sentry/cli@2.58.4": {
+    "licenses": "MIT*",
+    "repository": "https://github.com/getsentry/sentry-cli",
+    "publisher": "Sentry",
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli/LICENSE"
+  },
+  "@sentry/cli@3.0.1": {
     "licenses": "MIT*",
     "repository": "https://github.com/getsentry/sentry-cli",
     "publisher": "Sentry",
@@ -5323,6 +5336,12 @@
     "path": "node_modules/undici-types",
     "licenseFile": "node_modules/undici-types/LICENSE"
   },
+  "undici@6.22.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nodejs/undici",
+    "path": "node_modules/undici",
+    "licenseFile": "node_modules/undici/LICENSE"
+  },
   "unified@11.0.5": {
     "licenses": "MIT",
     "repository": "https://github.com/unifiedjs/unified",
@@ -5459,8 +5478,8 @@
   "uuid@11.1.0": {
     "licenses": "MIT",
     "repository": "https://github.com/uuidjs/uuid",
-    "path": "node_modules/uuid",
-    "licenseFile": "node_modules/uuid/LICENSE.md"
+    "path": "node_modules/@sequelize/core/node_modules/uuid",
+    "licenseFile": "node_modules/@sequelize/core/node_modules/uuid/LICENSE.md"
   },
   "uuidv7@1.1.0": {
     "licenses": "Apache-2.0",
