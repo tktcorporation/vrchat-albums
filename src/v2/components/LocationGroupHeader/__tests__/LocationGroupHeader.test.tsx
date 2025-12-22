@@ -85,10 +85,12 @@ global.IntersectionObserver = vi.fn().mockImplementation((callback) => {
 });
 
 // ResizeObserverのモック
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  disconnect: vi.fn(),
-}));
+class ResizeObserverMock {
+  observe = vi.fn();
+  disconnect = vi.fn();
+  unobserve = vi.fn();
+}
+global.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
 
 // createPortalのモック
 vi.mock('react-dom', () => ({
