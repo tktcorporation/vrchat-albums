@@ -1,45 +1,22 @@
 {
   "mcpServers": {
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "bash",
+      "args": [".devcontainer/run-chrome-devtools-mcp.sh"],
+      "env": {}
+    },
     "context7": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"],
       "env": {}
     },
-    "serena": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena",
-        "start-mcp-server",
-        "--context",
-        "ide-assistant",
-        "--project",
-        ".",
-        "--enable-web-dashboard",
-        "false"
-      ],
-      "env": {}
-    },
-    "chrome-devtools": {
+    "ide": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--headless=true",
-        "--isolated=true",
-        "--executablePath=/workspaces/vrchat-albums/scripts/chromium-wrapper.sh",
-        "--chromeArg=--no-sandbox",
-        "--chromeArg=--disable-setuid-sandbox",
-        "--chromeArg=--disable-dev-shm-usage",
-        "--logFile=/tmp/chrome-devtools-mcp.log"
-      ],
-      "env": {
-        "DEBUG": "*"
-      }
+      "args": ["-y", "@anthropic-ai/ide-mcp@latest"],
+      "env": {}
     }
   }
 }
