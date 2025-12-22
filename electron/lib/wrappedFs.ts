@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import { promisify } from 'node:util';
 import type { Result } from 'neverthrow';
 import { err, ok } from 'neverthrow';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 
 /**
  * 同期的にファイルを読み込み、存在しない場合はエラー情報を返す。
@@ -122,11 +122,8 @@ export const existsSyncSafe = (path: string): boolean => {
   return fs.existsSync(path);
 };
 
-type PromiseType<T extends PromiseLike<unknown>> = T extends PromiseLike<
-  infer P
->
-  ? P
-  : never;
+type PromiseType<T extends PromiseLike<unknown>> =
+  T extends PromiseLike<infer P> ? P : never;
 
 const appendFilePromisified = promisify(fs.appendFile);
 type AppendFileReturn = PromiseType<ReturnType<typeof appendFilePromisified>>;

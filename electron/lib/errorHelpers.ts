@@ -1,5 +1,5 @@
 import type { Result } from 'neverthrow';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { ERROR_CATEGORIES, ERROR_CODES, UserFacingError } from './errors';
 
 /**

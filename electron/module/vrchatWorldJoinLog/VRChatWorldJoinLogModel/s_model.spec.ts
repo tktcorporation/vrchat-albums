@@ -1,17 +1,16 @@
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import * as client from '../../../lib/sequelize';
 import {
   type getSettingStore,
   initSettingStoreForTest,
 } from '../../settingStore';
 import {
-  type VRChatWorldJoinLog,
   getVRChaLogInfoFromLogPath,
+  type VRChatWorldJoinLog,
 } from '../../vrchatLog/service';
 import { getValidVRChatLogFileDir } from '../../vrchatLogFileDir/service';
 import * as model from './s_model';
-
-import * as client from '../../../lib/sequelize';
 
 describe('module/logInfo/s_model', () => {
   beforeAll(async () => {

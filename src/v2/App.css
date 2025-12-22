@@ -13,7 +13,8 @@
 }
 
 @keyframes fade-in-out {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.3;
   }
   50% {
@@ -22,7 +23,8 @@
 }
 
 @keyframes dot-fade {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.2;
   }
   50% {

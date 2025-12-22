@@ -2,7 +2,7 @@ import { captureException } from '@sentry/electron/main';
 import * as log from 'electron-log';
 import path from 'pathe';
 import { stackWithCauses } from 'pony-cause';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { getSettingStore } from '../module/settingStore';
 import { UserFacingError } from './errors';
 

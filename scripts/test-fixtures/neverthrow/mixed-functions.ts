@@ -1,4 +1,4 @@
-import { type Result, ok } from 'neverthrow';
+import { ok, type Result } from 'neverthrow';
 
 type DataError = { type: 'NOT_FOUND' };
 

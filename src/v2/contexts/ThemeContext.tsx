@@ -1,6 +1,6 @@
 import type React from 'react';
 import { createContext, useEffect, useMemo, useState } from 'react';
-import { type Theme, setRootTheme, shouldUseDarkTheme } from '../utils/theme';
+import { setRootTheme, shouldUseDarkTheme, type Theme } from '../utils/theme';
 
 interface ThemeContextType {
   theme: Theme;

@@ -1,8 +1,7 @@
-import { createQueryStub } from '@/v2/helpers/testing/createQueryStub';
 import { render, screen } from '@testing-library/react';
 import { ok } from 'neverthrow';
-import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createQueryStub } from '@/v2/helpers/testing/createQueryStub';
 import { LocationGroupHeader } from '../index';
 
 // バックエンドサービスのモック

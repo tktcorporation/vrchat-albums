@@ -1,12 +1,14 @@
 import {
   type CreationOptional,
+  col,
   DataTypes,
+  fn,
   type InferAttributes,
   type InferCreationAttributes,
+  literal,
   Model,
   Op,
 } from '@sequelize/core';
-import { col, fn, literal } from '@sequelize/core';
 import {
   Attribute,
   Default,

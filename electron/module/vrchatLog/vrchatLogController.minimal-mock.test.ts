@@ -60,8 +60,8 @@ vi.mock('../logSync/service', async () => {
 
 import * as initRDBClient from '../../lib/sequelize';
 import { eventEmitter } from '../../trpc';
-import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import { initSettingStore } from '../settingStore';
+import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 
 import {

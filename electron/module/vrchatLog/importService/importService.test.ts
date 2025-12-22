@@ -1,5 +1,5 @@
-import { promises as fs } from 'node:fs';
 import type { Dirent, Stats } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import * as neverthrow from 'neverthrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as logSyncModule from '../../logSync/service';

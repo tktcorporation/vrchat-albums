@@ -178,7 +178,7 @@ const GalleryContent = memo(
             });
             const index = topEntry.target.getAttribute('data-index');
             if (index !== null) {
-              setCurrentGroupIndex(Number.parseInt(index));
+              setCurrentGroupIndex(Number.parseInt(index, 10));
             }
           }
         },

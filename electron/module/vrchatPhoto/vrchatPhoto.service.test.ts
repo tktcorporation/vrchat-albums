@@ -2,7 +2,7 @@ import * as nodefsPromises from 'node:fs/promises'; // 明示的にインポー�
 import * as dateFns from 'date-fns';
 import { glob } from 'glob';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { type SettingStore, getSettingStore } from '../settingStore';
+import { getSettingStore, type SettingStore } from '../settingStore';
 import * as model from './model/vrchatPhotoPath.model';
 import { VRChatPhotoDirPathSchema } from './valueObjects';
 import * as service from './vrchatPhoto.service';

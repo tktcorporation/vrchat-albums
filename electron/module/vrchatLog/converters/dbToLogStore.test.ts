@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type DBLogRecord,
   convertPlayerJoinLogToLogLine,
   convertPlayerLeaveLogToLogLine,
   convertWorldJoinLogToLogLines,
+  type DBLogRecord,
   exportLogsToLogStore,
 } from './dbToLogStore';
 

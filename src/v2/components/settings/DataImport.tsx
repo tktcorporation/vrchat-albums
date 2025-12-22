@@ -1,4 +1,3 @@
-import { trpcClient, trpcReact } from '@/trpc';
 import { format } from 'date-fns';
 import {
   AlertTriangle,
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react';
 import type React from 'react';
 import { memo, useState } from 'react';
+import { trpcClient, trpcReact } from '@/trpc';
 // import { Badge } from '../../../components/ui/badge';
 // Note: Using custom badge styling since Badge component doesn't exist
 import { Button } from '../../../components/ui/button';

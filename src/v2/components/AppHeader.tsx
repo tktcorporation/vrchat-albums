@@ -1,17 +1,15 @@
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Copy,
   Download,
   Minus,
   RefreshCw,
-  Search,
   Settings,
   Square,
   X,
 } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { trpcReact as trpc } from '../../trpc';
 import { ICON_SIZE } from '../constants/ui';
 import type { UseLoadingStateResult } from '../hooks/useLoadingState';
@@ -117,60 +115,57 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         className="flex items-center gap-1 flex-shrink-0"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        {showGalleryControls && (
-          <>
-            {isMultiSelectMode ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onClearSelection}
-                  className="h-7 w-7 p-0"
-                >
-                  <X className={ICON_SIZE.sm.class} />
-                </Button>
-                <span className="text-xs font-medium px-2">
-                  {selectedPhotoCount}件
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onCopySelected}
-                  disabled={!onCopySelected}
-                  className="h-7 w-7 p-0"
-                  title={t('common.contextMenu.copyPhotoData')}
-                >
-                  <Copy className={ICON_SIZE.sm.class} />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onOpenSettings}
-                  className="h-7 w-7 p-0"
-                >
-                  <Settings className={ICON_SIZE.sm.class} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={loadingState?.isRefreshing || isSyncing}
-                  className="h-7 w-7 p-0"
-                  title={t('common.refresh')}
-                >
-                  <RefreshCw
-                    className={`${ICON_SIZE.sm.class} ${
-                      loadingState?.isRefreshing ? 'animate-spin' : ''
-                    }`}
-                  />
-                </Button>
-              </>
-            )}
-          </>
-        )}
+        {showGalleryControls &&
+          (isMultiSelectMode ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClearSelection}
+                className="h-7 w-7 p-0"
+              >
+                <X className={ICON_SIZE.sm.class} />
+              </Button>
+              <span className="text-xs font-medium px-2">
+                {selectedPhotoCount}件
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onCopySelected}
+                disabled={!onCopySelected}
+                className="h-7 w-7 p-0"
+                title={t('common.contextMenu.copyPhotoData')}
+              >
+                <Copy className={ICON_SIZE.sm.class} />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onOpenSettings}
+                className="h-7 w-7 p-0"
+              >
+                <Settings className={ICON_SIZE.sm.class} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={loadingState?.isRefreshing || isSyncing}
+                className="h-7 w-7 p-0"
+                title={t('common.refresh')}
+              >
+                <RefreshCw
+                  className={`${ICON_SIZE.sm.class} ${
+                    loadingState?.isRefreshing ? 'animate-spin' : ''
+                  }`}
+                />
+              </Button>
+            </>
+          ))}
       </div>
 
       {/* 中央: 検索バー */}

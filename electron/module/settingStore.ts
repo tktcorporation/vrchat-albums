@@ -184,6 +184,7 @@ import {
   type VRChatPhotoDirPath,
   VRChatPhotoDirPathSchema,
 } from './vrchatPhoto/valueObjects';
+
 let settingStore: ReturnType<typeof setSettingStore> | null = null;
 const setSettingStore = (name: StoreName) => {
   const store = new Store({ name });

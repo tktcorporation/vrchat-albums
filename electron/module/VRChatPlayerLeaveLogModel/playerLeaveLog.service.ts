@@ -17,7 +17,7 @@ export const createVRChatPlayerLeaveLogModel = async (
     playerId:
       typeof logInfo.playerId === 'string'
         ? logInfo.playerId
-        : logInfo.playerId?.value ?? null,
+        : (logInfo.playerId?.value ?? null),
   }));
 
   if (newLogs.length > 0) {

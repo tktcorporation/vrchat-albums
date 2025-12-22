@@ -1,6 +1,6 @@
-import licenseJsonFile from '@/assets/licenses.json';
 import { Book } from 'lucide-react';
 import { memo } from 'react';
+import licenseJsonFile from '@/assets/licenses.json';
 import { useI18n } from '../../i18n/store';
 
 interface LibraryMetadata {

@@ -152,21 +152,21 @@ describe('StartupContext', () => {
     { initialization: 'inProgress' as const, expected: 'syncing' },
     { initialization: 'success' as const, expected: 'ready' },
     { initialization: 'error' as const, expected: 'error' },
-  ])(
-    '$initialization ステージは $expected として表示される',
-    ({ initialization, expected }) => {
-      mockUseStartupStage.stages = { initialization };
-      mockUseStartupStageHook.mockReturnValue(mockUseStartupStage);
+  ])('$initialization ステージは $expected として表示される', ({
+    initialization,
+    expected,
+  }) => {
+    mockUseStartupStage.stages = { initialization };
+    mockUseStartupStageHook.mockReturnValue(mockUseStartupStage);
 
-      render(
-        <StartupProvider>
-          <TestComponent />
-        </StartupProvider>,
-      );
+    render(
+      <StartupProvider>
+        <TestComponent />
+      </StartupProvider>,
+    );
 
-      expect(screen.getByTestId('stage').textContent).toBe(expected);
-    },
-  );
+    expect(screen.getByTestId('stage').textContent).toBe(expected);
+  });
 
   it('completed フラグが正しく反映される', () => {
     // 完了していない状態

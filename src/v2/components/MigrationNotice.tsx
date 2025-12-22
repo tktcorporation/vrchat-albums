@@ -1,6 +1,6 @@
+import { useEffect, useState } from 'react';
 import { trpcReact } from '@/trpc';
 import { useToast } from '@/v2/hooks/use-toast';
-import { useEffect, useState } from 'react';
 import { MigrationDialog } from './MigrationDialog';
 
 /**

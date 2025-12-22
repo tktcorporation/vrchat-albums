@@ -2,11 +2,11 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as datefns from 'date-fns';
 import { app } from 'electron';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import {
-  type LogRecord,
   exportLogsToLogStore,
   formatLogStoreContent,
+  type LogRecord,
 } from '../converters/dbToLogStore';
 
 /**

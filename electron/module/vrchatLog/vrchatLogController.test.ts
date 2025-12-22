@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as exportService from './exportService/exportService';
 import type { DBLogProvider } from './exportService/exportService';
+import * as exportService from './exportService/exportService';
 import { vrchatLogRouter } from './vrchatLogController';
 
 // tRPCコンテキストのモック

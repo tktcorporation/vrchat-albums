@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as neverthrow from 'neverthrow';
-import { P, match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { getDBQueue } from '../../../lib/dbQueue';
 import { logger } from '../../../lib/logger';
 import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
@@ -9,7 +9,7 @@ import {
   getLogStoreDir,
   initLogStoreDir,
 } from '../fileHandlers/logStorageManager';
-import { type ImportBackupMetadata, backupService } from './backupService';
+import { backupService, type ImportBackupMetadata } from './backupService';
 
 /**
  * ロールバックサービス

@@ -10,7 +10,6 @@ import {
   type ErrorCode,
 } from './errorConstants';
 import { extractStructuredError } from './errorSchemas';
-import { getStructuredError, hasStructuredError } from './trpcErrors';
 
 // Re-export for backward compatibility
 export { ERROR_CATEGORIES, ERROR_CODES, type ErrorCategory, type ErrorCode };

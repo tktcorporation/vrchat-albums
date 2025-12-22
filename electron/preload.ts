@@ -1,12 +1,12 @@
 import '@sentry/electron/preload';
+
+import type { Operation } from '@trpc/client';
+import type { TRPCResponseMessage } from '@trpc/server/rpc';
 /**
  * Electron の preload スクリプト。
  * Sentry の IPC 連携を有効化するため、`@sentry/electron/preload` を読み込む。
  */
 import { contextBridge, ipcRenderer } from 'electron';
-
-import type { Operation } from '@trpc/client';
-import type { TRPCResponseMessage } from '@trpc/server/rpc';
 
 type ETRPCRequest =
   | { method: 'request'; operation: Operation }
