@@ -1303,17 +1303,17 @@
     "path": "node_modules/@types/mysql",
     "licenseFile": "node_modules/@types/mysql/LICENSE"
   },
+  "@types/node@22.17.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "node_modules/@types/node",
+    "licenseFile": "node_modules/@types/node/LICENSE"
+  },
   "@types/node@22.19.3": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/electron/node_modules/@types/node",
     "licenseFile": "node_modules/electron/node_modules/@types/node/LICENSE"
-  },
-  "@types/node@24.0.15": {
-    "licenses": "MIT",
-    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
-    "path": "node_modules/@types/node",
-    "licenseFile": "node_modules/@types/node/LICENSE"
   },
   "@types/node@24.0.3": {
     "licenses": "MIT",
@@ -5327,14 +5327,14 @@
   "undici-types@6.21.0": {
     "licenses": "MIT",
     "repository": "https://github.com/nodejs/undici",
-    "path": "node_modules/electron/node_modules/undici-types",
-    "licenseFile": "node_modules/electron/node_modules/undici-types/LICENSE"
+    "path": "node_modules/undici-types",
+    "licenseFile": "node_modules/undici-types/LICENSE"
   },
   "undici-types@7.8.0": {
     "licenses": "MIT",
     "repository": "https://github.com/nodejs/undici",
-    "path": "node_modules/undici-types",
-    "licenseFile": "node_modules/undici-types/LICENSE"
+    "path": "node_modules/@types/connect/node_modules/undici-types",
+    "licenseFile": "node_modules/@types/connect/node_modules/undici-types/LICENSE"
   },
   "undici@6.22.0": {
     "licenses": "MIT",
