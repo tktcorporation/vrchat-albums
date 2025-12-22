@@ -72,17 +72,32 @@ vi.mock('@/trpc', () => ({
 }));
 
 // IntersectionObserverのモック
-const mockIntersectionObserver = vi.fn();
+const mockIntersectionObserverCallback = vi.fn();
+const mockIntersectionObserverConstructor = vi.fn();
 const mockObserve = vi.fn();
 const mockDisconnect = vi.fn();
 
-global.IntersectionObserver = vi.fn().mockImplementation((callback) => {
-  mockIntersectionObserver.mockImplementation(callback);
-  return {
-    observe: mockObserve,
-    disconnect: mockDisconnect,
-  };
-});
+class IntersectionObserverMock {
+  callback: IntersectionObserverCallback;
+  observe = mockObserve;
+  disconnect = mockDisconnect;
+  unobserve = vi.fn();
+  takeRecords = vi.fn(() => []);
+  root = null;
+  rootMargin = '';
+  thresholds = [];
+
+  constructor(
+    callback: IntersectionObserverCallback,
+    options?: IntersectionObserverInit,
+  ) {
+    this.callback = callback;
+    mockIntersectionObserverCallback.mockImplementation(callback);
+    mockIntersectionObserverConstructor(callback, options);
+  }
+}
+global.IntersectionObserver =
+  IntersectionObserverMock as unknown as typeof IntersectionObserver;
 
 // ResizeObserverのモック
 class ResizeObserverMock {
@@ -375,7 +390,7 @@ describe('LocationGroupHeader - Query Optimization', () => {
 
     render(<LocationGroupHeader {...mockProps} />);
 
-    expect(global.IntersectionObserver).toHaveBeenCalledWith(
+    expect(mockIntersectionObserverConstructor).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({
         root: null,
@@ -420,7 +435,7 @@ describe('LocationGroupHeader - Query Optimization', () => {
     );
 
     // Simulate intersection observer callback for visibility
-    const [callback] = mockIntersectionObserver.mock.calls[0] || [];
+    const [callback] = mockIntersectionObserverCallback.mock.calls[0] || [];
     if (callback) {
       callback([{ isIntersecting: true }]);
 
@@ -432,7 +447,7 @@ describe('LocationGroupHeader - Query Optimization', () => {
     }
 
     // After visibility, intersection observer should be properly set up
-    expect(global.IntersectionObserver).toHaveBeenCalled();
+    expect(mockObserve).toHaveBeenCalled();
   });
 
   it('should disable queries when element becomes invisible', async () => {
@@ -461,7 +476,7 @@ describe('LocationGroupHeader - Query Optimization', () => {
     render(<LocationGroupHeader {...mockProps} />);
 
     // Simulate becoming visible first
-    const [callback] = mockIntersectionObserver.mock.calls[0] || [];
+    const [callback] = mockIntersectionObserverCallback.mock.calls[0] || [];
     if (callback) {
       callback([{ isIntersecting: true }]);
       vi.advanceTimersByTime(250);
@@ -472,7 +487,7 @@ describe('LocationGroupHeader - Query Optimization', () => {
     }
 
     // Verify that intersection observer was set up
-    expect(global.IntersectionObserver).toHaveBeenCalled();
+    expect(mockObserve).toHaveBeenCalled();
   });
 
   it('should cleanup IntersectionObserver on unmount', async () => {
