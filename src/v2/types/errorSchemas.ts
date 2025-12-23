@@ -61,6 +61,16 @@ export const TRPCErrorSchema = z.union([
 ]);
 
 /**
+ * tRPC v11のエラー構造（cause.data）
+ * v11ではエラーがcauseプロパティにラップされている場合がある
+ */
+export const CauseDataErrorSchema = z.object({
+  cause: z.object({
+    data: TRPCErrorDataSchema,
+  }),
+});
+
+/**
  * エラーオブジェクトから構造化エラー情報を安全に抽出
  */
 export function extractStructuredError(error: unknown) {
@@ -80,6 +90,33 @@ export function extractStructuredError(error: unknown) {
   const shapeJsonDataResult = ShapeJsonDataErrorSchema.safeParse(error);
   if (shapeJsonDataResult.success) {
     return shapeJsonDataResult.data.shape.json.data.structuredError;
+  }
+
+  // tRPC v11のcauseパターンを試行
+  const causeDataResult = CauseDataErrorSchema.safeParse(error);
+  if (causeDataResult.success) {
+    return causeDataResult.data.cause.data.structuredError;
+  }
+
+  // 柔軟なパターン: 任意の深さでstructuredErrorを探す
+  if (error && typeof error === 'object') {
+    const findStructuredError = (obj: unknown, depth = 0): unknown => {
+      if (depth > 5 || !obj || typeof obj !== 'object') return undefined;
+      const record = obj as Record<string, unknown>;
+      if ('structuredError' in record && record.structuredError) {
+        const result = StructuredErrorSchema.safeParse(record.structuredError);
+        if (result.success) return result.data;
+      }
+      for (const value of Object.values(record)) {
+        const found = findStructuredError(value, depth + 1);
+        if (found) return found;
+      }
+      return undefined;
+    };
+    const found = findStructuredError(error);
+    if (found) {
+      return found as z.infer<typeof StructuredErrorSchema>;
+    }
   }
 
   return undefined;

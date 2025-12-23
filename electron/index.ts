@@ -6,9 +6,9 @@ import {
 } from '@sentry/electron/main';
 import { app, type BrowserWindow, ipcMain } from 'electron';
 import isDev from 'electron-is-dev';
-// Packages
-import { createIPCHandler } from 'electron-trpc/main';
 import unhandled from 'electron-unhandled';
+// Packages
+import { createIPCHandler } from 'trpc-electron/main';
 import { scrubEventData } from '../src/lib/utils/masking';
 import { router } from './api';
 import * as electronUtil from './electronUtil';

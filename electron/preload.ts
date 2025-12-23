@@ -17,7 +17,7 @@ interface RendererGlobalElectronTRPC {
   onMessage: (callback: (args: TRPCResponseMessage) => void) => void;
 }
 
-const ELECTRON_TRPC_CHANNEL = 'electron-trpc';
+const ELECTRON_TRPC_CHANNEL = 'trpc-electron';
 
 /**
  * tRPC 用の IPC チャンネルをレンダラに公開するヘルパー。

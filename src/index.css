@@ -1,8 +1,10 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap");
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Load JS config for compatibility */
+@config "../tailwind.config.js";
 
 /* For AppBar */
 .draggable {
@@ -181,11 +183,11 @@
   /* Firefox */
   * {
     scrollbar-width: thin;
-    scrollbar-color: theme("colors.gray.300") theme("colors.gray.100");
+    scrollbar-color: var(--color-gray-300) var(--color-gray-100);
   }
 
   .dark * {
-    scrollbar-color: theme("colors.gray.700") theme("colors.gray.900");
+    scrollbar-color: var(--color-gray-700) var(--color-gray-900);
   }
 
   /* Hide scrollbar for Chrome, Safari and Opera when not hovering */

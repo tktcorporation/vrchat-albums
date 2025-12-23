@@ -51,7 +51,9 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'nr dev',
+    // Use dev:vite directly to avoid race condition with build:electron
+    // The electron main process files are already built by test:playwright
+    command: 'yarn dev:vite',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 60000,
