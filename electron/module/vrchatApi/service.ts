@@ -1,7 +1,7 @@
 import * as neverthrow from 'neverthrow';
 import { z } from 'zod';
 import { getData } from '../../lib/getData';
-import type { VRChatWorldId } from './valueObject';
+import type { VRChatWorldId } from '../vrchatLog/model';
 
 /**
  * id: 'wrld_6fecf18a-ab96-43f2-82dc-ccf79f17c34f',
@@ -101,7 +101,7 @@ export const getVrcWorldInfoByWorldId = async (
 ): Promise<
   neverthrow.Result<VRChatWorldInfoFromApi, Error | 'WORLD_NOT_FOUND'>
 > => {
-  const reqUrl = `https://api.vrchat.cloud/api/1/worlds/${worldId.value}`;
+  const reqUrl = `https://api.vrchat.cloud/api/1/worlds/${worldId}`;
   const response = await getData(reqUrl);
   if (!response.isOk()) {
     if (response.error.status === 404) {

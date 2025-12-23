@@ -18,7 +18,7 @@ describe('VRChatログ関連のvalueObjects', () => {
     it('有効なプレイヤーIDでvalueObjectを作成できる', () => {
       const validId = 'usr_12345678-1234-1234-1234-123456789abc';
       const playerId = VRChatPlayerIdSchema.parse(validId);
-      expect(playerId.value).toBe(validId);
+      expect(playerId).toBe(validId);
     });
 
     it('無効なプレイヤーIDでエラーが発生する', () => {
@@ -41,7 +41,7 @@ describe('VRChatログ関連のvalueObjects', () => {
     it('有効なワールドIDでvalueObjectを作成できる', () => {
       const validId = 'wrld_12345678-1234-1234-1234-123456789abc';
       const worldId = VRChatWorldIdSchema.parse(validId);
-      expect(worldId.value).toBe(validId);
+      expect(worldId).toBe(validId);
     });
 
     it('無効なワールドIDでエラーが発生する', () => {
@@ -191,13 +191,13 @@ describe('VRChatログ関連のvalueObjects', () => {
     it('有効なプレイヤー名でvalueObjectを作成できる', () => {
       const validName = 'TestPlayer';
       const playerName = VRChatPlayerNameSchema.parse(validName);
-      expect(playerName.value).toBe(validName);
+      expect(playerName).toBe(validName);
     });
 
     it('スペースを含むプレイヤー名でも作成できる', () => {
       const validName = 'Test Player With Spaces';
       const playerName = VRChatPlayerNameSchema.parse(validName);
-      expect(playerName.value).toBe(validName);
+      expect(playerName).toBe(validName);
     });
 
     it('空文字列や空白のみでエラーが発生する', () => {
@@ -217,7 +217,7 @@ describe('VRChatログ関連のvalueObjects', () => {
     it('有効なワールド名でvalueObjectを作成できる', () => {
       const validName = 'Test World';
       const worldName = VRChatWorldNameSchema.parse(validName);
-      expect(worldName.value).toBe(validName);
+      expect(worldName).toBe(validName);
     });
 
     it('空文字列や空白のみでエラーが発生する', () => {
@@ -241,7 +241,7 @@ describe('VRChatログ関連のvalueObjects', () => {
     it('有効なIDの場合はvalueObjectを返す', () => {
       const validId = 'usr_12345678-1234-1234-1234-123456789abc';
       const result = OptionalVRChatPlayerIdSchema.parse(validId);
-      expect(result?.value).toBe(validId);
+      expect(result).toBe(validId);
     });
 
     it('無効なIDの場合はエラーが発生する', () => {

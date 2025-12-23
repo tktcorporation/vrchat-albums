@@ -85,7 +85,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
     // }
 
     // ワールド参加ログ
-    if (l.value.includes('Joining wrld_')) {
+    if (l.includes('Joining wrld_')) {
       const info = extractWorldJoinInfoFromLogs(logLines, index);
       if (info) {
         logInfos.push(info);
@@ -100,20 +100,20 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
     }
 
     // プレイヤー参加ログ
-    if (l.value.includes('[Behaviour] OnPlayerJoined')) {
+    if (l.includes('[Behaviour] OnPlayerJoined')) {
       const result = extractPlayerJoinInfoFromLog(l);
 
       if (result.isOk()) {
         logInfos.push(result.value);
       } else {
         // ログ行からプレイヤー名とIDを抽出（デバッグ用）
-        const playerNameMatch = l.value.match(
+        const playerNameMatch = l.match(
           /OnPlayerJoined (.+?)(?:\s+\((usr_[^)]+)\))?$/,
         );
         const playerName = playerNameMatch
           ? playerNameMatch[1]
           : 'Unknown player';
-        const playerIdMatch = l.value.match(/\((usr_[^)]+)\)/);
+        const playerIdMatch = l.match(/\((usr_[^)]+)\)/);
         const playerId = playerIdMatch
           ? playerIdMatch[1]
           : 'No player ID found';
@@ -138,7 +138,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
 
         // エラー情報を収集
         errors.push({
-          line: l.value,
+          line: l,
           error: errorMessage,
           type: 'player_join',
         });
@@ -147,7 +147,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
         logger.error({
           message: new Error(`Player join parse error: ${errorMessage}`),
           details: {
-            logLine: l.value,
+            logLine: l,
             playerName,
             playerId,
             errorType: result.error,
@@ -157,23 +157,20 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
     }
 
     // プレイヤー退出ログ（OnPlayerLeftRoomは除外）
-    if (
-      l.value.includes('OnPlayerLeft') &&
-      !l.value.includes('OnPlayerLeftRoom')
-    ) {
+    if (l.includes('OnPlayerLeft') && !l.includes('OnPlayerLeftRoom')) {
       const result = extractPlayerLeaveInfoFromLog(l);
 
       if (result.isOk()) {
         logInfos.push(result.value);
       } else {
         // ログ行からプレイヤー名とIDを抽出（デバッグ用）
-        const playerNameMatch = l.value.match(
+        const playerNameMatch = l.match(
           /OnPlayerLeft (.+?)(?:\s+\((usr_[^)]+)\))?$/,
         );
         const playerName = playerNameMatch
           ? playerNameMatch[1]
           : 'Unknown player';
-        const playerIdMatch = l.value.match(/\((usr_[^)]+)\)/);
+        const playerIdMatch = l.match(/\((usr_[^)]+)\)/);
         const playerId = playerIdMatch
           ? playerIdMatch[1]
           : 'No player ID found';
@@ -198,7 +195,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
 
         // エラー情報を収集
         errors.push({
-          line: l.value,
+          line: l,
           error: errorMessage,
           type: 'player_leave',
         });
@@ -207,7 +204,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
         logger.error({
           message: new Error(`Player leave parse error: ${errorMessage}`),
           details: {
-            logLine: l.value,
+            logLine: l,
             playerName,
             playerId,
             errorType: result.error,

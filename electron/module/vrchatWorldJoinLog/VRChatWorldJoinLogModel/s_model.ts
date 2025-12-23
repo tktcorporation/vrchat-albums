@@ -84,9 +84,9 @@ export const createVRChatWorldJoinLog = async (
 ): Promise<VRChatWorldJoinLogModel[]> => {
   const newLogs = vrchatWorldJoinLogList.map((logInfo) => ({
     joinDateTime: logInfo.joinDate,
-    worldId: logInfo.worldId.value,
-    worldInstanceId: logInfo.worldInstanceId.value,
-    worldName: logInfo.worldName.value,
+    worldId: logInfo.worldId,
+    worldInstanceId: logInfo.worldInstanceId.value, // VRChatWorldInstanceId はメソッドを持つクラス
+    worldName: logInfo.worldName,
   }));
 
   if (newLogs.length > 0) {

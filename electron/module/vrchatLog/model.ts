@@ -3,16 +3,39 @@ import * as datefns from 'date-fns';
 import { z } from 'zod';
 import { BaseValueObject } from '../../lib/baseValueObject.js';
 
+// Re-export Branded Types from shared module
+export {
+  OptionalVRChatPlayerIdSchema,
+  type VRChatLogLine,
+  VRChatLogLineSchema,
+  type VRChatPlayerId,
+  VRChatPlayerIdSchema,
+  type VRChatPlayerName,
+  VRChatPlayerNameSchema,
+  type VRChatWorldId,
+  VRChatWorldIdSchema,
+  type VRChatWorldName,
+  VRChatWorldNameSchema,
+} from '../../lib/brandedTypes.js';
+// Re-export validation functions from shared module
+export {
+  isValidVRChatPlayerId,
+  isValidVRChatPlayerName,
+  isValidVRChatWorldId,
+  isValidVRChatWorldInstanceId,
+  isValidVRChatWorldName,
+} from '../../lib/vrchatIdValidation.js';
+
 export { BaseValueObject }; // Re-export for backward compatibility
 
-/**
- * VRChatのログ行
- */
-class VRChatLogLine extends BaseValueObject<'VRChatLogLine', string> {}
+// Import validation function for VRChatWorldInstanceId
+import { isValidVRChatWorldInstanceId } from '../../lib/vrchatIdValidation.js';
 
 /**
  * VRChatのログ行の保存先（標準形式）
  * 例: logStore-2024-05.txt
+ *
+ * メソッドを持つため、クラスベースの ValueObject として維持
  */
 class VRChatLogStoreFilePath extends BaseValueObject<
   'VRChatLogStoreFilePath',
@@ -69,45 +92,9 @@ export const createTimestampedLogFilePath = (
 };
 
 /**
- * VRChatプレイヤーIDの検証関数
- * usr_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx形式
- */
-export const isValidVRChatPlayerId = (value: string): boolean => {
-  const regex =
-    /^usr_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-  return regex.test(value);
-};
-
-/**
- * VRChatプレイヤーID
- */
-class VRChatPlayerId extends BaseValueObject<'VRChatPlayerId', string> {}
-
-/**
- * VRChatワールドIDの検証関数
- * wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx形式
- */
-export const isValidVRChatWorldId = (value: string): boolean => {
-  const regex =
-    /^wrld_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-  return regex.test(value);
-};
-
-/**
- * VRChatワールドID
- */
-class VRChatWorldId extends BaseValueObject<'VRChatWorldId', string> {}
-
-/**
- * VRChatワールドインスタンスIDの検証関数
- * 英数字のみ、または英数字~region(region_code)形式を許可
- */
-export const isValidVRChatWorldInstanceId = (value: string): boolean => {
-  return /^[a-zA-Z0-9]+(~.+)?$/.test(value);
-};
-
-/**
  * VRChatワールドインスタンスID
+ *
+ * メソッドを持つため、クラスベースの ValueObject として維持
  */
 class VRChatWorldInstanceId extends BaseValueObject<
   'VRChatWorldInstanceId',
@@ -177,45 +164,7 @@ class VRChatWorldInstanceId extends BaseValueObject<
   }
 }
 
-/**
- * VRChatプレイヤー名の検証関数
- * 空文字列ではない文字列
- */
-export const isValidVRChatPlayerName = (value: string): boolean => {
-  return value.trim().length > 0;
-};
-
-/**
- * VRChatプレイヤー名
- */
-class VRChatPlayerName extends BaseValueObject<'VRChatPlayerName', string> {}
-
-/**
- * VRChatワールド名の検証関数
- * 空文字列ではない文字列
- */
-export const isValidVRChatWorldName = (value: string): boolean => {
-  return value.trim().length > 0;
-};
-
-/**
- * VRChatワールド名
- */
-class VRChatWorldName extends BaseValueObject<'VRChatWorldName', string> {}
-
-export type {
-  VRChatLogLine,
-  VRChatLogStoreFilePath,
-  VRChatPlayerId,
-  VRChatWorldId,
-  VRChatWorldInstanceId,
-  VRChatPlayerName,
-  VRChatWorldName,
-};
-
-export const VRChatLogLineSchema = z.string().transform((value) => {
-  return new VRChatLogLine(value);
-});
+export type { VRChatLogStoreFilePath, VRChatWorldInstanceId };
 
 export const VRChatLogStoreFilePathRegex =
   /(logStore-\d{4}-\d{2}(?:-\d{14})?\.txt$|logStore\.txt$)/;
@@ -229,76 +178,10 @@ export const VRChatLogStoreFilePathSchema = z
     return new VRChatLogStoreFilePath(value);
   });
 
-// ID検証用のZodスキーマ
-export const VRChatPlayerIdSchema = z
-  .string()
-  .refine(isValidVRChatPlayerId, {
-    message:
-      'Invalid VRChat Player ID format. Expected: usr_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-  })
-  .transform((value) => new VRChatPlayerId(value));
-
-export const VRChatWorldIdSchema = z
-  .string()
-  .refine(isValidVRChatWorldId, {
-    error: (issue) => ({
-      message: `Invalid VRChat World ID format. Expected: wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx, received: ${issue.input}`,
-    }),
-  })
-  .transform((value) => new VRChatWorldId(value));
-
 export const VRChatWorldInstanceIdSchema = z
   .string()
   .refine(isValidVRChatWorldInstanceId, {
-    error: (issue) => ({
-      message: `Invalid VRChat World Instance ID format. Expected: alphanumeric string or alphanumeric~region(region_code), received: ${issue.input}`,
-    }),
+    message:
+      'Invalid VRChat World Instance ID format. Expected: alphanumeric string or alphanumeric~region(region_code)',
   })
   .transform((value) => new VRChatWorldInstanceId(value));
-
-export const VRChatPlayerNameSchema = z
-  .string()
-  .refine(isValidVRChatPlayerName, {
-    error: (issue) => ({
-      message: `Invalid VRChat Player Name. Cannot be empty, received: ${issue.input}`,
-    }),
-  })
-  .transform((value) => new VRChatPlayerName(value));
-
-export const VRChatWorldNameSchema = z
-  .string()
-  .refine(isValidVRChatWorldName, {
-    error: (issue) => ({
-      message: `Invalid VRChat World Name. Cannot be empty, received: ${issue.input}`,
-    }),
-  })
-  .transform((value) => new VRChatWorldName(value));
-
-// オプショナルなプレイヤーID用のスキーマ
-export const OptionalVRChatPlayerIdSchema = z
-  .string()
-  .nullable()
-  .transform((value) => {
-    if (!value) return null;
-    return new VRChatPlayerId(value);
-  })
-  .pipe(
-    z.custom<VRChatPlayerId | null>(
-      (val): val is VRChatPlayerId | null => {
-        if (val === null) return true;
-        if (
-          val &&
-          typeof val === 'object' &&
-          'value' in val &&
-          typeof val.value === 'string'
-        ) {
-          return isValidVRChatPlayerId(val.value);
-        }
-        return false;
-      },
-      {
-        message:
-          'Invalid VRChat Player ID format. Expected: usr_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-      },
-    ),
-  );

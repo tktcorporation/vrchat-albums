@@ -69,7 +69,7 @@ export const extractPlayerJoinInfoFromLog = (
   // 2025.01.07 23:25:34 Log        -  [Behaviour] OnPlayerJoined プレイヤーA (usr_8862b082-dbc8-4b6d-8803-e834f833b498)
   const regex =
     /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2}).*\[Behaviour\] OnPlayerJoined (.+?)(?:\s+\((usr_[^)]+)\))?$/;
-  const matches = logLine.value.match(regex);
+  const matches = logLine.match(regex);
 
   if (!matches) {
     return err('LOG_FORMAT_MISMATCH');
@@ -113,7 +113,7 @@ export const extractPlayerLeaveInfoFromLog = (
   // 2025.02.22 21:14:48 Debug      -  [Behaviour] OnPlayerLeft tkt (usr_3ba2a992-724c-4463-bc75-7e9f6674e8e0)
   const regex =
     /(\d{4}\.\d{2}\.\d{2})\s+(\d{2}:\d{2}:\d{2})\s+\S+\s+-\s+\[Behaviour\] OnPlayerLeft (.+?)(?:\s+\((usr_[^)]+)\))?$/;
-  const matches = logLine.value.match(regex);
+  const matches = logLine.match(regex);
 
   if (!matches) {
     return err('LOG_FORMAT_MISMATCH');

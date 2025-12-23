@@ -358,8 +358,8 @@ export class ImportService {
       // 重複を確認（同一内容の行をカウント）
       const uniqueLines = new Map<string, number>();
       for (const logLine of allLogLines) {
-        const count = uniqueLines.get(logLine.value) || 0;
-        uniqueLines.set(logLine.value, count + 1);
+        const count = uniqueLines.get(logLine) || 0;
+        uniqueLines.set(logLine, count + 1);
       }
 
       const duplicateCount = Array.from(uniqueLines.values()).reduce(
