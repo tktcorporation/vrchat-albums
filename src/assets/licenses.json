@@ -5269,7 +5269,7 @@
     "path": "node_modules/vite",
     "licenseFile": "node_modules/vite/LICENSE.md"
   },
-  "vrchat-albums@0.20.0": {
+  "vrchat-albums@0.21.0": {
     "licenses": "MIT*",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",
