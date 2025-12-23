@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import type { FC, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
+import superjson from 'superjson';
 import { ipcLink } from 'trpc-electron/renderer';
 import { trpcReact } from './trpc';
 
@@ -38,7 +39,7 @@ export const TrpcWrapper: FC<Props> = ({ children }) => {
   );
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
-      links: [ipcLink()],
+      links: [ipcLink({ transformer: superjson })],
     }),
   );
   return (
@@ -74,7 +75,7 @@ export const TrpcWrapperForServerError: FC<Props> = ({ children }) => {
   );
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
-      links: [ipcLink()],
+      links: [ipcLink({ transformer: superjson })],
     }),
   );
   return (
@@ -111,7 +112,7 @@ export const TrpcWrapperDev: FC<DevProps> = ({ children }) => {
 
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
-      links: [ipcLink()],
+      links: [ipcLink({ transformer: superjson })],
     }),
   );
   return (
