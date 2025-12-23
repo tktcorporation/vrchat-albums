@@ -115,9 +115,7 @@ describe('logFileReader - Batch Processing', () => {
 
       // "Important"を含む行のみが抽出されることを確認
       expect(results).toHaveLength(3);
-      expect(results.every((line) => line.value.includes('Important'))).toBe(
-        true,
-      );
+      expect(results.every((line) => line.includes('Important'))).toBe(true);
     });
 
     it('デフォルトのバッチサイズ（1000行）で大量データを処理する', async () => {
@@ -326,7 +324,7 @@ describe('logFileReader - Batch Processing', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0]).toHaveLength(3);
-      expect(results[0].map((line: { value: string }) => line.value)).toEqual([
+      expect(results[0].map((line: string) => line)).toEqual([
         '2023-01-01 10:00:00 [Info] Line 1',
         '2023-01-01 10:00:01 [Info] Line 2',
         '2023-01-02 10:00:00 [Info] Line 3',
@@ -468,7 +466,7 @@ describe('logFileReader - Batch Processing', () => {
       }
 
       expect(results).toHaveLength(1);
-      expect(results[0].value).toBe('2023-01-01 10:00:00 [Info] Valid line');
+      expect(results[0]).toBe('2023-01-01 10:00:00 [Info] Valid line');
     });
   });
 });

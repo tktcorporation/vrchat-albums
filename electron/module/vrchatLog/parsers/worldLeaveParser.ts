@@ -40,7 +40,7 @@ export const extractWorldLeaveInfoFromLog = (
 
   // 日時を抽出
   const dateTimeRegex = /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2})/;
-  const dateTimeMatch = logEntry.value.match(dateTimeRegex);
+  const dateTimeMatch = logEntry.match(dateTimeRegex);
 
   if (!dateTimeMatch) {
     return null;
@@ -58,7 +58,7 @@ export const extractWorldLeaveInfoFromLog = (
   ];
 
   const matchedPattern = patterns.find(({ patterns: patternList }) =>
-    patternList.some((pattern) => pattern.test(logEntry.value)),
+    patternList.some((pattern) => pattern.test(logEntry)),
   );
 
   return match(matchedPattern)
@@ -107,7 +107,7 @@ export const inferWorldLeaveEvents = (
     const leaveLogEntry = logLines[leaveIndex];
     if (leaveLogEntry) {
       const dateTimeRegex = /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2})/;
-      const dateTimeMatch = leaveLogEntry.value.match(dateTimeRegex);
+      const dateTimeMatch = leaveLogEntry.match(dateTimeRegex);
 
       if (dateTimeMatch) {
         const date = dateTimeMatch[1];

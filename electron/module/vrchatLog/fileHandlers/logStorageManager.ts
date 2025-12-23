@@ -135,7 +135,7 @@ export const appendLoglinesToFile = async (props: {
   const logsByMonth = new Map<string, VRChatLogLine[]>();
 
   for (const logLine of props.logLines) {
-    const dateMatch = logLine.value.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+    const dateMatch = logLine.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
     if (!dateMatch) {
       const key = datefns.format(new Date(), 'yyyy-MM');
       const monthLogs = logsByMonth.get(key) || [];
@@ -180,7 +180,7 @@ export const appendLoglinesToFile = async (props: {
           timestamp,
         );
 
-        const newLog = `${logs.map((l) => l.value).join('\n')}\n`;
+        const newLog = `${logs.join('\n')}\n`;
         const writeResult = await fs.writeFileSyncSafe(newFilePath, newLog);
         if (writeResult.isErr()) {
           throw writeResult.error;
@@ -205,12 +205,12 @@ export const appendLoglinesToFile = async (props: {
     }
 
     // 重複を除外して新しいログ行を追加
-    const newLines = logs.filter((log) => !existingLines.has(log.value));
+    const newLines = logs.filter((log) => !existingLines.has(log));
     if (newLines.length === 0) {
       continue;
     }
 
-    const newLog = `${newLines.map((l) => l.value).join('\n')}\n`;
+    const newLog = `${newLines.join('\n')}\n`;
 
     // ファイルが存在しない場合は新規作成、存在する場合は追記
     if (!isExists) {

@@ -36,7 +36,7 @@ export const extractWorldJoinInfoFromLogs = (
   const logEntry = logLines[index];
   const regex =
     /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2}) .* \[Behaviour\] Joining (wrld_[a-f0-9-]+):(.*)/;
-  const matches = logEntry.value.match(regex);
+  const matches = logEntry.match(regex);
 
   if (!matches || matches.length < 4) {
     return null;
@@ -56,7 +56,7 @@ export const extractWorldJoinInfoFromLogs = (
   // 後続のログ行からワールド名を抽出
   for (const l of logLines.slice(index + 1)) {
     const worldNameRegex = /\[Behaviour\] Joining or Creating Room: (.+)/;
-    const [, worldName] = l.value.match(worldNameRegex) || [];
+    const [, worldName] = l.match(worldNameRegex) || [];
     if (worldName && !foundWorldName) {
       foundWorldName = worldName;
     }

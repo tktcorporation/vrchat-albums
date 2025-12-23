@@ -43,7 +43,7 @@ export const filterLogLinesByDate = (
   startDate: Date,
 ): VRChatLogLine[] => {
   return logLines.filter((logLine) => {
-    const dateTimeMatch = logLine.value.match(
+    const dateTimeMatch = logLine.match(
       /^(\d{4})\.(\d{2})\.(\d{2}) (\d{2}):(\d{2}):(\d{2})/,
     );
     if (!dateTimeMatch) return false;

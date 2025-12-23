@@ -271,5 +271,5 @@ export const exportLogsToLogStore = (
  * @returns 改行区切りの文字列
  */
 export const formatLogStoreContent = (logLines: VRChatLogLine[]): string => {
-  return logLines.map((line) => line.value).join('\n');
+  return logLines.join('\n');
 };

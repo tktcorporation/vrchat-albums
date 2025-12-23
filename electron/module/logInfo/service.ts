@@ -416,8 +416,8 @@ export async function loadLogInfoIndexFromVRChatLog({
       playerLeaveLogService.createVRChatPlayerLeaveLogModel(
         playerLeaveLogBatch.map((logInfo) => ({
           leaveDate: logInfo.leaveDate,
-          playerName: logInfo.playerName.value,
-          playerId: logInfo.playerId?.value ?? null,
+          playerName: logInfo.playerName,
+          playerId: logInfo.playerId ?? null,
         })),
       ),
       // TODO: アプリイベントの処理は今後実装

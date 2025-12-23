@@ -92,11 +92,7 @@ export const createVRChatPlayerJoinLog = async (
   const seen = new Set();
   const newLogsExcludeDup = playerJoinLogList
     .filter((logInfo) => {
-      const key = `${logInfo.joinDate.toISOString()}|${
-        typeof logInfo.playerName === 'string'
-          ? logInfo.playerName
-          : logInfo.playerName.value
-      }`;
+      const key = `${logInfo.joinDate.toISOString()}|${logInfo.playerName}`;
       if (existingSet.has(key) || seen.has(key)) {
         return false; // 既存セットまたは新しいセットに重複が見つかった場合は除外
       }
@@ -105,14 +101,8 @@ export const createVRChatPlayerJoinLog = async (
     })
     .map((logInfo) => ({
       joinDateTime: logInfo.joinDate,
-      playerId:
-        (typeof logInfo.playerId === 'string'
-          ? logInfo.playerId
-          : logInfo.playerId?.value) ?? null,
-      playerName:
-        typeof logInfo.playerName === 'string'
-          ? logInfo.playerName
-          : logInfo.playerName.value,
+      playerId: logInfo.playerId ?? null,
+      playerName: logInfo.playerName,
     }));
 
   if (newLogsExcludeDup.length < 1) {

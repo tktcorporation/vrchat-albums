@@ -340,7 +340,7 @@ describe('filterLogLinesByDate', () => {
     );
     const day2Logs = filterLogLinesByDate(logLines, midDate);
     expect(day2Logs.length).toBe(2);
-    expect(day2Logs[0].value).toContain('2025.02.23');
+    expect(day2Logs[0]).toContain('2025.02.23');
 
     // ケース3: すべてのログを除外する日付（新しい日付）
     const futureDate = datefns.parseISO('2025-02-24T00:00:00Z');
@@ -355,7 +355,7 @@ describe('filterLogLinesByDate', () => {
     );
     const timeFilteredLogs = filterLogLinesByDate(logLines, specificTime);
     expect(timeFilteredLogs.length).toBe(4);
-    expect(timeFilteredLogs[0].value).toContain('21:14:07');
+    expect(timeFilteredLogs[0]).toContain('21:14:07');
   });
 
   test('無効な日付形式のログ行を正しく処理する', () => {
@@ -370,7 +370,7 @@ describe('filterLogLinesByDate', () => {
 
     // 有効な日付形式のログだけがフィルタリングされる
     expect(filteredLogs.length).toBe(1);
-    expect(filteredLogs[0].value).toContain('2025.02.22');
+    expect(filteredLogs[0]).toContain('2025.02.22');
   });
 
   test('同じ日付のログを含める', () => {

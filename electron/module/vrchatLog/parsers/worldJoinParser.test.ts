@@ -18,11 +18,9 @@ describe('worldJoinParser', () => {
 
       expect(result).not.toBeNull();
       expect(result?.logType).toBe('worldJoin');
-      expect(result?.worldId.value).toBe(
-        'wrld_12345678-1234-1234-1234-123456789abc',
-      );
+      expect(result?.worldId).toBe('wrld_12345678-1234-1234-1234-123456789abc');
       expect(result?.worldInstanceId.value).toBe('12345');
-      expect(result?.worldName.value).toBe('Test World');
+      expect(result?.worldName).toBe('Test World');
       expect(result?.joinDate).toEqual(new Date('2023-10-08T15:30:45'));
     });
 

@@ -17,8 +17,8 @@ describe('playerActionParser', () => {
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
         expect(result.value.logType).toBe('playerJoin');
-        expect(result.value.playerName.value).toBe('TestPlayer');
-        expect(result.value.playerId?.value).toBe(
+        expect(result.value.playerName).toBe('TestPlayer');
+        expect(result.value.playerId).toBe(
           'usr_12345678-1234-1234-1234-123456789abc',
         );
         expect(result.value.joinDate).toEqual(new Date('2025-01-07T23:25:34'));
@@ -35,7 +35,7 @@ describe('playerActionParser', () => {
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
         expect(result.value.logType).toBe('playerJoin');
-        expect(result.value.playerName.value).toBe('TestPlayer');
+        expect(result.value.playerName).toBe('TestPlayer');
         expect(result.value.playerId).toBeNull();
         expect(result.value.joinDate).toEqual(new Date('2025-01-07T23:25:34'));
       }
@@ -49,7 +49,7 @@ describe('playerActionParser', () => {
       const result = extractPlayerJoinInfoFromLog(logLine);
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
-        expect(result.value.playerName.value).toBe('Test Player Name');
+        expect(result.value.playerName).toBe('Test Player Name');
       }
     });
 
@@ -75,8 +75,8 @@ describe('playerActionParser', () => {
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
         expect(result.value.logType).toBe('playerLeave');
-        expect(result.value.playerName.value).toBe('TestPlayer');
-        expect(result.value.playerId?.value).toBe(
+        expect(result.value.playerName).toBe('TestPlayer');
+        expect(result.value.playerId).toBe(
           'usr_12345678-1234-1234-1234-123456789abc',
         );
         expect(result.value.leaveDate).toEqual(new Date('2025-01-08T00:22:04'));
@@ -91,7 +91,7 @@ describe('playerActionParser', () => {
       const result = extractPlayerLeaveInfoFromLog(logLine);
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
-        expect(result.value.playerName.value).toBe('プレイヤー ⁄ A');
+        expect(result.value.playerName).toBe('プレイヤー ⁄ A');
       }
     });
 
@@ -103,7 +103,7 @@ describe('playerActionParser', () => {
       const result = extractPlayerLeaveInfoFromLog(logLine);
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
-        expect(result.value.playerName.value).toBe('TestPlayer');
+        expect(result.value.playerName).toBe('TestPlayer');
         expect(result.value.playerId).toBeNull();
       }
     });

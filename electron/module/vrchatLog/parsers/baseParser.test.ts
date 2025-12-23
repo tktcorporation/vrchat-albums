@@ -72,8 +72,8 @@ describe('baseParser', () => {
       const result = filterLogLinesByDate(logLines, startDate);
 
       expect(result).toHaveLength(2);
-      expect(result[0].value).toContain('2023.10.08');
-      expect(result[1].value).toContain('2023.10.09');
+      expect(result[0]).toContain('2023.10.08');
+      expect(result[1]).toContain('2023.10.09');
     });
 
     it('日付形式が不正なログを除外する', () => {
@@ -86,7 +86,7 @@ describe('baseParser', () => {
       const result = filterLogLinesByDate(logLines, startDate);
 
       expect(result).toHaveLength(1);
-      expect(result[0].value).toContain('Valid log');
+      expect(result[0]).toContain('Valid log');
     });
   });
 });

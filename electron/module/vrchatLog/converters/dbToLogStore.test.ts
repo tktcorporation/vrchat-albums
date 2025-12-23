@@ -23,10 +23,10 @@ describe('dbToLogStore', () => {
       const result = convertWorldJoinLogToLogLines(worldJoinLog);
 
       expect(result).toHaveLength(2);
-      expect(result[0].value).toBe(
+      expect(result[0]).toBe(
         '2023.10.08 15:30:45 Log        -  [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789abc:12345',
       );
-      expect(result[1].value).toBe(
+      expect(result[1]).toBe(
         '2023.10.08 15:30:45 Log        -  [Behaviour] Joining or Creating Room: Test World',
       );
     });
@@ -44,11 +44,11 @@ describe('dbToLogStore', () => {
 
       const result = convertWorldJoinLogToLogLines(worldJoinLog);
 
-      expect(result[0].value).toContain('2024.01.15 09:15:30');
-      expect(result[0].value).toContain(
+      expect(result[0]).toContain('2024.01.15 09:15:30');
+      expect(result[0]).toContain(
         'wrld_87654321-4321-4321-4321-abcdefabcdef:54321',
       );
-      expect(result[1].value).toContain('Another World');
+      expect(result[1]).toContain('Another World');
     });
   });
 
@@ -65,7 +65,7 @@ describe('dbToLogStore', () => {
 
       const result = convertPlayerJoinLogToLogLine(playerJoinLog);
 
-      expect(result.value).toBe(
+      expect(result).toBe(
         '2025.01.07 23:25:34 Log        -  [Behaviour] OnPlayerJoined TestPlayer (usr_12345678-1234-1234-1234-123456789abc)',
       );
     });
@@ -82,7 +82,7 @@ describe('dbToLogStore', () => {
 
       const result = convertPlayerJoinLogToLogLine(playerJoinLog);
 
-      expect(result.value).toBe(
+      expect(result).toBe(
         '2025.01.07 23:25:34 Log        -  [Behaviour] OnPlayerJoined TestPlayer',
       );
     });
@@ -99,7 +99,7 @@ describe('dbToLogStore', () => {
 
       const result = convertPlayerJoinLogToLogLine(playerJoinLog);
 
-      expect(result.value).toContain('Test Player Name');
+      expect(result).toContain('Test Player Name');
     });
   });
 
@@ -116,7 +116,7 @@ describe('dbToLogStore', () => {
 
       const result = convertPlayerLeaveLogToLogLine(playerLeaveLog);
 
-      expect(result.value).toBe(
+      expect(result).toBe(
         '2025.01.08 00:22:04 Log        -  [Behaviour] OnPlayerLeft TestPlayer (usr_12345678-1234-1234-1234-123456789abc)',
       );
     });
@@ -133,7 +133,7 @@ describe('dbToLogStore', () => {
 
       const result = convertPlayerLeaveLogToLogLine(playerLeaveLog);
 
-      expect(result.value).toBe(
+      expect(result).toBe(
         '2025.01.08 00:22:04 Log        -  [Behaviour] OnPlayerLeft TestPlayer',
       );
     });
@@ -150,7 +150,7 @@ describe('dbToLogStore', () => {
 
       const result = convertPlayerLeaveLogToLogLine(playerLeaveLog);
 
-      expect(result.value).toContain('プレイヤー ⁄ A');
+      expect(result).toContain('プレイヤー ⁄ A');
     });
   });
 
@@ -198,14 +198,14 @@ describe('dbToLogStore', () => {
       expect(result).toHaveLength(4); // worldJoin=2行 + playerJoin=1行 + playerLeave=1行
 
       // 時系列順であることを確認
-      expect(result[0].value).toContain('15:30:45');
-      expect(result[0].value).toContain('Joining wrld_');
-      expect(result[1].value).toContain('15:30:45');
-      expect(result[1].value).toContain('Joining or Creating Room');
-      expect(result[2].value).toContain('15:31:00');
-      expect(result[2].value).toContain('OnPlayerJoined');
-      expect(result[3].value).toContain('15:32:00');
-      expect(result[3].value).toContain('OnPlayerLeft');
+      expect(result[0]).toContain('15:30:45');
+      expect(result[0]).toContain('Joining wrld_');
+      expect(result[1]).toContain('15:30:45');
+      expect(result[1]).toContain('Joining or Creating Room');
+      expect(result[2]).toContain('15:31:00');
+      expect(result[2]).toContain('OnPlayerJoined');
+      expect(result[3]).toContain('15:32:00');
+      expect(result[3]).toContain('OnPlayerLeft');
     });
 
     it('空の配列で空の結果を返す', () => {

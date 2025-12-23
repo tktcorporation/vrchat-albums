@@ -1,8 +1,8 @@
 import { ok } from 'neverthrow';
 import { describe, expect, it, vi } from 'vitest';
 import { getData } from '../../lib/getData';
+import { VRChatWorldIdSchema } from '../vrchatLog/model';
 import * as vrchatApiService from './service';
-import { VRChatWorldIdSchema } from './valueObject';
 
 vi.mock('../../lib/getData', () => ({
   getData: vi.fn(),
