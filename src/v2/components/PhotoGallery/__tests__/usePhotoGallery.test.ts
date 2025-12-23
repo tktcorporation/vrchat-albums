@@ -214,6 +214,127 @@ describe('usePhotoGallery', () => {
     vi.useRealTimers();
   });
 
+  describe('写真選択と順序保持', () => {
+    it('selectedPhotosの初期状態は空配列である', () => {
+      const { result } = renderHook(() => usePhotoGallery(''));
+
+      expect(result.current.selectedPhotos).toEqual([]);
+      expect(Array.isArray(result.current.selectedPhotos)).toBe(true);
+    });
+
+    it('写真を選択すると配列に追加される', () => {
+      const { result } = renderHook(() => usePhotoGallery(''));
+
+      act(() => {
+        result.current.setSelectedPhotos(['photo-1']);
+      });
+
+      expect(result.current.selectedPhotos).toEqual(['photo-1']);
+    });
+
+    it('複数の写真を選択すると選択順序が保持される', () => {
+      const { result } = renderHook(() => usePhotoGallery(''));
+
+      // 順番に写真を選択
+      act(() => {
+        result.current.setSelectedPhotos(['photo-3']);
+      });
+      act(() => {
+        result.current.setSelectedPhotos((prev) => [...prev, 'photo-1']);
+      });
+      act(() => {
+        result.current.setSelectedPhotos((prev) => [...prev, 'photo-2']);
+      });
+
+      // 選択順序が維持されていることを確認
+      expect(result.current.selectedPhotos).toEqual([
+        'photo-3',
+        'photo-1',
+        'photo-2',
+      ]);
+    });
+
+    it('選択済みの写真を削除しても他の写真の順序は維持される', () => {
+      const { result } = renderHook(() => usePhotoGallery(''));
+
+      // 3つの写真を選択
+      act(() => {
+        result.current.setSelectedPhotos(['photo-1', 'photo-2', 'photo-3']);
+      });
+
+      // 真ん中の写真を削除
+      act(() => {
+        result.current.setSelectedPhotos((prev) =>
+          prev.filter((id) => id !== 'photo-2'),
+        );
+      });
+
+      // 残りの写真の順序が維持されていることを確認
+      expect(result.current.selectedPhotos).toEqual(['photo-1', 'photo-3']);
+    });
+
+    it('選択をクリアすると空配列になる', () => {
+      const { result } = renderHook(() => usePhotoGallery(''));
+
+      // 写真を選択
+      act(() => {
+        result.current.setSelectedPhotos(['photo-1', 'photo-2']);
+      });
+
+      // クリア
+      act(() => {
+        result.current.setSelectedPhotos([]);
+      });
+
+      expect(result.current.selectedPhotos).toEqual([]);
+    });
+
+    it('関数型更新で順序を維持しながら追加・削除ができる', () => {
+      const { result } = renderHook(() => usePhotoGallery(''));
+
+      // 追加
+      act(() => {
+        result.current.setSelectedPhotos((prev) => [...prev, 'photo-1']);
+      });
+      act(() => {
+        result.current.setSelectedPhotos((prev) => [...prev, 'photo-2']);
+      });
+
+      expect(result.current.selectedPhotos).toEqual(['photo-1', 'photo-2']);
+
+      // 削除して再追加（順序が変わることを確認）
+      act(() => {
+        result.current.setSelectedPhotos((prev) =>
+          prev.filter((id) => id !== 'photo-1'),
+        );
+      });
+      act(() => {
+        result.current.setSelectedPhotos((prev) => [...prev, 'photo-1']);
+      });
+
+      // photo-1が末尾に移動していることを確認
+      expect(result.current.selectedPhotos).toEqual(['photo-2', 'photo-1']);
+    });
+
+    it('選択番号は1から始まるインデックスで取得できる', () => {
+      const { result } = renderHook(() => usePhotoGallery(''));
+
+      act(() => {
+        result.current.setSelectedPhotos(['photo-a', 'photo-b', 'photo-c']);
+      });
+
+      const selectedPhotos = result.current.selectedPhotos;
+
+      // indexOf + 1 で選択番号を取得
+      expect(selectedPhotos.indexOf('photo-a') + 1).toBe(1);
+      expect(selectedPhotos.indexOf('photo-b') + 1).toBe(2);
+      expect(selectedPhotos.indexOf('photo-c') + 1).toBe(3);
+
+      // 未選択の写真は0（indexOf が -1 を返すため）
+      expect(selectedPhotos.indexOf('photo-d') + 1).toBe(0);
+    });
+  });
+
   it('初期状態で写真を正しく読み込む', () => {
     const { result, rerender } = renderHook(() => usePhotoGallery(''));
 

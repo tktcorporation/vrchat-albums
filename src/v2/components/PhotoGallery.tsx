@@ -53,7 +53,7 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
 
   /** 選択をクリアし、複数選択モードを解除するハンドラ */
   const handleClearSelection = () => {
-    setSelectedPhotos(new Set());
+    setSelectedPhotos([]);
     setIsMultiSelectMode(false);
   };
 
@@ -86,23 +86,24 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
     });
 
   // 選択された写真をクリップボードにコピーするハンドラ
-  /** 選択写真のパスを集めて一括コピーする */
+  /** 選択写真のパスを集めて一括コピーする（選択順序を維持） */
   const handleCopySelected = () => {
-    if (selectedPhotos.size === 0) {
+    if (selectedPhotos.length === 0) {
       return;
     }
 
-    // 選択された写真のパスを取得
-    const selectedPhotoUrls: string[] = [];
-
-    // グループ内の写真からIDが一致するものを探す
+    // 全グループの写真をIDでマップ化
+    const photoUrlMap = new Map<string, string>();
     for (const group of Object.values(groupedPhotos)) {
       for (const photo of group.photos) {
-        if (selectedPhotos.has(photo.id.toString())) {
-          selectedPhotoUrls.push(photo.url);
-        }
+        photoUrlMap.set(photo.id.toString(), photo.url);
       }
     }
+
+    // 選択順序を維持してパスを取得
+    const selectedPhotoUrls = selectedPhotos
+      .map((id) => photoUrlMap.get(id))
+      .filter((url): url is string => url !== undefined);
 
     // 写真をクリップボードにコピー
     if (selectedPhotoUrls.length > 0) {
@@ -137,7 +138,7 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
     searchQuery,
     setSearchQuery: handleSearch,
     onOpenSettings: () => setShowSettings(true),
-    selectedPhotoCount: selectedPhotos.size,
+    selectedPhotoCount: selectedPhotos.length,
     onClearSelection: handleClearSelection,
     isMultiSelectMode,
     onCopySelected: handleCopySelected,

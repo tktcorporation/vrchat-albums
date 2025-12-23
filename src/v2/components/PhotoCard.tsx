@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { CheckCircle2, Circle } from 'lucide-react';
+import { Circle } from 'lucide-react';
 import React, { memo, useCallback, useRef, useState } from 'react';
 import {
   ContextMenu,
@@ -22,11 +22,11 @@ interface PhotoCardProps {
   photo: Photo;
   /** 画像を優先的に読み込むか (ビューポート内の最初の要素など) */
   priority?: boolean;
-  /** 現在選択されている写真のIDセット */
-  selectedPhotos: Set<string>;
-  /** 選択されている写真のIDセットを更新する関数 */
+  /** 現在選択されている写真のID配列（選択順序を保持） */
+  selectedPhotos: string[];
+  /** 選択されている写真のID配列を更新する関数 */
   setSelectedPhotos: (
-    update: Set<string> | ((prev: Set<string>) => Set<string>),
+    update: string[] | ((prev: string[]) => string[]),
   ) => void;
   /** このカードが含まれるグリッド全体の写真リスト (複数コピー時のパス取得用、将来的に不要かも) */
   photos: Photo[];
@@ -67,7 +67,9 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
 
     const currentPhotoId = String(photo.id);
     /** このカードが現在選択されているかどうか */
-    const isSelected = selectedPhotos.has(currentPhotoId);
+    const isSelected = selectedPhotos.includes(currentPhotoId);
+    /** 選択順番（1から始まる、未選択の場合は0） */
+    const selectionOrder = selectedPhotos.indexOf(currentPhotoId) + 1;
 
     /** 画像を読み込むべきか (優先指定またはビューポート内) */
     const shouldLoad = priority || isIntersecting;
@@ -100,12 +102,13 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     /** コンテキストメニュー: 写真パスコピー (単一/複数対応) */
     const handleCopyPhotoData = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (selectedPhotos.size > 1 && onCopySelected) {
+      if (selectedPhotos.length > 1 && onCopySelected) {
         // 複数選択時は親コンポーネントのコピー機能を使用（全グループにアクセス可能）
         onCopySelected();
-      } else if (selectedPhotos.size > 1) {
+      } else if (selectedPhotos.length > 1) {
         // フォールバック：同じグループ内の写真のみコピー（後方互換性のため）
-        const pathsToCopy = Array.from(selectedPhotos)
+        // 選択順序を維持してコピー
+        const pathsToCopy = selectedPhotos
           .map((id) => {
             const p = photos.find((p) => String(p.id) === id);
             return p?.url;
@@ -133,15 +136,15 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     /** カード本体のクリックハンドラ */
     const handleClick = useCallback(() => {
       if (isMultiSelectMode) {
-        // 複数選択モード中: 選択/選択解除
+        // 複数選択モード中: 選択/選択解除（順序を保持）
         setSelectedPhotos((prev) => {
-          const newSelected = new Set(prev);
-          if (newSelected.has(currentPhotoId)) {
-            newSelected.delete(currentPhotoId);
-          } else {
-            newSelected.add(currentPhotoId);
+          const index = prev.indexOf(currentPhotoId);
+          if (index !== -1) {
+            // 既に選択されている場合は削除
+            return prev.filter((id) => id !== currentPhotoId);
           }
-          return newSelected;
+          // 選択されていない場合は末尾に追加
+          return [...prev, currentPhotoId];
         });
       } else {
         // 通常モード中: システムの写真ビューアで開く
@@ -165,13 +168,13 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         }
 
         setSelectedPhotos((prev) => {
-          const newSelected = new Set(prev);
-          if (newSelected.has(currentPhotoId)) {
-            newSelected.delete(currentPhotoId);
-          } else {
-            newSelected.add(currentPhotoId);
+          const index = prev.indexOf(currentPhotoId);
+          if (index !== -1) {
+            // 既に選択されている場合は削除
+            return prev.filter((id) => id !== currentPhotoId);
           }
-          return newSelected;
+          // 選択されていない場合は末尾に追加
+          return [...prev, currentPhotoId];
         });
       },
       [
@@ -184,9 +187,9 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
 
     /** カードの右クリックハンドラ */
     const handleContextMenu = useCallback(() => {
-      if (!isMultiSelectMode || !selectedPhotos.has(currentPhotoId)) {
+      if (!isMultiSelectMode || !selectedPhotos.includes(currentPhotoId)) {
         // モード外 or 未選択写真を右クリック: これを選択しモード開始
-        setSelectedPhotos(new Set([currentPhotoId]));
+        setSelectedPhotos([currentPhotoId]);
         setIsMultiSelectMode(true);
       }
     }, [
@@ -256,11 +259,16 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
               tabIndex={0}
             >
               {isSelected ? (
-                <CheckCircle2
-                  size={ICON_SIZE.photo.pixels}
-                  className="text-primary bg-white dark:bg-gray-800 rounded-full shadow-sm"
-                  strokeWidth={2.5}
-                />
+                <div
+                  className="flex items-center justify-center bg-primary text-primary-foreground rounded-full shadow-sm font-semibold"
+                  style={{
+                    width: ICON_SIZE.photo.pixels,
+                    height: ICON_SIZE.photo.pixels,
+                    fontSize: ICON_SIZE.photo.pixels * 0.55,
+                  }}
+                >
+                  {selectionOrder}
+                </div>
               ) : (
                 <Circle
                   size={ICON_SIZE.photo.pixels}
@@ -318,10 +326,10 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
           <ContextMenuContent onClick={(e) => e.stopPropagation()}>
             <ContextMenuItem
               onClick={(e) => handleMenuAction(e, handleCopyPhotoData)}
-              disabled={selectedPhotos.size === 0 && !isSelected}
+              disabled={selectedPhotos.length === 0 && !isSelected}
             >
-              {selectedPhotos.size > 1
-                ? `${selectedPhotos.size}枚の写真をコピー`
+              {selectedPhotos.length > 1
+                ? `${selectedPhotos.length}枚の写真をコピー`
                 : t('common.contextMenu.copyPhotoData')}
             </ContextMenuItem>
             <ContextMenuItem
