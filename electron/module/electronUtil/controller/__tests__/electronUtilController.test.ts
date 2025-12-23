@@ -51,12 +51,13 @@ describe('electronUtilController', () => {
           pngBase64: 'test-base64',
           filenameWithoutExt: 'test',
         },
-        rawInput: {
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        },
         path: '',
         type: 'mutation',
+        getRawInput: async () => ({
+          pngBase64: 'test-base64',
+          filenameWithoutExt: 'test',
+        }),
+        signal: new AbortController().signal,
       });
 
       const expectedTempPath = path.join(os.tmpdir(), 'test-dir', 'test.png');
@@ -98,12 +99,13 @@ describe('electronUtilController', () => {
           pngBase64: 'test-base64',
           filenameWithoutExt: 'test',
         },
-        rawInput: {
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        },
         path: '',
         type: 'mutation',
+        getRawInput: async () => ({
+          pngBase64: 'test-base64',
+          filenameWithoutExt: 'test',
+        }),
+        signal: new AbortController().signal,
       });
 
       // 一時ファイルの作成は行われる
@@ -133,12 +135,13 @@ describe('electronUtilController', () => {
             pngBase64: 'test-base64',
             filenameWithoutExt: 'test',
           },
-          rawInput: {
-            pngBase64: 'test-base64',
-            filenameWithoutExt: 'test',
-          },
           path: '',
           type: 'mutation',
+          getRawInput: async () => ({
+            pngBase64: 'test-base64',
+            filenameWithoutExt: 'test',
+          }),
+          signal: new AbortController().signal,
         }),
       ).rejects.toThrow('ファイル操作中にエラーが発生しました。');
 

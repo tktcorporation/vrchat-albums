@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { VRChatPhotoFileNameWithExtSchema } from '../../../../valueObjects';
+
+// Mock trpc to prevent ipcLink from being evaluated in non-electron environment
+vi.mock('@/trpc', () => ({
+  trpcReact: {
+    logInfo: {
+      getVisitedWorldListAll: {
+        useQuery: vi.fn(() => ({ data: [] })),
+      },
+    },
+  },
+}));
+
 import type { Photo } from '../../../types/photo';
 import type { WorldJoinLog } from '../useGroupPhotos';
 import { groupPhotosBySession } from '../useGroupPhotos';

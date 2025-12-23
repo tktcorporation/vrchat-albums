@@ -4202,53 +4202,40 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/match-sorter-utils@npm:^8.7.0":
-  version: 8.19.4
-  resolution: "@tanstack/match-sorter-utils@npm:8.19.4"
-  dependencies:
-    remove-accents: "npm:0.5.0"
-  checksum: 10c0/935022e3d639f19472131d289f3e1202253ff34301717c337e9bac0eeae6a0bd56450ed8ae2f7eb7ac9dfefa7ceaa7d126d8c5441021968b4a9eabc3ac4f8ba1
+"@tanstack/query-core@npm:5.90.12":
+  version: 5.90.12
+  resolution: "@tanstack/query-core@npm:5.90.12"
+  checksum: 10c0/60d5dd23d7801118d6ef84a3d76e798aaf6eb851ee5227629a1dc798fa01ac9560580553413208fcc8a003fb12a89e83d6dd1f38ebc3bd9b6e8838cfaaa45fef
   languageName: node
   linkType: hard
 
-"@tanstack/query-core@npm:4.40.0":
-  version: 4.40.0
-  resolution: "@tanstack/query-core@npm:4.40.0"
-  checksum: 10c0/c04ebaae3b30d59fcf647c3e3aed95bc7aea632a37088f6066b9958ac2144613ed545471e9ecefd78b1ebe2536fbc74eb708f8614334d012156d82aabfef5fd6
+"@tanstack/query-devtools@npm:5.91.1":
+  version: 5.91.1
+  resolution: "@tanstack/query-devtools@npm:5.91.1"
+  checksum: 10c0/856d85d249fd46a9f191a345f4446dcfb11a6b48d664f18f5bf480d0802fde5089ca7ae39e26e3445256a13f12f9b77b8639c33ad26c9d1e4b4c56a00fdb9b8c
   languageName: node
   linkType: hard
 
-"@tanstack/react-query-devtools@npm:^4.36.1":
-  version: 4.42.0
-  resolution: "@tanstack/react-query-devtools@npm:4.42.0"
+"@tanstack/react-query-devtools@npm:^5":
+  version: 5.91.1
+  resolution: "@tanstack/react-query-devtools@npm:5.91.1"
   dependencies:
-    "@tanstack/match-sorter-utils": "npm:^8.7.0"
-    superjson: "npm:^1.10.0"
-    use-sync-external-store: "npm:^1.2.0"
+    "@tanstack/query-devtools": "npm:5.91.1"
   peerDependencies:
-    "@tanstack/react-query": ^4.42.0
-    react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-  checksum: 10c0/88e95d79469bd229c308680166df7a34425e1c4123a0716473b3584114e0f07d25777e1fa172ec17369f3ec3fec6dd7d9eff7f615f02ed79a9e3604d92cbc6db
+    "@tanstack/react-query": ^5.90.10
+    react: ^18 || ^19
+  checksum: 10c0/be19d04a292168bf9404f0f98a0e3f95f0340c0e88c838028805578da5c49b014275b1014f7a04f9c865788d96112be001eb72fa8253cadd83b6905f6bd6331e
   languageName: node
   linkType: hard
 
-"@tanstack/react-query@npm:4.40.1":
-  version: 4.40.1
-  resolution: "@tanstack/react-query@npm:4.40.1"
+"@tanstack/react-query@npm:^5":
+  version: 5.90.12
+  resolution: "@tanstack/react-query@npm:5.90.12"
   dependencies:
-    "@tanstack/query-core": "npm:4.40.0"
-    use-sync-external-store: "npm:^1.2.0"
+    "@tanstack/query-core": "npm:5.90.12"
   peerDependencies:
-    react: ^16.8.0 || ^17.0.0 || ^18.0.0
-    react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
-    react-native: "*"
-  peerDependenciesMeta:
-    react-dom:
-      optional: true
-    react-native:
-      optional: true
-  checksum: 10c0/19d93d60fc39872683da0b74ca11cf78cc6186c8eec8b4732bec3efb83d553e94108a838d6d20dd54f109f330a56858133df85b4a4700c641c1fb3eb11855d35
+    react: ^18 || ^19
+  checksum: 10c0/da01ec2819d301e4be89731e82d3f091fa4f1ab2745be324e5166f9df77e2aaf1c362b0fa61aab226bb01634873f1a00562f7d7f405867fe23bdd47fe4d00fda
   languageName: node
   linkType: hard
 
@@ -4327,32 +4314,36 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@trpc/client@npm:10.45.2":
-  version: 10.45.2
-  resolution: "@trpc/client@npm:10.45.2"
+"@trpc/client@npm:^11":
+  version: 11.8.1
+  resolution: "@trpc/client@npm:11.8.1"
   peerDependencies:
-    "@trpc/server": 10.45.2
-  checksum: 10c0/15c277a35f15108346902507c7f04fdcdf008d7fd8232f28806518af555ce72273a06d024b727494684c9d8752949b3e334437f321a7f3228be6411511b553f0
+    "@trpc/server": 11.8.1
+    typescript: ">=5.7.2"
+  checksum: 10c0/2b015230e7f289fac98a2d146fe67bcfe60f3392871f967fa15afb56f8da898f8f6bc4d81672b60dfe414a5007fecd09547e1a8e878d2fd76e6eba6241d63bad
   languageName: node
   linkType: hard
 
-"@trpc/react-query@npm:10.45.2":
-  version: 10.45.2
-  resolution: "@trpc/react-query@npm:10.45.2"
+"@trpc/react-query@npm:^11":
+  version: 11.8.1
+  resolution: "@trpc/react-query@npm:11.8.1"
   peerDependencies:
-    "@tanstack/react-query": ^4.18.0
-    "@trpc/client": 10.45.2
-    "@trpc/server": 10.45.2
-    react: ">=16.8.0"
-    react-dom: ">=16.8.0"
-  checksum: 10c0/f843b6638c007eba748a34d7cc2360aea8531b0f5a3ebd4afe219cffb4b4e990e04afbf6ba1f8bb18837cc1c68059a274536c1965cdbc683d234fbbde348661a
+    "@tanstack/react-query": ^5.80.3
+    "@trpc/client": 11.8.1
+    "@trpc/server": 11.8.1
+    react: ">=18.2.0"
+    react-dom: ">=18.2.0"
+    typescript: ">=5.7.2"
+  checksum: 10c0/316be1cae71caeb43e4543f0a3230ece7cee2ed797a9a5fa0dbd6b32d6c8bfe32912db9fc7d6b89cdc658d96a1133e79294dea162ba93c456c526298b2aa3296
   languageName: node
   linkType: hard
 
-"@trpc/server@npm:10.45.2":
-  version: 10.45.2
-  resolution: "@trpc/server@npm:10.45.2"
-  checksum: 10c0/c6bff389f7c4e273101834d55c917c2fe271189ee17985b79e4a925920afc39d45da3f247611cd7f8aeca3a461739118c621679bd183e9ad8765676e85c95712
+"@trpc/server@npm:^11":
+  version: 11.8.1
+  resolution: "@trpc/server@npm:11.8.1"
+  peerDependencies:
+    typescript: ">=5.7.2"
+  checksum: 10c0/82099e2230f25ea9253c3d54f1c216930d688db47c73a4141b7ec4f439e1fd53c3e8e5e47684c0bfa4e576c7b1df0820f28a85f48797d8cee7b570dc46035402
   languageName: node
   linkType: hard
 
@@ -6371,15 +6362,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"copy-anything@npm:^3.0.2":
-  version: 3.0.5
-  resolution: "copy-anything@npm:3.0.5"
-  dependencies:
-    is-what: "npm:^4.1.8"
-  checksum: 10c0/01eadd500c7e1db71d32d95a3bfaaedcb839ef891c741f6305ab0461398056133de08f2d1bf4c392b364e7bdb7ce498513896e137a7a183ac2516b065c28a4fe
-  languageName: node
-  linkType: hard
-
 "copy-anything@npm:^4":
   version: 4.0.5
   resolution: "copy-anything@npm:4.0.5"
@@ -6923,19 +6905,6 @@ __metadata:
   version: 1.5.267
   resolution: "electron-to-chromium@npm:1.5.267"
   checksum: 10c0/0732bdb891b657f2e43266a3db8cf86fff6cecdcc8d693a92beff214e136cb5c2ee7dc5945ed75fa1db16e16bad0c38695527a020d15f39e79084e0b2e447621
-  languageName: node
-  linkType: hard
-
-"electron-trpc@npm:0.7.1":
-  version: 0.7.1
-  resolution: "electron-trpc@npm:0.7.1"
-  dependencies:
-    debug: "npm:^4.3.4"
-  peerDependencies:
-    "@trpc/client": ">10.0.0"
-    "@trpc/server": ">10.0.0"
-    electron: ">19.0.0"
-  checksum: 10c0/c285403de2a5d854671f252ace9fa83155610efe98887c0002a9bdeac4899640c8adbd11668ac194c3fb1c800c75f8c1c9666f0e2b1444f68b544a7d0d756ad0
   languageName: node
   linkType: hard
 
@@ -8776,13 +8745,6 @@ __metadata:
   version: 2.1.0
   resolution: "is-unicode-supported@npm:2.1.0"
   checksum: 10c0/a0f53e9a7c1fdbcf2d2ef6e40d4736fdffff1c9f8944c75e15425118ff3610172c87bf7bc6c34d3903b04be59790bb2212ddbe21ee65b5a97030fc50370545a5
-  languageName: node
-  linkType: hard
-
-"is-what@npm:^4.1.8":
-  version: 4.1.16
-  resolution: "is-what@npm:4.1.16"
-  checksum: 10c0/611f1947776826dcf85b57cfb7bd3b3ea6f4b94a9c2f551d4a53f653cf0cb9d1e6518846648256d46ee6c91d114b6d09d2ac8a07306f7430c5900f87466aae5b
   languageName: node
   linkType: hard
 
@@ -11806,13 +11768,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"remove-accents@npm:0.5.0":
-  version: 0.5.0
-  resolution: "remove-accents@npm:0.5.0"
-  checksum: 10c0/a75321aa1b53d9abe82637115a492770bfe42bb38ed258be748bf6795871202bc8b4badff22013494a7029f5a241057ad8d3f72adf67884dbe15a9e37e87adc4
-  languageName: node
-  linkType: hard
-
 "require-directory@npm:^2.1.1":
   version: 2.1.1
   resolution: "require-directory@npm:2.1.1"
@@ -12816,15 +12771,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"superjson@npm:^1.10.0":
-  version: 1.13.3
-  resolution: "superjson@npm:1.13.3"
-  dependencies:
-    copy-anything: "npm:^3.0.2"
-  checksum: 10c0/389a0a0c86884dd0558361af5d6d7f37102b71dda9595a665fe8b39d1ba0e57c859e39a9bd79b6f1fde6f4dcceac49a1c205f248d292744b2a340ee52846efdb
-  languageName: node
-  linkType: hard
-
 "supports-color@npm:^5.3.0":
   version: 5.5.0
   resolution: "supports-color@npm:5.5.0"
@@ -13151,6 +13097,17 @@ __metadata:
   version: 2.2.0
   resolution: "trough@npm:2.2.0"
   checksum: 10c0/58b671fc970e7867a48514168894396dd94e6d9d6456aca427cc299c004fe67f35ed7172a36449086b2edde10e78a71a284ec0076809add6834fb8f857ccb9b0
+  languageName: node
+  linkType: hard
+
+"trpc-electron@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "trpc-electron@npm:0.1.2"
+  peerDependencies:
+    "@trpc/client": ">=11.0.0"
+    "@trpc/server": ">=11.0.0"
+    electron: ">19.0.0"
+  checksum: 10c0/e7196dbf0d5bd4bf43ab9649bf45a1e2ce44fd34a528c2c2794ce866e9ce7bcbcc6561ca9423cc5532712f064c064fbc124a1f893e84dd2e0a4c22e207892209
   languageName: node
   linkType: hard
 
@@ -13578,15 +13535,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"use-sync-external-store@npm:^1.2.0":
-  version: 1.6.0
-  resolution: "use-sync-external-store@npm:1.6.0"
-  peerDependencies:
-    react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-  checksum: 10c0/35e1179f872a53227bdf8a827f7911da4c37c0f4091c29b76b1e32473d1670ebe7bcd880b808b7549ba9a5605c233350f800ffab963ee4a4ee346ee983b6019b
-  languageName: node
-  linkType: hard
-
 "utf8-byte-length@npm:^1.0.1":
   version: 1.0.5
   resolution: "utf8-byte-length@npm:1.0.5"
@@ -13876,15 +13824,15 @@ __metadata:
     "@sentry/vite-plugin": "npm:^4.6.1"
     "@sequelize/core": "npm:7.0.0-alpha.47"
     "@sequelize/sqlite3": "npm:7.0.0-alpha.47"
-    "@tanstack/react-query": "npm:4.40.1"
-    "@tanstack/react-query-devtools": "npm:^4.36.1"
+    "@tanstack/react-query": "npm:^5"
+    "@tanstack/react-query-devtools": "npm:^5"
     "@tanstack/react-virtual": "npm:~3.13.13"
     "@testing-library/dom": "npm:~10.4.1"
     "@testing-library/react": "npm:~16.3.1"
     "@tktco/node-actionlint": "npm:~1.6.0"
-    "@trpc/client": "npm:10.45.2"
-    "@trpc/react-query": "npm:10.45.2"
-    "@trpc/server": "npm:10.45.2"
+    "@trpc/client": "npm:^11"
+    "@trpc/react-query": "npm:^11"
+    "@trpc/server": "npm:^11"
     "@types/electron-is-dev": "npm:1.1.3"
     "@types/license-checker": "npm:25.0.6"
     "@types/node": "npm:~22.17.0"
@@ -13907,7 +13855,6 @@ __metadata:
     electron-is-dev: "npm:2.0.0"
     electron-log: "npm:5.4.3"
     electron-store: "npm:8.2.0"
-    electron-trpc: "npm:0.7.1"
     electron-unhandled: "npm:4.0.1"
     electron-updater: "npm:6.6.2"
     exiftool-vendored: "npm:^34.1.0"
@@ -13942,6 +13889,7 @@ __metadata:
     tailwindcss: "npm:3.4.17"
     tailwindcss-animate: "npm:1.0.7"
     tmp-promise: "npm:~3.0.3"
+    trpc-electron: "npm:^0.1.2"
     ts-pattern: "npm:5.9.0"
     ts-prune: "npm:0.10.3"
     tsx: "npm:^4.21.0"
