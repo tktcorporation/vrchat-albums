@@ -154,8 +154,8 @@ describe('extractPlayerJoinInfoFromLog', () => {
     expect(result.isOk()).toBe(true);
     if (result.isOk()) {
       expect(result.value.logType).toBe('playerJoin');
-      expect(result.value.playerName.value).toBe('プレイヤーA');
-      expect(result.value.playerId?.value).toBe(
+      expect(result.value.playerName).toBe('プレイヤーA');
+      expect(result.value.playerId).toBe(
         'usr_8862b082-dbc8-4b6d-8803-e834f833b498',
       );
       expect(result.value.joinDate).toBeInstanceOf(Date);
@@ -170,7 +170,7 @@ describe('extractPlayerJoinInfoFromLog', () => {
     expect(result.isOk()).toBe(true);
     if (result.isOk()) {
       expect(result.value.logType).toBe('playerJoin');
-      expect(result.value.playerName.value).toBe('プレイヤーB');
+      expect(result.value.playerName).toBe('プレイヤーB');
       expect(result.value.playerId).toBe(null);
       expect(result.value.joinDate).toBeInstanceOf(Date);
     }
