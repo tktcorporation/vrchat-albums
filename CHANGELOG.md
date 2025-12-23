@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Upgrade Tailwind CSS from v3 to v4 (#640)
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 0.21.0
+
+## [0.20.0] - 2025-12-22
+
+### 🚀 Features
+
 - Claude Code v2のベストプラクティスとlinterシステムの実装 (#617)
 - 利用規約をMarkdown形式に変換しスタイル・内容を改善 (#619)
 - Upgrade Electron to v39 for Node.js 22 compatibility (#632)
@@ -20,7 +30,6 @@ All notable changes to this project will be documented in this file.
 - Yarn workspaceの依存関係とLanding Pageデプロイワークフローを修正 (#614)
 - Grit CLIをdevDependenciesに追加してCIのlintエラーを修正 (#621)
 - TsxをdevDependenciesに追加してnpx依存を解消 (#622)
-- Prevent grit stdlib fetch by adding .gritmodules directory
 
 ### ⚙️ Miscellaneous Tasks
 
