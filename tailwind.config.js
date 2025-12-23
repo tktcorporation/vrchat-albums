@@ -1,5 +1,3 @@
-const { fontFamily } = require('tailwindcss/defaultTheme');
-
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
@@ -73,7 +71,13 @@ module.exports = {
           '"BIZ UDPGothic"',
           '"meiryo"',
           '"sans-serif"',
-          ...fontFamily.sans,
+          'ui-sans-serif',
+          'system-ui',
+          'sans-serif',
+          '"Apple Color Emoji"',
+          '"Segoe UI Emoji"',
+          '"Segoe UI Symbol"',
+          '"Noto Color Emoji"',
         ],
       },
       keyframes: {
@@ -135,5 +139,5 @@ module.exports = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [],
 };
