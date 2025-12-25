@@ -457,6 +457,22 @@ export async function loadLogInfoIndexFromVRChatLog({
         batchEndTime - batchStartTime
       } ms`,
     );
+
+    // メモリ使用量をモニタリング（10バッチごと）
+    if ((i / BATCH_SIZE + 1) % 10 === 0) {
+      const memUsage = process.memoryUsage();
+      const heapUsedMB = memUsage.heapUsed / 1024 / 1024;
+      logger.debug(
+        `Memory usage after batch ${i / BATCH_SIZE + 1}: Heap=${heapUsedMB.toFixed(2)}MB`,
+      );
+
+      // メモリ使用量が500MBを超えた場合は警告
+      if (heapUsedMB > 500) {
+        logger.warn(
+          `High memory usage detected during log processing: ${heapUsedMB.toFixed(2)}MB`,
+        );
+      }
+    }
   }
   const batchProcessEndTime = performance.now();
   logger.debug(
@@ -583,23 +599,35 @@ export const getFrequentPlayerNames = async (
  * 効率的なサーバーサイド検索により、該当するセッションのみを返します。
  * これにより、フロントエンドは全データをフェッチする必要がなくなります。
  *
+ * メモリ使用量を抑えるため、以下の最適化を行っています:
+ * - プレイヤー検索結果に LIMIT を設定
+ * - バッチ処理でワールドセッションを取得
+ * - 重複排除を効率的に行う
+ *
  * @param playerName 検索するプレイヤー名（部分一致）
+ * @param options.limit 検索するプレイヤー参加ログの最大件数（デフォルト: 1000）
+ * @param options.maxSessions 返すセッションの最大件数（デフォルト: 100）
  * @returns 該当するセッションの参加日時の配列
  */
 export const searchSessionsByPlayerName = async (
   playerName: string,
+  options: { limit?: number; maxSessions?: number } = {},
 ): Promise<neverthrow.Result<Date[], never>> => {
   const startTime = performance.now();
+  const { limit = 1000, maxSessions = 100 } = options;
 
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   // プレイヤー名で部分一致検索（大文字小文字を区別しない）
+  // LIMITを設定してメモリ使用量を抑える
   const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
+    attributes: ['joinDateTime'], // 必要なカラムのみ取得
     where: {
       playerName: {
         [Op.like]: `%${playerName}%`,
       },
     },
     order: [['joinDateTime', 'DESC']],
+    limit,
   });
 
   if (playerJoinLogs.length === 0) {
@@ -610,27 +638,48 @@ export const searchSessionsByPlayerName = async (
   }
 
   // 各プレイヤー参加ログに対して、対応するワールド参加ログを探す
+  // バッチ処理でメモリ効率を向上
   const sessionJoinDates: Date[] = [];
   const processedWorldJoins = new Set<string>();
+  const BATCH_SIZE = 50;
 
-  for (const playerLog of playerJoinLogs) {
-    // このプレイヤーが参加した時点での最新のワールド参加ログを取得
-    const worldJoinLog = await VRChatWorldJoinLogModel.findOne({
-      where: {
-        joinDateTime: {
-          [Op.lte]: playerLog.joinDateTime,
+  for (let i = 0; i < playerJoinLogs.length; i += BATCH_SIZE) {
+    // 十分なセッションが見つかったら早期終了
+    if (sessionJoinDates.length >= maxSessions) {
+      break;
+    }
+
+    const batch = playerJoinLogs.slice(i, i + BATCH_SIZE);
+
+    // バッチ内のプレイヤー参加日時を並列で処理
+    const worldJoinPromises = batch.map(async (playerLog) => {
+      // このプレイヤーが参加した時点での最新のワールド参加ログを取得
+      return VRChatWorldJoinLogModel.findOne({
+        attributes: ['joinDateTime'], // 必要なカラムのみ取得
+        where: {
+          joinDateTime: {
+            [Op.lte]: playerLog.joinDateTime,
+          },
         },
-      },
-      order: [['joinDateTime', 'DESC']],
+        order: [['joinDateTime', 'DESC']],
+      });
     });
 
-    if (worldJoinLog) {
-      const worldJoinKey = worldJoinLog.joinDateTime.toISOString();
+    const worldJoinLogs = await Promise.all(worldJoinPromises);
 
-      // 同じワールドセッションを重複して追加しないようにする
-      if (!processedWorldJoins.has(worldJoinKey)) {
-        processedWorldJoins.add(worldJoinKey);
-        sessionJoinDates.push(worldJoinLog.joinDateTime);
+    for (const worldJoinLog of worldJoinLogs) {
+      if (sessionJoinDates.length >= maxSessions) {
+        break;
+      }
+
+      if (worldJoinLog) {
+        const worldJoinKey = worldJoinLog.joinDateTime.toISOString();
+
+        // 同じワールドセッションを重複して追加しないようにする
+        if (!processedWorldJoins.has(worldJoinKey)) {
+          processedWorldJoins.add(worldJoinKey);
+          sessionJoinDates.push(worldJoinLog.joinDateTime);
+        }
       }
     }
   }
@@ -641,7 +690,7 @@ export const searchSessionsByPlayerName = async (
       sessionJoinDates.length
     } unique sessions for player "${playerName}" in ${(
       endTime - startTime
-    ).toFixed(2)}ms`,
+    ).toFixed(2)}ms (searched ${playerJoinLogs.length} player logs)`,
   );
 
   // 新しい順にソートして返す

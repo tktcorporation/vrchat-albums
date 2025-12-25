@@ -13,11 +13,14 @@ import { VRChatPhotoDirPathSchema } from './valueObjects';
 
 /**
  * index 済みの写真ファイルのpath一覧を取得する
+ * ページネーション対応でメモリ使用量を抑える
  */
 const getVRChatLogFilePathModelList = async (query?: {
   gtPhotoTakenAt?: Date;
   ltPhotoTakenAt?: Date;
   orderByPhotoTakenAt: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
 }): Promise<
   neverthrow.Result<
     {
@@ -109,6 +112,8 @@ export const vrchatPhotoRouter = () =>
             gtPhotoTakenAt: z.date().optional(),
             ltPhotoTakenAt: z.date().optional(),
             orderByPhotoTakenAt: z.enum(['asc', 'desc']),
+            limit: z.number().int().positive().max(5000).optional(),
+            offset: z.number().int().nonnegative().optional(),
           })
           .optional(),
       )
@@ -117,6 +122,21 @@ export const vrchatPhotoRouter = () =>
         return handleResultError(result, {
           default: (error) => photoOperationErrorMappings.default(error),
         });
+      }),
+    getVrchatPhotoPathCount: procedure
+      .input(
+        z
+          .object({
+            gtPhotoTakenAt: z.date().optional(),
+            ltPhotoTakenAt: z.date().optional(),
+          })
+          .optional(),
+      )
+      .query(async (ctx) => {
+        const count = await vrchatPhotoService.getVRChatPhotoPathCount(
+          ctx.input,
+        );
+        return count;
       }),
     getCountByYearMonthList: procedure.query(async () => {
       const result = await getCountByYearMonthList();

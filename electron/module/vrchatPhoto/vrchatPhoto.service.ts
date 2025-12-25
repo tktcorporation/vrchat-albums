@@ -1,4 +1,6 @@
+import * as crypto from 'node:crypto';
 import * as fsPromises from 'node:fs/promises';
+import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
 import * as dateFns from 'date-fns';
 import { app } from 'electron';
@@ -15,6 +17,155 @@ import {
   type VRChatPhotoDirPath,
   VRChatPhotoDirPathSchema,
 } from './valueObjects';
+
+// サムネイルキャッシュの設定
+const THUMBNAIL_CACHE_DIR_NAME = 'vrchat-albums-thumbnails';
+const MAX_CACHE_SIZE_MB = 500; // キャッシュの最大サイズ
+const CACHE_CLEANUP_THRESHOLD = 0.9; // キャッシュサイズがこの割合を超えたらクリーンアップ
+
+/**
+ * サムネイルキャッシュディレクトリのパスを取得
+ */
+const getThumbnailCacheDir = (): string => {
+  try {
+    return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
+  } catch {
+    // テスト環境などでappが使えない場合
+    return path.join(os.tmpdir(), THUMBNAIL_CACHE_DIR_NAME);
+  }
+};
+
+/**
+ * キャッシュキーを生成（ファイルパスとサイズからハッシュを生成）
+ */
+const generateCacheKey = (photoPath: string, width?: number): string => {
+  const normalizedPath = path.normalize(photoPath);
+  const key = `${normalizedPath}:${width ?? 'original'}`;
+  return crypto.createHash('md5').update(key).digest('hex');
+};
+
+/**
+ * キャッシュディレクトリを初期化
+ */
+const ensureCacheDir = async (): Promise<string> => {
+  const cacheDir = getThumbnailCacheDir();
+  try {
+    await fsPromises.mkdir(cacheDir, { recursive: true });
+  } catch (error) {
+    // ディレクトリが既に存在する場合は無視
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+      logger.error({
+        message: `Failed to create cache directory: ${cacheDir}`,
+        stack: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
+  }
+  return cacheDir;
+};
+
+/**
+ * キャッシュからサムネイルを取得
+ */
+const getCachedThumbnail = async (cacheKey: string): Promise<Buffer | null> => {
+  const cacheDir = await ensureCacheDir();
+  const cachePath = path.join(cacheDir, `${cacheKey}.webp`);
+
+  try {
+    const stats = await fsPromises.stat(cachePath);
+    // キャッシュが7日以上古い場合は無効
+    const cacheAgeMs = Date.now() - stats.mtimeMs;
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    if (cacheAgeMs > sevenDaysMs) {
+      return null;
+    }
+    return await fsPromises.readFile(cachePath);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * サムネイルをキャッシュに保存
+ */
+const saveThumbnailToCache = async (
+  cacheKey: string,
+  buffer: Buffer,
+): Promise<void> => {
+  const cacheDir = await ensureCacheDir();
+  const cachePath = path.join(cacheDir, `${cacheKey}.webp`);
+
+  try {
+    await fsPromises.writeFile(cachePath, buffer);
+  } catch (error) {
+    logger.error({
+      message: `Failed to save thumbnail to cache: ${cachePath}`,
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+  }
+};
+
+/**
+ * 古いキャッシュをクリーンアップ（必要に応じて呼び出される）
+ */
+export const cleanupThumbnailCache = async (): Promise<void> => {
+  const cacheDir = await ensureCacheDir();
+
+  try {
+    const files = await fsPromises.readdir(cacheDir);
+    const fileStats = await Promise.all(
+      files.map(async (file) => {
+        const filePath = path.join(cacheDir, file);
+        try {
+          const stats = await fsPromises.stat(filePath);
+          return { filePath, stats, size: stats.size, mtime: stats.mtimeMs };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    const validFiles = fileStats.filter(
+      (f): f is NonNullable<typeof f> => f !== null,
+    );
+    const totalSizeMB =
+      validFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
+
+    // キャッシュサイズがしきい値を超えている場合のみクリーンアップ
+    if (totalSizeMB < MAX_CACHE_SIZE_MB * CACHE_CLEANUP_THRESHOLD) {
+      return;
+    }
+
+    logger.info(
+      `Cleaning up thumbnail cache. Current size: ${totalSizeMB.toFixed(2)}MB`,
+    );
+
+    // 古いファイルから削除
+    const sortedFiles = validFiles.sort((a, b) => a.mtime - b.mtime);
+    let currentSize = totalSizeMB;
+    const targetSize = MAX_CACHE_SIZE_MB * 0.5; // 50%まで削減
+
+    for (const file of sortedFiles) {
+      if (currentSize <= targetSize) {
+        break;
+      }
+      try {
+        await fsPromises.unlink(file.filePath);
+        currentSize -= file.size / 1024 / 1024;
+      } catch {
+        // 削除失敗は無視
+      }
+    }
+
+    logger.info(
+      `Thumbnail cache cleanup completed. New size: ${currentSize.toFixed(2)}MB`,
+    );
+  } catch (error) {
+    logger.error({
+      message: 'Failed to cleanup thumbnail cache',
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+  }
+};
 
 /**
  * VRChat の写真が保存されている場所のデフォルト値を取得する
@@ -70,11 +221,24 @@ export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
 };
 
 // バッチサイズ定数
-const PHOTO_PATH_BATCH_SIZE = 1000; // パスの取得用（stat情報のチェック）
 const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（sharp処理は重いため小さく）
+const MAX_MEMORY_USAGE_MB = 500; // メモリ使用量の上限
+
+/**
+ * メモリ使用量をチェックする
+ */
+const checkMemoryUsage = (): { heapUsedMB: number; isHighUsage: boolean } => {
+  const memUsage = process.memoryUsage();
+  const heapUsedMB = memUsage.heapUsed / 1024 / 1024;
+  return {
+    heapUsedMB,
+    isHighUsage: heapUsedMB > MAX_MEMORY_USAGE_MB,
+  };
+};
 
 /**
  * 写真パスをバッチごとに取得するジェネレータ関数
+ * glob.stream() を使用してメモリ効率を改善
  */
 async function* getPhotoPathBatches(
   dirPath: VRChatPhotoDirPath,
@@ -87,49 +251,60 @@ async function* getPhotoPathBatches(
 
   // Convert to POSIX format for glob pattern matching
   const normalizedTargetDir = path.normalize(targetDir).replace(/\\/g, '/');
-  const allPhotoPathList = await glob(`${normalizedTargetDir}/**/VRChat_*.png`);
 
-  let targetPhotoPathList: string[];
-  if (lastProcessedDate) {
-    // バッチ処理でstat情報を取得
-    const filteredPaths: string[] = [];
-    for (let i = 0; i < allPhotoPathList.length; i += PHOTO_PATH_BATCH_SIZE) {
-      const batch = allPhotoPathList.slice(i, i + PHOTO_PATH_BATCH_SIZE);
-      const statsPromises = batch.map(async (photoPath) => {
-        try {
-          const stats = await fsPromises.stat(photoPath);
-          return { photoPath, stats };
-        } catch (error) {
-          logger.error({
-            message: `Failed to get stats for ${photoPath}`,
-            stack: error instanceof Error ? error : new Error(String(error)),
-          });
-          return null;
+  // glob.stream() を使用してストリーミング処理（メモリ効率向上）
+  const globStream = glob.stream(`${normalizedTargetDir}/**/VRChat_*.png`);
+
+  let batch: string[] = [];
+  let processedCount = 0;
+
+  for await (const photoPath of globStream) {
+    const photoPathStr =
+      typeof photoPath === 'string' ? photoPath : String(photoPath);
+
+    // 日付フィルタリングが必要な場合
+    if (lastProcessedDate) {
+      try {
+        const stats = await fsPromises.stat(photoPathStr);
+        if (stats.mtime <= lastProcessedDate) {
+          continue; // 古いファイルはスキップ
         }
-      });
-
-      const statsResults = (await Promise.all(statsPromises)).filter(
-        (result): result is NonNullable<typeof result> => result !== null,
-      );
-
-      filteredPaths.push(
-        ...statsResults
-          .filter((r) => r.stats.mtime > lastProcessedDate)
-          .map((r) => r.photoPath),
-      );
+      } catch (error) {
+        logger.error({
+          message: `Failed to get stats for ${photoPathStr}`,
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
+        continue;
+      }
     }
-    targetPhotoPathList = filteredPaths;
-  } else {
-    targetPhotoPathList = allPhotoPathList;
+
+    batch.push(photoPathStr);
+    processedCount++;
+
+    // バッチサイズに達したらyield
+    if (batch.length >= PHOTO_METADATA_BATCH_SIZE) {
+      yield batch;
+      batch = [];
+
+      // メモリ使用量をチェック
+      if (processedCount % 1000 === 0) {
+        const { heapUsedMB, isHighUsage } = checkMemoryUsage();
+        if (isHighUsage) {
+          logger.warn(
+            `High memory usage detected: ${heapUsedMB.toFixed(2)}MB. Consider processing in smaller batches.`,
+          );
+          // GCを促すためのヒント
+          if (global.gc) {
+            global.gc();
+          }
+        }
+      }
+    }
   }
 
-  // メタデータ処理用の小さいバッチサイズでyield
-  for (
-    let i = 0;
-    i < targetPhotoPathList.length;
-    i += PHOTO_METADATA_BATCH_SIZE
-  ) {
-    yield targetPhotoPathList.slice(i, i + PHOTO_METADATA_BATCH_SIZE);
+  // 残りのバッチをyield
+  if (batch.length > 0) {
+    yield batch;
   }
 }
 
@@ -305,13 +480,26 @@ export const createVRChatPhotoPathIndex = async (
 /**
  * 写真パスモデルを条件付きで取得する
  * コントローラー経由で一覧表示に利用される
+ * ページネーション対応でメモリ使用量を抑える
  */
 export const getVRChatPhotoPathList = async (query?: {
   gtPhotoTakenAt?: Date;
   ltPhotoTakenAt?: Date;
   orderByPhotoTakenAt: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
 }) => {
   return model.getVRChatPhotoPathList(query);
+};
+
+/**
+ * 写真の総件数を取得する（ページネーション用）
+ */
+export const getVRChatPhotoPathCount = async (query?: {
+  gtPhotoTakenAt?: Date;
+  ltPhotoTakenAt?: Date;
+}) => {
+  return model.getVRChatPhotoPathCount(query);
 };
 
 /**
@@ -345,6 +533,10 @@ export const validateVRChatPhotoPathModel = async ({
 /**
  * 画像ファイルを読み込み Base64 文字列で返す
  * テストやプレビュー生成で利用される
+ *
+ * メモリ効率のため、サムネイルはディスクキャッシュを使用:
+ * - width指定時: WebP形式でキャッシュし、再利用
+ * - 元サイズ時: キャッシュなし（大きすぎるため）
  */
 export const getVRChatPhotoItemData = async ({
   photoPath,
@@ -355,9 +547,36 @@ export const getVRChatPhotoItemData = async ({
   width?: number;
 }): Promise<neverthrow.Result<string, 'InputFileIsMissing'>> => {
   try {
-    const photoBuf = await sharp(photoPath)
-      .resize(width ?? undefined)
-      .toBuffer();
+    // サムネイル（width指定あり）の場合はキャッシュを使用
+    if (width !== undefined) {
+      const cacheKey = generateCacheKey(photoPath, width);
+
+      // キャッシュから取得を試みる
+      const cachedBuffer = await getCachedThumbnail(cacheKey);
+      if (cachedBuffer) {
+        return neverthrow.ok(
+          `data:image/webp;base64,${cachedBuffer.toString('base64')}`,
+        );
+      }
+
+      // キャッシュにない場合は生成してキャッシュに保存
+      const photoBuf = await sharp(photoPath)
+        .resize(width)
+        .webp({ quality: 80 }) // WebPに変換（ファイルサイズ削減）
+        .toBuffer();
+
+      // 非同期でキャッシュに保存（レスポンスを遅らせない）
+      saveThumbnailToCache(cacheKey, photoBuf).catch(() => {
+        // キャッシュ保存失敗は無視
+      });
+
+      return neverthrow.ok(
+        `data:image/webp;base64,${photoBuf.toString('base64')}`,
+      );
+    }
+
+    // 元サイズの場合はキャッシュなし
+    const photoBuf = await sharp(photoPath).toBuffer();
     return neverthrow.ok(
       `data:image/${path
         .extname(photoPath)

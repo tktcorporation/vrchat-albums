@@ -96,12 +96,19 @@ export const createOrUpdateListVRChatPhotoPath = async (
 
 /**
  * VRChatの写真の保存pathを取得する
+ * ページネーション対応でメモリ使用量を抑える
+ *
+ * @param query.limit 取得する最大件数（デフォルト: 1000）
+ * @param query.offset スキップする件数（デフォルト: 0）
  */
 export const getVRChatPhotoPathList = async (query?: {
   gtPhotoTakenAt?: Date;
   ltPhotoTakenAt?: Date;
   orderByPhotoTakenAt: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
 }): Promise<VRChatPhotoPathModel[]> => {
+  const DEFAULT_LIMIT = 1000;
   const photoPathList = await VRChatPhotoPathModel.findAll({
     where: {
       photoTakenAt: {
@@ -110,9 +117,28 @@ export const getVRChatPhotoPathList = async (query?: {
       },
     },
     order: [['photoTakenAt', query?.orderByPhotoTakenAt ?? 'asc']],
+    limit: query?.limit ?? DEFAULT_LIMIT,
+    ...(query?.offset !== undefined && { offset: query.offset }),
   });
 
   return photoPathList;
+};
+
+/**
+ * 写真の総件数を取得する（ページネーション用）
+ */
+export const getVRChatPhotoPathCount = async (query?: {
+  gtPhotoTakenAt?: Date;
+  ltPhotoTakenAt?: Date;
+}): Promise<number> => {
+  return VRChatPhotoPathModel.count({
+    where: {
+      photoTakenAt: {
+        ...(query?.gtPhotoTakenAt && { [Op.gt]: query.gtPhotoTakenAt }),
+        ...(query?.ltPhotoTakenAt && { [Op.lt]: query.ltPhotoTakenAt }),
+      },
+    },
+  });
 };
 
 /**

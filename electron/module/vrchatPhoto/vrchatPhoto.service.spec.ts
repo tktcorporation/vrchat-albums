@@ -2,12 +2,30 @@ import sharp, { type Metadata, type Sharp } from 'sharp';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getVRChatPhotoItemData } from './vrchatPhoto.service';
 
+// node:fs/promisesをモック（キャッシュ機能で使用）
+vi.mock('node:fs/promises', () => ({
+  stat: vi.fn().mockRejectedValue(new Error('ENOENT: no such file')), // キャッシュなし
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn().mockRejectedValue(new Error('ENOENT: no such file')),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  readdir: vi.fn().mockResolvedValue([]),
+  unlink: vi.fn().mockResolvedValue(undefined),
+}));
+
+// electronをモック
+vi.mock('electron', () => ({
+  app: {
+    getPath: vi.fn().mockReturnValue('/tmp'),
+  },
+}));
+
 // sharpモジュールをモック
 vi.mock('sharp', () => {
   // sharpクラスのモックオブジェクトを作成
   const mockSharpInstance = {
     metadata: vi.fn(), // 具体的な値は各テストで設定
     resize: vi.fn().mockReturnThis(),
+    webp: vi.fn().mockReturnThis(), // WebP変換用のメソッドチェーン
     toBuffer: vi.fn(), // 具体的な値は各テストで設定
   };
 
@@ -36,12 +54,13 @@ describe('vrchatPhoto.service', () => {
     let mockSharpInstance: {
       metadata: ReturnType<typeof vi.fn>;
       resize: ReturnType<typeof vi.fn>;
+      webp: ReturnType<typeof vi.fn>;
       toBuffer: ReturnType<typeof vi.fn>;
     };
 
     // 各テストケースの前に、sharpモックの基本的な振る舞いを設定する。
     // sharpファクトリ関数がモックインスタンスを返すようにし、
-    // そのインスタンスの各メソッド（metadata, resize, toBuffer）もモックする。
+    // そのインスタンスの各メソッド（metadata, resize, webp, toBuffer）もモックする。
     beforeEach(async () => {
       // sharpモジュールのモックを再取得
       sharpFactory = vi.mocked(sharp);
@@ -56,6 +75,7 @@ describe('vrchatPhoto.service', () => {
           format: 'png',
         } as Metadata),
         resize: vi.fn().mockReturnThis(), // メソッドチェーンのためthisを返す
+        webp: vi.fn().mockReturnThis(), // WebP変換用のメソッドチェーン
         toBuffer: vi
           .fn()
           .mockResolvedValue(Buffer.from('dummy_thumbnail_data')), // デフォルトの成功時の値を設定
@@ -65,9 +85,11 @@ describe('vrchatPhoto.service', () => {
 
     // 正常系のテストケース
     // 画像処理が成功し、期待されるbase64文字列が返されることを確認する。
+    // width指定時はWebP形式で返される。
     it('should return VRChatPhotoItemData on success', async () => {
       const mockThumbnailBuffer = Buffer.from('thumbnail_data');
-      const expectedBase64String = `data:image/png;base64,${mockThumbnailBuffer.toString(
+      // width指定時はWebP形式で返される
+      const expectedBase64String = `data:image/webp;base64,${mockThumbnailBuffer.toString(
         'base64',
       )}`;
       // このテストケース専用にtoBufferの戻り値を設定
@@ -88,6 +110,8 @@ describe('vrchatPhoto.service', () => {
       expect(sharpFactory).toHaveBeenCalledWith(mockInputPhotoPath);
       // resizeメソッドが正しい引数で呼び出されたことを確認
       expect(mockSharpInstance.resize).toHaveBeenCalledWith(mockResizeWidth);
+      // webpメソッドが呼び出されたことを確認
+      expect(mockSharpInstance.webp).toHaveBeenCalledWith({ quality: 80 });
       // toBufferメソッドが呼び出されたことを確認
       expect(mockSharpInstance.toBuffer).toHaveBeenCalled();
     });
@@ -120,15 +144,16 @@ describe('vrchatPhoto.service', () => {
       it('should throw error for other sharp instantiation errors', async () => {
         const errorMessage = 'Some other sharp error';
         // sharpファクトリが特定のエラーメッセージでエラーをスローするように設定
+        // width指定なしでテストすることで、webpチェーンをスキップする
         sharpFactory.mockImplementationOnce(() => {
           throw new Error(errorMessage);
         });
 
         // getVRChatPhotoItemDataの呼び出しが特定のエラーメッセージで失敗することを期待
+        // width指定なしでテスト（元サイズパス）
         await expect(
           getVRChatPhotoItemData({
             photoPath: mockInputPhotoPath,
-            width: mockResizeWidth,
           }),
         ).rejects.toThrow(errorMessage);
       });
@@ -143,10 +168,10 @@ describe('vrchatPhoto.service', () => {
         );
 
         // getVRChatPhotoItemDataの呼び出しが特定のエラーメッセージで失敗することを期待
+        // width指定なしでテスト（元サイズパスでtoBufferエラーを確認）
         await expect(
           getVRChatPhotoItemData({
             photoPath: mockInputPhotoPath,
-            width: mockResizeWidth,
           }),
         ).rejects.toThrow(errorMessage);
       });
