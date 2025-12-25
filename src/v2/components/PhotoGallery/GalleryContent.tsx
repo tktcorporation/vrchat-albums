@@ -14,7 +14,6 @@ import type { PhotoGalleryData } from '../PhotoGallery';
 import PhotoGrid from '../PhotoGrid';
 import { DateJumpSidebar } from './DateJumpSidebar';
 import { GalleryErrorBoundary } from './GalleryErrorBoundary';
-import { MeasurePhotoGroup } from './MeasurePhotoGroup';
 import type { GroupedPhoto } from './useGroupPhotos';
 import { usePhotoGallery } from './usePhotoGallery';
 
@@ -54,33 +53,25 @@ const SkeletonGroup = () => (
  *
  * ## アーキテクチャ設計：動的レイアウトとバーチャルスクロールの協調
  *
- * このコンポーネントは以下の3つのシステムが密接に連携して動作します：
+ * このコンポーネントは以下の2つのシステムが密接に連携して動作します：
  *
  * 1. **PhotoGrid の動的幅計算**
  *    - コンテナ幅に基づいて各写真のサイズを動的に計算
  *    - ResizeObserver で幅の変化を検知し、レイアウトを再計算
  *    - 各行の写真を親要素の幅にジャストフィットさせる
  *
- * 2. **MeasurePhotoGroup の予測的高さ計算**
- *    - PhotoGrid と同じアルゴリズムで高さを事前計算
- *    - バーチャルスクロールの初期推定値として使用
- *    - 実際のレンダリング前に大まかな高さを提供
+ * 2. **Virtualizer の高さ管理**
+ *    - estimateSize で事前計算による高さ推定（estimateGroupHeight）
+ *    - measureElement で実際のDOM要素の高さを測定・キャッシュ
+ *    - キャッシュがある場合は実測値、なければ計算値を使用
  *
- * 3. **Virtualizer の実測ベース高さ管理**
- *    - measureElement で実際のDOM要素の高さを測定
- *    - groupSizesRef に各グループの実測値を保存
- *    - estimateSize で保存された実測値または予測値を返す
+ * ## レイアウトシフト対策
  *
- * ## 重要な同期ポイント
+ * - **事前計算**: JustifiedLayoutCalculator で高さを事前推定
+ * - **overscan**: 画面外のグループを多く保持してスクロールを安定化
  *
- * - **幅変更時**: PhotoGrid がレイアウトを再計算 → 高さが変化 → Virtualizer が再測定
- * - **初回レンダリング**: MeasurePhotoGroup の予測値 → 実際のレンダリング → 実測値で更新
- * - **スクロール時**: 保存された実測値を使用してスムーズなスクロールを実現
- *
- * @warning これらのシステムが正しく協調しないと、以下の問題が発生します：
- * - セクション間の重なり（高さ計算の不整合）
- * - ガタつくスクロール（推定値と実測値の大きな差）
- * - レイアウトシフト（幅変更時の高さ更新遅延）
+ * @see estimateGroupHeight - 高さ推定ロジック
+ * @see JustifiedLayoutCalculator - レイアウト計算
  */
 const GalleryContent = memo(
   ({
@@ -277,6 +268,7 @@ const GalleryContent = memo(
           >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const [key, group] = filteredGroups[virtualRow.index];
+
               return (
                 <div
                   key={key}
@@ -317,13 +309,6 @@ const GalleryContent = memo(
                       </div>
                     )}
                   </div>
-                  <MeasurePhotoGroup
-                    photos={group.photos}
-                    onMeasure={(height) => {
-                      groupSizesRef.current.set(key, height);
-                      virtualizer.measure();
-                    }}
-                  />
                 </div>
               );
             })}
