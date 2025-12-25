@@ -3,6 +3,11 @@ import { LoaderCircle } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UseLoadingStateResult } from '../../hooks/useLoadingState';
+import {
+  estimateGroupHeight,
+  GROUP_HEIGHT_CONSTANTS,
+} from '../../utils/estimateGroupHeight';
+import { JustifiedLayoutCalculator } from '../../utils/justifiedLayoutCalculator';
 import { AppHeader } from '../AppHeader';
 import { LocationGroupHeader } from '../LocationGroupHeader';
 import type { PhotoGalleryData } from '../PhotoGallery';
@@ -28,8 +33,6 @@ interface GalleryContentProps
   /** ギャラリーデータ（統合AppHeaderに渡す） */
   galleryData?: PhotoGalleryData;
 }
-
-const GROUP_SPACING = 32;
 
 const SkeletonGroup = () => (
   <div className="space-y-2 animate-pulse">
@@ -116,25 +119,39 @@ const GalleryContent = memo(
 
     const isLoading = isLoadingGrouping || isLoadingStartupSync;
 
+    // レイアウト計算機（再利用のためメモ化）
+    const layoutCalculator = useMemo(() => new JustifiedLayoutCalculator(), []);
+
     // 仮想スクローラーの設定
     const virtualizer = useVirtualizer({
       count: filteredGroups.length,
       getScrollElement: () => containerRef.current,
       estimateSize: useCallback(
         (index) => {
-          const [key] = filteredGroups[index];
-          return (groupSizesRef.current.get(key) ?? 0) + GROUP_SPACING;
+          const [key, group] = filteredGroups[index];
+          const containerWidth = containerRef.current?.clientWidth ?? 0;
+          const cachedHeight = groupSizesRef.current.get(key);
+
+          // estimateGroupHeight でキャッシュまたは計算による推定を行う
+          const estimate = estimateGroupHeight(
+            group.photos,
+            containerWidth,
+            cachedHeight,
+            layoutCalculator,
+          );
+          return estimate.height;
         },
-        [filteredGroups],
+        [filteredGroups, layoutCalculator],
       ),
-      overscan: 3, // 画面外のデータをより多く保持してスクロール時の再ロードを抑制
+      // 画面外のグループを多く保持してスクロール時のレイアウトシフトを軽減
+      overscan: 5,
       measureElement: useCallback((element: HTMLElement) => {
         const height = element.getBoundingClientRect().height;
         const key = element.getAttribute('data-key');
         if (key) {
           groupSizesRef.current.set(key, height);
         }
-        return height + GROUP_SPACING;
+        return height + GROUP_HEIGHT_CONSTANTS.GROUP_SPACING;
       }, []),
     });
 
