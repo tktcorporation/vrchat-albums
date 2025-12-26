@@ -209,3 +209,70 @@ export const getLatestVRChatPhoto = async () => {
     order: [['photoTakenAt', 'DESC']],
   });
 };
+
+/**
+ * 軽量メタデータのみ取得する（ハイブリッドローディング Phase 1）
+ * photoPath を含まないことでメモリ使用量を削減
+ *
+ * @see docs/photo-grouping-logic.md - 写真グループ化ロジック
+ */
+export const getVRChatPhotoMetadataList = async (query?: {
+  gtPhotoTakenAt?: Date;
+  ltPhotoTakenAt?: Date;
+  orderByPhotoTakenAt: 'asc' | 'desc';
+}): Promise<
+  {
+    id: string;
+    photoTakenAt: Date;
+    width: number;
+    height: number;
+  }[]
+> => {
+  const photoList = await VRChatPhotoPathModel.findAll({
+    attributes: ['id', 'photoTakenAt', 'width', 'height'], // photoPath を除外
+    where: {
+      photoTakenAt: {
+        ...(query?.gtPhotoTakenAt && { [Op.gt]: query.gtPhotoTakenAt }),
+        ...(query?.ltPhotoTakenAt && { [Op.lt]: query.ltPhotoTakenAt }),
+      },
+    },
+    order: [['photoTakenAt', query?.orderByPhotoTakenAt ?? 'asc']],
+    raw: true, // プレーンオブジェクトを返す（メモリ効率向上）
+  });
+
+  return photoList as {
+    id: string;
+    photoTakenAt: Date;
+    width: number;
+    height: number;
+  }[];
+};
+
+/**
+ * 指定されたIDの写真パスをバッチ取得（ハイブリッドローディング Phase 2）
+ * 表示に必要な範囲のみ取得することでメモリ使用量を削減
+ */
+export const getVRChatPhotoPathsByIds = async (
+  ids: string[],
+): Promise<Map<string, string>> => {
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const photos = await VRChatPhotoPathModel.findAll({
+    attributes: ['id', 'photoPath'],
+    where: {
+      id: {
+        [Op.in]: ids,
+      },
+    },
+    raw: true,
+  });
+
+  const pathMap = new Map<string, string>();
+  for (const photo of photos) {
+    pathMap.set(photo.id, photo.photoPath);
+  }
+
+  return pathMap;
+};

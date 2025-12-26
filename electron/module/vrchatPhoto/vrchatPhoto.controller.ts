@@ -179,4 +179,44 @@ export const vrchatPhotoRouter = () =>
           result,
         };
       }),
+    /**
+     * 軽量メタデータのみ取得（ハイブリッドローディング Phase 1）
+     * photoPath を含まないことでメモリ使用量を大幅に削減
+     */
+    getVrchatPhotoMetadataList: procedure
+      .input(
+        z
+          .object({
+            gtPhotoTakenAt: z.date().optional(),
+            ltPhotoTakenAt: z.date().optional(),
+            orderByPhotoTakenAt: z.enum(['asc', 'desc']),
+          })
+          .optional(),
+      )
+      .query(async (ctx) => {
+        const result = await vrchatPhotoService.getVRChatPhotoMetadataList(
+          ctx.input,
+        );
+        return result;
+      }),
+    /**
+     * 指定されたIDの写真パスをバッチ取得（ハイブリッドローディング Phase 2）
+     * 表示に必要な範囲のみ取得
+     */
+    getVrchatPhotoPathsByIds: procedure
+      .input(
+        z.object({
+          ids: z.array(z.string()).max(500), // バッチサイズ制限
+        }),
+      )
+      .query(async (ctx) => {
+        const pathMap = await vrchatPhotoService.getVRChatPhotoPathsByIds(
+          ctx.input.ids,
+        );
+        // Map を配列に変換（tRPC での転送用）
+        return Array.from(pathMap.entries()).map(([id, photoPath]) => ({
+          id,
+          photoPath,
+        }));
+      }),
   });
