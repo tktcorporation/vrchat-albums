@@ -17,8 +17,6 @@ interface PhotoMetadata {
 interface UseHybridPhotoLoadingOptions {
   /** 一度に取得するphotoPathの最大数 */
   batchSize?: number;
-  /** キャッシュをクリアするタイミング（ミリ秒） */
-  cacheExpiry?: number;
 }
 
 /**

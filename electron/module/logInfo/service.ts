@@ -601,7 +601,8 @@ export const getFrequentPlayerNames = async (
  *
  * メモリ使用量を抑えるため、以下の最適化を行っています:
  * - プレイヤー検索結果に LIMIT を設定
- * - バッチ処理でワールドセッションを取得
+ * - ワールドセッションを1回のクエリでバッチ取得（N+1問題を解決）
+ * - 二分探索でインメモリマッチング
  * - 重複排除を効率的に行う
  *
  * @param playerName 検索するプレイヤー名（部分一致）
@@ -637,49 +638,58 @@ export const searchSessionsByPlayerName = async (
     return neverthrow.ok([]);
   }
 
-  // 各プレイヤー参加ログに対して、対応するワールド参加ログを探す
-  // バッチ処理でメモリ効率を向上
+  // プレイヤー参加日時を取得
+  const playerJoinDates = playerJoinLogs.map((log) => log.joinDateTime);
+  const maxPlayerJoinDate = playerJoinDates[0]; // DESC順なので最初が最大
+
+  // N+1問題を解決: ワールド参加ログを1回のクエリでバッチ取得
+  // プレイヤー参加日時以前のワールド参加ログをすべて取得
+  const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
+    attributes: ['joinDateTime'],
+    where: {
+      joinDateTime: {
+        [Op.lte]: maxPlayerJoinDate,
+      },
+    },
+    order: [['joinDateTime', 'DESC']],
+    // 最大でプレイヤーログ数と同程度のワールドログがあると想定
+    limit: limit * 2,
+  });
+
+  if (worldJoinLogs.length === 0) {
+    logger.debug(
+      `searchSessionsByPlayerName: No world join logs found before ${maxPlayerJoinDate.toISOString()}`,
+    );
+    return neverthrow.ok([]);
+  }
+
+  // ワールド参加ログを時系列順にソート（二分探索用）
+  const sortedWorldJoinDates = worldJoinLogs
+    .map((log) => log.joinDateTime)
+    .sort((a, b) => a.getTime() - b.getTime());
+
+  // 各プレイヤー参加日時に対して、対応するワールド参加日時を探す（インメモリ）
   const sessionJoinDates: Date[] = [];
   const processedWorldJoins = new Set<string>();
-  const BATCH_SIZE = 50;
 
-  for (let i = 0; i < playerJoinLogs.length; i += BATCH_SIZE) {
-    // 十分なセッションが見つかったら早期終了
+  for (const playerJoinDate of playerJoinDates) {
     if (sessionJoinDates.length >= maxSessions) {
       break;
     }
 
-    const batch = playerJoinLogs.slice(i, i + BATCH_SIZE);
+    // 二分探索でプレイヤー参加日時以下の最大のワールド参加日時を見つける
+    const worldJoinDate = findLatestWorldJoinBefore(
+      sortedWorldJoinDates,
+      playerJoinDate,
+    );
 
-    // バッチ内のプレイヤー参加日時を並列で処理
-    const worldJoinPromises = batch.map(async (playerLog) => {
-      // このプレイヤーが参加した時点での最新のワールド参加ログを取得
-      return VRChatWorldJoinLogModel.findOne({
-        attributes: ['joinDateTime'], // 必要なカラムのみ取得
-        where: {
-          joinDateTime: {
-            [Op.lte]: playerLog.joinDateTime,
-          },
-        },
-        order: [['joinDateTime', 'DESC']],
-      });
-    });
+    if (worldJoinDate) {
+      const worldJoinKey = worldJoinDate.toISOString();
 
-    const worldJoinLogs = await Promise.all(worldJoinPromises);
-
-    for (const worldJoinLog of worldJoinLogs) {
-      if (sessionJoinDates.length >= maxSessions) {
-        break;
-      }
-
-      if (worldJoinLog) {
-        const worldJoinKey = worldJoinLog.joinDateTime.toISOString();
-
-        // 同じワールドセッションを重複して追加しないようにする
-        if (!processedWorldJoins.has(worldJoinKey)) {
-          processedWorldJoins.add(worldJoinKey);
-          sessionJoinDates.push(worldJoinLog.joinDateTime);
-        }
+      // 同じワールドセッションを重複して追加しないようにする
+      if (!processedWorldJoins.has(worldJoinKey)) {
+        processedWorldJoins.add(worldJoinKey);
+        sessionJoinDates.push(worldJoinDate);
       }
     }
   }
@@ -690,11 +700,55 @@ export const searchSessionsByPlayerName = async (
       sessionJoinDates.length
     } unique sessions for player "${playerName}" in ${(
       endTime - startTime
-    ).toFixed(2)}ms (searched ${playerJoinLogs.length} player logs)`,
+    ).toFixed(
+      2,
+    )}ms (searched ${playerJoinLogs.length} player logs, ${worldJoinLogs.length} world logs)`,
   );
 
   // 新しい順にソートして返す
   return neverthrow.ok(
     sessionJoinDates.sort((a, b) => b.getTime() - a.getTime()),
   );
+};
+
+/**
+ * 二分探索でtargetDate以下の最大の日時を見つける
+ * @param sortedDates 昇順にソートされた日時配列
+ * @param targetDate 検索対象の日時
+ * @returns targetDate以下の最大の日時、見つからない場合はnull
+ */
+const findLatestWorldJoinBefore = (
+  sortedDates: Date[],
+  targetDate: Date,
+): Date | null => {
+  if (sortedDates.length === 0) {
+    return null;
+  }
+
+  const targetTime = targetDate.getTime();
+
+  // 最小値より小さい場合は見つからない
+  if (targetTime < sortedDates[0].getTime()) {
+    return null;
+  }
+
+  // 最大値以上の場合は最大値を返す
+  if (targetTime >= sortedDates[sortedDates.length - 1].getTime()) {
+    return sortedDates[sortedDates.length - 1];
+  }
+
+  // 二分探索
+  let left = 0;
+  let right = sortedDates.length - 1;
+
+  while (left < right) {
+    const mid = Math.ceil((left + right + 1) / 2);
+    if (sortedDates[mid].getTime() <= targetTime) {
+      left = mid;
+    } else {
+      right = mid - 1;
+    }
+  }
+
+  return sortedDates[left];
 };

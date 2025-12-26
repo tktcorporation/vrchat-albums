@@ -7,6 +7,7 @@ import { trpcReact } from '@/trpc';
 const CACHE_MAX_SIZE = 500; // 最大キャッシュ数
 const PREFETCH_BATCH_SIZE = 20; // プリフェッチのバッチサイズ
 const PREFETCH_AHEAD = 50; // 何枚先までプリフェッチするか
+const CACHE_CHECK_INTERVAL_MS = 100; // キャッシュ更新チェック間隔
 
 /**
  * LRU (Least Recently Used) キャッシュ
@@ -260,7 +261,7 @@ export function useThumbnail(photoPath: string, enabled = true) {
       if (cached && cached !== thumbnail) {
         setThumbnailState(cached);
       }
-    }, 100);
+    }, CACHE_CHECK_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [photoPath, enabled, getThumbnail, thumbnail]);

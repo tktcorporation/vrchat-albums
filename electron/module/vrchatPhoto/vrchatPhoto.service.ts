@@ -3,7 +3,6 @@ import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
 import * as dateFns from 'date-fns';
-import { app } from 'electron';
 import { glob } from 'glob';
 import * as neverthrow from 'neverthrow';
 import * as path from 'pathe';
@@ -22,17 +21,36 @@ import {
 const THUMBNAIL_CACHE_DIR_NAME = 'vrchat-albums-thumbnails';
 const MAX_CACHE_SIZE_MB = 500; // キャッシュの最大サイズ
 const CACHE_CLEANUP_THRESHOLD = 0.9; // キャッシュサイズがこの割合を超えたらクリーンアップ
+const CACHE_EXPIRY_DAYS = 7; // キャッシュの有効期限（日数）
+
+/**
+ * Electronのappモジュールを遅延取得する
+ * Playwrightテスト時のクラッシュを防ぐため、トップレベルインポートを避ける
+ */
+const getElectronApp = (): typeof import('electron').app | null => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { app } = require('electron') as typeof import('electron');
+    return app;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * サムネイルキャッシュディレクトリのパスを取得
  */
 const getThumbnailCacheDir = (): string => {
-  try {
-    return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
-  } catch {
-    // テスト環境などでappが使えない場合
-    return path.join(os.tmpdir(), THUMBNAIL_CACHE_DIR_NAME);
+  const app = getElectronApp();
+  if (app) {
+    try {
+      return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
+    } catch {
+      // アプリ未初期化時はフォールバック
+    }
   }
+  // テスト環境などでappが使えない場合
+  return path.join(os.tmpdir(), THUMBNAIL_CACHE_DIR_NAME);
 };
 
 /**
@@ -72,10 +90,10 @@ const getCachedThumbnail = async (cacheKey: string): Promise<Buffer | null> => {
 
   try {
     const stats = await fsPromises.stat(cachePath);
-    // キャッシュが7日以上古い場合は無効
-    const cacheAgeMs = Date.now() - stats.mtimeMs;
-    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    if (cacheAgeMs > sevenDaysMs) {
+    // キャッシュが有効期限を超えている場合は無効
+    const cacheDate = new Date(stats.mtimeMs);
+    const expiryDate = dateFns.subDays(new Date(), CACHE_EXPIRY_DAYS);
+    if (cacheDate < expiryDate) {
       return null;
     }
     return await fsPromises.readFile(cachePath);
@@ -173,10 +191,19 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
 const getDefaultVRChatPhotoDir = (): VRChatPhotoDirPath => {
   // /workspaces/vrchat-albums/debug/photos/VRChat
   // return path.join('/workspaces/vrchat-albums/debug/photos');
-  const logFilesDir =
-    process.platform === 'win32' && process.env.USERPROFILE
-      ? path.join(app.getPath('pictures') || '', 'VRChat')
-      : path.join(process.env.HOME || '', 'Pictures', 'VRChat');
+  let logFilesDir: string;
+
+  if (process.platform === 'win32' && process.env.USERPROFILE) {
+    const app = getElectronApp();
+    const picturesPath = app?.getPath('pictures');
+    // app.getPath('pictures') はフルパスを返す (例: C:\Users\xxx\Pictures)
+    // フォールバック時は USERPROFILE/Pictures を使用
+    logFilesDir = picturesPath
+      ? path.join(picturesPath, 'VRChat')
+      : path.join(process.env.USERPROFILE, 'Pictures', 'VRChat');
+  } else {
+    logFilesDir = path.join(process.env.HOME || '', 'Pictures', 'VRChat');
+  }
 
   return VRChatPhotoDirPathSchema.parse(logFilesDir);
 };

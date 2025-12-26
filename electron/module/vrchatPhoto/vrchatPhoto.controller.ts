@@ -136,7 +136,11 @@ export const vrchatPhotoRouter = () =>
         const count = await vrchatPhotoService.getVRChatPhotoPathCount(
           ctx.input,
         );
-        return count;
+        // 他のエンドポイントと同様にResult型でラップして返す
+        const result = neverthrow.ok(count);
+        return handleResultError(result, {
+          default: (error) => photoOperationErrorMappings.default(error),
+        });
       }),
     getCountByYearMonthList: procedure.query(async () => {
       const result = await getCountByYearMonthList();
