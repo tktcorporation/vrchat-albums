@@ -96,9 +96,13 @@ export const createOrUpdateListVRChatPhotoPath = async (
 
 /**
  * VRChatの写真の保存pathを取得する
- * ページネーション対応でメモリ使用量を抑える
+ * ページネーション対応（オプション）
  *
- * @param query.limit 取得する最大件数（デフォルト: 1000）
+ * 注意: バーチャルスクロールで高さ計算を行っているため、
+ * フロントエンドでページネーションを実装するまでは
+ * limit/offset を指定せずに全件取得することを推奨
+ *
+ * @param query.limit 取得する最大件数（指定しない場合は全件取得）
  * @param query.offset スキップする件数（デフォルト: 0）
  */
 export const getVRChatPhotoPathList = async (query?: {
@@ -108,7 +112,6 @@ export const getVRChatPhotoPathList = async (query?: {
   limit?: number;
   offset?: number;
 }): Promise<VRChatPhotoPathModel[]> => {
-  const DEFAULT_LIMIT = 1000;
   const photoPathList = await VRChatPhotoPathModel.findAll({
     where: {
       photoTakenAt: {
@@ -117,7 +120,8 @@ export const getVRChatPhotoPathList = async (query?: {
       },
     },
     order: [['photoTakenAt', query?.orderByPhotoTakenAt ?? 'asc']],
-    limit: query?.limit ?? DEFAULT_LIMIT,
+    // limit が明示的に指定された場合のみ適用（デフォルトは全件取得）
+    ...(query?.limit !== undefined && { limit: query.limit }),
     ...(query?.offset !== undefined && { offset: query.offset }),
   });
 
