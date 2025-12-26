@@ -96,7 +96,9 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
     const photoUrlMap = new Map<string, string>();
     for (const group of Object.values(groupedPhotos)) {
       for (const photo of group.photos) {
-        photoUrlMap.set(photo.id.toString(), photo.url);
+        if (photo.url) {
+          photoUrlMap.set(photo.id.toString(), photo.url);
+        }
       }
     }
 

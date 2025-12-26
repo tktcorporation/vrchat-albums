@@ -201,9 +201,10 @@ export function usePhotoGallery(
         }
       }
 
-      // ファイル名での検索
-      const matchingPhotos = group.photos.filter((photo: Photo) =>
-        photo.fileNameWithExt.value.toLowerCase().includes(query),
+      // ファイル名での検索（fileNameWithExtが利用可能な場合のみ）
+      const matchingPhotos = group.photos.filter(
+        (photo: Photo) =>
+          photo.fileNameWithExt?.value.toLowerCase().includes(query) ?? false,
       );
       if (matchingPhotos.length > 0) {
         filtered[key] = group;

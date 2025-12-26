@@ -187,7 +187,9 @@ const GalleryContent = memo(
       for (let i = prefetchStart; i < prefetchEnd; i++) {
         const [, group] = filteredGroups[i];
         for (const photo of group.photos) {
-          pathsToPrefetch.push(photo.url);
+          if (photo.url) {
+            pathsToPrefetch.push(photo.url);
+          }
         }
       }
 
