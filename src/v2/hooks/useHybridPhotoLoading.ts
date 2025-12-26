@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { trpcReact } from '@/trpc';
 
 /**
@@ -32,7 +32,7 @@ interface UseHybridPhotoLoadingResult {
   /** 指定IDのphotoPathを取得（キャッシュから、またはバッチリクエスト） */
   getPhotoPath: (id: string) => string | undefined;
   /** 複数IDのphotoPathをプリフェッチ（表示範囲に応じて呼び出す） */
-  prefetchPhotoPaths: (ids: string[]) => void;
+  prefetchPhotoPaths: (ids: string[]) => Promise<void>;
   /** キャッシュ済みのphotoPath数 */
   cachedPathCount: number;
 }
@@ -76,6 +76,9 @@ export function useHybridPhotoLoading(
 
   // プリフェッチ中のIDセット（重複リクエスト防止）
   const pendingIdsRef = useRef<Set<string>>(new Set());
+
+  // キャッシュ数をリアクティブに管理（UIの再レンダリングをトリガー）
+  const [cachedPathCount, setCachedPathCount] = useState(0);
 
   // Phase 2: photoPath をバッチ取得
   const utils = trpcReact.useUtils();
@@ -129,6 +132,9 @@ export function useHybridPhotoLoading(
           for (const { id, photoPath } of result) {
             pathCacheRef.current.set(id, photoPath);
           }
+
+          // キャッシュ数を更新（リアクティブ）
+          setCachedPathCount(pathCacheRef.current.size);
         } catch (error) {
           console.error('Failed to prefetch photo paths:', error);
         } finally {
@@ -147,6 +153,6 @@ export function useHybridPhotoLoading(
     isLoadingMetadata,
     getPhotoPath,
     prefetchPhotoPaths,
-    cachedPathCount: pathCacheRef.current.size,
+    cachedPathCount,
   };
 }
