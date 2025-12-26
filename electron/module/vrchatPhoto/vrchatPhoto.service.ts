@@ -634,3 +634,48 @@ export const getVRChatPhotoMetadataList = async (query?: {
 export const getVRChatPhotoPathsByIds = async (ids: string[]) => {
   return model.getVRChatPhotoPathsByIds(ids);
 };
+
+/**
+ * 複数のサムネイルをバッチ取得（Google Photos風の高速ローディング）
+ *
+ * 個別リクエストではなくバッチで取得することで:
+ * - ネットワークオーバーヘッド削減
+ * - 並列処理による高速化
+ *
+ * @param photoPaths 取得したい写真のパスリスト
+ * @param width サムネイルの幅（デフォルト: 256px）
+ * @returns Map<photoPath, base64Data>
+ */
+export const getBatchThumbnails = async (
+  photoPaths: string[],
+  width = 256,
+): Promise<Map<string, string>> => {
+  const results = new Map<string, string>();
+  const PARALLEL_LIMIT = 8; // 並列処理数を制限
+
+  // 並列処理数を制限しながらバッチ処理
+  for (let i = 0; i < photoPaths.length; i += PARALLEL_LIMIT) {
+    const batch = photoPaths.slice(i, i + PARALLEL_LIMIT);
+
+    const thumbnailPromises = batch.map(async (photoPath) => {
+      try {
+        const result = await getVRChatPhotoItemData({ photoPath, width });
+        if (result.isOk()) {
+          return { photoPath, data: result.value };
+        }
+        return { photoPath, data: null };
+      } catch {
+        return { photoPath, data: null };
+      }
+    });
+
+    const batchResults = await Promise.all(thumbnailPromises);
+    for (const { photoPath, data } of batchResults) {
+      if (data) {
+        results.set(photoPath, data);
+      }
+    }
+  }
+
+  return results;
+};

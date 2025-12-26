@@ -10,6 +10,7 @@ import {
 import { trpcReact } from '@/trpc';
 import { ICON_SIZE } from '../constants/ui';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
+import { useThumbnail } from '../hooks/useThumbnailCache';
 import { useI18n } from '../i18n/store';
 import type { Photo } from '../types/photo';
 import ProgressiveImage from './ProgressiveImage';
@@ -75,13 +76,23 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     const shouldLoad = priority || isIntersecting;
     const placeholderUrl = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${photo.width} ${photo.height}'%3E%3Crect width='100%25' height='100%25' fill='%23f3f4f6'/%3E%3C/svg%3E`;
 
+    // --- サムネイルキャッシュ（Google Photos風の高速ローディング） ---
+    // LRUキャッシュを使用してメモリ効率良くサムネイルを管理
+    const cachedThumbnail = useThumbnail(photo.url, shouldLoad);
+
     // --- tRPC Hooks ---
     const validatePhotoPathMutation =
       trpcReact.vrchatPhoto.validateVRChatPhotoPath.useMutation();
+
+    // フォールバック: キャッシュにない場合は従来のtRPCクエリを使用
     const { data: photoData } =
       trpcReact.vrchatPhoto.getVRChatPhotoItemData.useQuery(photo.url, {
-        enabled: shouldLoad,
+        enabled: shouldLoad && !cachedThumbnail,
+        staleTime: 1000 * 60 * 5, // 5分間は再取得しない
       });
+
+    // 最終的に表示するサムネイル（キャッシュ優先）
+    const thumbnailSrc = cachedThumbnail || photoData?.data || '';
 
     // Handle missing photo validation
     React.useEffect(() => {
@@ -292,7 +303,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
               >
                 {shouldLoad ? (
                   <ProgressiveImage
-                    src={photoData?.data || ''}
+                    src={thumbnailSrc}
                     placeholderSrc={placeholderUrl}
                     alt={photo.fileNameWithExt.value}
                     className="absolute inset-0 w-full h-full object-cover"

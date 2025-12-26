@@ -3,6 +3,7 @@ import { LoaderCircle } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UseLoadingStateResult } from '../../hooks/useLoadingState';
+import { useThumbnailCache } from '../../hooks/useThumbnailCache';
 import {
   estimateGroupHeight,
   GROUP_HEIGHT_CONSTANTS,
@@ -98,6 +99,9 @@ const GalleryContent = memo(
     >(undefined);
     const observerRef = useRef<IntersectionObserver | null>(null);
 
+    // サムネイルキャッシュ（Google Photos風の高速ローディング）
+    const { prefetchThumbnails } = useThumbnailCache();
+
     // 全てのグループを表示（写真があるグループもないグループも）
     const filteredGroups = useMemo(() => {
       return Object.entries(groupedPhotos);
@@ -166,6 +170,32 @@ const GalleryContent = memo(
       },
       [virtualizer],
     );
+
+    // 表示中のグループの写真をプリフェッチ（Google Photos風の先読み）
+    useEffect(() => {
+      const virtualItems = virtualizer.getVirtualItems();
+      if (virtualItems.length === 0) return;
+
+      // 表示中 + 前後のグループのインデックスを計算
+      const firstIndex = virtualItems[0].index;
+      const lastIndex = virtualItems[virtualItems.length - 1].index;
+      const prefetchStart = Math.max(0, firstIndex - 2); // 2グループ前から
+      const prefetchEnd = Math.min(filteredGroups.length, lastIndex + 5); // 5グループ先まで
+
+      // プリフェッチ対象の写真パスを収集
+      const pathsToPrefetch: string[] = [];
+      for (let i = prefetchStart; i < prefetchEnd; i++) {
+        const [, group] = filteredGroups[i];
+        for (const photo of group.photos) {
+          pathsToPrefetch.push(photo.url);
+        }
+      }
+
+      // バッチでプリフェッチ
+      if (pathsToPrefetch.length > 0) {
+        prefetchThumbnails(pathsToPrefetch);
+      }
+    }, [virtualizer.getVirtualItems(), filteredGroups, prefetchThumbnails]);
 
     // IntersectionObserverでビューポート内のグループを検知
     useEffect(() => {

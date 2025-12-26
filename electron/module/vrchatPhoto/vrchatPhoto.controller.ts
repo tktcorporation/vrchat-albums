@@ -219,4 +219,26 @@ export const vrchatPhotoRouter = () =>
           photoPath,
         }));
       }),
+    /**
+     * 複数のサムネイルをバッチ取得（Google Photos風の高速ローディング）
+     * 個別リクエストより効率的にサムネイルを取得
+     */
+    getBatchThumbnails: procedure
+      .input(
+        z.object({
+          photoPaths: z.array(z.string()).max(50), // バッチサイズ制限
+          width: z.number().int().positive().max(512).optional(),
+        }),
+      )
+      .query(async (ctx) => {
+        const thumbnailMap = await vrchatPhotoService.getBatchThumbnails(
+          ctx.input.photoPaths,
+          ctx.input.width,
+        );
+        // Map を配列に変換（tRPC での転送用）
+        return Array.from(thumbnailMap.entries()).map(([photoPath, data]) => ({
+          photoPath,
+          data,
+        }));
+      }),
   });
