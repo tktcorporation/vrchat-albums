@@ -262,7 +262,7 @@ describe('useThumbnail', () => {
   beforeEach(() => {
     clearAllListeners();
     mockFetch.mockReset();
-    mockFetch.mockResolvedValue([]);
+    mockFetch.mockResolvedValue({ success: [], failed: [] });
   });
 
   afterEach(() => {
@@ -478,9 +478,10 @@ describe('バッチフェッチ失敗時のエラーハンドリング', () => {
     // First call fails
     mockFetch.mockRejectedValueOnce(testError);
     // Second call succeeds
-    mockFetch.mockResolvedValueOnce([
-      { photoPath: '/test/success.png', data: 'success-data' },
-    ]);
+    mockFetch.mockResolvedValueOnce({
+      success: [{ photoPath: '/test/success.png', data: 'success-data' }],
+      failed: [],
+    });
 
     const { result } = renderHook(() => useThumbnailCache());
 

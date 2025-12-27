@@ -13,13 +13,34 @@ export {
 } from '../types/photo';
 
 /**
+ * プリフェッチエラー時のコールバック型
+ */
+type PrefetchErrorCallback = (error: unknown, failedIds: string[]) => void;
+
+/**
+ * デフォルトのプリフェッチエラーハンドラ
+ * 最低限のログ出力を行い、エラーが完全に無視されることを防ぐ
+ */
+const defaultPrefetchErrorHandler: PrefetchErrorCallback = (
+  error,
+  failedIds,
+) => {
+  logger.warn({
+    message: 'Photo path prefetch failed (default handler)',
+    error,
+    details: { failedCount: failedIds.length },
+  });
+};
+
+/**
  * ハイブリッドローディング設定
  */
 interface UseHybridPhotoLoadingOptions {
   /** 一度に取得するphotoPathの最大数 */
   batchSize?: number;
-  /** プリフェッチ失敗時のコールバック（UIへの通知等に使用） */
-  onPrefetchError?: (error: unknown, failedIds: string[]) => void;
+  /** プリフェッチ失敗時のコールバック（UIへの通知等に使用）
+   * 指定しない場合はデフォルトのログ出力のみ実行 */
+  onPrefetchError?: PrefetchErrorCallback;
 }
 
 /**
@@ -158,8 +179,9 @@ export function useHybridPhotoLoading(
                 details: { batchSize: batch.length },
               });
             });
-          // コールバックがあれば通知（UIへの表示等）
-          onPrefetchError?.(error, batch);
+          // コールバックで通知（デフォルトハンドラあり）
+          const errorHandler = onPrefetchError ?? defaultPrefetchErrorHandler;
+          errorHandler(error, batch);
         } finally {
           // ペンディングから削除
           for (const id of batch) {

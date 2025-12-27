@@ -75,34 +75,62 @@ const generateCacheKey = (photoPath: string, width?: number): string => {
 };
 
 /**
- * キャッシュディレクトリを初期化
+ * キャッシュディレクトリ初期化エラー
  */
-const ensureCacheDir = async (): Promise<string> => {
+interface CacheDirError {
+  type: 'CACHE_DIR_CREATION_FAILED';
+  message: string;
+  code?: string;
+}
+
+/**
+ * キャッシュディレクトリを初期化
+ *
+ * @returns Result<cacheDir, CacheDirError> - 成功時はディレクトリパス、失敗時はエラー
+ */
+const ensureCacheDir = async (): Promise<
+  neverthrow.Result<string, CacheDirError>
+> => {
   const cacheDir = getThumbnailCacheDir();
   try {
     await fsPromises.mkdir(cacheDir, { recursive: true });
+    return neverthrow.ok(cacheDir);
   } catch (error) {
-    // ディレクトリが既に存在する場合は無視
-    match(error)
-      .with({ code: 'EEXIST' }, () => {
-        // 既に存在するのでOK
-      })
+    // ディレクトリが既に存在する場合は成功
+    return match(error)
+      .with({ code: 'EEXIST' }, () => neverthrow.ok(cacheDir))
       .otherwise((e) => {
+        const errorCode = (e as NodeJS.ErrnoException).code;
         logger.error({
           message: `Failed to create cache directory: ${cacheDir}`,
           stack: e instanceof Error ? e : new Error(String(e)),
         });
+        return neverthrow.err({
+          type: 'CACHE_DIR_CREATION_FAILED' as const,
+          message: `Cannot create cache directory: ${cacheDir}`,
+          code: errorCode,
+        });
       });
   }
-  return cacheDir;
 };
 
 /**
  * キャッシュからサムネイルを取得
+ *
+ * @returns キャッシュヒット時はBuffer、キャッシュミスまたはキャッシュ無効時はnull
  */
 const getCachedThumbnail = async (cacheKey: string): Promise<Buffer | null> => {
-  const cacheDir = await ensureCacheDir();
-  const cachePath = path.join(cacheDir, `${cacheKey}.webp`);
+  const cacheDirResult = await ensureCacheDir();
+  if (cacheDirResult.isErr()) {
+    // キャッシュディレクトリが利用不可の場合はキャッシュミスとして扱う
+    logger.debug({
+      message: 'Cache directory unavailable, skipping cache lookup',
+      stack: new Error(cacheDirResult.error.message),
+    });
+    return null;
+  }
+
+  const cachePath = path.join(cacheDirResult.value, `${cacheKey}.webp`);
 
   try {
     const stats = await fsPromises.stat(cachePath);
@@ -151,8 +179,17 @@ const saveThumbnailToCache = async (
   pendingCacheWrites.add(cacheKey);
 
   try {
-    const cacheDir = await ensureCacheDir();
-    const cachePath = path.join(cacheDir, `${cacheKey}.webp`);
+    const cacheDirResult = await ensureCacheDir();
+    if (cacheDirResult.isErr()) {
+      // キャッシュディレクトリが利用不可の場合は書き込みをスキップ
+      logger.debug({
+        message: 'Cache directory unavailable, skipping cache write',
+        stack: new Error(cacheDirResult.error.message),
+      });
+      return;
+    }
+
+    const cachePath = path.join(cacheDirResult.value, `${cacheKey}.webp`);
     const tempPath = `${cachePath}.tmp`;
 
     // アトミック書き込み: tmp -> rename
@@ -172,7 +209,16 @@ const saveThumbnailToCache = async (
  * 古いキャッシュをクリーンアップ（必要に応じて呼び出される）
  */
 export const cleanupThumbnailCache = async (): Promise<void> => {
-  const cacheDir = await ensureCacheDir();
+  const cacheDirResult = await ensureCacheDir();
+  if (cacheDirResult.isErr()) {
+    // キャッシュディレクトリが利用不可の場合はクリーンアップをスキップ
+    logger.debug({
+      message: 'Cache directory unavailable, skipping cleanup',
+      stack: new Error(cacheDirResult.error.message),
+    });
+    return;
+  }
+  const cacheDir = cacheDirResult.value;
 
   try {
     const files = await fsPromises.readdir(cacheDir);
@@ -719,6 +765,20 @@ export const getVRChatPhotoPathsByIds = async (ids: string[]) => {
 };
 
 /**
+ * バッチサムネイル取得の結果
+ */
+export interface BatchThumbnailResult {
+  /** 成功したサムネイル（photoPath -> base64Data） */
+  success: Map<string, string>;
+  /** 失敗したパスと理由 */
+  failed: Array<{
+    photoPath: string;
+    reason: 'file_not_found' | 'processing_error' | 'unexpected_error';
+    message: string;
+  }>;
+}
+
+/**
  * 複数のサムネイルをバッチ取得（Google Photos風の高速ローディング）
  *
  * 個別リクエストではなくバッチで取得することで:
@@ -727,13 +787,14 @@ export const getVRChatPhotoPathsByIds = async (ids: string[]) => {
  *
  * @param photoPaths 取得したい写真のパスリスト
  * @param width サムネイルの幅（デフォルト: 256px）
- * @returns Map<photoPath, base64Data>
+ * @returns 成功したサムネイルと失敗情報を含む構造化された結果
  */
 export const getBatchThumbnails = async (
   photoPaths: string[],
   width = 256,
-): Promise<Map<string, string>> => {
-  const results = new Map<string, string>();
+): Promise<BatchThumbnailResult> => {
+  const success = new Map<string, string>();
+  const failed: BatchThumbnailResult['failed'] = [];
   const PARALLEL_LIMIT = 8; // 並列処理数を制限
 
   // 並列処理数を制限しながらバッチ処理
@@ -744,26 +805,65 @@ export const getBatchThumbnails = async (
       try {
         const result = await getVRChatPhotoItemData({ photoPath, width });
         if (result.isOk()) {
-          return { photoPath, data: result.value };
+          return {
+            photoPath,
+            data: result.value,
+            error: null as null,
+          };
         }
-        return { photoPath, data: null };
+        // Result.isErr() の場合
+        return {
+          photoPath,
+          data: null as null,
+          error: {
+            reason: 'file_not_found' as const,
+            message: result.error,
+          },
+        };
       } catch (error) {
         // 予期しないエラーをログ出力（バッチ処理は継続）
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         logger.warn({
           message: `Failed to get thumbnail in batch for ${photoPath}`,
-          stack: error instanceof Error ? error : new Error(String(error)),
+          stack: error instanceof Error ? error : new Error(errorMessage),
         });
-        return { photoPath, data: null };
+        return {
+          photoPath,
+          data: null as null,
+          error: {
+            reason: 'unexpected_error' as const,
+            message: errorMessage,
+          },
+        };
       }
     });
 
     const batchResults = await Promise.all(thumbnailPromises);
-    for (const { photoPath, data } of batchResults) {
+    for (const { photoPath, data, error } of batchResults) {
       if (data) {
-        results.set(photoPath, data);
+        success.set(photoPath, data);
+      } else if (error) {
+        failed.push({
+          photoPath,
+          reason: error.reason,
+          message: error.message,
+        });
       }
     }
   }
 
-  return results;
+  // 失敗があった場合はサマリーログを出力
+  if (failed.length > 0) {
+    logger.info({
+      message: `Batch thumbnail fetch completed with failures`,
+      details: {
+        totalRequested: photoPaths.length,
+        successCount: success.size,
+        failedCount: failed.length,
+      },
+    });
+  }
+
+  return { success, failed };
 };

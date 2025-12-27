@@ -12,14 +12,30 @@ import { logger } from '../lib/logger';
  * これらのプロパティはハイブリッドローディングの初期段階から利用可能。
  *
  * @remarks
- * id は string 型（UUID）。DBモデル VRChatPhotoPathModel と一致。
+ * - id は string 型（UUID）。DBモデル VRChatPhotoPathModel と一致。
+ * - location.joinedAt は Phase 1 では photoTakenAt で近似される（実際のワールド参加時刻はログ解析が必要）
  */
 export interface PhotoBase {
   id: string;
   width: number;
   height: number;
   takenAt: Date;
+  /**
+   * 写真の撮影場所に関する情報
+   *
+   * @remarks
+   * Phase 1（メタデータのみ）では joinedAt は photoTakenAt で近似される。
+   * 正確なワールド参加時刻はログファイル解析後にのみ取得可能。
+   * グルーピングは takenAt を基準に行うため、近似値でも実用上の問題はない。
+   */
   location: {
+    /**
+     * ワールドに参加した時刻
+     *
+     * @remarks
+     * Phase 1: photoTakenAt で近似（ログ解析前のため）
+     * Phase 2: 実際のワールド参加時刻（将来対応予定）
+     */
     joinedAt: Date;
   };
 }
@@ -112,6 +128,11 @@ export interface PhotoMetadata {
  *
  * @param metadata DBから取得した軽量メタデータ
  * @returns Phase 1のPhoto（loadingState: 'metadata'）
+ *
+ * @remarks
+ * location.joinedAt は photoTakenAt で近似される。
+ * これはログ解析を行わずに高速にメタデータを取得するためのトレードオフ。
+ * グルーピングは takenAt を基準に行うため、実用上の問題はない。
  */
 export function createMetadataOnlyPhoto(
   metadata: PhotoMetadata,
@@ -123,6 +144,8 @@ export function createMetadataOnlyPhoto(
     height: metadata.height,
     takenAt: metadata.photoTakenAt,
     location: {
+      // Note: 実際のワールド参加時刻はログ解析が必要。
+      // ここでは photoTakenAt で近似する。
       joinedAt: metadata.photoTakenAt,
     },
   };
@@ -136,8 +159,8 @@ export function createMetadataOnlyPhoto(
  * @returns Phase 2のPhoto、またはファイル名が無効な場合はnull
  *
  * @remarks
- * VRChatPhotoPathSchema でパスを検証し、VRChat写真形式でない場合はnullを返す。
- * 呼び出し元で適切にハンドリングすること。
+ * - VRChatPhotoPathSchema でパスを検証し、VRChat写真形式でない場合はnullを返す
+ * - location.joinedAt は現時点では photoTakenAt で近似（将来的にログ解析結果を使用予定）
  */
 export function createFullyLoadedPhoto(
   metadata: PhotoMetadata,
@@ -168,6 +191,7 @@ export function createFullyLoadedPhoto(
     height: metadata.height,
     takenAt: metadata.photoTakenAt,
     location: {
+      // Note: 将来的にはログ解析から取得した実際のワールド参加時刻を使用予定
       joinedAt: metadata.photoTakenAt,
     },
   };

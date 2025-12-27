@@ -200,12 +200,33 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
           width: 256,
         });
 
-        // キャッシュに保存 + イベント通知
-        for (const { photoPath, data } of result) {
+        // 成功したサムネイルをキャッシュに保存 + イベント通知
+        for (const { photoPath, data } of result.success) {
           globalThumbnailCache.set(photoPath, data);
           notifyCacheUpdate(photoPath, data);
         }
         setCacheSize(globalThumbnailCache.size);
+
+        // 失敗があった場合はログ出力
+        if (result.failed.length > 0) {
+          logger.warn({
+            message: 'Some thumbnails failed to load',
+            details: {
+              failedCount: result.failed.length,
+              successCount: result.success.length,
+              failures: result.failed.map((f) => ({
+                path: f.photoPath,
+                reason: f.reason,
+              })),
+            },
+          });
+          // 失敗した写真をコールバックで通知
+          const failedPaths = result.failed.map((f) => f.photoPath);
+          onFetchError?.(
+            new Error(`Failed to load ${result.failed.length} thumbnails`),
+            failedPaths,
+          );
+        }
       } catch (error) {
         // エラー分類とログ出力
         match(error)

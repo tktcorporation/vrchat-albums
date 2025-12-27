@@ -351,10 +351,11 @@ describe('vrchatPhoto.service', () => {
       );
     });
 
-    it('空の配列を渡すと空のMapを返す', async () => {
+    it('空の配列を渡すと空の結果を返す', async () => {
       const { getBatchThumbnails } = await import('./vrchatPhoto.service');
       const result = await getBatchThumbnails([]);
-      expect(result.size).toBe(0);
+      expect(result.success.size).toBe(0);
+      expect(result.failed.length).toBe(0);
     });
 
     it('成功したパスのサムネイルを返す', async () => {
@@ -366,9 +367,10 @@ describe('vrchatPhoto.service', () => {
 
       const result = await getBatchThumbnails(paths, 256);
 
-      expect(result.size).toBe(2);
-      expect(result.has(paths[0])).toBe(true);
-      expect(result.has(paths[1])).toBe(true);
+      expect(result.success.size).toBe(2);
+      expect(result.success.has(paths[0])).toBe(true);
+      expect(result.success.has(paths[1])).toBe(true);
+      expect(result.failed.length).toBe(0);
     });
 
     it('一部のパスが失敗しても成功したものは返す（混合ケース）', async () => {
@@ -393,13 +395,17 @@ describe('vrchatPhoto.service', () => {
       const result = await getBatchThumbnails(paths, 256);
 
       // 2つは成功、1つは失敗
-      expect(result.size).toBe(2);
-      expect(result.has(paths[0])).toBe(true);
-      expect(result.has(paths[1])).toBe(false); // 失敗したものは含まれない
-      expect(result.has(paths[2])).toBe(true);
+      expect(result.success.size).toBe(2);
+      expect(result.success.has(paths[0])).toBe(true);
+      expect(result.success.has(paths[1])).toBe(false); // 失敗したものは含まれない
+      expect(result.success.has(paths[2])).toBe(true);
+      // 失敗情報も返される（VRChat写真パターンにマッチしないので file_not_found）
+      expect(result.failed.length).toBe(1);
+      expect(result.failed[0].photoPath).toBe(paths[1]);
+      expect(result.failed[0].reason).toBe('file_not_found');
     });
 
-    it('全て失敗した場合は空のMapを返す', async () => {
+    it('全て失敗した場合は空のsuccessと失敗リストを返す', async () => {
       const { getBatchThumbnails } = await import('./vrchatPhoto.service');
 
       sharpFactory.mockImplementation(() => {
@@ -410,7 +416,8 @@ describe('vrchatPhoto.service', () => {
 
       const result = await getBatchThumbnails(paths, 256);
 
-      expect(result.size).toBe(0);
+      expect(result.success.size).toBe(0);
+      expect(result.failed.length).toBe(2);
     });
 
     it('PARALLEL_LIMIT を超えるパスでも全て処理する', async () => {
@@ -425,7 +432,8 @@ describe('vrchatPhoto.service', () => {
 
       const result = await getBatchThumbnails(paths, 256);
 
-      expect(result.size).toBe(16);
+      expect(result.success.size).toBe(16);
+      expect(result.failed.length).toBe(0);
     });
   });
 

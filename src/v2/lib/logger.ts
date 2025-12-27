@@ -2,7 +2,7 @@
  * フロントエンド用ロガー
  *
  * バックエンドの electron/lib/logger.ts と同様のインターフェースを提供。
- * 将来的には Sentry（レンダラー側）との連携も可能。
+ * Sentry（レンダラー側）と連携してエラーを報告。
  *
  * ## 使用例
  * ```ts
@@ -15,6 +15,7 @@
  * ```
  */
 
+import * as Sentry from '@sentry/electron/renderer';
 import { match, P } from 'ts-pattern';
 
 interface LogParams {
@@ -112,14 +113,27 @@ const warn = (params: LogParams | string): void => {
  * エラーログ
  *
  * @remarks
- * 将来的にはSentry連携を追加予定。
- * 現時点ではconsole.errorに出力のみ。
+ * Sentryにエラーを送信し、詳細情報をextraとして添付。
  */
 const error = (params: LogParams | string): void => {
   log('error', params, console.error);
 
-  // TODO: Sentry連携
-  // captureException(normalizeError(params.error), { extra: params.details });
+  // Sentry にエラーを送信
+  match(params)
+    .with(P.string, (msg) => {
+      Sentry.captureMessage(msg, 'error');
+    })
+    .otherwise((p) => {
+      const errorToSend = p.error
+        ? normalizeError(p.error)
+        : new Error(p.message);
+      Sentry.captureException(errorToSend, {
+        extra: {
+          ...p.details,
+          originalMessage: p.message,
+        },
+      });
+    });
 };
 
 export const logger = {

@@ -221,6 +221,8 @@ export const vrchatPhotoRouter = () =>
     /**
      * 複数のサムネイルをバッチ取得（Google Photos風の高速ローディング）
      * 個別リクエストより効率的にサムネイルを取得
+     *
+     * @returns 成功したサムネイルと失敗情報を含む構造化された結果
      */
     getBatchThumbnails: procedure
       .input(
@@ -230,14 +232,19 @@ export const vrchatPhotoRouter = () =>
         }),
       )
       .query(async (ctx) => {
-        const thumbnailMap = await vrchatPhotoService.getBatchThumbnails(
+        const result = await vrchatPhotoService.getBatchThumbnails(
           ctx.input.photoPaths,
           ctx.input.width,
         );
         // Map を配列に変換（tRPC での転送用）
-        return Array.from(thumbnailMap.entries()).map(([photoPath, data]) => ({
-          photoPath,
-          data,
-        }));
+        return {
+          success: Array.from(result.success.entries()).map(
+            ([photoPath, data]) => ({
+              photoPath,
+              data,
+            }),
+          ),
+          failed: result.failed,
+        };
       }),
   });
