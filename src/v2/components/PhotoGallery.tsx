@@ -94,23 +94,23 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
     }
 
     // 全グループの写真をIDでマップ化（完全ロード済みのみ）
-    const photoUrlMap = new Map<string, string>();
+    const photoPathMap = new Map<string, string>();
     for (const group of Object.values(groupedPhotos)) {
       for (const photo of group.photos) {
         if (isPhotoLoaded(photo)) {
-          photoUrlMap.set(photo.id.toString(), photo.url);
+          photoPathMap.set(photo.id.toString(), photo.photoPath.value);
         }
       }
     }
 
     // 選択順序を維持してパスを取得
-    const selectedPhotoUrls = selectedPhotos
-      .map((id) => photoUrlMap.get(id))
-      .filter((url): url is string => url !== undefined);
+    const selectedPhotoPaths = selectedPhotos
+      .map((id) => photoPathMap.get(id))
+      .filter((path): path is string => path !== undefined);
 
     // 写真をクリップボードにコピー
-    if (selectedPhotoUrls.length > 0) {
-      copyMultipleImagesToClipboard(selectedPhotoUrls);
+    if (selectedPhotoPaths.length > 0) {
+      copyMultipleImagesToClipboard(selectedPhotoPaths);
     }
   };
 

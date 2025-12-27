@@ -1,7 +1,7 @@
-import pathe from 'pathe';
 import {
   type VRChatPhotoFileNameWithExt,
-  VRChatPhotoFileNameWithExtSchema,
+  type VRChatPhotoPath,
+  VRChatPhotoPathSchema,
 } from './../../valueObjects';
 
 /**
@@ -34,8 +34,8 @@ export interface PhotoBase {
  */
 export interface PhotoMetadataOnly extends PhotoBase {
   loadingState: 'metadata';
-  /** url は存在しない（型レベルで保証） */
-  url?: never;
+  /** photoPath は存在しない（型レベルで保証） */
+  photoPath?: never;
   /** fileNameWithExt は存在しない（型レベルで保証） */
   fileNameWithExt?: never;
 }
@@ -48,9 +48,9 @@ export interface PhotoMetadataOnly extends PhotoBase {
  */
 export interface PhotoFullyLoaded extends PhotoBase {
   loadingState: 'loaded';
-  /** 写真のパス */
-  url: string;
-  /** ファイル名（urlから派生） */
+  /** 写真ファイルのフルパス（検証済みVRChat写真パス） */
+  photoPath: VRChatPhotoPath;
+  /** ファイル名（photoPathから派生） */
   fileNameWithExt: VRChatPhotoFileNameWithExt;
 }
 
@@ -65,13 +65,13 @@ export interface PhotoFullyLoaded extends PhotoBase {
  * ## 型安全な使用例
  * ```ts
  * if (isPhotoLoaded(photo)) {
- *   // photo.url と photo.fileNameWithExt が string 型として推論される
- *   console.log(photo.url);
+ *   // photo.photoPath が VRChatPhotoPath 型として推論される
+ *   console.log(photo.photoPath.value);
  * }
  *
  * // または ts-pattern で
  * match(photo)
- *   .with({ loadingState: 'loaded' }, (p) => <img src={p.url} />)
+ *   .with({ loadingState: 'loaded' }, (p) => <img src={p.photoPath.value} />)
  *   .with({ loadingState: 'metadata' }, () => <Skeleton />)
  *   .exhaustive();
  * ```
@@ -131,36 +131,42 @@ export function createMetadataOnlyPhoto(
  * メタデータとパスからPhotoFullyLoaded型を生成
  *
  * @param metadata DBから取得した軽量メタデータ
- * @param photoPath 写真ファイルのフルパス
+ * @param photoPathStr 写真ファイルのフルパス（文字列）
  * @returns Phase 2のPhoto、またはファイル名が無効な場合はnull
  *
  * @remarks
- * ファイル名のバリデーションを行い、VRChat写真形式でない場合はnullを返す。
+ * VRChatPhotoPathSchema でパスを検証し、VRChat写真形式でない場合はnullを返す。
  * 呼び出し元で適切にハンドリングすること。
  */
 export function createFullyLoadedPhoto(
   metadata: PhotoMetadata,
-  photoPath: string,
+  photoPathStr: string,
 ): PhotoFullyLoaded | null {
-  try {
-    const basename = pathe.basename(photoPath);
-    const fileNameWithExt = VRChatPhotoFileNameWithExtSchema.parse(basename);
+  const parseResult = VRChatPhotoPathSchema.safeParse(photoPathStr);
 
-    return {
-      loadingState: 'loaded',
-      id: metadata.id,
-      url: photoPath,
-      fileNameWithExt,
-      width: metadata.width,
-      height: metadata.height,
-      takenAt: metadata.photoTakenAt,
-      location: {
-        joinedAt: metadata.photoTakenAt,
-      },
-    };
-  } catch {
+  if (!parseResult.success) {
+    // VRChat写真形式でないファイル名の場合はnullを返す
+    console.warn(
+      `[createFullyLoadedPhoto] Invalid VRChat photo path: ${photoPathStr}`,
+      parseResult.error.message,
+    );
     return null;
   }
+
+  const photoPath = parseResult.data;
+
+  return {
+    loadingState: 'loaded',
+    id: metadata.id,
+    photoPath,
+    fileNameWithExt: photoPath.fileName,
+    width: metadata.width,
+    height: metadata.height,
+    takenAt: metadata.photoTakenAt,
+    location: {
+      joinedAt: metadata.photoTakenAt,
+    },
+  };
 }
 
 /**

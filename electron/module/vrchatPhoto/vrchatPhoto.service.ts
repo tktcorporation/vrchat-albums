@@ -104,8 +104,18 @@ const getCachedThumbnail = async (cacheKey: string): Promise<Buffer | null> => {
       return null;
     }
     return await fsPromises.readFile(cachePath);
-  } catch {
-    return null;
+  } catch (error) {
+    // 予期されたエラー（ファイル不在）と予期しないエラーを分類
+    return match(error)
+      .with({ code: 'ENOENT' }, () => null) // ファイルがない場合はキャッシュミス
+      .otherwise((e) => {
+        // 予期しないエラー（権限エラー、I/Oエラー等）はログ出力
+        logger.warn({
+          message: `Unexpected error reading cached thumbnail: ${cachePath}`,
+          stack: e instanceof Error ? e : new Error(String(e)),
+        });
+        return null;
+      });
   }
 };
 
@@ -196,8 +206,12 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
       try {
         await fsPromises.unlink(file.filePath);
         currentSize -= file.size / 1024 / 1024;
-      } catch {
-        // 削除失敗は無視
+      } catch (error) {
+        // 削除失敗をログ出力（処理は継続）
+        logger.warn({
+          message: `Failed to delete cache file during cleanup: ${file.filePath}`,
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
       }
     }
 
@@ -620,9 +634,8 @@ export const getVRChatPhotoItemData = async ({
         .toBuffer();
 
       // 非同期でキャッシュに保存（レスポンスを遅らせない）
-      saveThumbnailToCache(cacheKey, photoBuf).catch(() => {
-        // キャッシュ保存失敗は無視
-      });
+      // エラーは saveThumbnailToCache 内部でログ出力される
+      void saveThumbnailToCache(cacheKey, photoBuf);
 
       return neverthrow.ok(
         `data:image/webp;base64,${photoBuf.toString('base64')}`,
@@ -715,7 +728,12 @@ export const getBatchThumbnails = async (
           return { photoPath, data: result.value };
         }
         return { photoPath, data: null };
-      } catch {
+      } catch (error) {
+        // 予期しないエラーをログ出力（バッチ処理は継続）
+        logger.debug({
+          message: `Failed to get thumbnail in batch for ${photoPath}`,
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
         return { photoPath, data: null };
       }
     });

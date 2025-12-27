@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { VRChatPhotoFileNameWithExtSchema } from '../../../../valueObjects';
+import { VRChatPhotoPathSchema } from '../../../../valueObjects';
 
 // Mock trpc to prevent ipcLink from being evaluated in non-electron environment
 vi.mock('@/trpc', () => ({
@@ -21,21 +21,24 @@ import { groupPhotosBySession } from '../useGroupPhotos';
  * 指定日時の写真オブジェクトを生成するテスト用関数。
  * groupPhotosBySession の検証で写真一覧を作る際に使用する。
  */
-const createPhoto = (id: string | number, takenAt: Date): Photo => ({
-  loadingState: 'loaded',
-  id: id.toString(),
-  url: `photo-${id}`,
-  // /^VRChat_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.\d{3}_\d+x\d+\.[a-z]+$/
-  fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(
-    'VRChat_2025-05-25_12-00-00.000_1920x1080.png',
-  ),
-  width: 1920,
-  height: 1080,
-  takenAt,
-  location: {
-    joinedAt: takenAt,
-  },
-});
+const createPhoto = (id: string | number, takenAt: Date): Photo => {
+  const padded = String(id).padStart(3, '0');
+  const photoPath = VRChatPhotoPathSchema.parse(
+    `/path/VRChat_2025-05-25_12-00-${padded.slice(-2)}.${padded}_1920x1080.png`,
+  );
+  return {
+    loadingState: 'loaded',
+    id: id.toString(),
+    photoPath,
+    fileNameWithExt: photoPath.fileName,
+    width: 1920,
+    height: 1080,
+    takenAt,
+    location: {
+      joinedAt: takenAt,
+    },
+  };
+};
 
 /**
  * ワールド参加ログのモックを生成するヘルパー。

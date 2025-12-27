@@ -716,8 +716,9 @@ export const searchSessionsByPlayerName = async (
  * @param sortedDates 昇順にソートされた日時配列
  * @param targetDate 検索対象の日時
  * @returns targetDate以下の最大の日時、見つからない場合はnull
+ * @internal テスト用にexport
  */
-const findLatestWorldJoinBefore = (
+export const findLatestWorldJoinBefore = (
   sortedDates: Date[],
   targetDate: Date,
 ): Date | null => {

@@ -82,7 +82,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     // --- サムネイルキャッシュ（Google Photos風の高速ローディング） ---
     // LRUキャッシュを使用してメモリ効率良くサムネイルを管理
     const cachedThumbnail = useThumbnail(
-      photoLoaded ? photo.url : '',
+      photoLoaded ? photo.photoPath.value : '',
       shouldLoad && photoLoaded,
     );
 
@@ -93,7 +93,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     // フォールバック: キャッシュにない場合は従来のtRPCクエリを使用
     const { data: photoData } =
       trpcReact.vrchatPhoto.getVRChatPhotoItemData.useQuery(
-        photoLoaded ? photo.url : '',
+        photoLoaded ? photo.photoPath.value : '',
         {
           enabled: shouldLoad && photoLoaded && !cachedThumbnail,
           staleTime: 1000 * 60 * 5, // 5分間は再取得しない
@@ -106,7 +106,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     // Handle missing photo validation
     React.useEffect(() => {
       if (photoData?.error === 'InputFileIsMissing' && photoLoaded) {
-        validatePhotoPathMutation.mutate(photo.url);
+        validatePhotoPathMutation.mutate(photo.photoPath.value);
       }
     }, [photoData, photoLoaded, photo, validatePhotoPathMutation]);
     const copySingleMutation =
@@ -131,13 +131,13 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         const pathsToCopy = selectedPhotos
           .map((id) => {
             const p = photos.find((p) => String(p.id) === id);
-            return p && isPhotoLoaded(p) ? p.url : undefined;
+            return p && isPhotoLoaded(p) ? p.photoPath.value : undefined;
           })
-          .filter((url): url is string => url !== undefined);
+          .filter((path): path is string => path !== undefined);
         console.log('Triggering multiple photo copy:', pathsToCopy);
         copyMultipleMutation.mutate(pathsToCopy);
       } else if (photoLoaded) {
-        copySingleMutation.mutate(photo.url);
+        copySingleMutation.mutate(photo.photoPath.value);
       }
     };
 
@@ -145,7 +145,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     const handleOpenInPhotoApp = (e: React.MouseEvent) => {
       e.stopPropagation();
       if (photoLoaded) {
-        openInPhotoAppMutation.mutate(photo.url);
+        openInPhotoAppMutation.mutate(photo.photoPath.value);
       }
     };
 
@@ -153,7 +153,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     const handleOpenInExplorer = (e: React.MouseEvent) => {
       e.stopPropagation();
       if (photoLoaded) {
-        openDirOnExplorerMutation.mutate(photo.url);
+        openDirOnExplorerMutation.mutate(photo.photoPath.value);
       }
     };
 
@@ -172,7 +172,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         });
       } else if (photoLoaded) {
         // 通常モード中: システムの写真ビューアで開く
-        openInPhotoAppMutation.mutate(photo.url);
+        openInPhotoAppMutation.mutate(photo.photoPath.value);
       }
     }, [
       isMultiSelectMode,

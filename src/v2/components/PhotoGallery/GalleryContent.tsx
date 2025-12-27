@@ -189,7 +189,7 @@ const GalleryContent = memo(
         const [, group] = filteredGroups[i];
         for (const photo of group.photos) {
           if (isPhotoLoaded(photo)) {
-            pathsToPrefetch.push(photo.url);
+            pathsToPrefetch.push(photo.photoPath.value);
           }
         }
       }

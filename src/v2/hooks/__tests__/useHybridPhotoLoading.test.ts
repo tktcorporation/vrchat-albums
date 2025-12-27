@@ -18,18 +18,60 @@ vi.mock('@/trpc', () => ({
   },
 }));
 
-// VRChatPhotoFileNameWithExtSchemaをモック
+// VRChat写真ファイル名のバリデーション正規表現
+const VRCHAT_PHOTO_REGEX =
+  /^VRChat_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.\d{3}_\d+x\d+\.(png|jpg|jpeg)$/i;
+
+// パスからファイル名を抽出する正規表現
+const FILENAME_FROM_PATH_REGEX =
+  /VRChat_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.\d{3}_\d+x\d+\.(png|jpg|jpeg)$/i;
+
+// VRChatPhotoFileNameWithExtSchema と VRChatPhotoPathSchema をモック
 vi.mock('../../../valueObjects', () => ({
   VRChatPhotoFileNameWithExtSchema: {
     parse: (value: string) => {
-      // VRChat写真ファイル名のフォーマットをバリデート
-      // 例: VRChat_2024-01-01_12-00-00.000_1920x1080.png
-      const regex =
-        /^VRChat_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.\d{3}_\d+x\d+\.(png|jpg|jpeg)$/i;
-      if (!regex.test(value)) {
+      if (!VRCHAT_PHOTO_REGEX.test(value)) {
         throw new Error('Invalid VRChat photo filename format');
       }
       return { value, type: 'VRChatPhotoFileNameWithExt' as const };
+    },
+  },
+  VRChatPhotoPathSchema: {
+    parse: (value: string) => {
+      const match = value.match(FILENAME_FROM_PATH_REGEX);
+      if (!match) {
+        throw new Error('Invalid VRChat photo path format');
+      }
+      const fileName = match[0];
+      return {
+        value,
+        type: 'VRChatPhotoPath' as const,
+        fileName: {
+          value: fileName,
+          type: 'VRChatPhotoFileNameWithExt' as const,
+        },
+      };
+    },
+    safeParse: (value: string) => {
+      const match = value.match(FILENAME_FROM_PATH_REGEX);
+      if (!match) {
+        return {
+          success: false,
+          error: new Error('Invalid VRChat photo path'),
+        };
+      }
+      const fileName = match[0];
+      return {
+        success: true,
+        data: {
+          value,
+          type: 'VRChatPhotoPath' as const,
+          fileName: {
+            value: fileName,
+            type: 'VRChatPhotoFileNameWithExt' as const,
+          },
+        },
+      };
     },
   },
 }));
@@ -78,7 +120,7 @@ describe('useHybridPhotoLoading', () => {
       expect(result.loadingState).toBe('metadata');
     });
 
-    it('urlプロパティが存在しない', () => {
+    it('photoPathプロパティが存在しない', () => {
       const metadata = {
         id: 'test-id',
         photoTakenAt: new Date(),
@@ -88,8 +130,8 @@ describe('useHybridPhotoLoading', () => {
 
       const result = createMetadataOnlyPhoto(metadata);
 
-      expect(result.url).toBeUndefined();
-      expect('url' in result).toBe(false);
+      expect(result.photoPath).toBeUndefined();
+      expect('photoPath' in result).toBe(false);
     });
 
     it('fileNameWithExtプロパティが存在しない', () => {
@@ -122,7 +164,7 @@ describe('useHybridPhotoLoading', () => {
       expect(result).not.toBeNull();
       expect(result?.loadingState).toBe('loaded');
       expect(result?.id).toBe('photo-456');
-      expect(result?.url).toBe(photoPath);
+      expect(result?.photoPath.value).toBe(photoPath);
       expect(result?.width).toBe(3840);
       expect(result?.height).toBe(2160);
     });
@@ -141,7 +183,7 @@ describe('useHybridPhotoLoading', () => {
       expect(result?.loadingState).toBe('loaded');
     });
 
-    it('urlプロパティにphotoPathが設定される', () => {
+    it('photoPathプロパティが設定される', () => {
       const metadata = {
         id: 'test-id',
         photoTakenAt: new Date(),
@@ -152,7 +194,7 @@ describe('useHybridPhotoLoading', () => {
 
       const result = createFullyLoadedPhoto(metadata, photoPath);
 
-      expect(result?.url).toBe(photoPath);
+      expect(result?.photoPath.value).toBe(photoPath);
     });
 
     it('fileNameWithExtがパスから抽出される', () => {

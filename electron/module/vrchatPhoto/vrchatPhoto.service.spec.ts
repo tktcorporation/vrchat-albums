@@ -324,4 +324,108 @@ describe('vrchatPhoto.service', () => {
       await expect(cleanupThumbnailCache()).resolves.toBeUndefined();
     });
   });
+
+  describe('getBatchThumbnails', () => {
+    let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
+    let mockSharpInstance: {
+      metadata: ReturnType<typeof vi.fn>;
+      resize: ReturnType<typeof vi.fn>;
+      webp: ReturnType<typeof vi.fn>;
+      toBuffer: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(async () => {
+      sharpFactory = vi.mocked(sharp);
+      mockSharpInstance = {
+        metadata: vi.fn().mockResolvedValue({
+          width: 1920,
+          height: 1080,
+          format: 'png',
+        }),
+        resize: vi.fn().mockReturnThis(),
+        webp: vi.fn().mockReturnThis(),
+        toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumbnail_data')),
+      };
+      sharpFactory.mockReturnValue(
+        mockSharpInstance as unknown as ReturnType<typeof sharp>,
+      );
+    });
+
+    it('空の配列を渡すと空のMapを返す', async () => {
+      const { getBatchThumbnails } = await import('./vrchatPhoto.service');
+      const result = await getBatchThumbnails([]);
+      expect(result.size).toBe(0);
+    });
+
+    it('成功したパスのサムネイルを返す', async () => {
+      const { getBatchThumbnails } = await import('./vrchatPhoto.service');
+      const paths = [
+        '/path/to/VRChat_2024-01-15_10-00-00.000_1920x1080.png',
+        '/path/to/VRChat_2024-01-15_11-00-00.000_1920x1080.png',
+      ];
+
+      const result = await getBatchThumbnails(paths, 256);
+
+      expect(result.size).toBe(2);
+      expect(result.has(paths[0])).toBe(true);
+      expect(result.has(paths[1])).toBe(true);
+    });
+
+    it('一部のパスが失敗しても成功したものは返す（混合ケース）', async () => {
+      const { getBatchThumbnails } = await import('./vrchatPhoto.service');
+
+      // 2番目のリクエストでエラーを発生させる
+      let callCount = 0;
+      sharpFactory.mockImplementation(() => {
+        callCount++;
+        if (callCount === 2) {
+          throw new Error('Input file is missing');
+        }
+        return mockSharpInstance as unknown as ReturnType<typeof sharp>;
+      });
+
+      const paths = [
+        '/path/to/VRChat_2024-01-15_10-00-00.000_1920x1080.png', // 成功
+        '/path/to/missing_photo.png', // 失敗
+        '/path/to/VRChat_2024-01-15_12-00-00.000_1920x1080.png', // 成功
+      ];
+
+      const result = await getBatchThumbnails(paths, 256);
+
+      // 2つは成功、1つは失敗
+      expect(result.size).toBe(2);
+      expect(result.has(paths[0])).toBe(true);
+      expect(result.has(paths[1])).toBe(false); // 失敗したものは含まれない
+      expect(result.has(paths[2])).toBe(true);
+    });
+
+    it('全て失敗した場合は空のMapを返す', async () => {
+      const { getBatchThumbnails } = await import('./vrchatPhoto.service');
+
+      sharpFactory.mockImplementation(() => {
+        throw new Error('Input file is missing');
+      });
+
+      const paths = ['/path/to/missing1.png', '/path/to/missing2.png'];
+
+      const result = await getBatchThumbnails(paths, 256);
+
+      expect(result.size).toBe(0);
+    });
+
+    it('PARALLEL_LIMIT を超えるパスでも全て処理する', async () => {
+      const { getBatchThumbnails } = await import('./vrchatPhoto.service');
+
+      // PARALLEL_LIMIT = 8 なので、16個のパスを渡す
+      const paths = Array.from(
+        { length: 16 },
+        (_, i) =>
+          `/path/to/VRChat_2024-01-15_${String(i).padStart(2, '0')}-00-00.000_1920x1080.png`,
+      );
+
+      const result = await getBatchThumbnails(paths, 256);
+
+      expect(result.size).toBe(16);
+    });
+  });
 });
