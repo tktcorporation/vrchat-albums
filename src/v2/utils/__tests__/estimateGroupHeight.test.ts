@@ -14,6 +14,7 @@ import { JustifiedLayoutCalculator } from '../justifiedLayoutCalculator';
  */
 const createMockPhotos = (count: number): Photo[] =>
   Array.from({ length: count }, (_, i) => ({
+    loadingState: 'loaded' as const,
     id: `photo-${i}`,
     url: `/path/photo-${i}.jpg`,
     fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(

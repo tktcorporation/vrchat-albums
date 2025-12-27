@@ -3,7 +3,7 @@ import pathe from 'pathe';
 import { useMemo } from 'react';
 import { trpcReact } from '@/trpc';
 import { VRChatPhotoFileNameWithExtSchema } from '../../../valueObjects';
-import type { Photo } from '../../types/photo';
+import { isPhotoLoaded, type Photo } from '../../types/photo';
 import type { GroupedPhotos } from './useGroupPhotos';
 import { useGroupPhotos } from './useGroupPhotos';
 
@@ -103,6 +103,7 @@ export function usePhotoGallery(
       }
 
       return {
+        loadingState: 'loaded' as const,
         id: p.id,
         url: p.photoPath,
         fileNameWithExt: fileNameWithExt,
@@ -201,10 +202,11 @@ export function usePhotoGallery(
         }
       }
 
-      // ファイル名での検索（fileNameWithExtが利用可能な場合のみ）
+      // ファイル名での検索（完全ロード済みの写真のみ対象）
       const matchingPhotos = group.photos.filter(
         (photo: Photo) =>
-          photo.fileNameWithExt?.value.toLowerCase().includes(query) ?? false,
+          isPhotoLoaded(photo) &&
+          photo.fileNameWithExt.value.toLowerCase().includes(query),
       );
       if (matchingPhotos.length > 0) {
         filtered[key] = group;

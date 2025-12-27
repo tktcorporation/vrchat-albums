@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { trpcReact } from '@/trpc';
+import {
+  notifyCacheUpdate,
+  subscribeToCacheUpdate,
+} from '../services/thumbnailEventEmitter';
 
 /**
  * LRUキャッシュの設定
@@ -7,7 +11,6 @@ import { trpcReact } from '@/trpc';
 const CACHE_MAX_SIZE = 500; // 最大キャッシュ数
 const PREFETCH_BATCH_SIZE = 20; // プリフェッチのバッチサイズ
 const PREFETCH_AHEAD = 50; // 何枚先までプリフェッチするか
-const CACHE_CHECK_INTERVAL_MS = 100; // キャッシュ更新チェック間隔
 
 /**
  * LRU (Least Recently Used) キャッシュ
@@ -127,9 +130,10 @@ export function useThumbnailCache() {
           width: 256,
         });
 
-        // キャッシュに保存
+        // キャッシュに保存 + イベント通知
         for (const { photoPath, data } of result) {
           globalThumbnailCache.set(photoPath, data);
+          notifyCacheUpdate(photoPath, data);
         }
         setCacheSize(globalThumbnailCache.size);
       } catch (error) {
@@ -252,19 +256,17 @@ export function useThumbnail(photoPath: string, enabled = true) {
     prefetchThumbnails([photoPath]);
   }, [photoPath, enabled, getThumbnail, prefetchThumbnails]);
 
-  // キャッシュが更新されたらチェック
+  // キャッシュ更新イベントを購読
   useEffect(() => {
     if (!enabled || !photoPath) return;
 
-    const interval = setInterval(() => {
-      const cached = getThumbnail(photoPath);
-      if (cached && cached !== thumbnail) {
-        setThumbnailState(cached);
-      }
-    }, CACHE_CHECK_INTERVAL_MS);
+    // 既にキャッシュにある場合は購読不要
+    const cached = getThumbnail(photoPath);
+    if (cached) return;
 
-    return () => clearInterval(interval);
-  }, [photoPath, enabled, getThumbnail, thumbnail]);
+    // キャッシュ更新を待つ
+    return subscribeToCacheUpdate(photoPath, setThumbnailState);
+  }, [photoPath, enabled, getThumbnail]);
 
   return thumbnail;
 }

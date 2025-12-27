@@ -7,7 +7,7 @@ import { glob } from 'glob';
 import * as neverthrow from 'neverthrow';
 import * as path from 'pathe';
 import sharp from 'sharp';
-import { match, P } from 'ts-pattern';
+import { match } from 'ts-pattern';
 import { logger } from './../../lib/logger';
 import * as fs from './../../lib/wrappedFs';
 import { getSettingStore } from '../settingStore';
@@ -22,6 +22,9 @@ const THUMBNAIL_CACHE_DIR_NAME = 'vrchat-albums-thumbnails';
 const MAX_CACHE_SIZE_MB = 500; // キャッシュの最大サイズ
 const CACHE_CLEANUP_THRESHOLD = 0.9; // キャッシュサイズがこの割合を超えたらクリーンアップ
 const CACHE_EXPIRY_DAYS = 7; // キャッシュの有効期限（日数）
+
+// 書き込み中のキャッシュキーを追跡（競合防止）
+const pendingCacheWrites = new Set<string>();
 
 /**
  * Electronのappモジュールを遅延取得する
@@ -71,12 +74,16 @@ const ensureCacheDir = async (): Promise<string> => {
     await fsPromises.mkdir(cacheDir, { recursive: true });
   } catch (error) {
     // ディレクトリが既に存在する場合は無視
-    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-      logger.error({
-        message: `Failed to create cache directory: ${cacheDir}`,
-        stack: error instanceof Error ? error : new Error(String(error)),
+    match(error)
+      .with({ code: 'EEXIST' }, () => {
+        // 既に存在するのでOK
+      })
+      .otherwise((e) => {
+        logger.error({
+          message: `Failed to create cache directory: ${cacheDir}`,
+          stack: e instanceof Error ? e : new Error(String(e)),
+        });
       });
-    }
   }
   return cacheDir;
 };
@@ -103,22 +110,42 @@ const getCachedThumbnail = async (cacheKey: string): Promise<Buffer | null> => {
 };
 
 /**
- * サムネイルをキャッシュに保存
+ * サムネイルをキャッシュに保存（アトミック書き込み + 競合防止）
+ *
+ * 複数の同時リクエストが同一キーに書き込もうとした場合:
+ * - 最初のリクエストのみが書き込みを実行
+ * - 後続のリクエストは早期リターン（既に書き込み中のため）
+ *
+ * アトミック書き込み:
+ * - 一時ファイル (.tmp) に書き込み
+ * - rename で本来のパスに移動
+ * - これにより書き込み途中のファイルが読まれることを防止
  */
 const saveThumbnailToCache = async (
   cacheKey: string,
   buffer: Buffer,
 ): Promise<void> => {
-  const cacheDir = await ensureCacheDir();
-  const cachePath = path.join(cacheDir, `${cacheKey}.webp`);
+  // 既に書き込み中の場合はスキップ
+  if (pendingCacheWrites.has(cacheKey)) {
+    return;
+  }
+  pendingCacheWrites.add(cacheKey);
 
   try {
-    await fsPromises.writeFile(cachePath, buffer);
+    const cacheDir = await ensureCacheDir();
+    const cachePath = path.join(cacheDir, `${cacheKey}.webp`);
+    const tempPath = `${cachePath}.tmp`;
+
+    // アトミック書き込み: tmp -> rename
+    await fsPromises.writeFile(tempPath, buffer);
+    await fsPromises.rename(tempPath, cachePath);
   } catch (error) {
     logger.error({
-      message: `Failed to save thumbnail to cache: ${cachePath}`,
+      message: `Failed to save thumbnail to cache: ${cacheKey}`,
       stack: error instanceof Error ? error : new Error(String(error)),
     });
+  } finally {
+    pendingCacheWrites.delete(cacheKey);
   }
 };
 
@@ -613,17 +640,12 @@ export const getVRChatPhotoItemData = async ({
     if (!(error instanceof Error)) {
       throw new Error(JSON.stringify(error));
     }
-    return neverthrow.err(
-      match(error.message)
-        .with(
-          P.string.includes('Input file is missing'),
-          () => 'InputFileIsMissing' as const,
-        )
-        .with(P.string, () => {
-          throw error;
-        })
-        .exhaustive(),
-    );
+
+    if (error.message.includes('Input file is missing')) {
+      return neverthrow.err('InputFileIsMissing' as const);
+    }
+
+    throw error;
   }
 };
 

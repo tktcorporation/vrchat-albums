@@ -4,6 +4,7 @@ import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UseLoadingStateResult } from '../../hooks/useLoadingState';
 import { useThumbnailCache } from '../../hooks/useThumbnailCache';
+import { isPhotoLoaded } from '../../types/photo';
 import {
   estimateGroupHeight,
   GROUP_HEIGHT_CONSTANTS,
@@ -182,12 +183,12 @@ const GalleryContent = memo(
       const prefetchStart = Math.max(0, firstIndex - 2); // 2グループ前から
       const prefetchEnd = Math.min(filteredGroups.length, lastIndex + 5); // 5グループ先まで
 
-      // プリフェッチ対象の写真パスを収集
+      // プリフェッチ対象の写真パスを収集（完全ロード済みのみ）
       const pathsToPrefetch: string[] = [];
       for (let i = prefetchStart; i < prefetchEnd; i++) {
         const [, group] = filteredGroups[i];
         for (const photo of group.photos) {
-          if (photo.url) {
+          if (isPhotoLoaded(photo)) {
             pathsToPrefetch.push(photo.url);
           }
         }
@@ -197,7 +198,7 @@ const GalleryContent = memo(
       if (pathsToPrefetch.length > 0) {
         prefetchThumbnails(pathsToPrefetch);
       }
-    }, [virtualizer.getVirtualItems(), filteredGroups, prefetchThumbnails]);
+    }, [virtualizer, filteredGroups, prefetchThumbnails]);
 
     // IntersectionObserverでビューポート内のグループを検知
     useEffect(() => {

@@ -17,6 +17,7 @@ describe('JustifiedLayoutCalculator', () => {
    */
   const createMockPhotos = (count: number): Photo[] =>
     Array.from({ length: count }, (_, i) => ({
+      loadingState: 'loaded' as const,
       id: `photo-${i}`,
       url: `/path/photo-${i}.jpg`,
       fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(
@@ -93,6 +94,7 @@ describe('JustifiedLayoutCalculator', () => {
     it('アスペクト比が異なる写真を適切に処理する', () => {
       const photos: Photo[] = [
         {
+          loadingState: 'loaded' as const,
           id: 'portrait',
           url: '/portrait.jpg',
           fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(
@@ -106,6 +108,7 @@ describe('JustifiedLayoutCalculator', () => {
           },
         },
         {
+          loadingState: 'loaded' as const,
           id: 'landscape',
           url: '/landscape.jpg',
           fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(
@@ -220,6 +223,7 @@ describe('JustifiedLayoutCalculator', () => {
     it('写真の幅・高さがnullの場合はデフォルト値を使用する', () => {
       const photos: Photo[] = [
         {
+          loadingState: 'loaded' as const,
           id: 'no-dimensions',
           url: '/test.jpg',
           fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(

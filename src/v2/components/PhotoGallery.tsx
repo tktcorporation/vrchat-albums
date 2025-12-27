@@ -4,6 +4,7 @@ import { useToast } from '../hooks/use-toast';
 import { useDebounce } from '../hooks/useDebounce';
 import type { UseLoadingStateResult } from '../hooks/useLoadingState';
 import { useI18n } from '../i18n/store';
+import { isPhotoLoaded } from '../types/photo';
 import { useMigrationNotice } from './MigrationNotice';
 import GalleryContent from './PhotoGallery/GalleryContent';
 import { usePhotoGallery } from './PhotoGallery/usePhotoGallery';
@@ -92,11 +93,11 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
       return;
     }
 
-    // 全グループの写真をIDでマップ化
+    // 全グループの写真をIDでマップ化（完全ロード済みのみ）
     const photoUrlMap = new Map<string, string>();
     for (const group of Object.values(groupedPhotos)) {
       for (const photo of group.photos) {
-        if (photo.url) {
+        if (isPhotoLoaded(photo)) {
           photoUrlMap.set(photo.id.toString(), photo.url);
         }
       }
