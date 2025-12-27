@@ -35,7 +35,12 @@ const getElectronApp = (): typeof import('electron').app | null => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { app } = require('electron') as typeof import('electron');
     return app;
-  } catch {
+  } catch (error) {
+    // Playwrightテストなど非Electron環境では予期されるエラー
+    logger.debug({
+      message: 'Electron app module not available, using fallback paths',
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
     return null;
   }
 };
@@ -48,8 +53,12 @@ const getThumbnailCacheDir = (): string => {
   if (app) {
     try {
       return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
-    } catch {
+    } catch (error) {
       // アプリ未初期化時はフォールバック
+      logger.debug({
+        message: 'app.getPath("temp") failed, using os.tmpdir() fallback',
+        stack: error instanceof Error ? error : new Error(String(error)),
+      });
     }
   }
   // テスト環境などでappが使えない場合
@@ -173,8 +182,18 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
         try {
           const stats = await fsPromises.stat(filePath);
           return { filePath, stats, size: stats.size, mtime: stats.mtimeMs };
-        } catch {
-          return null;
+        } catch (error) {
+          // ENOENT はレースコンディション（ファイル削除）で予期される
+          // その他のエラー（権限、I/O）はログ出力
+          return match(error)
+            .with({ code: 'ENOENT' }, () => null)
+            .otherwise((e) => {
+              logger.debug({
+                message: `Failed to stat cache file: ${filePath}`,
+                stack: e instanceof Error ? e : new Error(String(e)),
+              });
+              return null;
+            });
         }
       }),
     );
@@ -730,7 +749,7 @@ export const getBatchThumbnails = async (
         return { photoPath, data: null };
       } catch (error) {
         // 予期しないエラーをログ出力（バッチ処理は継続）
-        logger.debug({
+        logger.warn({
           message: `Failed to get thumbnail in batch for ${photoPath}`,
           stack: error instanceof Error ? error : new Error(String(error)),
         });

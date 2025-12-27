@@ -49,22 +49,36 @@ const VRCHAT_PHOTO_FILENAME_PATTERN =
  * パスの末尾がVRChat写真のファイル名形式であることを検証済み。
  * 例: /path/to/VRChat/VRChat_2023-10-01_03-01-18.551_2560x1440.png
  *
+ * @remarks
+ * fileNameとdirPathはコンストラクタ時に計算・キャッシュされる。
+ * これにより、頻繁なアクセス時のパース処理オーバーヘッドを削減。
+ *
  * @see VRChatPhotoFileNameWithExt - ファイル名のみのValueObject
  */
 class VRChatPhotoPath extends BaseValueObject<'VRChatPhotoPath', string> {
-  /**
-   * パスからファイル名部分を取得
-   */
-  public get fileName(): VRChatPhotoFileNameWithExt {
-    const basename = pathe.basename(this.value);
-    return VRChatPhotoFileNameWithExtSchema.parse(basename);
+  private readonly _fileName: VRChatPhotoFileNameWithExt;
+  private readonly _dirPath: string;
+
+  constructor(value: string) {
+    super(value);
+    // 派生プロパティをコンストラクタ時にキャッシュ
+    const basename = pathe.basename(value);
+    this._fileName = VRChatPhotoFileNameWithExtSchema.parse(basename);
+    this._dirPath = pathe.dirname(value);
   }
 
   /**
-   * パスからディレクトリ部分を取得
+   * パスからファイル名部分を取得（キャッシュ済み）
+   */
+  public get fileName(): VRChatPhotoFileNameWithExt {
+    return this._fileName;
+  }
+
+  /**
+   * パスからディレクトリ部分を取得（キャッシュ済み）
    */
   public get dirPath(): string {
-    return pathe.dirname(this.value);
+    return this._dirPath;
   }
 }
 

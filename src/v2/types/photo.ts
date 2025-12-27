@@ -3,6 +3,7 @@ import {
   type VRChatPhotoPath,
   VRChatPhotoPathSchema,
 } from './../../valueObjects';
+import { logger } from '../lib/logger';
 
 /**
  * 写真データの共通プロパティ（基底インターフェース）
@@ -146,10 +147,13 @@ export function createFullyLoadedPhoto(
 
   if (!parseResult.success) {
     // VRChat写真形式でないファイル名の場合はnullを返す
-    console.warn(
-      `[createFullyLoadedPhoto] Invalid VRChat photo path: ${photoPathStr}`,
-      parseResult.error.message,
-    );
+    logger.warn({
+      message: 'Invalid VRChat photo path in createFullyLoadedPhoto',
+      details: {
+        photoPath: photoPathStr,
+        zodError: parseResult.error.message,
+      },
+    });
     return null;
   }
 

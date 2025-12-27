@@ -1,5 +1,8 @@
+import { TRPCClientError } from '@trpc/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { match, P } from 'ts-pattern';
 import { trpcReact } from '@/trpc';
+import { logger } from '../lib/logger';
 import {
   notifyCacheUpdate,
   subscribeToCacheUpdate,
@@ -204,8 +207,27 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
         }
         setCacheSize(globalThumbnailCache.size);
       } catch (error) {
-        // エラーログは常に出力
-        console.error('Failed to fetch batch thumbnails:', error);
+        // エラー分類とログ出力
+        match(error)
+          .with(P.instanceOf(TRPCClientError), (trpcError) => {
+            // tRPCエラー（サーバー応答あり）
+            logger.warn({
+              message: 'tRPC error fetching batch thumbnails',
+              error: trpcError,
+              details: {
+                batchSize: batchToFetch.length,
+                code: trpcError.data?.code,
+              },
+            });
+          })
+          .otherwise((e) => {
+            // ネットワークエラーなど予期しないエラー
+            logger.error({
+              message: 'Failed to fetch batch thumbnails',
+              error: e,
+              details: { batchSize: batchToFetch.length },
+            });
+          });
         // コールバックがあれば通知（UIへの表示等）
         onFetchError?.(error, batchToFetch);
       } finally {

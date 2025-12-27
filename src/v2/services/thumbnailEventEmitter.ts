@@ -23,6 +23,8 @@
  * ```
  */
 
+import { logger } from '../lib/logger';
+
 type CacheUpdateListener = (data: string) => void;
 
 // photoPath -> リスナーのセット
@@ -68,7 +70,11 @@ export const notifyCacheUpdate = (photoPath: string, data: string): void => {
         listener(data);
       } catch (error) {
         // リスナーのエラーは他のリスナーに影響させない
-        console.error('Thumbnail cache listener error:', error);
+        logger.error({
+          message: 'Thumbnail cache listener error',
+          error,
+          details: { photoPath },
+        });
       }
     }
   }

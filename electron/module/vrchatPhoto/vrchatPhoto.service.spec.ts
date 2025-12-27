@@ -428,4 +428,110 @@ describe('vrchatPhoto.service', () => {
       expect(result.size).toBe(16);
     });
   });
+
+  describe('Cache Expiry (getCachedThumbnail)', () => {
+    // CACHE_EXPIRY_DAYS = 7
+    const mockStat = vi.mocked(fsPromises.stat);
+    const mockReadFile = vi.mocked(fsPromises.readFile);
+    let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
+    let mockSharpInstance: {
+      metadata: ReturnType<typeof vi.fn>;
+      resize: ReturnType<typeof vi.fn>;
+      webp: ReturnType<typeof vi.fn>;
+      toBuffer: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      sharpFactory = vi.mocked(sharp);
+      mockSharpInstance = {
+        metadata: vi.fn().mockResolvedValue({
+          width: 1920,
+          height: 1080,
+          format: 'png',
+        }),
+        resize: vi.fn().mockReturnThis(),
+        webp: vi.fn().mockReturnThis(),
+        toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumbnail_data')),
+      };
+      sharpFactory.mockReturnValue(
+        mockSharpInstance as unknown as ReturnType<typeof sharp>,
+      );
+    });
+
+    it('有効期限内のキャッシュは使用される', async () => {
+      const mockPhotoPath =
+        '/path/to/VRChat_2023-10-26_10-30-00.123_1920x1080.png';
+      const cachedData = Buffer.from('cached_thumbnail_data');
+
+      // キャッシュファイルが存在し、6日前（有効期限内）
+      const sixDaysAgo = Date.now() - 6 * 24 * 60 * 60 * 1000;
+      mockStat.mockResolvedValue({
+        size: cachedData.length,
+        mtimeMs: sixDaysAgo,
+      } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>);
+      mockReadFile.mockResolvedValue(cachedData);
+
+      const result = await getVRChatPhotoItemData({
+        photoPath: mockPhotoPath,
+        width: 256,
+      });
+
+      // キャッシュからのデータが返される
+      expect(result.isOk()).toBe(true);
+      // sharpは呼ばれない（キャッシュからデータを取得したため）
+      expect(mockReadFile).toHaveBeenCalled();
+    });
+
+    it('有効期限切れのキャッシュは無視され再生成される', async () => {
+      const mockPhotoPath =
+        '/path/to/VRChat_2023-10-26_10-30-00.123_1920x1080.png';
+      const newThumbnailData = Buffer.from('new_thumbnail_data');
+
+      // キャッシュファイルが存在するが、8日前（有効期限切れ）
+      const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000;
+      mockStat.mockResolvedValue({
+        size: 1000,
+        mtimeMs: eightDaysAgo,
+      } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>);
+
+      // sharpで新しいサムネイルを生成
+      mockSharpInstance.toBuffer.mockResolvedValue(newThumbnailData);
+
+      const result = await getVRChatPhotoItemData({
+        photoPath: mockPhotoPath,
+        width: 256,
+      });
+
+      // 新しく生成されたデータが返される
+      expect(result.isOk()).toBe(true);
+      // sharpが呼ばれる（キャッシュが期限切れなので再生成）
+      expect(sharpFactory).toHaveBeenCalled();
+    });
+
+    it('キャッシュファイルが存在しない場合は新規生成', async () => {
+      const mockPhotoPath =
+        '/path/to/VRChat_2023-10-26_10-30-00.123_1920x1080.png';
+      const newThumbnailData = Buffer.from('new_thumbnail_data');
+
+      // キャッシュファイルが存在しない（ENOENT）
+      const error = new Error('ENOENT: no such file') as Error & {
+        code: string;
+      };
+      error.code = 'ENOENT';
+      mockStat.mockRejectedValue(error);
+
+      // sharpで新しいサムネイルを生成
+      mockSharpInstance.toBuffer.mockResolvedValue(newThumbnailData);
+
+      const result = await getVRChatPhotoItemData({
+        photoPath: mockPhotoPath,
+        width: 256,
+      });
+
+      // 新しく生成されたデータが返される
+      expect(result.isOk()).toBe(true);
+      // sharpが呼ばれる
+      expect(sharpFactory).toHaveBeenCalled();
+    });
+  });
 });

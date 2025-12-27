@@ -1,5 +1,8 @@
+import { TRPCClientError } from '@trpc/client';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { match, P } from 'ts-pattern';
 import { trpcReact } from '@/trpc';
+import { logger } from '../lib/logger';
 import type { PhotoMetadata } from '../types/photo';
 
 // ファクトリ関数は photo.ts から再エクスポート
@@ -134,8 +137,27 @@ export function useHybridPhotoLoading(
           // キャッシュ数を更新（リアクティブ）
           setCachedPathCount(pathCacheRef.current.size);
         } catch (error) {
-          // エラーログは常に出力
-          console.error('Failed to prefetch photo paths:', error);
+          // エラー分類とログ出力
+          match(error)
+            .with(P.instanceOf(TRPCClientError), (trpcError) => {
+              // tRPCエラー（サーバー応答あり）
+              logger.warn({
+                message: 'tRPC error prefetching photo paths',
+                error: trpcError,
+                details: {
+                  batchSize: batch.length,
+                  code: trpcError.data?.code,
+                },
+              });
+            })
+            .otherwise((e) => {
+              // ネットワークエラーなど予期しないエラー
+              logger.error({
+                message: 'Failed to prefetch photo paths',
+                error: e,
+                details: { batchSize: batch.length },
+              });
+            });
           // コールバックがあれば通知（UIへの表示等）
           onPrefetchError?.(error, batch);
         } finally {
