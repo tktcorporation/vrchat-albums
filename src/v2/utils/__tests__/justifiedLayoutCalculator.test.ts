@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { VRChatPhotoFileNameWithExtSchema } from '../../../valueObjects';
+import { VRChatPhotoPathSchema } from '../../../valueObjects';
 import { LAYOUT_CONSTANTS } from '../../constants/layoutConstants';
 import type { Photo } from '../../types/photo';
 import { JustifiedLayoutCalculator } from '../justifiedLayoutCalculator';
@@ -16,19 +16,24 @@ describe('JustifiedLayoutCalculator', () => {
    * レイアウト計算のテストで一括生成に利用する。
    */
   const createMockPhotos = (count: number): Photo[] =>
-    Array.from({ length: count }, (_, i) => ({
-      id: `photo-${i}`,
-      url: `/path/photo-${i}.jpg`,
-      fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(
-        'VRChat_2025-05-25_12-00-00.000_1920x1080.png',
-      ),
-      width: 1920,
-      height: 1080,
-      takenAt: new Date(),
-      location: {
-        joinedAt: new Date(),
-      },
-    }));
+    Array.from({ length: count }, (_, i) => {
+      const padded = String(i).padStart(2, '0');
+      const photoPath = VRChatPhotoPathSchema.parse(
+        `/path/VRChat_2025-05-25_12-00-${padded}.000_1920x1080.png`,
+      );
+      return {
+        loadingState: 'loaded' as const,
+        id: `photo-${i}`,
+        photoPath,
+        fileNameWithExt: photoPath.fileName,
+        width: 1920,
+        height: 1080,
+        takenAt: new Date(),
+        location: {
+          joinedAt: new Date(),
+        },
+      };
+    });
 
   describe('calculateLayout', () => {
     it('コンテナ幅が0の場合は空の結果を返す', () => {
@@ -91,13 +96,18 @@ describe('JustifiedLayoutCalculator', () => {
     });
 
     it('アスペクト比が異なる写真を適切に処理する', () => {
+      const portraitPath = VRChatPhotoPathSchema.parse(
+        '/path/VRChat_2025-05-25_12-00-00.000_1080x1920.png',
+      );
+      const landscapePath = VRChatPhotoPathSchema.parse(
+        '/path/VRChat_2025-05-25_12-00-01.000_1920x1080.png',
+      );
       const photos: Photo[] = [
         {
+          loadingState: 'loaded' as const,
           id: 'portrait',
-          url: '/portrait.jpg',
-          fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(
-            'VRChat_2025-05-25_12-00-00.000_1080x1920.png',
-          ),
+          photoPath: portraitPath,
+          fileNameWithExt: portraitPath.fileName,
           width: 1080,
           height: 1920, // 縦長
           takenAt: new Date(),
@@ -106,11 +116,10 @@ describe('JustifiedLayoutCalculator', () => {
           },
         },
         {
+          loadingState: 'loaded' as const,
           id: 'landscape',
-          url: '/landscape.jpg',
-          fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(
-            'VRChat_2025-05-25_12-00-00.000_1920x1080.png',
-          ),
+          photoPath: landscapePath,
+          fileNameWithExt: landscapePath.fileName,
           width: 1920,
           height: 1080, // 横長
           takenAt: new Date(),
@@ -218,13 +227,15 @@ describe('JustifiedLayoutCalculator', () => {
 
   describe('edge cases', () => {
     it('写真の幅・高さがnullの場合はデフォルト値を使用する', () => {
+      const photoPath = VRChatPhotoPathSchema.parse(
+        '/path/VRChat_2025-05-25_12-00-00.000_1920x1080.png',
+      );
       const photos: Photo[] = [
         {
+          loadingState: 'loaded' as const,
           id: 'no-dimensions',
-          url: '/test.jpg',
-          fileNameWithExt: VRChatPhotoFileNameWithExtSchema.parse(
-            'VRChat_2025-05-25_12-00-00.000_1920x1080.png',
-          ),
+          photoPath,
+          fileNameWithExt: photoPath.fileName,
           width: 0,
           height: 0,
           takenAt: new Date(),

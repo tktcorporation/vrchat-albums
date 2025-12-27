@@ -124,7 +124,7 @@ describe('createVRChatPhotoPathIndex', () => {
       mockSettingStore as unknown as SettingStore,
     );
 
-    // Mock glob
+    // Mock glob and glob.stream
     vi.mocked(glob).mockImplementation(async (pattern: string | string[]) => {
       const patternStr = Array.isArray(pattern) ? pattern.join(',') : pattern;
       if (typeof patternStr !== 'string') {
@@ -139,6 +139,25 @@ describe('createVRChatPhotoPathIndex', () => {
       return [];
     });
 
+    // Mock glob.stream (used for streaming file enumeration)
+    // @ts-expect-error - glob.stream is being mocked
+    glob.stream = vi.fn().mockImplementation((pattern: string) => {
+      // Create an async iterable from the files
+      const files = pattern.startsWith(`${mockPhotoDir.value}/**/`)
+        ? mockMainFiles
+        : pattern.startsWith(`${mockExtraDir.value}/**/`)
+          ? mockExtraFiles
+          : [];
+
+      return {
+        [Symbol.asyncIterator]: async function* () {
+          for (const file of files) {
+            yield file;
+          }
+        },
+      };
+    });
+
     // Mock DB model
     vi.mocked(model.createOrUpdateListVRChatPhotoPath).mockResolvedValue([]);
   });
@@ -150,12 +169,16 @@ describe('createVRChatPhotoPathIndex', () => {
   it('初回実行時はすべての写真ファイルを処理する', async () => {
     await service.createVRChatPhotoPathIndex(null);
 
-    // Check glob calls
-    expect(glob).toHaveBeenCalledTimes(2);
-    expect(glob).toHaveBeenCalledWith(`${mockPhotoDir.value}/**/VRChat_*.png`);
-    expect(glob).toHaveBeenCalledWith(`${mockExtraDir.value}/**/VRChat_*.png`);
+    // Check glob.stream calls (streaming API is now used)
+    expect(glob.stream).toHaveBeenCalledTimes(2);
+    expect(glob.stream).toHaveBeenCalledWith(
+      `${mockPhotoDir.value}/**/VRChat_*.png`,
+    );
+    expect(glob.stream).toHaveBeenCalledWith(
+      `${mockExtraDir.value}/**/VRChat_*.png`,
+    );
 
-    // Check stat calls (should NOT be called)
+    // Check stat calls (should NOT be called when no lastProcessedDate)
     expect(nodefsPromises.stat).toHaveBeenCalledTimes(0);
 
     // Check DB save call - now called multiple times due to batching
@@ -176,8 +199,8 @@ describe('createVRChatPhotoPathIndex', () => {
 
     await service.createVRChatPhotoPathIndex(lastProcessedDate);
 
-    // Check glob calls
-    expect(glob).toHaveBeenCalledTimes(2);
+    // Check glob.stream calls
+    expect(glob.stream).toHaveBeenCalledTimes(2);
 
     // Check stat calls for all files (to check mtime)
     expect(nodefsPromises.stat).toHaveBeenCalledTimes(allFiles.length);
@@ -205,8 +228,8 @@ describe('createVRChatPhotoPathIndex', () => {
 
     await service.createVRChatPhotoPathIndex(lastProcessedDate);
 
-    // Check glob calls
-    expect(glob).toHaveBeenCalledTimes(2);
+    // Check glob.stream calls
+    expect(glob.stream).toHaveBeenCalledTimes(2);
 
     // Check stat calls
     expect(nodefsPromises.stat).toHaveBeenCalledTimes(allFiles.length);

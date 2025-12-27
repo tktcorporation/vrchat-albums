@@ -438,7 +438,7 @@ describe('usePhotoGallery', () => {
     });
 
     let group = Object.values(result.current.groupedPhotos)[0];
-    expect(group.photos[0].fileNameWithExt.value).toBe(
+    expect(group.photos[0].fileNameWithExt?.value).toBe(
       'VRChat_2024-01-01_00-00-00.000_1920x1080.png',
     );
 
@@ -450,7 +450,7 @@ describe('usePhotoGallery', () => {
     });
 
     group = Object.values(result.current.groupedPhotos)[0];
-    expect(group.photos[0].fileNameWithExt.value).toBe(
+    expect(group.photos[0].fileNameWithExt?.value).toBe(
       'VRChat_2024-01-01_00-00-00.000_1920x1080.png',
     );
   });

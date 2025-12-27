@@ -1,9 +1,8 @@
 import { atom, useAtom } from 'jotai';
-import pathe from 'pathe';
 import { useMemo } from 'react';
 import { trpcReact } from '@/trpc';
-import { VRChatPhotoFileNameWithExtSchema } from '../../../valueObjects';
-import type { Photo } from '../../types/photo';
+import { VRChatPhotoPathSchema } from '../../../valueObjects';
+import { isPhotoLoaded, type Photo } from '../../types/photo';
 import type { GroupedPhotos } from './useGroupPhotos';
 import { useGroupPhotos } from './useGroupPhotos';
 
@@ -91,21 +90,18 @@ export function usePhotoGallery(
   const photoList: Photo[] = useMemo(() => {
     if (!photoListRaw) return [];
     const mappedList = photoListRaw.map((p) => {
-      let fileNameWithExt: ReturnType<
-        typeof VRChatPhotoFileNameWithExtSchema.parse
-      >;
-      try {
-        const basename = pathe.basename(p.photoPath);
-        fileNameWithExt = VRChatPhotoFileNameWithExtSchema.parse(basename);
-      } catch (error) {
-        console.warn(`Invalid photo file name: ${p.photoPath}`, error);
+      const parseResult = VRChatPhotoPathSchema.safeParse(p.photoPath);
+      if (!parseResult.success) {
+        console.warn(`Invalid photo path: ${p.photoPath}`, parseResult.error);
         return null;
       }
 
+      const photoPath = parseResult.data;
       return {
+        loadingState: 'loaded' as const,
         id: p.id,
-        url: p.photoPath,
-        fileNameWithExt: fileNameWithExt,
+        photoPath,
+        fileNameWithExt: photoPath.fileName,
         takenAt: p.photoTakenAt,
         width: p.width,
         height: p.height,
@@ -201,9 +197,11 @@ export function usePhotoGallery(
         }
       }
 
-      // ファイル名での検索
-      const matchingPhotos = group.photos.filter((photo: Photo) =>
-        photo.fileNameWithExt.value.toLowerCase().includes(query),
+      // ファイル名での検索（完全ロード済みの写真のみ対象）
+      const matchingPhotos = group.photos.filter(
+        (photo: Photo) =>
+          isPhotoLoaded(photo) &&
+          photo.fileNameWithExt.value.toLowerCase().includes(query),
       );
       if (matchingPhotos.length > 0) {
         filtered[key] = group;
