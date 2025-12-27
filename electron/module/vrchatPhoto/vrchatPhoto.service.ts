@@ -7,7 +7,7 @@ import { glob } from 'glob';
 import * as neverthrow from 'neverthrow';
 import * as path from 'pathe';
 import sharp from 'sharp';
-import { match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { logger } from './../../lib/logger';
 import * as fs from './../../lib/wrappedFs';
 import { getSettingStore } from '../settingStore';
@@ -637,15 +637,17 @@ export const getVRChatPhotoItemData = async ({
         .replace('.', '')};base64,${photoBuf.toString('base64')}`,
     );
   } catch (error) {
-    if (!(error instanceof Error)) {
-      throw new Error(JSON.stringify(error));
-    }
-
-    if (error.message.includes('Input file is missing')) {
-      return neverthrow.err('InputFileIsMissing' as const);
-    }
-
-    throw error;
+    return match(error)
+      .with(
+        P.intersection(P.instanceOf(Error), {
+          message: P.string.includes('Input file is missing'),
+        }),
+        () => neverthrow.err('InputFileIsMissing' as const),
+      )
+      .otherwise((e) => {
+        // 予期しないエラーはre-throw（Sentryに送信）
+        throw e instanceof Error ? e : new Error(JSON.stringify(e));
+      });
   }
 };
 

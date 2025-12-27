@@ -1,13 +1,20 @@
-import type { VRChatPhotoFileNameWithExt } from './../../valueObjects';
+import pathe from 'pathe';
+import {
+  type VRChatPhotoFileNameWithExt,
+  VRChatPhotoFileNameWithExtSchema,
+} from './../../valueObjects';
 
 /**
  * 写真データの共通プロパティ（基底インターフェース）
  *
  * Phase 1, Phase 2 両方で利用される基本情報。
  * これらのプロパティはハイブリッドローディングの初期段階から利用可能。
+ *
+ * @remarks
+ * id は string 型（UUID）。DBモデル VRChatPhotoPathModel と一致。
  */
 export interface PhotoBase {
-  id: number | string;
+  id: string;
   width: number;
   height: number;
   takenAt: Date;
@@ -81,4 +88,102 @@ export type Photo = PhotoMetadataOnly | PhotoFullyLoaded;
  */
 export function isPhotoLoaded(photo: Photo): photo is PhotoFullyLoaded {
   return photo.loadingState === 'loaded';
+}
+
+// ============================================================================
+// ファクトリ関数
+// ============================================================================
+
+/**
+ * 軽量メタデータ型（Phase 1で取得）
+ *
+ * DBから取得した最小限のデータ。photoPathを含まないことでメモリ削減。
+ */
+export interface PhotoMetadata {
+  id: string;
+  photoTakenAt: Date;
+  width: number;
+  height: number;
+}
+
+/**
+ * メタデータからPhotoMetadataOnly型を生成
+ *
+ * @param metadata DBから取得した軽量メタデータ
+ * @returns Phase 1のPhoto（loadingState: 'metadata'）
+ */
+export function createMetadataOnlyPhoto(
+  metadata: PhotoMetadata,
+): PhotoMetadataOnly {
+  return {
+    loadingState: 'metadata',
+    id: metadata.id,
+    width: metadata.width,
+    height: metadata.height,
+    takenAt: metadata.photoTakenAt,
+    location: {
+      joinedAt: metadata.photoTakenAt,
+    },
+  };
+}
+
+/**
+ * メタデータとパスからPhotoFullyLoaded型を生成
+ *
+ * @param metadata DBから取得した軽量メタデータ
+ * @param photoPath 写真ファイルのフルパス
+ * @returns Phase 2のPhoto、またはファイル名が無効な場合はnull
+ *
+ * @remarks
+ * ファイル名のバリデーションを行い、VRChat写真形式でない場合はnullを返す。
+ * 呼び出し元で適切にハンドリングすること。
+ */
+export function createFullyLoadedPhoto(
+  metadata: PhotoMetadata,
+  photoPath: string,
+): PhotoFullyLoaded | null {
+  try {
+    const basename = pathe.basename(photoPath);
+    const fileNameWithExt = VRChatPhotoFileNameWithExtSchema.parse(basename);
+
+    return {
+      loadingState: 'loaded',
+      id: metadata.id,
+      url: photoPath,
+      fileNameWithExt,
+      width: metadata.width,
+      height: metadata.height,
+      takenAt: metadata.photoTakenAt,
+      location: {
+        joinedAt: metadata.photoTakenAt,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * メタデータ配列からPhoto配列を生成
+ *
+ * パスがキャッシュされていればFullyLoaded、なければMetadataOnlyを返す。
+ * ハイブリッドローディングのUI構築に使用。
+ *
+ * @param metadataList メタデータ配列
+ * @param pathCache id -> photoPath のマッピング
+ * @returns Photo配列（無効なエントリは除外）
+ */
+export function createPhotoArray(
+  metadataList: PhotoMetadata[],
+  pathCache: Map<string, string>,
+): Photo[] {
+  return metadataList
+    .map((metadata) => {
+      const photoPath = pathCache.get(metadata.id);
+      if (photoPath) {
+        return createFullyLoadedPhoto(metadata, photoPath);
+      }
+      return createMetadataOnlyPhoto(metadata);
+    })
+    .filter((photo): photo is Photo => photo !== null);
 }

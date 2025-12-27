@@ -55,12 +55,21 @@ export const subscribeToCacheUpdate = (
 /**
  * キャッシュ更新を通知
  * 該当するphotoPathを待っている全てのリスナーに通知
+ *
+ * @remarks
+ * 各リスナーは個別にtry-catchで保護されている。
+ * 1つのリスナーが例外をスローしても、他のリスナーへの通知は継続される。
  */
 export const notifyCacheUpdate = (photoPath: string, data: string): void => {
   const pathListeners = listeners.get(photoPath);
   if (pathListeners) {
     for (const listener of pathListeners) {
-      listener(data);
+      try {
+        listener(data);
+      } catch (error) {
+        // リスナーのエラーは他のリスナーに影響させない
+        console.error('Thumbnail cache listener error:', error);
+      }
     }
   }
 };

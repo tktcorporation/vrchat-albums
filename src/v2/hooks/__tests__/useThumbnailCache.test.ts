@@ -6,6 +6,7 @@ import {
   notifyCacheUpdate,
   subscribeToCacheUpdate,
 } from '../../services/thumbnailEventEmitter';
+import { createLRUCacheForTesting } from '../useThumbnailCache';
 
 // Mock tRPC
 const mockFetch = vi.fn();
@@ -20,9 +21,6 @@ vi.mock('@/trpc', () => ({
     }),
   },
 }));
-
-// LRUCacheをテストするためにモジュール内部にアクセス
-// 実際のテストでは、useThumbnailCache経由でテスト
 
 describe('thumbnailEventEmitter', () => {
   beforeEach(() => {
@@ -321,5 +319,244 @@ describe('useThumbnail', () => {
     await waitFor(() => {
       expect(result.current).toBe(expectedData);
     });
+  });
+});
+
+describe('LRUCache eviction behavior', () => {
+  it('maxSizeを超えると最も古いアイテムが退避される', () => {
+    const cache = createLRUCacheForTesting<string, string>(3);
+
+    // 3つのアイテムを追加
+    cache.set('a', 'value-a');
+    cache.set('b', 'value-b');
+    cache.set('c', 'value-c');
+
+    expect(cache.size).toBe(3);
+    expect(cache.get('a')).toBe('value-a');
+    expect(cache.get('b')).toBe('value-b');
+    expect(cache.get('c')).toBe('value-c');
+
+    // 4つ目を追加すると最古の 'a' が退避される
+    cache.set('d', 'value-d');
+
+    expect(cache.size).toBe(3);
+    expect(cache.get('a')).toBeUndefined(); // 退避された
+    expect(cache.get('b')).toBe('value-b');
+    expect(cache.get('c')).toBe('value-c');
+    expect(cache.get('d')).toBe('value-d');
+  });
+
+  it('get()でアクセスしたアイテムはLRUの先頭に移動する', () => {
+    const cache = createLRUCacheForTesting<string, string>(3);
+
+    cache.set('a', 'value-a');
+    cache.set('b', 'value-b');
+    cache.set('c', 'value-c');
+
+    // 'a' にアクセス（最新に移動）
+    cache.get('a');
+
+    // 'd' を追加すると、最古の 'b' が退避される（'a' は最新なので残る）
+    cache.set('d', 'value-d');
+
+    expect(cache.get('a')).toBe('value-a'); // 残っている
+    expect(cache.get('b')).toBeUndefined(); // 退避された
+    expect(cache.get('c')).toBe('value-c');
+    expect(cache.get('d')).toBe('value-d');
+  });
+
+  it('同じキーでset()すると値が更新されLRUの先頭に移動する', () => {
+    const cache = createLRUCacheForTesting<string, string>(3);
+
+    cache.set('a', 'value-a');
+    cache.set('b', 'value-b');
+    cache.set('c', 'value-c');
+
+    // 'a' を更新（最新に移動）
+    cache.set('a', 'updated-a');
+
+    // 'd' を追加すると、最古の 'b' が退避される
+    cache.set('d', 'value-d');
+
+    expect(cache.get('a')).toBe('updated-a');
+    expect(cache.get('b')).toBeUndefined();
+    expect(cache.get('c')).toBe('value-c');
+    expect(cache.get('d')).toBe('value-d');
+  });
+
+  it('has()はLRU順序を変更しない', () => {
+    const cache = createLRUCacheForTesting<string, string>(3);
+
+    cache.set('a', 'value-a');
+    cache.set('b', 'value-b');
+    cache.set('c', 'value-c');
+
+    // has() でチェック（順序は変わらない）
+    expect(cache.has('a')).toBe(true);
+
+    // 'd' を追加すると、最古の 'a' が退避される（has()では順序が変わらない）
+    cache.set('d', 'value-d');
+
+    expect(cache.get('a')).toBeUndefined(); // 退避された
+    expect(cache.get('b')).toBe('value-b');
+    expect(cache.get('c')).toBe('value-c');
+    expect(cache.get('d')).toBe('value-d');
+  });
+
+  it('clear()で全アイテムが削除される', () => {
+    const cache = createLRUCacheForTesting<string, string>(3);
+
+    cache.set('a', 'value-a');
+    cache.set('b', 'value-b');
+
+    expect(cache.size).toBe(2);
+
+    cache.clear();
+
+    expect(cache.size).toBe(0);
+    expect(cache.get('a')).toBeUndefined();
+    expect(cache.get('b')).toBeUndefined();
+  });
+
+  it('maxSize=1の場合、常に最新の1つのみ保持', () => {
+    const cache = createLRUCacheForTesting<string, string>(1);
+
+    cache.set('a', 'value-a');
+    expect(cache.size).toBe(1);
+    expect(cache.get('a')).toBe('value-a');
+
+    cache.set('b', 'value-b');
+    expect(cache.size).toBe(1);
+    expect(cache.get('a')).toBeUndefined();
+    expect(cache.get('b')).toBe('value-b');
+  });
+});
+
+describe('バッチフェッチ失敗時のエラーハンドリング', () => {
+  beforeEach(() => {
+    clearAllListeners();
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    clearAllListeners();
+    vi.clearAllMocks();
+  });
+
+  it('onFetchErrorコールバックが呼ばれる', async () => {
+    const { useThumbnailCache } = await import('../useThumbnailCache');
+    const onFetchError = vi.fn();
+    const testError = new Error('Network error');
+
+    mockFetch.mockRejectedValueOnce(testError);
+
+    const { result } = renderHook(() => useThumbnailCache({ onFetchError }));
+
+    // Clear cache first
+    act(() => {
+      result.current.clearCache();
+    });
+
+    // Trigger a prefetch
+    const uniquePath = `/test/error-${Date.now()}.png`;
+    act(() => {
+      result.current.prefetchThumbnails([uniquePath]);
+    });
+
+    // Wait for the error callback to be called
+    await waitFor(() => {
+      expect(onFetchError).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onFetchError).toHaveBeenCalledWith(testError, expect.any(Array));
+  });
+
+  it('エラー後もキャッシュ機能は継続する', async () => {
+    const { useThumbnailCache } = await import('../useThumbnailCache');
+    const testError = new Error('Network error');
+
+    // First call fails
+    mockFetch.mockRejectedValueOnce(testError);
+    // Second call succeeds
+    mockFetch.mockResolvedValueOnce([
+      { photoPath: '/test/success.png', data: 'success-data' },
+    ]);
+
+    const { result } = renderHook(() => useThumbnailCache());
+
+    act(() => {
+      result.current.clearCache();
+    });
+
+    // First prefetch (will fail)
+    const errorPath = `/test/error-path-${Date.now()}.png`;
+    act(() => {
+      result.current.prefetchThumbnails([errorPath]);
+    });
+
+    // Wait for the first request to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Second prefetch (will succeed)
+    const successPath = '/test/success.png';
+    act(() => {
+      result.current.prefetchThumbnails([successPath]);
+    });
+
+    // Wait for the success callback
+    await waitFor(() => {
+      expect(result.current.getThumbnail(successPath)).toBe('success-data');
+    });
+  });
+});
+
+describe('notifyCacheUpdate リスナーエラー保護', () => {
+  beforeEach(() => {
+    clearAllListeners();
+  });
+
+  afterEach(() => {
+    clearAllListeners();
+  });
+
+  it('リスナーがエラーをスローしても他のリスナーに通知される', () => {
+    const errorListener = vi.fn(() => {
+      throw new Error('Listener error');
+    });
+    const normalListener = vi.fn();
+    const photoPath = '/test/error-listener.png';
+
+    subscribeToCacheUpdate(photoPath, errorListener);
+    subscribeToCacheUpdate(photoPath, normalListener);
+
+    // Should not throw
+    expect(() => {
+      notifyCacheUpdate(photoPath, 'data');
+    }).not.toThrow();
+
+    // Both listeners should be called
+    expect(errorListener).toHaveBeenCalledTimes(1);
+    expect(normalListener).toHaveBeenCalledTimes(1);
+    expect(normalListener).toHaveBeenCalledWith('data');
+  });
+
+  it('全リスナーがエラーをスローしても例外は伝播しない', () => {
+    const errorListener1 = vi.fn(() => {
+      throw new Error('Error 1');
+    });
+    const errorListener2 = vi.fn(() => {
+      throw new Error('Error 2');
+    });
+    const photoPath = '/test/all-error.png';
+
+    subscribeToCacheUpdate(photoPath, errorListener1);
+    subscribeToCacheUpdate(photoPath, errorListener2);
+
+    expect(() => {
+      notifyCacheUpdate(photoPath, 'data');
+    }).not.toThrow();
+
+    expect(errorListener1).toHaveBeenCalledTimes(1);
+    expect(errorListener2).toHaveBeenCalledTimes(1);
   });
 });

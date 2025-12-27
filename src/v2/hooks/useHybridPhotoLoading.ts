@@ -1,88 +1,13 @@
-import pathe from 'pathe';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { trpcReact } from '@/trpc';
-import { VRChatPhotoFileNameWithExtSchema } from '../../valueObjects';
-import type {
-  Photo,
-  PhotoFullyLoaded,
-  PhotoMetadataOnly,
+import type { PhotoMetadata } from '../types/photo';
+
+// ファクトリ関数は photo.ts から再エクスポート
+export {
+  createFullyLoadedPhoto,
+  createMetadataOnlyPhoto,
+  createPhotoArray,
 } from '../types/photo';
-
-/**
- * 軽量メタデータ型（Phase 1で取得）
- */
-interface PhotoMetadata {
-  id: string;
-  photoTakenAt: Date;
-  width: number;
-  height: number;
-}
-
-/**
- * メタデータからPhotoMetadataOnly型を生成
- */
-export function createMetadataOnlyPhoto(
-  metadata: PhotoMetadata,
-): PhotoMetadataOnly {
-  return {
-    loadingState: 'metadata',
-    id: metadata.id,
-    width: metadata.width,
-    height: metadata.height,
-    takenAt: metadata.photoTakenAt,
-    location: {
-      joinedAt: metadata.photoTakenAt,
-    },
-  };
-}
-
-/**
- * メタデータとパスからPhotoFullyLoaded型を生成
- * @returns Photo or null if fileNameWithExt is invalid
- */
-export function createFullyLoadedPhoto(
-  metadata: PhotoMetadata,
-  photoPath: string,
-): PhotoFullyLoaded | null {
-  try {
-    const basename = pathe.basename(photoPath);
-    const fileNameWithExt = VRChatPhotoFileNameWithExtSchema.parse(basename);
-
-    return {
-      loadingState: 'loaded',
-      id: metadata.id,
-      url: photoPath,
-      fileNameWithExt,
-      width: metadata.width,
-      height: metadata.height,
-      takenAt: metadata.photoTakenAt,
-      location: {
-        joinedAt: metadata.photoTakenAt,
-      },
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * メタデータ配列からPhoto配列を生成
- * パスがキャッシュされていればFullyLoaded、なければMetadataOnly
- */
-export function createPhotoArray(
-  metadataList: PhotoMetadata[],
-  pathCache: Map<string, string>,
-): Photo[] {
-  return metadataList
-    .map((metadata) => {
-      const photoPath = pathCache.get(metadata.id);
-      if (photoPath) {
-        return createFullyLoadedPhoto(metadata, photoPath);
-      }
-      return createMetadataOnlyPhoto(metadata);
-    })
-    .filter((photo): photo is Photo => photo !== null);
-}
 
 /**
  * ハイブリッドローディング設定
@@ -90,6 +15,8 @@ export function createPhotoArray(
 interface UseHybridPhotoLoadingOptions {
   /** 一度に取得するphotoPathの最大数 */
   batchSize?: number;
+  /** プリフェッチ失敗時のコールバック（UIへの通知等に使用） */
+  onPrefetchError?: (error: unknown, failedIds: string[]) => void;
 }
 
 /**
@@ -133,7 +60,7 @@ export function useHybridPhotoLoading(
   },
   options: UseHybridPhotoLoadingOptions = {},
 ): UseHybridPhotoLoadingResult {
-  const { batchSize = DEFAULT_BATCH_SIZE } = options;
+  const { batchSize = DEFAULT_BATCH_SIZE, onPrefetchError } = options;
 
   // Phase 1: 軽量メタデータを全件取得
   const { data: metadataRaw, isLoading: isLoadingMetadata } =
@@ -207,7 +134,10 @@ export function useHybridPhotoLoading(
           // キャッシュ数を更新（リアクティブ）
           setCachedPathCount(pathCacheRef.current.size);
         } catch (error) {
+          // エラーログは常に出力
           console.error('Failed to prefetch photo paths:', error);
+          // コールバックがあれば通知（UIへの表示等）
+          onPrefetchError?.(error, batch);
         } finally {
           // ペンディングから削除
           for (const id of batch) {
@@ -216,7 +146,7 @@ export function useHybridPhotoLoading(
         }
       }
     },
-    [batchSize, utils],
+    [batchSize, utils, onPrefetchError],
   );
 
   return {
