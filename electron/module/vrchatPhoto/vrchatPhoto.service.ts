@@ -26,6 +26,10 @@ const CACHE_EXPIRY_DAYS = 7; // キャッシュの有効期限（日数）
 // 書き込み中のキャッシュキーを追跡（競合防止）
 const pendingCacheWrites = new Set<string>();
 
+// キャッシュ書き込み失敗のトラッキング（サイレントエラー防止）
+const CACHE_FAILURE_THRESHOLD = 10;
+let consecutiveCacheFailures = 0;
+
 /**
  * Electronのappモジュールを遅延取得する
  * Playwrightテスト時のクラッシュを防ぐため、トップレベルインポートを避ける
@@ -195,11 +199,30 @@ const saveThumbnailToCache = async (
     // アトミック書き込み: tmp -> rename
     await fsPromises.writeFile(tempPath, buffer);
     await fsPromises.rename(tempPath, cachePath);
+
+    // 書き込み成功: 連続失敗カウンターをリセット
+    consecutiveCacheFailures = 0;
   } catch (error) {
+    // 失敗カウントをインクリメント
+    consecutiveCacheFailures++;
+
     logger.error({
       message: `Failed to save thumbnail to cache: ${cacheKey}`,
       stack: error instanceof Error ? error : new Error(String(error)),
     });
+
+    // 連続失敗が閾値を超えた場合、ユーザーに通知できるレベルで警告
+    if (consecutiveCacheFailures >= CACHE_FAILURE_THRESHOLD) {
+      logger.warn({
+        message: `Thumbnail cache has failed ${consecutiveCacheFailures} times consecutively. Cache may be unavailable (disk full, permission issues, etc.)`,
+        details: {
+          consecutiveFailures: consecutiveCacheFailures,
+          lastError: error instanceof Error ? error.message : String(error),
+        },
+      });
+      // リセットしてログスパムを防ぐ
+      consecutiveCacheFailures = 0;
+    }
   } finally {
     pendingCacheWrites.delete(cacheKey);
   }
@@ -773,7 +796,7 @@ export interface BatchThumbnailResult {
   /** 失敗したパスと理由 */
   failed: Array<{
     photoPath: string;
-    reason: 'file_not_found' | 'processing_error' | 'unexpected_error';
+    reason: 'file_not_found' | 'unexpected_error';
     message: string;
   }>;
 }

@@ -205,7 +205,7 @@ export function createFullyLoadedPhoto(
  *
  * @param metadataList メタデータ配列
  * @param pathCache id -> photoPath のマッピング
- * @returns Photo配列（無効なエントリは除外）
+ * @returns Photo配列（VRChat写真形式でないパスを持つエントリは除外される）
  */
 export function createPhotoArray(
   metadataList: PhotoMetadata[],

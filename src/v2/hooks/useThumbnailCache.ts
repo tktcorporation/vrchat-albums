@@ -16,11 +16,30 @@ const PREFETCH_BATCH_SIZE = 20; // プリフェッチのバッチサイズ
 const PREFETCH_AHEAD = 50; // 何枚先までプリフェッチするか
 
 /**
+ * フェッチエラー時のコールバック型
+ */
+type FetchErrorCallback = (error: unknown, failedPaths: string[]) => void;
+
+/**
+ * デフォルトのフェッチエラーハンドラ
+ *
+ * onFetchErrorが指定されない場合に使用される。
+ * エラーをログ出力し、ユーザーにフィードバックを提供する基盤を確保。
+ */
+const defaultFetchErrorHandler: FetchErrorCallback = (error, failedPaths) => {
+  logger.warn({
+    message: 'Thumbnail fetch failed (default handler)',
+    error,
+    details: { failedCount: failedPaths.length, firstPath: failedPaths[0] },
+  });
+};
+
+/**
  * サムネイルキャッシュフックのオプション
  */
 export interface UseThumbnailCacheOptions {
   /** バッチフェッチ失敗時のコールバック */
-  onFetchError?: (error: unknown, failedPaths: string[]) => void;
+  onFetchError?: FetchErrorCallback;
 }
 
 /**
@@ -154,7 +173,7 @@ export function createLRUCacheForTesting<K, V>(
  * ```
  */
 export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
-  const { onFetchError } = options;
+  const { onFetchError = defaultFetchErrorHandler } = options;
   const [cacheSize, setCacheSize] = useState(globalThumbnailCache.size);
   const prefetchQueueRef = useRef<string[]>([]);
   const isPrefetchingRef = useRef(false);
@@ -222,7 +241,7 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
           });
           // 失敗した写真をコールバックで通知
           const failedPaths = result.failed.map((f) => f.photoPath);
-          onFetchError?.(
+          onFetchError(
             new Error(`Failed to load ${result.failed.length} thumbnails`),
             failedPaths,
           );
@@ -249,8 +268,8 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
               details: { batchSize: batchToFetch.length },
             });
           });
-        // コールバックがあれば通知（UIへの表示等）
-        onFetchError?.(error, batchToFetch);
+        // コールバックで通知（UIへの表示等）
+        onFetchError(error, batchToFetch);
       } finally {
         // ペンディングから削除
         for (const path of pathsToFetch) {
