@@ -73,8 +73,6 @@ const DEFAULT_BATCH_SIZE = 100;
  * 1. photoMetadata を使用して高さ計算・グルーピング
  * 2. 表示範囲のIDに対して prefetchPhotoPaths() を呼び出し
  * 3. getPhotoPath(id) でキャッシュ済みのパスを取得
- *
- * @see docs/memory-optimization.md
  */
 export function useHybridPhotoLoading(
   query?: {

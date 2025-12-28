@@ -10,7 +10,6 @@
  * class UserId extends BaseValueObject<'UserId', string> {}
  * ```
  *
- * @see docs/refactoring-plan-code-duplication.md - 値オブジェクト活用の背景
  * @see electron/lib/pathObject.ts - パス操作用ValueObjectの例
  */
 export abstract class BaseValueObject<T extends string, K> {

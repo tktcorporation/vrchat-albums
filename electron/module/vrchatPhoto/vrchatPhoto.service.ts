@@ -821,10 +821,10 @@ export const getBatchThumbnails = async (
           },
         };
       } catch (error) {
-        // 予期しないエラーをログ出力（バッチ処理は継続）
+        // 予期しないエラーをログ出力（バッチ処理は継続、Sentryに送信）
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        logger.warn({
+        logger.error({
           message: `Failed to get thumbnail in batch for ${photoPath}`,
           stack: error instanceof Error ? error : new Error(errorMessage),
         });
