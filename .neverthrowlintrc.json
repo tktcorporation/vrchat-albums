@@ -21,5 +21,9 @@
         "getVrcUserInfoByUserName"
       ]
     }
-  ]
+  ],
+  "mustUseResult": {
+    "enabled": true,
+    "path": "electron/**/*.ts"
+  }
 }
