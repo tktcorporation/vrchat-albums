@@ -20,6 +20,10 @@ export interface NeverthrowLintConfig {
     apply: 'async-functions' | 'all-functions' | 'exported-functions';
     exceptions: string[];
   }>;
+  mustUseResult?: {
+    enabled: boolean;
+    path: string;
+  };
 }
 
 export interface NeverthrowIssue {
@@ -31,11 +35,25 @@ export interface NeverthrowIssue {
   ruleName: string;
 }
 
+// Properties that identify a Result-like type
+const RESULT_PROPERTIES = [
+  'mapErr',
+  'map',
+  'andThen',
+  'orElse',
+  'match',
+  'unwrapOr',
+];
+
+// Methods that properly handle/consume a Result
+const HANDLED_METHODS = ['match', 'unwrapOr', '_unsafeUnwrap', 'isErr', 'isOk'];
+
 export class NeverthrowLinter {
   private issues: NeverthrowIssue[] = [];
   private program: ts.Program;
   private checker: ts.TypeChecker;
   private files: NormalizedPath[];
+  private handledVariables: Set<string> = new Set();
 
   constructor(
     files: string[],
@@ -106,9 +124,284 @@ export class NeverthrowLinter {
       // TypeScript compiler always returns forward slashes, so sourceFile.fileName is already normalized
       if (this.files.includes(sourceFile.fileName as NormalizedPath)) {
         this.lintFile(sourceFile);
+        // Check for must-use-result if enabled
+        if (this.config.mustUseResult?.enabled) {
+          this.checkMustUseResult(sourceFile);
+        }
       }
     }
     return this.issues;
+  }
+
+  /**
+   * Check if a type is Result-like by checking for characteristic properties
+   * or by string matching the type name
+   */
+  private isResultLikeType(type: ts.Type): boolean {
+    const typeString = this.checker.typeToString(type);
+
+    // Exclude function types that return Result (we only want actual Result values)
+    // Function types look like "() => Result<...>" or "(args) => Result<...>"
+    if (typeString.includes('=>')) {
+      return false;
+    }
+
+    // First, try string-based matching (more reliable when module resolution is limited)
+    // Use regex to match only neverthrow Result types, not other types containing "Result"
+    // e.g., match "Result<string, Error>" but not "ZodSafeParseResult<...>"
+    const neverthrowResultPattern =
+      /^(neverthrow\.)?(Result|ResultAsync)<|^Promise<(neverthrow\.)?(Result|ResultAsync)</;
+    if (neverthrowResultPattern.test(typeString)) {
+      return true;
+    }
+
+    // Fallback: check for characteristic properties
+    const apparentType = this.checker.getApparentType(type);
+
+    // Check union types
+    if (apparentType.isUnion()) {
+      return apparentType.types.some((t) => this.hasResultProperties(t));
+    }
+
+    return this.hasResultProperties(apparentType);
+  }
+
+  private hasResultProperties(type: ts.Type): boolean {
+    return RESULT_PROPERTIES.every(
+      (prop) => type.getProperty(prop) !== undefined,
+    );
+  }
+
+  /**
+   * Check if a Result is being handled (consumed) properly
+   */
+  private isResultHandled(node: ts.Node): boolean {
+    const parent = node.parent;
+
+    // Case 1: Method call on Result (e.g., result.match(...))
+    if (ts.isPropertyAccessExpression(parent)) {
+      const methodName = parent.name.text;
+
+      // Check if this is a handled method being called
+      if (HANDLED_METHODS.includes(methodName)) {
+        const grandParent = parent.parent;
+        if (
+          ts.isCallExpression(grandParent) &&
+          grandParent.expression === parent
+        ) {
+          return true;
+        }
+      }
+
+      // Check if it's being chained further (e.g., result.map(...).match(...))
+      const grandParent = parent.parent;
+      if (grandParent && !ts.isExpressionStatement(grandParent)) {
+        return this.isResultHandled(grandParent);
+      }
+    }
+
+    // Case 2: Assigned to a variable - track it
+    if (ts.isVariableDeclaration(parent) && parent.initializer === node) {
+      if (ts.isIdentifier(parent.name)) {
+        // We'll check variable usage in a second pass
+        return true; // Don't report here, will be checked via variable tracking
+      }
+    }
+
+    // Case 3: Returned from function
+    if (ts.isReturnStatement(parent)) {
+      return true;
+    }
+
+    // Case 4: Arrow function implicit return
+    if (ts.isArrowFunction(parent) && parent.body === node) {
+      return true;
+    }
+
+    // Case 5: Passed as argument to another function
+    if (
+      ts.isCallExpression(parent) &&
+      parent.arguments.includes(node as ts.Expression)
+    ) {
+      return true;
+    }
+
+    // Case 6: Part of array literal or object literal
+    if (
+      ts.isArrayLiteralExpression(parent) ||
+      ts.isObjectLiteralExpression(parent)
+    ) {
+      return true;
+    }
+
+    // Case 7: Spread element
+    if (ts.isSpreadElement(parent)) {
+      return true;
+    }
+
+    // Case 8: Await expression - check the parent of await
+    if (ts.isAwaitExpression(parent)) {
+      return this.isResultHandled(parent);
+    }
+
+    // Case 9: Parenthesized expression - check parent
+    if (ts.isParenthesizedExpression(parent)) {
+      return this.isResultHandled(parent);
+    }
+
+    return false;
+  }
+
+  /**
+   * Check for must-use-result violations in a source file
+   */
+  private checkMustUseResult(sourceFile: ts.SourceFile) {
+    // Check if this file matches the mustUseResult path pattern
+    if (this.config.mustUseResult?.path) {
+      const mustUsePath = this.config.mustUseResult.path;
+      // If mustUsePath is absolute, compare directly
+      if (path.isAbsolute(mustUsePath)) {
+        if (sourceFile.fileName !== NormalizedPathSchema.parse(mustUsePath)) {
+          return;
+        }
+      } else {
+        // Otherwise, use minimatch with relative path
+        const relativePath = path.relative(process.cwd(), sourceFile.fileName);
+        if (!minimatch(relativePath, mustUsePath)) {
+          return;
+        }
+      }
+    }
+
+    // First pass: collect all variable declarations with Result types and track their usage
+    const resultVariables = new Map<
+      string,
+      { handled: boolean; node: ts.Node }
+    >();
+
+    const collectVariables = (node: ts.Node) => {
+      if (
+        ts.isVariableDeclaration(node) &&
+        node.initializer &&
+        ts.isIdentifier(node.name)
+      ) {
+        const type = this.checker.getTypeAtLocation(node.initializer);
+        if (this.isResultLikeType(type)) {
+          resultVariables.set(node.name.text, {
+            handled: false,
+            node: node.initializer,
+          });
+        }
+      }
+      ts.forEachChild(node, collectVariables);
+    };
+    ts.forEachChild(sourceFile, collectVariables);
+
+    // Second pass: check if variables are used with handling methods
+    const checkVariableUsage = (node: ts.Node) => {
+      if (ts.isIdentifier(node) && resultVariables.has(node.text)) {
+        const parent = node.parent;
+
+        // Check if this identifier is being accessed with a handling method
+        if (
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === node
+        ) {
+          const methodName = parent.name.text;
+          if (HANDLED_METHODS.includes(methodName)) {
+            const grandParent = parent.parent;
+            if (
+              ts.isCallExpression(grandParent) &&
+              grandParent.expression === parent
+            ) {
+              const varInfo = resultVariables.get(node.text);
+              if (varInfo) varInfo.handled = true;
+            }
+          }
+          // Also mark as handled if chained with other Result methods
+          if (RESULT_PROPERTIES.includes(methodName)) {
+            const grandParent = parent.parent;
+            if (
+              ts.isCallExpression(grandParent) &&
+              grandParent.expression === parent
+            ) {
+              // Check if the chain eventually gets handled
+              if (this.isResultHandled(grandParent)) {
+                const varInfo = resultVariables.get(node.text);
+                if (varInfo) varInfo.handled = true;
+              }
+            }
+          }
+        }
+
+        // Mark as handled if returned
+        if (ts.isReturnStatement(parent)) {
+          const varInfo = resultVariables.get(node.text);
+          if (varInfo) varInfo.handled = true;
+        }
+
+        // Mark as handled if passed to function
+        if (ts.isCallExpression(parent) && parent.arguments.includes(node)) {
+          const varInfo = resultVariables.get(node.text);
+          if (varInfo) varInfo.handled = true;
+        }
+      }
+      ts.forEachChild(node, checkVariableUsage);
+    };
+    ts.forEachChild(sourceFile, checkVariableUsage);
+
+    // Report unhandled variables
+    for (const [name, info] of resultVariables) {
+      if (!info.handled) {
+        const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+          info.node.getStart(),
+        );
+        this.issues.push({
+          file: sourceFile.fileName,
+          line: line + 1,
+          column: character + 1,
+          message: `Result assigned to '${name}' must be handled with match, unwrapOr, or _unsafeUnwrap.`,
+          severity: 'error',
+          ruleName: 'must-use-result',
+        });
+      }
+    }
+
+    // Third pass: check for expression statements that produce unhandled Results
+    const checkExpressionStatements = (node: ts.Node) => {
+      if (ts.isExpressionStatement(node)) {
+        const expr = node.expression;
+        let exprToCheck = expr;
+
+        // Handle await expressions
+        if (ts.isAwaitExpression(expr)) {
+          exprToCheck = expr.expression;
+        }
+
+        // Check call expressions and new expressions
+        if (
+          ts.isCallExpression(exprToCheck) ||
+          ts.isNewExpression(exprToCheck)
+        ) {
+          const type = this.checker.getTypeAtLocation(exprToCheck);
+          if (this.isResultLikeType(type)) {
+            const { line, character } =
+              sourceFile.getLineAndCharacterOfPosition(node.getStart());
+            this.issues.push({
+              file: sourceFile.fileName,
+              line: line + 1,
+              column: character + 1,
+              message:
+                'Result must be handled with match, unwrapOr, or _unsafeUnwrap.',
+              severity: 'error',
+              ruleName: 'must-use-result',
+            });
+          }
+        }
+      }
+      ts.forEachChild(node, checkExpressionStatements);
+    };
+    ts.forEachChild(sourceFile, checkExpressionStatements);
   }
 
   private lintFile(sourceFile: ts.SourceFile) {
@@ -643,6 +936,10 @@ export async function lintNeverthrow(config: NeverthrowLintConfig): Promise<{
   const patterns = new Set<string>();
   for (const rule of config.rules) {
     patterns.add(rule.path);
+  }
+  // Also include mustUseResult path if enabled
+  if (config.mustUseResult?.enabled && config.mustUseResult.path) {
+    patterns.add(config.mustUseResult.path);
   }
 
   // Convert Set to Array for processing
