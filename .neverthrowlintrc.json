@@ -23,7 +23,7 @@
     }
   ],
   "mustUseResult": {
-    "enabled": false,
+    "enabled": true,
     "path": "electron/**/*.ts"
   }
 }
