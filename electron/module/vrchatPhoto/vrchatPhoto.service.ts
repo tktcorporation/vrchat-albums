@@ -832,7 +832,7 @@ export const getLatestPhotoDate = async (): Promise<Date | null> => {
 };
 
 /**
- * 軽量メタデータのみ取得する（ハイブリッドローディング Phase 1）
+ * 軽量メタデータのみ取得する（初回クエリ用）
  * photoPath を含まないことでメモリ使用量を大幅に削減
  *
  * 使用例:
@@ -847,7 +847,7 @@ export const getVRChatPhotoMetadataList = async (query?: {
 };
 
 /**
- * 指定されたIDの写真パスをバッチ取得（ハイブリッドローディング Phase 2）
+ * 指定されたIDの写真パスをオンデマンドでバッチ取得
  * 表示に必要な範囲のみ取得することでメモリ使用量を削減
  *
  * @param ids 取得したい写真のIDリスト

@@ -15,8 +15,8 @@ import {
  *
  * ハイブリッドローディングに必要なモデル関数のテスト:
  * - getVRChatPhotoPathCount: ページネーション用のカウント
- * - getVRChatPhotoMetadataList: 軽量メタデータ取得（Phase 1）
- * - getVRChatPhotoPathsByIds: IDでバッチ取得（Phase 2）
+ * - getVRChatPhotoMetadataList: 軽量メタデータ取得（初回クエリ）
+ * - getVRChatPhotoPathsByIds: IDでオンデマンドバッチ取得
  */
 describe('VRChatPhotoPath Model Integration Tests', () => {
   beforeAll(async () => {

@@ -84,7 +84,7 @@ export function useHybridPhotoLoading(
 ): UseHybridPhotoLoadingResult {
   const { batchSize = DEFAULT_BATCH_SIZE, onPrefetchError } = options;
 
-  // Phase 1: 軽量メタデータを全件取得
+  // 軽量メタデータを全件取得（初回クエリ）
   const { data: metadataRaw, isLoading: isLoadingMetadata } =
     trpcReact.vrchatPhoto.getVrchatPhotoMetadataList.useQuery(query, {
       staleTime: 1000 * 60 * 5,
@@ -100,7 +100,7 @@ export function useHybridPhotoLoading(
   // キャッシュ数をリアクティブに管理（UIの再レンダリングをトリガー）
   const [cachedPathCount, setCachedPathCount] = useState(0);
 
-  // Phase 2: photoPath をバッチ取得
+  // photoPath をオンデマンドでバッチ取得
   const utils = trpcReact.useUtils();
 
   const photoMetadata = useMemo<PhotoMetadata[]>(() => {

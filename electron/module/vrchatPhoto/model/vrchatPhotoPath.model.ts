@@ -211,15 +211,15 @@ export const getLatestVRChatPhoto = async () => {
 };
 
 /**
- * 軽量メタデータ型（ハイブリッドローディング Phase 1 用）
+ * 軽量メタデータ型（ハイブリッドローディング用）
  *
  * @remarks
- * この型は `src/v2/types/photo.ts` の `PhotoMetadata` と同じ構造。
- * electronモジュールからフロントエンドへの依存を避けるため、
- * ここで独立して定義している。
+ * フロントエンド側に同等の型 PhotoMetadata が存在する。
+ * tRPC 経由で転送時に Date→string 変換されるため、
+ * 各レイヤーで専用の型定義を維持している。
  * 両方の型を変更する場合は、もう一方も更新すること。
  *
- * @see src/v2/types/photo.ts - フロントエンド側の同等の型定義
+ * @see src/v2/types/photo.ts - PhotoMetadata（フロントエンド側）
  */
 export interface VRChatPhotoMetadata {
   id: string;
@@ -229,7 +229,7 @@ export interface VRChatPhotoMetadata {
 }
 
 /**
- * 軽量メタデータのみ取得する（ハイブリッドローディング Phase 1）
+ * 軽量メタデータのみ取得する（初回クエリ用）
  * photoPath を含まないことでメモリ使用量を削減
  *
  * @see docs/photo-grouping-logic.md - 写真グループ化ロジック
@@ -256,7 +256,7 @@ export const getVRChatPhotoMetadataList = async (query?: {
 };
 
 /**
- * 指定されたIDの写真パスをバッチ取得（ハイブリッドローディング Phase 2）
+ * 指定されたIDの写真パスをオンデマンドでバッチ取得
  * 表示に必要な範囲のみ取得することでメモリ使用量を削減
  */
 export const getVRChatPhotoPathsByIds = async (

@@ -179,7 +179,7 @@ export const vrchatPhotoRouter = () =>
         };
       }),
     /**
-     * 軽量メタデータのみ取得（ハイブリッドローディング Phase 1）
+     * 軽量メタデータのみ取得（初回クエリ用）
      * photoPath を含まないことでメモリ使用量を大幅に削減
      */
     getVrchatPhotoMetadataList: procedure
@@ -199,7 +199,7 @@ export const vrchatPhotoRouter = () =>
         return result;
       }),
     /**
-     * 指定されたIDの写真パスをバッチ取得（ハイブリッドローディング Phase 2）
+     * 指定されたIDの写真パスをオンデマンドでバッチ取得
      * 表示に必要な範囲のみ取得
      */
     getVrchatPhotoPathsByIds: procedure

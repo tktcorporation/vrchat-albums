@@ -8,12 +8,12 @@ import { logger } from '../lib/logger';
 /**
  * 写真データの共通プロパティ（基底インターフェース）
  *
- * Phase 1, Phase 2 両方で利用される基本情報。
+ * 軽量メタデータ・完全ロード両方で利用される基本情報。
  * これらのプロパティはハイブリッドローディングの初期段階から利用可能。
  *
  * @remarks
  * - id は string 型（UUID）。DBモデル VRChatPhotoPathModel と一致。
- * - location.joinedAt は Phase 1 では photoTakenAt で近似される（実際のワールド参加時刻はログ解析が必要）
+ * - location.joinedAt は軽量メタデータ取得時は photoTakenAt で近似される（実際のワールド参加時刻はログ解析が必要）
  */
 export interface PhotoBase {
   id: string;
@@ -24,7 +24,7 @@ export interface PhotoBase {
    * 写真の撮影場所に関する情報
    *
    * @remarks
-   * Phase 1（メタデータのみ）では joinedAt は photoTakenAt で近似される。
+   * 軽量メタデータ取得時は joinedAt は photoTakenAt で近似される。
    * 正確なワールド参加時刻はログファイル解析後にのみ取得可能。
    * グルーピングは takenAt を基準に行うため、近似値でも実用上の問題はない。
    */
@@ -33,17 +33,17 @@ export interface PhotoBase {
      * ワールドに参加した時刻
      *
      * @remarks
-     * Phase 1: photoTakenAt で近似（ログ解析前のため）
-     * Phase 2: 実際のワールド参加時刻（将来対応予定）
+     * 軽量メタデータ: photoTakenAt で近似（ログ解析前のため）
+     * 完全ロード: 実際のワールド参加時刻（将来対応予定）
      */
     joinedAt: Date;
   };
 }
 
 /**
- * Phase 1: メタデータのみ（url/fileNameWithExt なし）
+ * 軽量メタデータ状態（パス未取得）
  *
- * ハイブリッドローディングの初期フェーズ。
+ * ハイブリッドローディングの初期状態。
  * 高さ計算・グルーピング・バーチャルスクロールに必要な情報のみ含む。
  * この状態ではサムネイル表示は不可（Skeleton等を表示）。
  *
@@ -58,7 +58,7 @@ export interface PhotoMetadataOnly extends PhotoBase {
 }
 
 /**
- * Phase 2: 完全ロード済み
+ * 完全ロード状態（パス取得済み）
  *
  * 表示に必要な全ての情報を含む完全な写真データ。
  * サムネイル表示・ファイル操作が可能。
@@ -76,8 +76,8 @@ export interface PhotoFullyLoaded extends PhotoBase {
  *
  * ## ハイブリッドローディング対応
  * loadingState で型を判別:
- * - 'metadata': Phase 1 - メタデータのみ
- * - 'loaded': Phase 2 - 完全ロード済み
+ * - 'metadata': 軽量メタデータ状態（パス未取得）
+ * - 'loaded': 完全ロード状態（パス取得済み）
  *
  * ## 型安全な使用例
  * ```ts
@@ -118,9 +118,15 @@ export function isPhotoLoaded(photo: Photo): photo is PhotoFullyLoaded {
 // ============================================================================
 
 /**
- * 軽量メタデータ型（Phase 1で取得）
+ * 軽量メタデータ型（初回クエリで取得）
  *
  * DBから取得した最小限のデータ。photoPathを含まないことでメモリ削減。
+ *
+ * @remarks
+ * バックエンド側に同等の型 VRChatPhotoMetadata が存在する。
+ * tRPC の Date→string 変換があるため、フロントエンド専用として維持。
+ *
+ * @see electron/module/vrchatPhoto/model/vrchatPhotoPath.model.ts - VRChatPhotoMetadata
  */
 export interface PhotoMetadata {
   id: string;
@@ -133,7 +139,7 @@ export interface PhotoMetadata {
  * メタデータからPhotoMetadataOnly型を生成
  *
  * @param metadata DBから取得した軽量メタデータ
- * @returns Phase 1のPhoto（loadingState: 'metadata'）
+ * @returns 軽量メタデータ状態のPhoto（loadingState: 'metadata'）
  *
  * @remarks
  * location.joinedAt は photoTakenAt で近似される。
@@ -162,7 +168,7 @@ export function createMetadataOnlyPhoto(
  *
  * @param metadata DBから取得した軽量メタデータ
  * @param photoPathStr 写真ファイルのフルパス（文字列）
- * @returns Phase 2のPhoto、またはファイル名が無効な場合はnull
+ * @returns 完全ロード状態のPhoto、またはファイル名が無効な場合はnull
  *
  * @remarks
  * - VRChatPhotoPathSchema でパスを検証し、VRChat写真形式でない場合はnullを返す
