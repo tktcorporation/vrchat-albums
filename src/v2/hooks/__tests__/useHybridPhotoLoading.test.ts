@@ -77,12 +77,12 @@ vi.mock('../../../valueObjects', () => ({
   },
 }));
 
-// モックの後にインポート
+// モックの後にインポート（ファクトリ関数はtypes/photoから直接インポート）
 import {
   createFullyLoadedPhoto,
   createMetadataOnlyPhoto,
   createPhotoArray,
-} from '../useHybridPhotoLoading';
+} from '../../types/photo';
 
 describe('useHybridPhotoLoading', () => {
   describe('createMetadataOnlyPhoto', () => {

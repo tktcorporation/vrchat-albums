@@ -1,19 +1,91 @@
-import { TRPCClientError } from '@trpc/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { match, P } from 'ts-pattern';
 import { trpcReact } from '@/trpc';
 import { logger } from '../lib/logger';
-import {
-  notifyCacheUpdate,
-  subscribeToCacheUpdate,
-} from '../services/thumbnailEventEmitter';
+import { logTRPCFetchError } from '../lib/trpcErrorLogger';
 
 /**
  * LRUキャッシュの設定
  */
 const CACHE_MAX_SIZE = 500; // 最大キャッシュ数
 const PREFETCH_BATCH_SIZE = 20; // プリフェッチのバッチサイズ
-const PREFETCH_AHEAD = 50; // 何枚先までプリフェッチするか
+
+// =========================================
+// キャッシュ更新イベントエミッター（インライン化）
+// =========================================
+
+type CacheUpdateListener = (data: string) => void;
+
+/** photoPath -> リスナーのセット */
+const cacheListeners = new Map<string, Set<CacheUpdateListener>>();
+
+/**
+ * キャッシュ更新イベントを購読
+ * @returns アンサブスクライブ関数
+ */
+function subscribeToCacheUpdate(
+  photoPath: string,
+  listener: CacheUpdateListener,
+): () => void {
+  if (!cacheListeners.has(photoPath)) {
+    cacheListeners.set(photoPath, new Set());
+  }
+  const pathListeners = cacheListeners.get(photoPath);
+  pathListeners?.add(listener);
+
+  return () => {
+    pathListeners?.delete(listener);
+    if (pathListeners?.size === 0) {
+      cacheListeners.delete(photoPath);
+    }
+  };
+}
+
+/**
+ * キャッシュ更新を通知
+ */
+function notifyCacheUpdate(photoPath: string, data: string): void {
+  const pathListeners = cacheListeners.get(photoPath);
+  if (pathListeners) {
+    for (const listener of pathListeners) {
+      try {
+        listener(data);
+      } catch (error) {
+        logger.error({
+          message: 'Thumbnail cache listener error',
+          error,
+          details: { photoPath },
+        });
+      }
+    }
+  }
+}
+
+/**
+ * テスト用: 全リスナーをクリア
+ * @internal
+ */
+export function clearAllListenersForTesting(): void {
+  cacheListeners.clear();
+}
+
+/**
+ * テスト用: 特定のphotoPathのリスナー数を取得
+ * @internal
+ */
+export function getListenerCountForTesting(photoPath: string): number {
+  return cacheListeners.get(photoPath)?.size ?? 0;
+}
+
+/**
+ * テスト用: イベントエミッター関数へのアクセス
+ * @internal
+ */
+export const __eventEmitterTestHelpers = {
+  subscribeToCacheUpdate,
+  notifyCacheUpdate,
+};
+
+// =========================================
 
 /**
  * フェッチエラー時のコールバック型
@@ -188,6 +260,16 @@ const globalThumbnailCache = new LRUCache<string, string>(CACHE_MAX_SIZE);
 const pendingRequests = new Set<string>();
 
 /**
+ * フェッチが必要なパスをフィルタリング
+ * キャッシュに存在するものとペンディング中のものを除外
+ */
+function filterPathsNeedingFetch(paths: string[]): string[] {
+  return paths.filter(
+    (path) => !globalThumbnailCache.has(path) && !pendingRequests.has(path),
+  );
+}
+
+/**
  * テスト用: グローバルキャッシュとpendingRequestsをリセット
  * @internal テスト専用 - プロダクションコードでは使用しない
  */
@@ -262,9 +344,7 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
   const fetchBatch = useCallback(
     async (paths: string[]) => {
       // 既にキャッシュにあるものとペンディング中のものを除外
-      const pathsToFetch = paths.filter(
-        (path) => !globalThumbnailCache.has(path) && !pendingRequests.has(path),
-      );
+      const pathsToFetch = filterPathsNeedingFetch(paths);
 
       if (pathsToFetch.length === 0) return;
 
@@ -309,26 +389,10 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
         }
       } catch (error) {
         // エラー分類とログ出力
-        match(error)
-          .with(P.instanceOf(TRPCClientError), (trpcError) => {
-            // tRPCエラー（サーバー応答あり）
-            logger.warn({
-              message: 'tRPC error fetching batch thumbnails',
-              error: trpcError,
-              details: {
-                batchSize: batchToFetch.length,
-                code: trpcError.data?.code,
-              },
-            });
-          })
-          .otherwise((e) => {
-            // ネットワークエラーなど予期しないエラー
-            logger.error({
-              message: 'Failed to fetch batch thumbnails',
-              error: e,
-              details: { batchSize: batchToFetch.length },
-            });
-          });
+        logTRPCFetchError(error, {
+          operation: 'fetch batch thumbnails',
+          batchSize: batchToFetch.length,
+        });
         // コールバックで通知（UIへの表示等）
         onFetchError(error, batchToFetch);
       } finally {
@@ -371,9 +435,7 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
   const prefetchThumbnails = useCallback(
     (paths: string[]) => {
       // 既にキャッシュにあるものを除外
-      const pathsToQueue = paths.filter(
-        (path) => !globalThumbnailCache.has(path) && !pendingRequests.has(path),
-      );
+      const pathsToQueue = filterPathsNeedingFetch(paths);
 
       if (pathsToQueue.length === 0) return;
 
@@ -392,22 +454,6 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
   );
 
   /**
-   * 表示中のインデックスに基づいてプリフェッチ
-   */
-  const prefetchAroundIndex = useCallback(
-    (allPaths: string[], currentIndex: number, visibleCount: number) => {
-      const start = Math.max(0, currentIndex - visibleCount);
-      const end = Math.min(
-        allPaths.length,
-        currentIndex + visibleCount + PREFETCH_AHEAD,
-      );
-      const pathsToFetch = allPaths.slice(start, end);
-      prefetchThumbnails(pathsToFetch);
-    },
-    [prefetchThumbnails],
-  );
-
-  /**
    * キャッシュをクリア
    */
   const clearCache = useCallback(() => {
@@ -419,7 +465,6 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
     getThumbnail,
     setThumbnail,
     prefetchThumbnails,
-    prefetchAroundIndex,
     clearCache,
     cacheSize,
   };

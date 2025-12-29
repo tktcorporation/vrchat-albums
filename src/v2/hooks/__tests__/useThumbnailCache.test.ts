@@ -1,12 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  clearAllListeners,
-  getListenerCount,
-  notifyCacheUpdate,
-  subscribeToCacheUpdate,
-} from '../../services/thumbnailEventEmitter';
-import { createLRUCacheForTesting } from '../useThumbnailCache';
+  __eventEmitterTestHelpers,
+  clearAllListenersForTesting,
+  createLRUCacheForTesting,
+  getListenerCountForTesting,
+} from '../useThumbnailCache';
+
+const { subscribeToCacheUpdate, notifyCacheUpdate } = __eventEmitterTestHelpers;
 
 // Mock tRPC
 const mockFetch = vi.fn();
@@ -24,11 +25,11 @@ vi.mock('@/trpc', () => ({
 
 describe('thumbnailEventEmitter', () => {
   beforeEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
   });
 
   afterEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
     vi.clearAllMocks();
   });
 
@@ -39,7 +40,7 @@ describe('thumbnailEventEmitter', () => {
 
       subscribeToCacheUpdate(photoPath, listener);
 
-      expect(getListenerCount(photoPath)).toBe(1);
+      expect(getListenerCountForTesting(photoPath)).toBe(1);
     });
 
     it('同じパスに複数のリスナーを登録できる', () => {
@@ -50,7 +51,7 @@ describe('thumbnailEventEmitter', () => {
       subscribeToCacheUpdate(photoPath, listener1);
       subscribeToCacheUpdate(photoPath, listener2);
 
-      expect(getListenerCount(photoPath)).toBe(2);
+      expect(getListenerCountForTesting(photoPath)).toBe(2);
     });
 
     it('異なるパスにリスナーを登録できる', () => {
@@ -62,8 +63,8 @@ describe('thumbnailEventEmitter', () => {
       subscribeToCacheUpdate(path1, listener1);
       subscribeToCacheUpdate(path2, listener2);
 
-      expect(getListenerCount(path1)).toBe(1);
-      expect(getListenerCount(path2)).toBe(1);
+      expect(getListenerCountForTesting(path1)).toBe(1);
+      expect(getListenerCountForTesting(path2)).toBe(1);
     });
 
     it('アンサブスクライブでリスナーが削除される', () => {
@@ -71,10 +72,10 @@ describe('thumbnailEventEmitter', () => {
       const photoPath = '/test/photo.png';
 
       const unsubscribe = subscribeToCacheUpdate(photoPath, listener);
-      expect(getListenerCount(photoPath)).toBe(1);
+      expect(getListenerCountForTesting(photoPath)).toBe(1);
 
       unsubscribe();
-      expect(getListenerCount(photoPath)).toBe(0);
+      expect(getListenerCountForTesting(photoPath)).toBe(0);
     });
 
     it('最後のリスナーが削除されるとセットもクリアされる', () => {
@@ -86,10 +87,10 @@ describe('thumbnailEventEmitter', () => {
       const unsub2 = subscribeToCacheUpdate(photoPath, listener2);
 
       unsub1();
-      expect(getListenerCount(photoPath)).toBe(1);
+      expect(getListenerCountForTesting(photoPath)).toBe(1);
 
       unsub2();
-      expect(getListenerCount(photoPath)).toBe(0);
+      expect(getListenerCountForTesting(photoPath)).toBe(0);
     });
   });
 
@@ -163,22 +164,22 @@ describe('thumbnailEventEmitter', () => {
       subscribeToCacheUpdate(path1, listener1);
       subscribeToCacheUpdate(path2, listener2);
 
-      clearAllListeners();
+      clearAllListenersForTesting();
 
-      expect(getListenerCount(path1)).toBe(0);
-      expect(getListenerCount(path2)).toBe(0);
+      expect(getListenerCountForTesting(path1)).toBe(0);
+      expect(getListenerCountForTesting(path2)).toBe(0);
     });
   });
 });
 
 describe('useThumbnailCache', () => {
   beforeEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
     mockFetch.mockReset();
   });
 
   afterEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
     vi.clearAllMocks();
   });
 
@@ -260,13 +261,13 @@ describe('useThumbnailCache', () => {
 
 describe('useThumbnail', () => {
   beforeEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({ success: [], failed: [] });
   });
 
   afterEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
     vi.clearAllMocks();
   });
 
@@ -434,12 +435,12 @@ describe('LRUCache eviction behavior', () => {
 
 describe('バッチフェッチ失敗時のエラーハンドリング', () => {
   beforeEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
     mockFetch.mockReset();
   });
 
   afterEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
     vi.clearAllMocks();
   });
 
@@ -513,11 +514,11 @@ describe('バッチフェッチ失敗時のエラーハンドリング', () => {
 
 describe('notifyCacheUpdate リスナーエラー保護', () => {
   beforeEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
   });
 
   afterEach(() => {
-    clearAllListeners();
+    clearAllListenersForTesting();
   });
 
   it('リスナーがエラーをスローしても他のリスナーに通知される', () => {
