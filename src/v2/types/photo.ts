@@ -83,12 +83,18 @@ export interface PhotoFullyLoaded extends PhotoBase {
  * ```ts
  * if (isPhotoLoaded(photo)) {
  *   // photo.photoPath が VRChatPhotoPath 型として推論される
- *   console.log(photo.photoPath.value);
+ *   // サムネイル取得には useThumbnail フックを使用
+ *   const thumbnail = useThumbnail(photo.photoPath.value);
+ *   return thumbnail ? <img src={thumbnail} /> : <Skeleton />;
  * }
  *
- * // または ts-pattern で
+ * // または ts-pattern で loadingState をチェック
  * match(photo)
- *   .with({ loadingState: 'loaded' }, (p) => <img src={p.photoPath.value} />)
+ *   .with({ loadingState: 'loaded' }, (p) => {
+ *     // p.photoPath.value はファイルパス（直接 img src には使えない）
+ *     // サムネイルは useThumbnail(p.photoPath.value) で取得
+ *     return <PhotoCard photo={p} />;
+ *   })
  *   .with({ loadingState: 'metadata' }, () => <Skeleton />)
  *   .exhaustive();
  * ```

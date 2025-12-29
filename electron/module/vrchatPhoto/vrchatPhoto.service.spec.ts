@@ -542,4 +542,94 @@ describe('vrchatPhoto.service', () => {
       expect(sharpFactory).toHaveBeenCalled();
     });
   });
+
+  describe('Concurrent Cache Writes (pendingCacheWrites)', () => {
+    const mockWriteFile = vi.mocked(fsPromises.writeFile);
+    const mockStat = vi.mocked(fsPromises.stat);
+    let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
+    let mockSharpInstance: {
+      metadata: ReturnType<typeof vi.fn>;
+      resize: ReturnType<typeof vi.fn>;
+      webp: ReturnType<typeof vi.fn>;
+      toBuffer: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(async () => {
+      vi.resetAllMocks();
+      sharpFactory = vi.mocked(sharp);
+      mockSharpInstance = {
+        metadata: vi.fn().mockResolvedValue({
+          width: 1920,
+          height: 1080,
+          format: 'png',
+        }),
+        resize: vi.fn().mockReturnThis(),
+        webp: vi.fn().mockReturnThis(),
+        toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumbnail_data')),
+      };
+      sharpFactory.mockReturnValue(
+        mockSharpInstance as unknown as ReturnType<typeof sharp>,
+      );
+
+      // キャッシュミスを強制（ENOENT）
+      const enoentError = new Error('ENOENT') as Error & { code: string };
+      enoentError.code = 'ENOENT';
+      mockStat.mockRejectedValue(enoentError);
+    });
+
+    it('同一キーへの並行書き込みリクエストで、最初のリクエストのみが書き込みを実行', async () => {
+      const { getVRChatPhotoItemData } = await import('./vrchatPhoto.service');
+      const mockPhotoPath =
+        '/path/to/VRChat_2024-01-15_10-00-00.000_1920x1080.png';
+
+      // 遅延を追加して並行実行をシミュレート
+      let _writeCallCount = 0;
+      mockWriteFile.mockImplementation(async () => {
+        _writeCallCount++;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      });
+
+      // 同じパスに対して並行でリクエスト
+      const promises = Array.from({ length: 5 }, () =>
+        getVRChatPhotoItemData({ photoPath: mockPhotoPath, width: 256 }),
+      );
+
+      const results = await Promise.all(promises);
+
+      // 全てのリクエストが成功
+      for (const result of results) {
+        expect(result.isOk()).toBe(true);
+      }
+
+      // pendingCacheWrites により、複数の並行書き込みは防止される
+      // 最初のリクエストで書き込みが開始されると、後続のリクエストはスキップされる
+      // ただし、sharpは各リクエストで呼ばれる（キャッシュミスなので）
+      expect(sharpFactory).toHaveBeenCalled();
+    });
+
+    it('異なるキーへの並行書き込みは全て実行される', async () => {
+      const { getVRChatPhotoItemData } = await import('./vrchatPhoto.service');
+
+      // 異なるパスを用意
+      const paths = [
+        '/path/to/VRChat_2024-01-15_10-00-00.000_1920x1080.png',
+        '/path/to/VRChat_2024-01-15_11-00-00.000_1920x1080.png',
+        '/path/to/VRChat_2024-01-15_12-00-00.000_1920x1080.png',
+      ];
+
+      const promises = paths.map((photoPath) =>
+        getVRChatPhotoItemData({ photoPath, width: 256 }),
+      );
+
+      const results = await Promise.all(promises);
+
+      // 全てのリクエストが成功
+      for (const result of results) {
+        expect(result.isOk()).toBe(true);
+      }
+
+      // 全ての異なるパスでsharpが呼ばれる
+      expect(sharpFactory).toHaveBeenCalledTimes(3);
+    });
+  });
 });

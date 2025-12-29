@@ -39,12 +39,9 @@ const getElectronApp = (): typeof import('electron').app | null => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { app } = require('electron') as typeof import('electron');
     return app;
-  } catch (error) {
+  } catch {
     // Playwrightテストなど非Electron環境では予期されるエラー
-    logger.debug({
-      message: 'Electron app module not available, using fallback paths',
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
+    logger.debug('Electron app module not available, using fallback paths');
     return null;
   }
 };
@@ -57,12 +54,9 @@ const getThumbnailCacheDir = (): string => {
   if (app) {
     try {
       return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
-    } catch (error) {
+    } catch {
       // アプリ未初期化時はフォールバック
-      logger.debug({
-        message: 'app.getPath("temp") failed, using os.tmpdir() fallback',
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
+      logger.debug('app.getPath("temp") failed, using os.tmpdir() fallback');
     }
   }
   // テスト環境などでappが使えない場合
@@ -121,7 +115,8 @@ const ensureCacheDir = async (): Promise<
 /**
  * キャッシュからサムネイルを取得
  *
- * @returns キャッシュヒット時はBuffer、キャッシュミスまたはキャッシュ無効時はnull
+ * @param cacheKey キャッシュキー（generateCacheKeyで生成）
+ * @returns キャッシュヒット時はBuffer、キャッシュミスまたは有効期限(7日)切れ時はnull
  */
 const getCachedThumbnail = async (cacheKey: string): Promise<Buffer | null> => {
   const cacheDirResult = await ensureCacheDir();
@@ -318,8 +313,6 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
  * VRChat の写真が保存されている場所のデフォルト値を取得する
  */
 const getDefaultVRChatPhotoDir = (): VRChatPhotoDirPath => {
-  // /workspaces/vrchat-albums/debug/photos/VRChat
-  // return path.join('/workspaces/vrchat-albums/debug/photos');
   let logFilesDir: string;
 
   if (process.platform === 'win32' && process.env.USERPROFILE) {

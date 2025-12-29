@@ -271,8 +271,8 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
         // コールバックで通知（UIへの表示等）
         onFetchError(error, batchToFetch);
       } finally {
-        // ペンディングから削除
-        for (const path of pathsToFetch) {
+        // ペンディングから削除（実際にフェッチを試みたバッチのみ）
+        for (const path of batchToFetch) {
           pendingRequests.delete(path);
         }
       }
