@@ -146,7 +146,15 @@ export const settingsRouter = () =>
     openApplicationLogInExploler: procedure.mutation(async () => {
       const logPath = electronUtilService.getApplicationLogPath();
       logger.debug('openApplicationLogInExploler', logPath);
-      await electronUtilService.openPathInExplorer(logPath);
+      const result = await electronUtilService.openPathInExplorer(logPath);
+      if (result.isErr()) {
+        throw UserFacingError.withStructuredInfo({
+          code: ERROR_CODES.FILE_NOT_FOUND,
+          category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+          message: result.error.message,
+          userMessage: `ログフォルダを開けませんでした: ${result.error.message}`,
+        });
+      }
     }),
     throwErrorForSentryTest: procedure.mutation(async () => {
       logger.debug('Throwing test error for Sentry integration');

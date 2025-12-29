@@ -94,6 +94,76 @@ describe('Neverthrow Linter', () => {
     expect(result.issues).toHaveLength(0);
   });
 
+  describe('must-use-result', () => {
+    it('should detect unhandled Result from function call', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        mustUseResult: {
+          enabled: true,
+          path: path.join(fixturesDir, 'must-use-result-invalid.ts'),
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      expect(result.success).toBe(false);
+      expect(result.issues.some((i) => i.ruleName === 'must-use-result')).toBe(
+        true,
+      );
+    });
+
+    it('should pass when Result is handled with match()', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        mustUseResult: {
+          enabled: true,
+          path: path.join(fixturesDir, 'must-use-result-valid.ts'),
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      const mustUseIssues = result.issues.filter(
+        (i) => i.ruleName === 'must-use-result',
+      );
+      expect(mustUseIssues).toHaveLength(0);
+    });
+
+    it('should pass when Result is returned', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        mustUseResult: {
+          enabled: true,
+          path: path.join(fixturesDir, 'must-use-result-return.ts'),
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      const mustUseIssues = result.issues.filter(
+        (i) => i.ruleName === 'must-use-result',
+      );
+      expect(mustUseIssues).toHaveLength(0);
+    });
+
+    it('should detect unhandled Result assigned to variable', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        mustUseResult: {
+          enabled: true,
+          path: path.join(fixturesDir, 'must-use-result-unhandled-var.ts'),
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      expect(result.success).toBe(false);
+      expect(result.issues.some((i) => i.ruleName === 'must-use-result')).toBe(
+        true,
+      );
+    });
+  });
+
   describe('Anti-pattern detection: catch-err without classification', () => {
     it('should detect catch block wrapping errors without classification', async () => {
       const testConfig: NeverthrowLintConfig = {
