@@ -1,8 +1,12 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { memo } from 'react';
+
+import { cn } from '@/components/lib/utils';
+import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useTheme } from '../../hooks/useTheme';
 import { useI18n } from '../../i18n/store';
 import type { ThemeOption } from '../../utils/theme';
+import { SettingsSection } from './common';
 
 /**
  * テーマをシステム・ダーク・ライトから選択する UI。
@@ -19,43 +23,38 @@ const ThemeSelector = memo(() => {
   ];
 
   return (
-    <section>
-      <h3 className="flex items-center text-lg font-medium text-gray-900 dark:text-white mb-4">
-        <Sun className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
-        {t('settings.theme.title')}
-      </h3>
+    <SettingsSection icon={Sun} title={t('settings.theme.title')}>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {themeOptions.map(({ value, label, icon: Icon }) => (
           <button
             type="button"
             key={value}
             onClick={() => setTheme(value)}
-            className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors ${
+            className={cn(
+              'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors',
               theme === value
-                ? 'border-indigo-600 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
-                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-            }`}
+                ? 'border-primary bg-primary/10 dark:bg-primary/20'
+                : 'border-border hover:border-primary/50',
+            )}
           >
             <Icon
-              className={`h-5 w-5 ${
-                theme === value
-                  ? 'text-indigo-600 dark:text-indigo-400'
-                  : 'text-gray-500 dark:text-gray-400'
-              }`}
+              className={cn(
+                'h-5 w-5',
+                theme === value ? 'text-primary' : TEXT_COLOR.muted,
+              )}
             />
             <span
-              className={`text-sm font-medium ${
-                theme === value
-                  ? 'text-indigo-600 dark:text-indigo-400'
-                  : 'text-gray-700 dark:text-gray-300'
-              }`}
+              className={cn(
+                TYPOGRAPHY.body.emphasis,
+                theme === value ? 'text-primary' : TEXT_COLOR.secondary,
+              )}
             >
               {label}
             </span>
           </button>
         ))}
       </div>
-    </section>
+    </SettingsSection>
   );
 });
 

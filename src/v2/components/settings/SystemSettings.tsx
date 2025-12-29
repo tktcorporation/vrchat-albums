@@ -1,33 +1,11 @@
+import { Settings } from 'lucide-react';
 import { memo } from 'react';
+
+import { Switch } from '@/components/ui/switch';
 import { trpcReact } from '@/trpc';
 import { useToast } from '../../hooks/use-toast';
 import { useI18n } from '../../i18n/store';
-
-interface ToggleProps {
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-  disabled?: boolean;
-}
-
-const Toggle = ({ checked, onCheckedChange, disabled }: ToggleProps) => (
-  <button
-    type="button"
-    onClick={() => onCheckedChange(!checked)}
-    disabled={disabled}
-    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
-      checked ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'
-    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-    role="switch"
-    aria-checked={checked}
-  >
-    <span
-      aria-hidden="true"
-      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-        checked ? 'translate-x-5' : 'translate-x-0'
-      }`}
-    />
-  </button>
-);
+import { SettingsItem, SettingsSection } from './common';
 
 /**
  * 自動起動やバックグラウンド処理の設定を行う画面。
@@ -87,46 +65,33 @@ const SystemSettings = memo(() => {
     );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('settings.system.title')}
-        </h3>
-      </div>
-
+    <SettingsSection icon={Settings} title={t('settings.system.title')}>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-gray-900 dark:text-white">
-              {t('settings.system.startupLaunch')}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {t('settings.system.startupDescription')}
-            </div>
-          </div>
-          <Toggle
+        <SettingsItem
+          label={t('settings.system.startupLaunch')}
+          description={t('settings.system.startupDescription')}
+          disabled={isStartupLoading || isStartupUpdating}
+        >
+          <Switch
             checked={startupLaunch ?? false}
             onCheckedChange={setStartupLaunch}
             disabled={isStartupLoading || isStartupUpdating}
+            aria-label={t('settings.system.startupLaunch')}
           />
-        </div>
+        </SettingsItem>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-gray-900 dark:text-white">
-              {t('settings.system.backgroundUpdate')}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {t('settings.system.backgroundDescription')}
-            </div>
-          </div>
-          <Toggle
+        <SettingsItem
+          label={t('settings.system.backgroundUpdate')}
+          description={t('settings.system.backgroundDescription')}
+        >
+          <Switch
             checked={backgroundUpdate ?? false}
             onCheckedChange={setBackgroundUpdate}
+            aria-label={t('settings.system.backgroundUpdate')}
           />
-        </div>
+        </SettingsItem>
       </div>
-    </div>
+    </SettingsSection>
   );
 });
 

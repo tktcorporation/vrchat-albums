@@ -1,10 +1,13 @@
 import { ArrowUpRight, Info } from 'lucide-react';
 import type React from 'react';
 import { memo, useState } from 'react';
+
 import { trpcReact } from '@/trpc';
 import packageJson from '../../../../package.json';
 import { Button } from '../../../components/ui/button';
+import { SPACING, SURFACE_COLOR, TEXT_COLOR } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
+import { SettingsSection } from './common';
 import SqliteConsole from './SqliteConsole';
 
 /**
@@ -44,18 +47,16 @@ const AppInfo = memo(() => {
   };
 
   return (
-    <section>
-      <h3 className="flex items-center text-lg font-medium text-gray-900 dark:text-white mb-4">
-        <Info className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
-        {t('settings.info.title')}
-      </h3>
-      <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 space-y-2">
+    <SettingsSection icon={Info} title={t('settings.info.title')}>
+      <div
+        className={`${SURFACE_COLOR.muted} rounded-lg ${SPACING.padding.card} ${SPACING.stack.tight}`}
+      >
         <div className="flex justify-between">
-          <span className="text-gray-600 dark:text-gray-400">
+          <span className={TEXT_COLOR.secondary}>
             {t('settings.info.version')}
           </span>
           <span
-            className="font-mono text-gray-900 dark:text-white cursor-pointer"
+            className={`font-mono ${TEXT_COLOR.primary} cursor-pointer`}
             onClick={handleVersionClick}
             onKeyDown={handleKeyDown}
             role="button"
@@ -65,15 +66,15 @@ const AppInfo = memo(() => {
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-600 dark:text-gray-400">
+          <span className={TEXT_COLOR.secondary}>
             {t('settings.info.name')}
           </span>
-          <span className="font-mono text-gray-900 dark:text-white">
+          <span className={`font-mono ${TEXT_COLOR.primary}`}>
             {packageJson.name}
           </span>
         </div>
         <div className="flex justify-between mt-8">
-          <span className="text-gray-600 dark:text-gray-400">
+          <span className={TEXT_COLOR.secondary}>
             {t('settings.info.openLog')}
           </span>
           <Button variant="outline" size="sm" onClick={handleOpenLog}>
@@ -87,7 +88,7 @@ const AppInfo = memo(() => {
         isOpen={showSqlConsole}
         onClose={() => setShowSqlConsole(false)}
       />
-    </section>
+    </SettingsSection>
   );
 });
 
