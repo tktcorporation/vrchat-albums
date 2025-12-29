@@ -1,10 +1,13 @@
 import { Calendar, Download, FolderOpen } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
+
 import { trpcClient, trpcReact } from '@/trpc';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
+import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
+import { SettingsInfoBox, SettingsSection } from './common';
 
 /**
  * ログデータのエクスポート機能を提供するコンポーネント
@@ -119,20 +122,19 @@ const DataExport = memo(() => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          ログデータエクスポート
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          データベースからlogStore形式でログデータをエクスポートします
-        </p>
-      </div>
-
-      <div className="space-y-4">
+    <SettingsSection
+      icon={Download}
+      title="ログデータエクスポート"
+      description="データベースからlogStore形式でログデータをエクスポートします"
+    >
+      <div className={SPACING.stack.relaxed}>
         {/* 期間設定 */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium">エクスポート期間</Label>
+        <div className={SPACING.stack.default}>
+          <Label
+            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
+          >
+            エクスポート期間
+          </Label>
 
           {/* プリセットボタン */}
           <div className="flex gap-2 flex-wrap">
@@ -188,16 +190,16 @@ const DataExport = memo(() => {
             <div>
               <Label
                 htmlFor="startDate"
-                className={`text-xs ${
-                  useFullPeriod
-                    ? 'text-gray-400'
-                    : 'text-gray-600 dark:text-gray-400'
+                className={`${TYPOGRAPHY.body.small} ${
+                  useFullPeriod ? TEXT_COLOR.muted : TEXT_COLOR.secondary
                 }`}
               >
                 開始日{useFullPeriod && ' (全期間選択時は無効)'}
               </Label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Calendar
+                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
+                />
                 <Input
                   id="startDate"
                   type="date"
@@ -211,16 +213,16 @@ const DataExport = memo(() => {
             <div>
               <Label
                 htmlFor="endDate"
-                className={`text-xs ${
-                  useFullPeriod
-                    ? 'text-gray-400'
-                    : 'text-gray-600 dark:text-gray-400'
+                className={`${TYPOGRAPHY.body.small} ${
+                  useFullPeriod ? TEXT_COLOR.muted : TEXT_COLOR.secondary
                 }`}
               >
                 終了日{useFullPeriod && ' (全期間選択時は無効)'}
               </Label>
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Calendar
+                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
+                />
                 <Input
                   id="endDate"
                   type="date"
@@ -235,13 +237,18 @@ const DataExport = memo(() => {
         </div>
 
         {/* 出力パス設定 */}
-        <div className="space-y-2">
-          <Label htmlFor="outputPath" className="text-sm font-medium">
+        <div className={SPACING.stack.tight}>
+          <Label
+            htmlFor="outputPath"
+            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
+          >
             出力先ディレクトリ（オプション）
           </Label>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <FolderOpen className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <FolderOpen
+                className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
+              />
               <Input
                 id="outputPath"
                 type="text"
@@ -260,7 +267,7 @@ const DataExport = memo(() => {
               参照
             </Button>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
             出力先を変更しない場合、ダウンロードフォルダ内のlogStoreディレクトリに出力されます
           </p>
         </div>
@@ -280,19 +287,16 @@ const DataExport = memo(() => {
         </div>
 
         {/* 説明 */}
-        <div className="bg-primary/10 dark:bg-primary/20 p-4 rounded-lg">
-          <h4 className="text-sm font-medium text-primary mb-2">
-            エクスポート形式について
-          </h4>
-          <ul className="text-xs text-primary/80 space-y-1">
+        <SettingsInfoBox title="エクスポート形式について" variant="info">
+          <ul className={`${TYPOGRAPHY.body.small} space-y-1`}>
             <li>• データベースからlogStore形式でエクスポートします</li>
             <li>• 月別にファイルが分割されます（例: logStore-2023-10.txt）</li>
             <li>• ワールド参加、プレイヤー参加/退出ログが含まれます</li>
             <li>• 時系列順でソートされた形式で出力されます</li>
           </ul>
-        </div>
+        </SettingsInfoBox>
       </div>
-    </div>
+    </SettingsSection>
   );
 });
 

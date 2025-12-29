@@ -1,7 +1,10 @@
 import { Book } from 'lucide-react';
 import { memo } from 'react';
+
 import licenseJsonFile from '@/assets/licenses.json';
+import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
+import { SettingsSection } from './common';
 
 interface LibraryMetadata {
   name: string;
@@ -31,32 +34,30 @@ const LicenseInfo = memo(() => {
   }));
 
   return (
-    <section>
-      <h3 className="flex items-center text-lg font-medium text-gray-900 dark:text-white mb-4">
-        <Book className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
-        {t('settings.info.licenses.title')}
-      </h3>
-      <div className="divide-y divide-gray-100 dark:divide-gray-800">
+    <SettingsSection icon={Book} title={t('settings.info.licenses.title')}>
+      <div className="divide-y divide-border">
         {libraries.map((lib) => (
           <div key={lib.path} className="py-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span
+                className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.primary}`}
+              >
                 {lib.name}
               </span>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
+              <span className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
                 {lib.licenses}
               </span>
             </div>
             {lib.repository && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">
-                  Repository
-                </span>
+              <div
+                className={`flex items-center justify-between ${TYPOGRAPHY.body.small}`}
+              >
+                <span className={TEXT_COLOR.secondary}>Repository</span>
                 <a
                   href={lib.repository}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                  className="text-primary hover:text-primary/80"
                 >
                   {lib.repository}
                 </a>
@@ -65,7 +66,7 @@ const LicenseInfo = memo(() => {
           </div>
         ))}
       </div>
-    </section>
+    </SettingsSection>
   );
 });
 

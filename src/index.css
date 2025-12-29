@@ -34,20 +34,20 @@
     --card: 0 0% 100% / 0.7;
     --card-foreground: 220 9% 15%;
 
-    --primary: 240 75% 60%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 32 95% 55%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary-muted: 220 5% 96% / 0.6;
     --secondary: 220 5% 96% / 0.8;
     --secondary-foreground: 220 9% 15%;
 
-    --accent: 240 30% 95% / 0.6;
-    --accent-foreground: 240 75% 60%;
+    --accent: 32 30% 95% / 0.6;
+    --accent-foreground: 32 95% 55%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --ring: 240 75% 60% / 0.3;
+    --ring: 32 95% 55% / 0.3;
 
     --radius: 0.75rem;
 
@@ -59,7 +59,7 @@
     /* Glass effect backdrop */
     --glass-bg: 0 0% 100% / 0.1;
     --glass-border: 0 0% 100% / 0.2;
-    --glass-shadow: 0 4px 16px rgba(31, 38, 135, 0.15);
+    --glass-shadow: 0 4px 16px rgba(247, 148, 29, 0.1);
   }
 
   .dark {
@@ -82,7 +82,7 @@
     --card: 220 27% 12% / 0.7;
     --card-foreground: 220 15% 85%;
 
-    --primary: 240 75% 60%;
+    --primary: 32 95% 55%;
     --primary-foreground: 220 27% 8%;
 
     --secondary: 220 27% 16% / 0.8;
@@ -91,7 +91,7 @@
     --destructive: 0 75% 55%;
     --destructive-foreground: 210 40% 98%;
 
-    --ring: 240 75% 60% / 0.3;
+    --ring: 32 95% 55% / 0.3;
 
     --radius: 0.75rem;
 
@@ -258,7 +258,7 @@
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid hsl(var(--border));
     box-shadow:
-      0 2px 8px rgba(31, 38, 135, 0.1),
+      0 2px 8px rgba(0, 0, 0, 0.08),
       inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
 
@@ -273,7 +273,7 @@
   .glass-button:hover {
     background: hsl(var(--primary) / 0.9);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(31, 38, 135, 0.2);
+    box-shadow: 0 4px 12px rgba(247, 148, 29, 0.2);
   }
 
   .glass-input {

@@ -9,12 +9,18 @@ import {
 } from 'lucide-react';
 import type React from 'react';
 import { memo, useState } from 'react';
+
 import { trpcClient, trpcReact } from '@/trpc';
-// import { Badge } from '../../../components/ui/badge';
-// Note: Using custom badge styling since Badge component doesn't exist
 import { Button } from '../../../components/ui/button';
 import { Label } from '../../../components/ui/label';
+import {
+  SPACING,
+  SURFACE_COLOR,
+  TEXT_COLOR,
+  TYPOGRAPHY,
+} from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
+import { SettingsInfoBox, SettingsSection } from './common';
 
 // Note: ImportHistoryItem interface is used for documentation purposes
 // The actual type comes from the tRPC query result
@@ -196,34 +202,35 @@ const DataImport = memo(() => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          ログデータインポート
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          エクスポートされたlogStoreファイルを既存のデータに統合します
-        </p>
-      </div>
-
-      <div className="space-y-4">
+    <SettingsSection
+      icon={Upload}
+      title="ログデータインポート"
+      description="エクスポートされたlogStoreファイルを既存のデータに統合します"
+    >
+      <div className={SPACING.stack.relaxed}>
         {/* ファイル選択・ドロップエリア */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium">インポートファイル</Label>
+        <div className={SPACING.stack.default}>
+          <Label
+            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
+          >
+            インポートファイル
+          </Label>
 
           {/* ドロップエリア */}
           <div
             className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
               isDragOver
                 ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                : 'border-gray-300 dark:border-gray-600'
+                : 'border-border'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            <Upload className={`h-8 w-8 mx-auto mb-2 ${TEXT_COLOR.muted}`} />
+            <p
+              className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary} mb-3`}
+            >
               logStoreファイルやディレクトリをドラッグ&amp;ドロップするか、下のボタンで選択してください
             </p>
             <div className="flex gap-2 justify-center">
@@ -250,8 +257,10 @@ const DataImport = memo(() => {
 
           {/* 選択されたパス一覧 */}
           {selectedPaths.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-xs text-gray-600 dark:text-gray-400">
+            <div className={SPACING.stack.tight}>
+              <Label
+                className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
+              >
                 選択されたアイテム ({selectedPaths.length}個)
               </Label>
               <div className="max-h-32 overflow-y-auto space-y-1">
@@ -261,7 +270,9 @@ const DataImport = memo(() => {
                     className="text-xs text-primary bg-primary/10 dark:bg-primary/20 p-2 rounded"
                   >
                     {getFilenameFromPath(pathItem)}
-                    <div className="text-gray-500 truncate">{pathItem}</div>
+                    <div className={`${TEXT_COLOR.muted} truncate`}>
+                      {pathItem}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -291,11 +302,8 @@ const DataImport = memo(() => {
         </div>
 
         {/* 説明 */}
-        <div className="bg-primary/10 dark:bg-primary/20 p-4 rounded-lg">
-          <h4 className="text-sm font-medium text-primary mb-2">
-            インポート機能について
-          </h4>
-          <ul className="text-xs text-primary/80 space-y-1">
+        <SettingsInfoBox title="インポート機能について" variant="info">
+          <ul className={`${TYPOGRAPHY.body.small} space-y-1`}>
             <li>
               • logStoreファイルまたはディレクトリを既存データに統合します
             </li>
@@ -307,13 +315,15 @@ const DataImport = memo(() => {
             <li>• インポート後、データベースが自動的に更新されます</li>
             <li>• ロールバック機能で元の状態に戻すことができます</li>
           </ul>
-        </div>
+        </SettingsInfoBox>
       </div>
 
       {/* インポート履歴・ロールバック */}
-      <div className="border-t pt-6">
+      <div className="border-t border-border pt-6">
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-md font-medium text-gray-900 dark:text-white">
+          <h4
+            className={`${TYPOGRAPHY.heading.subsection} ${TEXT_COLOR.primary}`}
+          >
             インポート履歴・ロールバック
           </h4>
           <Button
@@ -329,25 +339,29 @@ const DataImport = memo(() => {
 
         {isLoadingHistory ? (
           <div className="text-center py-4">
-            <div className="text-sm text-gray-500">履歴を読み込み中...</div>
+            <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
+              履歴を読み込み中...
+            </div>
           </div>
         ) : importHistory && importHistory.length > 0 ? (
-          <div className="space-y-3">
+          <div className={SPACING.stack.default}>
             {importHistory.map((backup) => (
               <div
                 key={backup.id}
-                className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 dark:bg-gray-800"
+                className={`flex items-center justify-between p-4 border border-border rounded-lg ${SURFACE_COLOR.muted}`}
               >
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
-                    <div className="font-medium text-sm">
+                    <div
+                      className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.primary}`}
+                    >
                       {backup.exportFolderPath}
                     </div>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                         backup.status === 'completed'
                           ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                          : 'bg-muted text-muted-foreground'
                       }`}
                     >
                       {backup.status === 'completed'
@@ -355,7 +369,9 @@ const DataImport = memo(() => {
                         : 'ロールバック済み'}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 space-y-0.5">
+                  <div
+                    className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted} space-y-0.5`}
+                  >
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-1">
                         <Clock className="h-3 w-3" />
@@ -396,7 +412,7 @@ const DataImport = memo(() => {
                       size="sm"
                       onClick={() => handleRollback(backup.id)}
                       disabled={isRollingBack}
-                      className="text-orange-600 hover:text-orange-700"
+                      className="text-destructive hover:text-destructive"
                     >
                       <AlertTriangle className="h-4 w-4 mr-1" />
                       この時点に戻す
@@ -408,13 +424,13 @@ const DataImport = memo(() => {
           </div>
         ) : (
           <div className="text-center py-8">
-            <div className="text-sm text-gray-500">
+            <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
               インポート履歴がありません
             </div>
           </div>
         )}
       </div>
-    </div>
+    </SettingsSection>
   );
 });
 
