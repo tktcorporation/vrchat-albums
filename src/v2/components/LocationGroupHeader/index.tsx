@@ -11,8 +11,9 @@ import {
 import type { ReactPortal } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Badge } from '@/components/ui/badge';
 import { trpcReact } from '@/trpc';
-import { ICON_SIZE } from '../../constants/ui';
+import { ICON_SIZE, SPACING, TEXT_COLOR } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import {
   getInstanceTypeColor,
@@ -200,14 +201,16 @@ export const LocationGroupHeader = ({
     return (
       <header
         data-testid="location-group-header"
-        className="w-full glass-panel rounded-t-xl p-6 animate-glass-morph"
+        className={`w-full glass-panel rounded-t-xl ${SPACING.padding.section} animate-glass-morph`}
       >
-        <div className="flex items-center gap-x-3">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
+        <div className={`flex items-center ${SPACING.inline.relaxed}`}>
+          <h2 className={`text-xl font-bold ${TEXT_COLOR.primary}`}>
             {t('locationHeader.ungrouped')}
           </h2>
         </div>
-        <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+        <div
+          className={`mt-2 text-sm ${TEXT_COLOR.secondary} flex items-center ${SPACING.inline.default}`}
+        >
           <Calendar className={ICON_SIZE.sm.class} />
           <time dateTime={joinDateTime.toISOString()}>{formattedDate}</time>
         </div>
@@ -310,12 +313,12 @@ export const LocationGroupHeader = ({
                         {getInstanceTypeLabel(worldInstanceId)}
                       </div>
                     )}
-                  <div className="flex items-center text-sm text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30">
+                  <Badge variant="glass" className="flex items-center text-sm">
                     <Calendar
-                      className={`${ICON_SIZE.sm.class} mr-1.5 text-primary-600 dark:text-primary-300`}
+                      className={`${ICON_SIZE.sm.class} mr-1.5 ${TEXT_COLOR.accent}`}
                     />
                     {formattedDate}
-                  </div>
+                  </Badge>
                   {details?.unityPackages &&
                     details.unityPackages.length > 0 && (
                       <div className="flex items-center gap-1.5">
