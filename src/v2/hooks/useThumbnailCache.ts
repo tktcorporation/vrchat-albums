@@ -21,17 +21,45 @@ const PREFETCH_AHEAD = 50; // 何枚先までプリフェッチするか
 type FetchErrorCallback = (error: unknown, failedPaths: string[]) => void;
 
 /**
+ * 大量失敗時の閾値
+ * この数を超える失敗が発生した場合、システム的な問題の可能性がある
+ */
+const MULTIPLE_FAILURE_THRESHOLD = 5;
+
+/**
  * デフォルトのフェッチエラーハンドラ
  *
  * onFetchErrorが指定されない場合に使用される。
- * エラーをログ出力し、ユーザーにフィードバックを提供する基盤を確保。
+ * エラーをログ出力し、Sentryに送信してモニタリングを可能にする。
+ *
+ * ## 通知レベル
+ * - 少数の失敗（<5件）: warn レベル（個別のファイル問題の可能性）
+ * - 大量の失敗（≥5件）: error レベル（システム的問題の可能性、Sentry送信）
+ *
+ * ## カスタムハンドラの推奨
+ * UI表示やToast通知が必要な場合は、useThumbnailCache に
+ * onFetchError コールバックを渡すことを推奨。
  */
 const defaultFetchErrorHandler: FetchErrorCallback = (error, failedPaths) => {
-  logger.warn({
-    message: 'Thumbnail fetch failed (default handler)',
-    error,
-    details: { failedCount: failedPaths.length, firstPath: failedPaths[0] },
-  });
+  // 大量失敗時はシステム的な問題の可能性があるためerrorレベルでログ
+  // Sentryに送信され、運用監視で検知可能になる
+  if (failedPaths.length >= MULTIPLE_FAILURE_THRESHOLD) {
+    logger.error({
+      message: `Multiple thumbnail fetches failed (${failedPaths.length} files) - possible system issue`,
+      error,
+      details: {
+        failedCount: failedPaths.length,
+        samplePaths: failedPaths.slice(0, 3), // 最初の3件をサンプルとして記録
+      },
+    });
+  } else {
+    // 少数の失敗は個別ファイルの問題の可能性が高い
+    logger.warn({
+      message: 'Thumbnail fetch failed (default handler)',
+      error,
+      details: { failedCount: failedPaths.length, firstPath: failedPaths[0] },
+    });
+  }
 };
 
 /**
@@ -131,9 +159,42 @@ class LRUCache<K, V> {
   }
 }
 
-// グローバルキャッシュインスタンス（コンポーネント間で共有）
+/**
+ * グローバルキャッシュインスタンス
+ *
+ * ## 設計意図
+ * このキャッシュは**意図的に**モジュールレベルで共有されている。
+ * これにより、異なるコンポーネント（PhotoCard, PhotoGallery等）間で
+ * サムネイルデータを再利用し、ネットワークリクエストを削減する。
+ *
+ * ## Hot Reload時の動作
+ * 開発時のHot Moduleリロード(HMR)では、このキャッシュは保持されるが
+ * React stateはリセットされる。これは想定された動作であり、
+ * キャッシュが残ることでリロード後も即座にサムネイルが表示される。
+ *
+ * ## テスト時の注意
+ * テスト間でキャッシュ状態が影響しないよう、`resetGlobalCacheForTesting()`
+ * を使用してキャッシュをリセットすること。
+ *
+ * @see createLRUCacheForTesting - 独立したLRUキャッシュインスタンス作成用
+ * @see resetGlobalCacheForTesting - テスト用グローバルキャッシュリセット
+ */
 const globalThumbnailCache = new LRUCache<string, string>(CACHE_MAX_SIZE);
+
+/**
+ * 進行中のリクエストを追跡するSet
+ * 同一パスへの重複リクエストを防止する
+ */
 const pendingRequests = new Set<string>();
+
+/**
+ * テスト用: グローバルキャッシュとpendingRequestsをリセット
+ * @internal テスト専用 - プロダクションコードでは使用しない
+ */
+export function resetGlobalCacheForTesting(): void {
+  globalThumbnailCache.clear();
+  pendingRequests.clear();
+}
 
 /**
  * テスト用: 小さいmaxSizeでLRUCacheインスタンスを作成

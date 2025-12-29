@@ -211,23 +211,35 @@ export const getLatestVRChatPhoto = async () => {
 };
 
 /**
+ * 軽量メタデータ型（ハイブリッドローディング Phase 1 用）
+ *
+ * @remarks
+ * この型は `src/v2/types/photo.ts` の `PhotoMetadata` と同じ構造。
+ * electronモジュールからフロントエンドへの依存を避けるため、
+ * ここで独立して定義している。
+ * 両方の型を変更する場合は、もう一方も更新すること。
+ *
+ * @see src/v2/types/photo.ts - フロントエンド側の同等の型定義
+ */
+export interface VRChatPhotoMetadata {
+  id: string;
+  photoTakenAt: Date;
+  width: number;
+  height: number;
+}
+
+/**
  * 軽量メタデータのみ取得する（ハイブリッドローディング Phase 1）
  * photoPath を含まないことでメモリ使用量を削減
  *
  * @see docs/photo-grouping-logic.md - 写真グループ化ロジック
+ * @see VRChatPhotoMetadata - 戻り値の型定義
  */
 export const getVRChatPhotoMetadataList = async (query?: {
   gtPhotoTakenAt?: Date;
   ltPhotoTakenAt?: Date;
   orderByPhotoTakenAt: 'asc' | 'desc';
-}): Promise<
-  {
-    id: string;
-    photoTakenAt: Date;
-    width: number;
-    height: number;
-  }[]
-> => {
+}): Promise<VRChatPhotoMetadata[]> => {
   const photoList = await VRChatPhotoPathModel.findAll({
     attributes: ['id', 'photoTakenAt', 'width', 'height'], // photoPath を除外
     where: {
@@ -240,12 +252,7 @@ export const getVRChatPhotoMetadataList = async (query?: {
     raw: true, // プレーンオブジェクトを返す（メモリ効率向上）
   });
 
-  return photoList as {
-    id: string;
-    photoTakenAt: Date;
-    width: number;
-    height: number;
-  }[];
+  return photoList as VRChatPhotoMetadata[];
 };
 
 /**

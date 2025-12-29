@@ -204,6 +204,22 @@ export function createFullyLoadedPhoto(
 }
 
 /**
+ * 無効なパスのレポート用コールバック型
+ */
+export type InvalidPathCallback = (id: string, path: string) => void;
+
+/**
+ * createPhotoArray のオプション
+ */
+export interface CreatePhotoArrayOptions {
+  /**
+   * 無効なパスが検出された際のコールバック
+   * 指定しない場合は、無効なパスはサマリーログとしてのみ記録される
+   */
+  onInvalidPath?: InvalidPathCallback;
+}
+
+/**
  * メタデータ配列からPhoto配列を生成
  *
  * パスがキャッシュされていればFullyLoaded、なければMetadataOnlyを返す。
@@ -211,19 +227,53 @@ export function createFullyLoadedPhoto(
  *
  * @param metadataList メタデータ配列
  * @param pathCache id -> photoPath のマッピング
+ * @param options オプション（無効パス検出時のコールバック等）
  * @returns Photo配列（VRChat写真形式でないパスを持つエントリは除外される）
+ *
+ * @remarks
+ * VRChat写真形式でないパスが検出された場合:
+ * - onInvalidPath が指定されていれば各パスについてコールバック
+ * - 最終的に除外された件数をサマリーログとして記録
  */
 export function createPhotoArray(
   metadataList: PhotoMetadata[],
   pathCache: Map<string, string>,
+  options: CreatePhotoArrayOptions = {},
 ): Photo[] {
-  return metadataList
+  const { onInvalidPath } = options;
+  const invalidPaths: Array<{ id: string; path: string }> = [];
+
+  const photos = metadataList
     .map((metadata) => {
       const photoPath = pathCache.get(metadata.id);
       if (photoPath) {
-        return createFullyLoadedPhoto(metadata, photoPath);
+        const loaded = createFullyLoadedPhoto(metadata, photoPath);
+        if (loaded === null) {
+          // 無効なパスをトラッキング
+          invalidPaths.push({ id: metadata.id, path: photoPath });
+          onInvalidPath?.(metadata.id, photoPath);
+        }
+        return loaded;
       }
       return createMetadataOnlyPhoto(metadata);
     })
     .filter((photo): photo is Photo => photo !== null);
+
+  // 無効なパスがあった場合はサマリーログを出力
+  if (invalidPaths.length > 0) {
+    logger.warn({
+      message: `createPhotoArray: ${invalidPaths.length} photos with invalid paths were filtered out`,
+      details: {
+        filteredCount: invalidPaths.length,
+        totalCount: metadataList.length,
+        // サンプルとして最初の3件を記録
+        samplePaths: invalidPaths.slice(0, 3).map((p) => ({
+          id: p.id,
+          path: p.path,
+        })),
+      },
+    });
+  }
+
+  return photos;
 }

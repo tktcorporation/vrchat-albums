@@ -31,17 +31,53 @@ const CACHE_FAILURE_THRESHOLD = 10;
 let consecutiveCacheFailures = 0;
 
 /**
+ * テスト環境かどうかを判定する
+ * Playwright、Vitest等のテスト環境ではElectronモジュールが利用不可
+ */
+const isTestEnvironment = (): boolean => {
+  return (
+    process.env.PLAYWRIGHT_TEST === 'true' ||
+    process.env.VITEST === 'true' ||
+    process.env.NODE_ENV === 'test'
+  );
+};
+
+/**
  * Electronのappモジュールを遅延取得する
  * Playwrightテスト時のクラッシュを防ぐため、トップレベルインポートを避ける
+ *
+ * ## 環境による動作の違い
+ * - テスト環境: Electronを試行せずnullを返す（想定された動作）
+ * - 開発/プロダクション環境: Electronのロードを試行し、失敗時はエラーログ出力
+ *
+ * @returns Electron appモジュール、または利用不可時はnull
  */
 const getElectronApp = (): typeof import('electron').app | null => {
+  // テスト環境ではElectronを試行しない（想定された動作）
+  if (isTestEnvironment()) {
+    logger.debug('Test environment detected, skipping Electron module');
+    return null;
+  }
+
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { app } = require('electron') as typeof import('electron');
     return app;
-  } catch {
-    // Playwrightテストなど非Electron環境では予期されるエラー
-    logger.debug('Electron app module not available, using fallback paths');
+  } catch (error) {
+    // 開発/プロダクション環境でのElectronロード失敗は予期しない
+    // Sentryに送信して問題を検知できるようにする
+    if (process.env.NODE_ENV === 'production') {
+      logger.error({
+        message: 'Failed to load Electron app module in production environment',
+        stack: error instanceof Error ? error : new Error(String(error)),
+      });
+    } else {
+      // 開発環境では警告レベル（Electronなしでの動作確認時など）
+      logger.warn({
+        message: 'Electron app module not available, using fallback paths',
+        stack: error instanceof Error ? error : new Error(String(error)),
+      });
+    }
     return null;
   }
 };
@@ -113,20 +149,41 @@ const ensureCacheDir = async (): Promise<
 };
 
 /**
+ * キャッシュ読み取り結果の型
+ *
+ * キャッシュミスと予期しないエラーを区別するための discriminated union
+ */
+type CacheReadResult =
+  | { status: 'hit'; data: Buffer }
+  | {
+      status: 'miss';
+      reason: 'not_found' | 'expired' | 'cache_dir_unavailable';
+    }
+  | { status: 'error'; error: Error };
+
+/**
  * キャッシュからサムネイルを取得
  *
  * @param cacheKey キャッシュキー（generateCacheKeyで生成）
- * @returns キャッシュヒット時はBuffer、キャッシュミスまたは有効期限(7日)切れ時はnull
+ * @returns 構造化された結果（hit/miss/error を区別可能）
+ *
+ * ## 戻り値の例
+ * - { status: 'hit', data: Buffer } - キャッシュヒット
+ * - { status: 'miss', reason: 'not_found' } - キャッシュファイルなし
+ * - { status: 'miss', reason: 'expired' } - キャッシュ有効期限切れ
+ * - { status: 'error', error: Error } - 予期しないエラー（権限、I/O等）
  */
-const getCachedThumbnail = async (cacheKey: string): Promise<Buffer | null> => {
+const getCachedThumbnail = async (
+  cacheKey: string,
+): Promise<CacheReadResult> => {
   const cacheDirResult = await ensureCacheDir();
   if (cacheDirResult.isErr()) {
-    // キャッシュディレクトリが利用不可の場合はキャッシュミスとして扱う
+    // キャッシュディレクトリが利用不可の場合
     logger.debug({
       message: 'Cache directory unavailable, skipping cache lookup',
       stack: new Error(cacheDirResult.error.message),
     });
-    return null;
+    return { status: 'miss', reason: 'cache_dir_unavailable' };
   }
 
   const cachePath = path.join(cacheDirResult.value, `${cacheKey}.webp`);
@@ -137,20 +194,25 @@ const getCachedThumbnail = async (cacheKey: string): Promise<Buffer | null> => {
     const cacheDate = new Date(stats.mtimeMs);
     const expiryDate = dateFns.subDays(new Date(), CACHE_EXPIRY_DAYS);
     if (cacheDate < expiryDate) {
-      return null;
+      return { status: 'miss', reason: 'expired' };
     }
-    return await fsPromises.readFile(cachePath);
+    const data = await fsPromises.readFile(cachePath);
+    return { status: 'hit', data };
   } catch (error) {
     // 予期されたエラー（ファイル不在）と予期しないエラーを分類
     return match(error)
-      .with({ code: 'ENOENT' }, () => null) // ファイルがない場合はキャッシュミス
+      .with({ code: 'ENOENT' }, () => ({
+        status: 'miss' as const,
+        reason: 'not_found' as const,
+      }))
       .otherwise((e) => {
-        // 予期しないエラー（権限エラー、I/Oエラー等）はログ出力
+        // 予期しないエラー（権限エラー、I/Oエラー等）
+        const err = e instanceof Error ? e : new Error(String(e));
         logger.warn({
           message: `Unexpected error reading cached thumbnail: ${cachePath}`,
-          stack: e instanceof Error ? e : new Error(String(e)),
+          stack: err,
         });
-        return null;
+        return { status: 'error' as const, error: err };
       });
   }
 };
@@ -700,11 +762,26 @@ export const getVRChatPhotoItemData = async ({
     if (width !== undefined) {
       const cacheKey = generateCacheKey(photoPath, width);
 
-      // キャッシュから取得を試みる
-      const cachedBuffer = await getCachedThumbnail(cacheKey);
-      if (cachedBuffer) {
+      // キャッシュから取得を試みる（構造化された結果で判定）
+      const cacheResult = await getCachedThumbnail(cacheKey);
+
+      // ts-patternでキャッシュ結果を処理
+      const cachedData = match(cacheResult)
+        .with({ status: 'hit' }, ({ data }) => data)
+        .with({ status: 'miss' }, () => null)
+        .with({ status: 'error' }, ({ error }) => {
+          // エラー時はログ出力済み、生成にフォールバック
+          logger.debug({
+            message: `Cache read error for ${cacheKey}, regenerating thumbnail`,
+            stack: error,
+          });
+          return null;
+        })
+        .exhaustive();
+
+      if (cachedData) {
         return neverthrow.ok(
-          `data:image/webp;base64,${cachedBuffer.toString('base64')}`,
+          `data:image/webp;base64,${cachedData.toString('base64')}`,
         );
       }
 
