@@ -152,6 +152,17 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
       .otherwise((idx) => dateIndex.groupToDates.get(idx) || null);
   }, [currentGroupIndex, dateIndex]);
 
+  // 水平ラインインジケーターの位置（currentDateと同期）
+  const indicatorPosition = useMemo(() => {
+    if (!currentDate) return 10;
+    const index = dateSummaries.findIndex((s) => s.date === currentDate);
+    if (index < 0) return 10;
+    if (dateSummaries.length <= 1) return 50;
+    const paddingPercent = 10;
+    const usableRange = 100 - paddingPercent * 2;
+    return paddingPercent + (index / (dateSummaries.length - 1)) * usableRange;
+  }, [currentDate, dateSummaries]);
+
   // クリック位置から最も近い日付を見つける
   const handleSidebarClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
@@ -256,6 +267,17 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
             ? 'bg-gradient-to-l from-background/5 to-transparent opacity-100'
             : 'opacity-0',
         )}
+      />
+
+      {/* スクロール位置インジケーター - 常時表示（水平ラインポインター） */}
+      <div
+        className={cn(
+          'absolute right-0 h-0.5 bg-primary rounded-full transition-all duration-150',
+          isHovering || isScrolling ? 'w-10' : 'w-4',
+        )}
+        style={{
+          top: `${indicatorPosition}%`,
+        }}
       />
 
       {/* タイムライン - 透明度でアニメーション */}
