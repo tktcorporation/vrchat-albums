@@ -4,13 +4,16 @@ import {
 } from '../constants/layoutConstants';
 import type { Photo } from '../types/photo';
 
-/** レイアウト計算用の中間的な写真データ型 */
-export interface LayoutPhoto extends Photo {
-  width: number;
-  height: number;
+/**
+ * レイアウト計算用の中間的な写真データ型
+ *
+ * Photo（PhotoMetadataOnly | PhotoFullyLoaded）に表示用のサイズ情報を追加。
+ * intersection type を使用して union 型を正しく拡張。
+ */
+export type LayoutPhoto = Photo & {
   displayWidth: number;
   displayHeight: number;
-}
+};
 
 /** レイアウト計算結果の型 */
 export interface LayoutResult {

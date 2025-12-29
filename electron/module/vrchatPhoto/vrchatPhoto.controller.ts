@@ -13,11 +13,14 @@ import { VRChatPhotoDirPathSchema } from './valueObjects';
 
 /**
  * index 済みの写真ファイルのpath一覧を取得する
+ * ページネーション対応でメモリ使用量を抑える
  */
 const getVRChatLogFilePathModelList = async (query?: {
   gtPhotoTakenAt?: Date;
   ltPhotoTakenAt?: Date;
   orderByPhotoTakenAt: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
 }): Promise<
   neverthrow.Result<
     {
@@ -109,6 +112,8 @@ export const vrchatPhotoRouter = () =>
             gtPhotoTakenAt: z.date().optional(),
             ltPhotoTakenAt: z.date().optional(),
             orderByPhotoTakenAt: z.enum(['asc', 'desc']),
+            limit: z.number().int().positive().max(5000).optional(),
+            offset: z.number().int().nonnegative().optional(),
           })
           .optional(),
       )
@@ -117,6 +122,20 @@ export const vrchatPhotoRouter = () =>
         return handleResultError(result, {
           default: (error) => photoOperationErrorMappings.default(error),
         });
+      }),
+    getVrchatPhotoPathCount: procedure
+      .input(
+        z
+          .object({
+            gtPhotoTakenAt: z.date().optional(),
+            ltPhotoTakenAt: z.date().optional(),
+          })
+          .optional(),
+      )
+      .query(async (ctx) => {
+        // サービス関数は予期されたエラーを返さない
+        // データベースエラーなどの予期しないエラーはthrowされてSentryに送信される
+        return vrchatPhotoService.getVRChatPhotoPathCount(ctx.input);
       }),
     getCountByYearMonthList: procedure.query(async () => {
       const result = await getCountByYearMonthList();
@@ -157,6 +176,75 @@ export const vrchatPhotoRouter = () =>
         logger.debug('validateVRChatPhotoPath', ctx.input, result);
         return {
           result,
+        };
+      }),
+    /**
+     * 軽量メタデータのみ取得（初回クエリ用）
+     * photoPath を含まないことでメモリ使用量を大幅に削減
+     */
+    getVrchatPhotoMetadataList: procedure
+      .input(
+        z
+          .object({
+            gtPhotoTakenAt: z.date().optional(),
+            ltPhotoTakenAt: z.date().optional(),
+            orderByPhotoTakenAt: z.enum(['asc', 'desc']),
+          })
+          .optional(),
+      )
+      .query(async (ctx) => {
+        const result = await vrchatPhotoService.getVRChatPhotoMetadataList(
+          ctx.input,
+        );
+        return result;
+      }),
+    /**
+     * 指定されたIDの写真パスをオンデマンドでバッチ取得
+     * 表示に必要な範囲のみ取得
+     */
+    getVrchatPhotoPathsByIds: procedure
+      .input(
+        z.object({
+          ids: z.array(z.string()).max(500), // バッチサイズ制限
+        }),
+      )
+      .query(async (ctx) => {
+        const pathMap = await vrchatPhotoService.getVRChatPhotoPathsByIds(
+          ctx.input.ids,
+        );
+        // Map を配列に変換（tRPC での転送用）
+        return Array.from(pathMap.entries()).map(([id, photoPath]) => ({
+          id,
+          photoPath,
+        }));
+      }),
+    /**
+     * 複数のサムネイルをバッチ取得（Google Photos風の高速ローディング）
+     * 個別リクエストより効率的にサムネイルを取得
+     *
+     * @returns 成功したサムネイルと失敗情報を含む構造化された結果
+     */
+    getBatchThumbnails: procedure
+      .input(
+        z.object({
+          photoPaths: z.array(z.string()).max(50), // バッチサイズ制限
+          width: z.number().int().positive().max(512).optional(),
+        }),
+      )
+      .query(async (ctx) => {
+        const result = await vrchatPhotoService.getBatchThumbnails(
+          ctx.input.photoPaths,
+          ctx.input.width,
+        );
+        // Map を配列に変換（tRPC での転送用）
+        return {
+          success: Array.from(result.success.entries()).map(
+            ([photoPath, data]) => ({
+              photoPath,
+              data,
+            }),
+          ),
+          failed: result.failed,
         };
       }),
   });
