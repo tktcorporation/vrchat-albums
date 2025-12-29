@@ -281,7 +281,7 @@ const GalleryContent = memo(
         )}
         <div
           ref={containerRef}
-          className="flex-1 overflow-y-auto p-4 pr-4"
+          className="flex-1 overflow-y-auto p-4 pr-4 scrollbar-none"
           onClick={handleBackgroundClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {

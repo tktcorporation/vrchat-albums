@@ -29,6 +29,17 @@ export interface DateSummary {
   normalizedHeight: number;
 }
 
+export interface MonthSummary {
+  yearMonth: string; // 'YYYY-MM'
+  year: string;
+  month: string;
+  label: string; // 'M月'
+  photoCount: number;
+  dateCount: number;
+  firstDateIndex: number; // dateSummaries内の最初の日付のインデックス
+  isFirstOfYear: boolean;
+}
+
 interface DateJumpSidebarProps {
   groups: GroupedPhoto[];
   onJumpToDate: (groupIndex: number) => void;
@@ -48,6 +59,8 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [hoverY, setHoverY] = useState<number | null>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // スクロール状態の検知
@@ -145,6 +158,50 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
     });
   }, [dateIndex, groups]);
 
+  // 月サマリーを生成（月単位のセグメント表示用）
+  const monthSummaries = useMemo<MonthSummary[]>(() => {
+    const monthMap = new Map<
+      string,
+      { photoCount: number; dateIndices: number[] }
+    >();
+
+    dateSummaries.forEach((summary, index) => {
+      const yearMonth = summary.date.substring(0, 7); // 'YYYY-MM'
+      const existing = monthMap.get(yearMonth) || {
+        photoCount: 0,
+        dateIndices: [],
+      };
+      existing.photoCount += summary.photoCount;
+      existing.dateIndices.push(index);
+      monthMap.set(yearMonth, existing);
+    });
+
+    let lastYear: string | null = null;
+    const sortedYearMonths = Array.from(monthMap.keys()).sort().reverse();
+
+    return sortedYearMonths.flatMap((yearMonth) => {
+      const [year, month] = yearMonth.split('-');
+      const data = monthMap.get(yearMonth);
+      if (!data) return [];
+
+      const isFirstOfYear = year !== lastYear;
+      lastYear = year;
+
+      return [
+        {
+          yearMonth,
+          year,
+          month,
+          label: `${Number.parseInt(month, 10)}月`,
+          photoCount: data.photoCount,
+          dateCount: data.dateIndices.length,
+          firstDateIndex: Math.min(...data.dateIndices),
+          isFirstOfYear,
+        },
+      ];
+    });
+  }, [dateSummaries]);
+
   // 現在表示中の日付
   const currentDate = useMemo(() => {
     return match(currentGroupIndex)
@@ -152,16 +209,39 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
       .otherwise((idx) => dateIndex.groupToDates.get(idx) || null);
   }, [currentGroupIndex, dateIndex]);
 
-  // クリック位置から最も近い日付を見つける
-  const handleSidebarClick = useCallback(
-    (e: MouseEvent<HTMLDivElement>) => {
-      if (!sidebarRef.current || dateSummaries.length === 0) return;
+  // 水平ラインインジケーターの位置（currentDateと同期）
+  const indicatorPosition = useMemo(() => {
+    if (!currentDate) return 10;
+    const index = dateSummaries.findIndex((s) => s.date === currentDate);
+    if (index < 0) return 10;
+    if (dateSummaries.length <= 1) return 50;
+    const paddingPercent = 10;
+    const usableRange = 100 - paddingPercent * 2;
+    return paddingPercent + (index / (dateSummaries.length - 1)) * usableRange;
+  }, [currentDate, dateSummaries]);
+
+  // 日付の位置を計算（パディングを考慮した配置）
+  const getDatePosition = useCallback(
+    (index: number) => {
+      if (dateSummaries.length <= 1) return 50;
+      const paddingPercent = 10;
+      const usableRange = 100 - paddingPercent * 2;
+      return (
+        paddingPercent + (index / (dateSummaries.length - 1)) * usableRange
+      );
+    },
+    [dateSummaries.length],
+  );
+
+  // Y座標から最も近い日付インデックスを取得
+  const getClosestDateIndex = useCallback(
+    (clientY: number) => {
+      if (!sidebarRef.current || dateSummaries.length === 0) return 0;
 
       const rect = sidebarRef.current.getBoundingClientRect();
-      const clickY = e.clientY - rect.top;
+      const clickY = clientY - rect.top;
       const clickPercent = (clickY / rect.height) * 100;
 
-      // クリック位置に最も近い日付を見つける
       let closestIndex = 0;
       let minDistance = Number.POSITIVE_INFINITY;
 
@@ -174,9 +254,111 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
         }
       });
 
+      return closestIndex;
+    },
+    [dateSummaries, getDatePosition],
+  );
+
+  // スクラブ操作（ドラッグ中の位置更新）
+  const handleScrub = useCallback(
+    (clientY: number) => {
+      const closestIndex = getClosestDateIndex(clientY);
       const summary = dateSummaries[closestIndex];
-      const firstGroupIndex = summary.groupIndices[0];
-      onJumpToDate(firstGroupIndex);
+      if (summary) {
+        const firstGroupIndex = summary.groupIndices[0];
+        onJumpToDate(firstGroupIndex);
+      }
+    },
+    [dateSummaries, getClosestDateIndex, onJumpToDate],
+  );
+
+  // ドラッグ開始（マウス）
+  const handleMouseDown = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setIsDragging(true);
+      handleScrub(e.clientY);
+    },
+    [handleScrub],
+  );
+
+  // タッチ開始
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      setIsDragging(true);
+      setIsHovering(true);
+      const touch = e.touches[0];
+      handleScrub(touch.clientY);
+      if (sidebarRef.current) {
+        const rect = sidebarRef.current.getBoundingClientRect();
+        setHoverY(touch.clientY - rect.top);
+      }
+    },
+    [handleScrub],
+  );
+
+  // ドラッグ・タッチ中の移動（グローバル）
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: globalThis.MouseEvent) => {
+      handleScrub(e.clientY);
+      if (sidebarRef.current) {
+        const rect = sidebarRef.current.getBoundingClientRect();
+        setHoverY(e.clientY - rect.top);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      handleScrub(touch.clientY);
+      if (sidebarRef.current) {
+        const rect = sidebarRef.current.getBoundingClientRect();
+        setHoverY(touch.clientY - rect.top);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    const handleTouchEnd = () => {
+      setIsDragging(false);
+      setIsHovering(false);
+      setHoveredDate(null);
+      setHoverY(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [isDragging, handleScrub]);
+
+  // クリック位置から最も近い日付を見つける
+  const handleSidebarClick = useCallback(
+    (e: MouseEvent<HTMLDivElement>) => {
+      // ドラッグ中はクリックとして処理しない
+      if (isDragging) return;
+
+      const closestIndex = getClosestDateIndex(e.clientY);
+      const summary = dateSummaries[closestIndex];
+      if (summary) {
+        const firstGroupIndex = summary.groupIndices[0];
+        onJumpToDate(firstGroupIndex);
+      }
 
       // クリック後はスクロール状態をリセット（ホバー状態は維持）
       if (scrollTimeoutRef.current) {
@@ -184,30 +366,46 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
       }
       setIsScrolling(false);
     },
-    [dateSummaries, onJumpToDate],
+    [dateSummaries, getClosestDateIndex, isDragging, onJumpToDate],
   );
 
-  // 日付の位置を計算（パディングを考慮した配置）
-  const getDatePosition = (index: number) => {
-    if (dateSummaries.length <= 1) return 50;
-    // 上下に5%ずつ余白を確保して、10%〜90%の範囲に配置
-    const paddingPercent = 10;
-    const usableRange = 100 - paddingPercent * 2;
-    return paddingPercent + (index / (dateSummaries.length - 1)) * usableRange;
-  };
+  // 展開状態（ホバー、スクロール、ドラッグのいずれか）
+  const isExpanded = isHovering || isScrolling || isDragging;
 
-  return (
-    <div
-      ref={sidebarRef}
-      className={cn(
-        'fixed right-0 top-12 bottom-0 transition-all duration-300 z-10',
-        isHovering || isScrolling ? 'w-24' : 'w-2',
-        'group cursor-pointer',
-        className,
-      )}
-      onClick={handleSidebarClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+  // 現在のインデックス（キーボードナビゲーション用）
+  const currentDateIndex = useMemo(() => {
+    if (!currentDate) return 0;
+    return dateSummaries.findIndex((s) => s.date === currentDate);
+  }, [currentDate, dateSummaries]);
+
+  // キーボードナビゲーション
+  const handleKeyNavigation = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (dateSummaries.length === 0) return;
+
+      let targetIndex: number | null = null;
+
+      match(e.key)
+        .with('ArrowUp', () => {
+          e.preventDefault();
+          targetIndex = Math.max(0, currentDateIndex - 1);
+        })
+        .with('ArrowDown', () => {
+          e.preventDefault();
+          targetIndex = Math.min(
+            dateSummaries.length - 1,
+            currentDateIndex + 1,
+          );
+        })
+        .with('Home', () => {
+          e.preventDefault();
+          targetIndex = 0;
+        })
+        .with('End', () => {
+          e.preventDefault();
+          targetIndex = dateSummaries.length - 1;
+        })
+        .with('Enter', ' ', () => {
           e.preventDefault();
           const rect = sidebarRef.current?.getBoundingClientRect();
           if (rect) {
@@ -216,85 +414,146 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
             } as MouseEvent<HTMLDivElement>;
             handleSidebarClick(mockEvent);
           }
+        })
+        .otherwise(() => {});
+
+      if (targetIndex !== null) {
+        const summary = dateSummaries[targetIndex];
+        if (summary) {
+          const firstGroupIndex = summary.groupIndices[0];
+          onJumpToDate(firstGroupIndex);
         }
-      }}
-      role="navigation"
-      aria-label="日付ジャンプサイドバー"
+      }
+    },
+    [currentDateIndex, dateSummaries, handleSidebarClick, onJumpToDate],
+  );
+
+  // スクロールバーのARIA値（パーセント）
+  const ariaValueNow = useMemo(() => {
+    if (dateSummaries.length <= 1) return 0;
+    return Math.round((currentDateIndex / (dateSummaries.length - 1)) * 100);
+  }, [currentDateIndex, dateSummaries.length]);
+
+  return (
+    <div
+      ref={sidebarRef}
+      className={cn(
+        'fixed right-0 top-12 bottom-0 transition-all duration-300 z-10',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+        isExpanded ? 'w-24' : 'w-6',
+        isDragging ? 'cursor-row-resize' : 'cursor-pointer',
+        className,
+      )}
+      onClick={handleSidebarClick}
+      onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
+      onKeyDown={handleKeyNavigation}
+      role="slider"
+      aria-label="日付ナビゲーション"
+      aria-orientation="vertical"
+      aria-valuenow={ariaValueNow}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuetext={
+        currentDate
+          ? format(new Date(currentDate), 'yyyy年M月d日', { locale: ja })
+          : undefined
+      }
+      tabIndex={0}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => {
-        setIsHovering(false);
-        setHoveredDate(null);
+        if (!isDragging) {
+          setIsHovering(false);
+          setHoveredDate(null);
+          setHoverY(null);
+        }
       }}
       onMouseMove={(e) => {
         if (!sidebarRef.current || dateSummaries.length === 0) return;
 
         const rect = sidebarRef.current.getBoundingClientRect();
         const mouseY = e.clientY - rect.top;
-        const mousePercent = (mouseY / rect.height) * 100;
+        setHoverY(mouseY);
 
         // マウス位置に最も近い日付を見つける
-        let closestDate: string | null = null;
-        let minDistance = Number.POSITIVE_INFINITY;
-
-        dateSummaries.forEach((summary, index) => {
-          const datePercent = getDatePosition(index);
-          const distance = Math.abs(datePercent - mousePercent);
-          if (distance < minDistance) {
-            minDistance = distance;
-            closestDate = summary.date;
-          }
-        });
-
-        setHoveredDate(closestDate);
+        const closestIndex = getClosestDateIndex(e.clientY);
+        setHoveredDate(dateSummaries[closestIndex]?.date || null);
       }}
     >
       {/* 背景 - 極めて薄いグラデーション */}
       <div
         className={cn(
           'absolute inset-0 transition-all duration-300',
-          isHovering || isScrolling
+          isExpanded
             ? 'bg-gradient-to-l from-background/5 to-transparent opacity-100'
             : 'opacity-0',
         )}
       />
 
-      {/* タイムライン - 透明度でアニメーション */}
+      {/* スクロール位置インジケーター - 常時表示（水平ラインポインター） */}
       <div
         className={cn(
-          'absolute right-0 w-24 h-full py-12 transition-opacity duration-300',
-          isHovering || isScrolling ? 'opacity-100' : 'opacity-0',
+          'absolute right-0 h-0.5 bg-primary rounded-full shadow-sm',
+          'transition-all duration-200 ease-out',
+          isExpanded ? 'w-10 shadow-md' : 'w-4',
+        )}
+        style={{
+          top: `${indicatorPosition}%`,
+          boxShadow: isExpanded
+            ? '0 0 8px rgba(var(--primary), 0.4)'
+            : undefined,
+        }}
+      />
+
+      {/* 現在日付ラベル - 常時表示（縮小時も見える） */}
+      {currentDate && !isExpanded && (
+        <div
+          className="absolute right-6 text-[10px] font-medium text-foreground/60 whitespace-nowrap transition-opacity duration-300"
+          style={{
+            top: `${indicatorPosition}%`,
+            transform: 'translateY(-50%)',
+          }}
+        >
+          {format(new Date(currentDate), 'M/d', { locale: ja })}
+        </div>
+      )}
+
+      {/* タイムライン - スライドイン + 透明度アニメーション */}
+      <div
+        className={cn(
+          'absolute right-0 w-24 h-full py-12',
+          'transition-all duration-300 ease-out',
+          isExpanded
+            ? 'opacity-100 translate-x-0'
+            : 'opacity-0 translate-x-2 pointer-events-none',
         )}
       >
-        {/* 年の区切りとラベル - Google Photo風 */}
-        {(() => {
-          // 各年の最初の日付（配列内では最後）を見つける
-          const yearFirstIndices = new Map<string, number>();
-          for (let i = dateSummaries.length - 1; i >= 0; i--) {
-            const year = dateSummaries[i].date.split('-')[0];
-            if (!yearFirstIndices.has(year)) {
-              yearFirstIndices.set(year, i);
-            }
-          }
-
-          return Array.from(yearFirstIndices.entries()).map(([year, index]) => (
-            <div
-              key={`year-${year}`}
-              className="absolute left-0 right-0 z-10 pointer-events-none"
-              style={{ top: `${getDatePosition(index)}%` }}
-            >
-              {(isHovering || isScrolling) && (
-                <div
-                  className="absolute right-3 -translate-y-1/2"
-                  style={{ top: '50%' }}
-                >
+        {/* 月セグメントと年ラベル - Google Photo風 */}
+        {monthSummaries.map((monthSummary) => (
+          <div
+            key={`month-${monthSummary.yearMonth}`}
+            className="absolute left-0 right-0 z-10 pointer-events-none"
+            style={{ top: `${getDatePosition(monthSummary.firstDateIndex)}%` }}
+          >
+            {isExpanded && (
+              <div
+                className="absolute right-3 -translate-y-1/2 flex items-center gap-1"
+                style={{ top: '50%' }}
+              >
+                {/* 年ラベル（年の最初の月のみ表示） */}
+                {monthSummary.isFirstOfYear && (
                   <span className="text-xs font-medium text-foreground/70 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
-                    {year}
+                    {monthSummary.year}
                   </span>
-                </div>
-              )}
-            </div>
-          ));
-        })()}
+                )}
+                {/* 月ラベル */}
+                <span className="text-[10px] text-foreground/50">
+                  {monthSummary.label}
+                </span>
+              </div>
+            )}
+          </div>
+        ))}
 
         {/* 各日付のビジュアル表現 */}
         {dateSummaries.map((summary, index) => {
@@ -323,28 +582,31 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
                   )}
                 />
               </div>
-
-              {/* ホバー時の日付表示 - Google Photo風のシンプルなポップアップ */}
-              {(isHovering || isScrolling) && isHovered && (
-                <div
-                  className={cn(
-                    'absolute right-full mr-4 top-1/2 -translate-y-1/2',
-                    'bg-background/95 backdrop-blur-sm bg-gray-100 dark:bg-gray-800',
-                    'rounded-md shadow-sm',
-                    'px-2 py-1',
-                    'text-[11px] font-medium text-foreground',
-                    'whitespace-nowrap',
-                    // 'animate-in fade-in-0 duration-10',
-                  )}
-                >
-                  {format(new Date(summary.date), 'M月d日', {
-                    locale: ja,
-                  })}
-                </div>
-              )}
             </div>
           );
         })}
+
+        {/* ホバー時の日付ラベル - マウス位置に追従 */}
+        {isExpanded && hoveredDate && hoverY !== null && (
+          <div
+            className={cn(
+              'absolute right-6 z-30 pointer-events-none',
+              'bg-gray-100/95 dark:bg-gray-800/95 backdrop-blur-sm',
+              'rounded-md',
+              'px-2 py-1',
+              'text-[11px] font-medium text-foreground',
+              'whitespace-nowrap',
+              'shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]',
+              'transition-opacity duration-100',
+            )}
+            style={{
+              top: hoverY,
+              transform: 'translateY(-50%)',
+            }}
+          >
+            {format(new Date(hoveredDate), 'M月d日', { locale: ja })}
+          </div>
+        )}
       </div>
     </div>
   );
