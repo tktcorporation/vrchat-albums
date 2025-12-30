@@ -178,10 +178,10 @@ vi.mock('./backupService/backupService', async (importOriginal) => {
         if (!backup) {
           return {
             isErr: (): boolean => true,
-            error: new Error('バックアップが見つかりません'),
+            error: { type: 'BACKUP_NOT_FOUND' as const, backupId },
             _tag: 'Err',
             isOk: (): boolean => false,
-          } as const;
+          };
         }
         return ok(backup);
       }),
