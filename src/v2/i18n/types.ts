@@ -68,6 +68,7 @@ export interface Translations {
     instanceId: string;
     clickToCopy: string;
     copied: string;
+    noPlayerInfo: string;
   };
   settings: {
     tabs: {

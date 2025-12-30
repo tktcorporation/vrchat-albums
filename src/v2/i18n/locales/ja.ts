@@ -41,6 +41,7 @@ const ja: Translations = {
     instanceId: 'Instance: {id}',
     clickToCopy: 'クリックでプレイヤー名一覧をコピー',
     copied: 'コピーしました',
+    noPlayerInfo: 'プレイヤー情報なし',
   },
   settings: {
     tabs: {

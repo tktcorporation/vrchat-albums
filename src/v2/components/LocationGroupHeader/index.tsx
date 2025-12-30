@@ -65,7 +65,7 @@ export const LocationGroupHeader = ({
   } = useShareActions();
 
   // State
-  const [isImageLoaded, _setIsImageLoaded] = useState(false);
+  const [_isImageLoaded, _setIsImageLoaded] = useState(false);
   const [shouldLoadDetails, setShouldLoadDetails] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -225,13 +225,7 @@ export const LocationGroupHeader = ({
       className="w-full glass-panel rounded-t-lg overflow-hidden group/card"
     >
       <div className="relative h-24 overflow-hidden flex items-center justify-center">
-        <div
-          className={`absolute inset-0 ${
-            !isImageLoaded || !details?.thumbnailImageUrl
-              ? 'bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-800 dark:to-gray-900'
-              : ''
-          }`}
-        >
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
           {details?.thumbnailImageUrl && isVisible && (
             <>
               <div
@@ -344,95 +338,106 @@ export const LocationGroupHeader = ({
               {/* 2行目: プレイヤーリスト */}
               <div className="flex items-center gap-2 w-full">
                 {isPlayersLoading ? (
-                  <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0 animate-pulse">
+                  // ローディング中: スケルトン表示（色は完了状態と統一）
+                  <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <Users
-                        className={`${ICON_SIZE.sm.class} text-primary-600/50 dark:text-primary-300/50 flex-shrink-0`}
+                        className={`${ICON_SIZE.sm.class} text-primary-600 dark:text-primary-300 flex-shrink-0`}
                       />
-                      <div className="h-4 w-6 bg-gray-200/70 dark:bg-black/40 rounded" />
+                      <div className="h-4 w-6 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
                     </div>
-                    <div className="text-gray-500/50 dark:text-gray-400/50">
-                      |
-                    </div>
+                    <div className="text-gray-500 dark:text-gray-400">|</div>
                     <div className="flex-1 flex items-center gap-2">
-                      <div className="h-4 w-24 bg-gray-200/70 dark:bg-black/40 rounded" />
-                      <div className="h-4 w-20 bg-gray-200/70 dark:bg-black/40 rounded" />
-                      <div className="h-4 w-16 bg-gray-200/70 dark:bg-black/40 rounded" />
+                      <div className="h-4 w-24 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
+                      <div className="h-4 w-20 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
                     </div>
                   </div>
-                ) : (
-                  players &&
-                  players.length > 0 && (
-                    <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 hover:bg-white/40 dark:bg-black/30 dark:hover:bg-black/40 px-3 py-1 rounded-full transition-all duration-300 border border-white/20 dark:border-gray-700/30 hover:border-white/30 dark:hover:border-gray-700/40 group/players flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <Users
-                          className={`${ICON_SIZE.sm.class} text-primary-600 dark:text-primary-300 flex-shrink-0`}
-                        />
-                        <span>{players.length}</span>
-                      </div>
-                      <div className="text-gray-500 dark:text-gray-400">|</div>
-                      <div
-                        ref={playerListContainerRef}
-                        className="relative cursor-pointer flex-1 min-w-0"
-                        onMouseEnter={() => setIsHovered(true)}
-                        onMouseLeave={() => setIsHovered(false)}
-                        onMouseMove={handleMouseMove}
-                        onClick={handleCopyPlayers}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleCopyPlayers();
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        title={t('locationHeader.clickToCopy')}
-                      >
-                        <div className="flex items-center gap-2 w-full">
-                          {!isCopied ? (
-                            <PlayerList
-                              players={players}
-                              maxVisiblePlayers={maxVisiblePlayers}
-                            />
-                          ) : (
-                            <span className="text-green-400 flex items-center gap-2">
-                              <CheckIcon className={ICON_SIZE.sm.class} />
-                              {t('locationHeader.copied')}
-                            </span>
-                          )}
-                        </div>
-                        {players &&
-                          (createPortal(
-                            <div
-                              style={{
-                                position: 'fixed',
-                                visibility: isHovered ? 'visible' : 'hidden',
-                                opacity: isHovered ? 1 : 0,
-                                transition: 'opacity 200ms',
-                                top: tooltipPosition.top,
-                                left: tooltipPosition.left,
-                              }}
-                              className="z-50 p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md text-gray-900 dark:text-gray-100 text-sm rounded-lg shadow-xl border border-gray-200/20 dark:border-gray-700/30"
-                            >
-                              <div className="flex flex-wrap gap-2">
-                                {players.map((p: Player) => (
-                                  <span
-                                    key={p.id}
-                                    className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-full border border-gray-200/50 dark:border-gray-700/50"
-                                  >
-                                    {p.playerName}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>,
-                            document.body,
-                          ) as ReactPortal)}
-                      </div>
-                      <Copy
-                        className={`${ICON_SIZE.sm.class} ml-2 text-gray-800 dark:text-white group-hover/players:text-gray-200 transition-colors flex-shrink-0`}
+                ) : players && players.length > 0 ? (
+                  // プレイヤーあり: リスト表示
+                  <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 hover:bg-white/40 dark:bg-black/30 dark:hover:bg-black/40 px-3 py-1 rounded-full transition-all duration-300 border border-white/20 dark:border-gray-700/30 hover:border-white/30 dark:hover:border-gray-700/40 group/players flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <Users
+                        className={`${ICON_SIZE.sm.class} text-primary-600 dark:text-primary-300 flex-shrink-0`}
                       />
+                      <span>{players.length}</span>
                     </div>
-                  )
+                    <div className="text-gray-500 dark:text-gray-400">|</div>
+                    <div
+                      ref={playerListContainerRef}
+                      className="relative cursor-pointer flex-1 min-w-0"
+                      onMouseEnter={() => setIsHovered(true)}
+                      onMouseLeave={() => setIsHovered(false)}
+                      onMouseMove={handleMouseMove}
+                      onClick={handleCopyPlayers}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleCopyPlayers();
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      title={t('locationHeader.clickToCopy')}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        {!isCopied ? (
+                          <PlayerList
+                            players={players}
+                            maxVisiblePlayers={maxVisiblePlayers}
+                          />
+                        ) : (
+                          <span className="text-green-400 flex items-center gap-2">
+                            <CheckIcon className={ICON_SIZE.sm.class} />
+                            {t('locationHeader.copied')}
+                          </span>
+                        )}
+                      </div>
+                      {players &&
+                        (createPortal(
+                          <div
+                            style={{
+                              position: 'fixed',
+                              visibility: isHovered ? 'visible' : 'hidden',
+                              opacity: isHovered ? 1 : 0,
+                              transition: 'opacity 200ms',
+                              top: tooltipPosition.top,
+                              left: tooltipPosition.left,
+                            }}
+                            className="z-50 p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md text-gray-900 dark:text-gray-100 text-sm rounded-lg shadow-xl border border-gray-200/20 dark:border-gray-700/30"
+                          >
+                            <div className="flex flex-wrap gap-2">
+                              {players.map((p: Player) => (
+                                <span
+                                  key={p.id}
+                                  className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-full border border-gray-200/50 dark:border-gray-700/50"
+                                >
+                                  {p.playerName}
+                                </span>
+                              ))}
+                            </div>
+                          </div>,
+                          document.body,
+                        ) as ReactPortal)}
+                    </div>
+                    <Copy
+                      className={`${ICON_SIZE.sm.class} ml-2 text-gray-800 dark:text-white group-hover/players:text-gray-200 transition-colors flex-shrink-0`}
+                    />
+                  </div>
+                ) : (
+                  // プレイヤーなし: 「プレイヤー情報なし」表示
+                  <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0">
+                    <div className="flex items-center gap-1">
+                      <Users
+                        className={`${ICON_SIZE.sm.class} text-primary-600 dark:text-primary-300 flex-shrink-0`}
+                      />
+                      <span>0</span>
+                    </div>
+                    <div className="text-gray-500 dark:text-gray-400">|</div>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {t('locationHeader.noPlayerInfo')}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>

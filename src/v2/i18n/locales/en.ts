@@ -41,6 +41,7 @@ const en: Translations = {
     instanceId: 'Instance: {id}',
     clickToCopy: 'Click to copy',
     copied: 'Copied',
+    noPlayerInfo: 'No player info',
   },
   settings: {
     tabs: {
