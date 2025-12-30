@@ -28,7 +28,7 @@ export interface LayoutResult {
 /**
  * Justified Layout アルゴリズムの統一実装クラス
  *
- * PhotoGrid と MeasurePhotoGroup で同じレイアウト計算ロジックを共有し、
+ * PhotoGrid と GalleryContent で同じレイアウト計算ロジックを共有し、
  * データ整合性を保証する。Google Photos 風の行ベースレイアウトを実装。
  *
  * ## 主要機能
@@ -46,7 +46,7 @@ export interface LayoutResult {
  *
  * @see docs/date-jump-architecture.md - 日付ジャンプ機能の設計
  * @see PhotoGrid
- * @see MeasurePhotoGroup
+ * @see GalleryContent
  */
 export class JustifiedLayoutCalculator {
   private readonly constants: LayoutConstants;
@@ -119,7 +119,7 @@ export class JustifiedLayoutCalculator {
 
   /**
    * 総高さのみを計算（バーチャルスクロール用の軽量版）
-   * MeasurePhotoGroup での高さ予測に使用される
+   * GalleryContent での高さ予測に使用される
    */
   calculateTotalHeight(photos: Photo[], containerWidth: number): number {
     if (containerWidth === 0) return 0;

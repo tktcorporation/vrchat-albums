@@ -1,7 +1,7 @@
 /**
  * PhotoGrid のレイアウト計算で使用する定数値を一元管理
  *
- * これらの定数は PhotoGrid, MeasurePhotoGroup, JustifiedLayoutCalculator で
+ * これらの定数は PhotoGrid, GalleryContent, JustifiedLayoutCalculator で
  * 共通して使用され、データ整合性を保つために一箇所で管理される。
  */
 interface LayoutConstants {

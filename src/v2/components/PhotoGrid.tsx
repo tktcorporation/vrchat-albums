@@ -39,13 +39,13 @@ interface PhotoGridProps {
  *
  * ### レイアウト計算の流れ
  *
- * 1. **コンテナ幅の監視**
- *    - useContainerWidth フックでコンテナ幅の変化をリアルタイムに検知
+ * 1. **コンテナ幅の取得**
+ *    - 親コンポーネント（GalleryContent）から effectiveWidth を props で受け取る
  *    - 幅が変化するたびにレイアウトを再計算
  *
  * 2. **統一されたレイアウト計算**
  *    - JustifiedLayoutCalculator.calculateLayout() で行ベース配置を計算
- *    - MeasurePhotoGroup と同じアルゴリズムを使用してデータ整合性を保証
+ *    - GalleryContent と同じアルゴリズムを使用してデータ整合性を保証
  *
  * 3. **最適化されたレンダリング**
  *    - useMemo でレイアウト計算をメモ化
@@ -53,7 +53,7 @@ interface PhotoGridProps {
  *
  * ### バーチャルスクロールとの連携
  *
- * - **データ整合性**: MeasurePhotoGroup と同じ JustifiedLayoutCalculator を使用
+ * - **データ整合性**: GalleryContent と同じ JustifiedLayoutCalculator を使用
  * - **高さの一致**: 予測値と実測値の差を最小化
  * - **パフォーマンス**: 共通化されたロジックで効率的な計算
  *
