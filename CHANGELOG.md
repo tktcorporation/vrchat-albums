@@ -21,6 +21,10 @@ All notable changes to this project will be documented in this file.
 
 - メモリ使用量を最適化 (#646)
 
+### ⚙️ Miscellaneous Tasks
+
+- Release v0.22.0
+
 ## [0.21.0] - 2025-12-23
 
 ### 🚀 Features
