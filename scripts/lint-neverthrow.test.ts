@@ -207,4 +207,97 @@ describe('Neverthrow Linter', () => {
       );
     });
   });
+
+  describe('try-catch warning: prefer-fromThrowable', () => {
+    it('should warn when using plain try-catch without proper patterns', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        tryCatchWarning: {
+          enabled: true,
+          path: path.join(fixturesDir, 'try-catch-warning.ts'),
+          exceptions: {
+            allowWithFinally: true,
+            allowInsideFromPromise: true,
+            allowWithRethrow: true,
+          },
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      // Should have warnings (not errors)
+      const tryCatchWarnings = result.issues.filter(
+        (i) => i.ruleName === 'prefer-fromThrowable',
+      );
+      expect(tryCatchWarnings.length).toBeGreaterThan(0);
+      expect(tryCatchWarnings[0].severity).toBe('warning');
+      expect(tryCatchWarnings[0].message).toContain('fromThrowable');
+    });
+
+    it('should not warn when try-catch has finally block for cleanup', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        tryCatchWarning: {
+          enabled: true,
+          path: path.join(fixturesDir, 'try-catch-with-finally.ts'),
+          exceptions: {
+            allowWithFinally: true,
+            allowInsideFromPromise: true,
+            allowWithRethrow: true,
+          },
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      const tryCatchWarnings = result.issues.filter(
+        (i) => i.ruleName === 'prefer-fromThrowable',
+      );
+      expect(tryCatchWarnings).toHaveLength(0);
+    });
+
+    it('should not warn when try-catch has proper error classification with rethrow', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        tryCatchWarning: {
+          enabled: true,
+          path: path.join(fixturesDir, 'try-catch-proper-rethrow.ts'),
+          exceptions: {
+            allowWithFinally: true,
+            allowInsideFromPromise: true,
+            allowWithRethrow: true,
+          },
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      const tryCatchWarnings = result.issues.filter(
+        (i) => i.ruleName === 'prefer-fromThrowable',
+      );
+      expect(tryCatchWarnings).toHaveLength(0);
+    });
+
+    it('should warn when allowWithRethrow is disabled even with proper rethrow', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        tryCatchWarning: {
+          enabled: true,
+          path: path.join(fixturesDir, 'try-catch-proper-rethrow.ts'),
+          exceptions: {
+            allowWithFinally: true,
+            allowInsideFromPromise: true,
+            allowWithRethrow: false, // Disabled
+          },
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      const tryCatchWarnings = result.issues.filter(
+        (i) => i.ruleName === 'prefer-fromThrowable',
+      );
+      expect(tryCatchWarnings.length).toBeGreaterThan(0);
+    });
+  });
 });

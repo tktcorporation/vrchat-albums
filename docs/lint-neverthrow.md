@@ -295,6 +295,149 @@ export async function processData(): Promise<Result<Data, Error>> {
 
 **重要**: このパターンを使う場合でも、可能であれば予期されたエラーは具体的な型で分類し、予期しないエラーのみをSentry通知してから返すようにしてください。
 
+## fromThrowable vs try-catch {#fromthrowable-vs-try-catch}
+
+### 推奨パターン
+
+`try-catch` の代わりに、neverthrow の `fromThrowable()` や `ResultAsync.fromPromise()` を使うことを推奨します。
+
+#### 同期関数の場合: `fromThrowable()`
+
+```typescript
+import { fromThrowable } from 'neverthrow';
+
+// ❌ try-catch パターン
+function parseJsonBad(str: string): Result<Data, ParseError> {
+  try {
+    return ok(JSON.parse(str));
+  } catch (error) {
+    return err({ type: 'PARSE_ERROR', message: String(error) });
+  }
+}
+
+// ✅ fromThrowable パターン
+const safeParse = fromThrowable(
+  (str: string) => JSON.parse(str),
+  (error): ParseError => ({ type: 'PARSE_ERROR', message: String(error) })
+);
+
+function parseJsonGood(str: string): Result<Data, ParseError> {
+  return safeParse(str);
+}
+```
+
+#### 非同期関数の場合: `ResultAsync.fromPromise()`
+
+```typescript
+import { ResultAsync } from 'neverthrow';
+
+// ❌ try-catch パターン
+async function fetchDataBad(url: string): Promise<Result<Data, FetchError>> {
+  try {
+    const response = await fetch(url);
+    return ok(await response.json());
+  } catch (error) {
+    return err({ type: 'FETCH_ERROR', message: String(error) });
+  }
+}
+
+// ✅ ResultAsync.fromPromise パターン
+function fetchDataGood(url: string): ResultAsync<Data, FetchError> {
+  return ResultAsync.fromPromise(
+    fetch(url).then(r => r.json()),
+    (error): FetchError => ({ type: 'FETCH_ERROR', message: String(error) })
+  );
+}
+```
+
+### 例外: try-catch が適切なケース
+
+以下のケースでは、`try-catch` の使用が適切です：
+
+1. **`finally` でリソースクリーンアップを行う場合**
+
+```typescript
+async function processWithCleanup(): Promise<Result<Data, ProcessError>> {
+  let resource: Resource | null = null;
+  try {
+    resource = await acquireResource();
+    const result = await processResource(resource);
+    return ok(result);
+  } catch (error) {
+    return err({ type: 'PROCESS_ERROR', message: String(error) });
+  } finally {
+    // クリーンアップは try-catch が必要
+    if (resource) {
+      await resource.release();
+    }
+  }
+}
+```
+
+2. **ts-pattern でエラーを分類し、予期しないエラーを再スローする場合**
+
+```typescript
+import { match } from 'ts-pattern';
+
+async function readFileWithClassification(
+  path: string
+): Promise<Result<string, FileError>> {
+  try {
+    return ok(await fs.readFile(path, 'utf-8'));
+  } catch (error) {
+    return match(error)
+      .with({ code: 'ENOENT' }, () =>
+        err({ type: 'FILE_NOT_FOUND', path })
+      )
+      .with({ code: 'EACCES' }, () =>
+        err({ type: 'PERMISSION_DENIED', path })
+      )
+      .otherwise((e) => {
+        throw e; // 予期しないエラーは再スロー
+      });
+  }
+}
+```
+
+3. **Electron 環境検出パターン**
+
+```typescript
+function getLogPath(): string {
+  try {
+    const { app } = require('electron');
+    return app.getPath('logs');
+  } catch {
+    return '/tmp/logs'; // テスト環境用フォールバック
+  }
+}
+```
+
+### 設定
+
+`.neverthrowlintrc.json` で try-catch 警告を設定できます：
+
+```json
+{
+  "tryCatchWarning": {
+    "enabled": true,
+    "path": "electron/**/*.ts",
+    "exceptions": {
+      "allowWithFinally": true,
+      "allowInsideFromPromise": true,
+      "allowWithRethrow": true
+    }
+  }
+}
+```
+
+| オプション | デフォルト | 説明 |
+|-----------|----------|------|
+| `enabled` | `false` | 警告を有効にするか |
+| `path` | - | 対象ファイルのglobパターン |
+| `allowWithFinally` | `true` | `finally` ブロックがある場合はスキップ |
+| `allowInsideFromPromise` | `true` | `ResultAsync.fromPromise()` 内はスキップ |
+| `allowWithRethrow` | `true` | 適切な再スローがある場合はスキップ |
+
 ## テスト
 
 リンターのテストは `scripts/lint-neverthrow.test.ts` にあります：

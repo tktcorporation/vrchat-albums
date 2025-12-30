@@ -24,6 +24,15 @@ export interface NeverthrowLintConfig {
     enabled: boolean;
     path: string;
   };
+  tryCatchWarning?: {
+    enabled: boolean;
+    path: string;
+    exceptions?: {
+      allowWithFinally?: boolean;
+      allowInsideFromPromise?: boolean;
+      allowWithRethrow?: boolean;
+    };
+  };
 }
 
 export interface NeverthrowIssue {
@@ -127,6 +136,31 @@ export class NeverthrowLinter {
         // Check for must-use-result if enabled
         if (this.config.mustUseResult?.enabled) {
           this.checkMustUseResult(sourceFile);
+        }
+        // Check for try-catch warning if enabled
+        if (this.config.tryCatchWarning?.enabled) {
+          const tryCatchPath = this.config.tryCatchWarning.path;
+          let shouldCheck = false;
+
+          if (path.isAbsolute(tryCatchPath)) {
+            // If path is absolute, compare directly
+            shouldCheck =
+              sourceFile.fileName === NormalizedPathSchema.parse(tryCatchPath);
+          } else {
+            // Otherwise, use minimatch with relative path
+            const relativePath = path.relative(
+              process.cwd(),
+              sourceFile.fileName,
+            );
+            shouldCheck = minimatch(relativePath, tryCatchPath);
+          }
+
+          if (shouldCheck) {
+            this.checkTryCatchForWarning(
+              sourceFile,
+              this.config.tryCatchWarning,
+            );
+          }
         }
       }
     }
@@ -873,6 +907,144 @@ export class NeverthrowLinter {
 
     ts.forEachChild(node.body, visit);
   }
+
+  /**
+   * Check if a try statement is inside a neverthrow utility function like
+   * ResultAsync.fromPromise() or fromThrowable()
+   */
+  private isInsideNeverthrowCallForTry(node: ts.TryStatement): boolean {
+    let parent = node.parent;
+
+    while (parent) {
+      if (ts.isCallExpression(parent)) {
+        const expr = parent.expression;
+
+        // Check for ResultAsync.fromPromise, ResultAsync.fromSafePromise, fromThrowable
+        if (ts.isPropertyAccessExpression(expr)) {
+          const methodName = expr.name.text;
+          const neverthrowMethods = [
+            'fromPromise',
+            'fromSafePromise',
+            'fromThrowable',
+          ];
+
+          if (neverthrowMethods.includes(methodName)) {
+            return true;
+          }
+        }
+      }
+
+      parent = parent.parent;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a try-catch has proper error classification with rethrow
+   * This means: has if/match for error classification AND has throw for unexpected errors
+   */
+  private hasProperRethrow(tryNode: ts.TryStatement): boolean {
+    if (!tryNode.catchClause) return false;
+    const catchBlock = tryNode.catchClause.block;
+
+    let hasThrow = false;
+    let hasMatch = false;
+    let hasIfStatement = false;
+
+    const visit = (n: ts.Node) => {
+      if (ts.isThrowStatement(n)) {
+        hasThrow = true;
+      }
+      if (ts.isIfStatement(n)) {
+        hasIfStatement = true;
+      }
+      if (ts.isCallExpression(n)) {
+        const expr = n.expression;
+        if (ts.isPropertyAccessExpression(expr) && expr.name.text === 'match') {
+          hasMatch = true;
+        }
+        // Also check for standalone match() calls from ts-pattern
+        if (ts.isIdentifier(expr) && expr.text === 'match') {
+          hasMatch = true;
+        }
+      }
+      ts.forEachChild(n, visit);
+    };
+
+    ts.forEachChild(catchBlock, visit);
+
+    // Proper rethrow requires: (match or if) AND throw
+    return hasThrow && (hasMatch || hasIfStatement);
+  }
+
+  /**
+   * Check for try-catch usage and suggest fromThrowable/ResultAsync.fromPromise
+   */
+  private checkTryCatchForWarning(
+    sourceFile: ts.SourceFile,
+    config: NonNullable<NeverthrowLintConfig['tryCatchWarning']>,
+  ) {
+    const visit = (node: ts.Node) => {
+      if (ts.isTryStatement(node)) {
+        // Exception 1: Inside fromPromise/fromThrowable callback
+        if (
+          config.exceptions?.allowInsideFromPromise &&
+          this.isInsideNeverthrowCallForTry(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 2: Has finally block for resource cleanup
+        if (config.exceptions?.allowWithFinally && node.finallyBlock) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 3: Has proper error classification with rethrow
+        if (
+          config.exceptions?.allowWithRethrow &&
+          this.hasProperRethrow(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Issue warning
+        const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+          node.getStart(),
+        );
+
+        // Avoid duplicate warnings
+        const isDuplicate = this.issues.some(
+          (issue) =>
+            issue.file === sourceFile.fileName &&
+            issue.line === line + 1 &&
+            issue.column === character + 1 &&
+            issue.ruleName === 'prefer-fromThrowable',
+        );
+
+        if (!isDuplicate) {
+          this.issues.push({
+            file: sourceFile.fileName,
+            line: line + 1,
+            column: character + 1,
+            message:
+              'Consider using fromThrowable() or ResultAsync.fromPromise() instead of try-catch.\n' +
+              '  - Sync: fromThrowable(() => op(), (e) => mapError(e))\n' +
+              '  - Async: ResultAsync.fromPromise(asyncOp(), (e) => mapError(e))',
+            severity: 'warning',
+            ruleName: 'prefer-fromThrowable',
+          });
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    ts.forEachChild(sourceFile, visit);
+  }
 }
 
 export async function loadConfig(
@@ -940,6 +1112,10 @@ export async function lintNeverthrow(config: NeverthrowLintConfig): Promise<{
   // Also include mustUseResult path if enabled
   if (config.mustUseResult?.enabled && config.mustUseResult.path) {
     patterns.add(config.mustUseResult.path);
+  }
+  // Also include tryCatchWarning path if enabled
+  if (config.tryCatchWarning?.enabled && config.tryCatchWarning.path) {
+    patterns.add(config.tryCatchWarning.path);
   }
 
   // Convert Set to Array for processing
