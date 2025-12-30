@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import { promisify } from 'node:util';
-import { err, fromThrowable, ok, type Result, ResultAsync } from 'neverthrow';
+import { err, ok, type Result, ResultAsync } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 
 /**
@@ -64,21 +64,48 @@ export const readdirAsync = async (
 };
 
 /**
- * ファイルを書き込み、失敗時には Error を Result として返す同期版ヘルパー。
+ * ファイル書き込みエラー型
+ */
+export type WriteFileError =
+  | { type: 'ENOENT'; message: string }
+  | { type: 'EACCES'; message: string }
+  | { type: 'ENOSPC'; message: string }
+  | { type: 'IO_ERROR'; message: string; code?: string };
+
+/**
+ * ファイルを書き込み、失敗時には具体的なエラー型を返す同期版ヘルパー。
  * ログ保存処理など複数箇所から利用される。
  */
-const safeWriteFileSync = fromThrowable(
-  (path: string, data: string | Uint8Array) => {
-    fs.writeFileSync(path, data);
-  },
-  (e): Error => (e instanceof Error ? e : new Error(String(e))),
-);
-
 export const writeFileSyncSafe = (
   path: string,
   data: string | Uint8Array,
-): Result<void, Error> => {
-  return safeWriteFileSync(path, data);
+): Result<void, WriteFileError> => {
+  try {
+    fs.writeFileSync(path, data);
+    return ok(undefined);
+  } catch (e) {
+    if (!isNodeError(e)) {
+      // 予期しないエラーはre-throw（Sentry通知）
+      throw e;
+    }
+    return match(e)
+      .with({ code: 'ENOENT' }, (ee) =>
+        err({ type: 'ENOENT' as const, message: ee.message }),
+      )
+      .with({ code: 'EACCES' }, (ee) =>
+        err({ type: 'EACCES' as const, message: ee.message }),
+      )
+      .with({ code: 'ENOSPC' }, (ee) =>
+        err({ type: 'ENOSPC' as const, message: ee.message }),
+      )
+      .otherwise((ee) =>
+        err({
+          type: 'IO_ERROR' as const,
+          message: ee.message,
+          code: ee.code,
+        }),
+      );
+  }
 };
 
 import typeUtils from 'node:util/types';
@@ -153,15 +180,40 @@ export const appendFileAsync = async (
 };
 
 /**
+ * ファイル削除エラー型
+ */
+export type UnlinkError =
+  | { type: 'ENOENT'; message: string }
+  | { type: 'EACCES'; message: string }
+  | { type: 'EPERM'; message: string }
+  | { type: 'IO_ERROR'; message: string; code?: string };
+
+/**
  * 指定したファイルを削除する非同期関数。
  * 一時ファイルのクリーンアップ処理などで使用される。
  */
-export const unlinkAsync = (path: string): ResultAsync<void, Error> => {
-  return ResultAsync.fromPromise(
-    fs.promises.unlink(path),
-    (e): Error => (e instanceof Error ? e : new Error(String(e))),
-  );
-};
+export const unlinkAsync = (filePath: string): ResultAsync<void, UnlinkError> =>
+  ResultAsync.fromPromise(fs.promises.unlink(filePath), (e): UnlinkError => {
+    const nodeError = e as NodeJS.ErrnoException;
+    return match(nodeError)
+      .with({ code: 'ENOENT' }, (ee) => ({
+        type: 'ENOENT' as const,
+        message: ee.message,
+      }))
+      .with({ code: 'EACCES' }, (ee) => ({
+        type: 'EACCES' as const,
+        message: ee.message,
+      }))
+      .with({ code: 'EPERM' }, (ee) => ({
+        type: 'EPERM' as const,
+        message: ee.message,
+      }))
+      .otherwise((ee) => ({
+        type: 'IO_ERROR' as const,
+        message: ee.message ?? String(e),
+        code: ee.code,
+      }));
+  });
 
 /**
  * fs.createReadStream をラップしたユーティリティ。
