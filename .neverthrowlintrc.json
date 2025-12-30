@@ -32,7 +32,8 @@
     "exceptions": {
       "allowWithFinally": true,
       "allowInsideFromPromise": true,
-      "allowWithRethrow": true
+      "allowWithRethrow": true,
+      "allowElectronEnvDetection": true
     }
   }
 }

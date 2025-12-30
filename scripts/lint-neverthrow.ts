@@ -31,6 +31,7 @@ export interface NeverthrowLintConfig {
       allowWithFinally?: boolean;
       allowInsideFromPromise?: boolean;
       allowWithRethrow?: boolean;
+      allowElectronEnvDetection?: boolean;
     };
   };
 }
@@ -979,6 +980,37 @@ export class NeverthrowLinter {
   }
 
   /**
+   * Check if a try block contains Electron environment detection pattern
+   * Pattern: try { require('electron') } catch { fallback }
+   */
+  private isElectronEnvDetection(tryNode: ts.TryStatement): boolean {
+    let hasElectronRequire = false;
+
+    const visit = (n: ts.Node) => {
+      if (ts.isCallExpression(n)) {
+        const expr = n.expression;
+        // Check for require('electron')
+        if (ts.isIdentifier(expr) && expr.text === 'require') {
+          const args = n.arguments;
+          if (
+            args.length > 0 &&
+            ts.isStringLiteral(args[0]) &&
+            args[0].text === 'electron'
+          ) {
+            hasElectronRequire = true;
+          }
+        }
+      }
+      if (!hasElectronRequire) {
+        ts.forEachChild(n, visit);
+      }
+    };
+
+    ts.forEachChild(tryNode.tryBlock, visit);
+    return hasElectronRequire;
+  }
+
+  /**
    * Check for try-catch usage and suggest fromThrowable/ResultAsync.fromPromise
    */
   private checkTryCatchForWarning(
@@ -1006,6 +1038,15 @@ export class NeverthrowLinter {
         if (
           config.exceptions?.allowWithRethrow &&
           this.hasProperRethrow(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 4: Electron environment detection pattern
+        if (
+          config.exceptions?.allowElectronEnvDetection &&
+          this.isElectronEnvDetection(node)
         ) {
           ts.forEachChild(node, visit);
           return;

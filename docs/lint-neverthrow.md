@@ -424,7 +424,8 @@ function getLogPath(): string {
     "exceptions": {
       "allowWithFinally": true,
       "allowInsideFromPromise": true,
-      "allowWithRethrow": true
+      "allowWithRethrow": true,
+      "allowElectronEnvDetection": true
     }
   }
 }
@@ -437,6 +438,7 @@ function getLogPath(): string {
 | `allowWithFinally` | `true` | `finally` ブロックがある場合はスキップ |
 | `allowInsideFromPromise` | `true` | `ResultAsync.fromPromise()` 内はスキップ |
 | `allowWithRethrow` | `true` | 適切な再スローがある場合はスキップ |
+| `allowElectronEnvDetection` | `true` | `require('electron')` を含む環境検出パターンはスキップ |
 
 ## テスト
 
