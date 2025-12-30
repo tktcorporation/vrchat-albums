@@ -333,7 +333,6 @@ const GalleryContent = memo(
               return (
                 <div
                   key={key}
-                  data-key={key}
                   data-index={virtualRow.index}
                   ref={(el) => {
                     // IntersectionObserver のみ設定（measureElement は不要）
