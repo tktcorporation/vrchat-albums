@@ -166,6 +166,14 @@ const GalleryContent = memo(
       // measureElement を削除：再測定によるレイアウトシフトと上方向スクロール問題を防止
     });
 
+    // effectiveWidth が変更されたら virtualizer に再計算させる
+    // 初回レンダリング時は effectiveWidth = 0 なので、正しい値になった時点で再計算が必要
+    useEffect(() => {
+      if (effectiveWidth > 0) {
+        virtualizer.measure();
+      }
+    }, [effectiveWidth, virtualizer]);
+
     // 日付ジャンプハンドラー
     const handleJumpToDate = useCallback(
       (groupIndex: number) => {
