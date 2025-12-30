@@ -1,7 +1,15 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { LoaderCircle } from 'lucide-react';
 import type React from 'react';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { LAYOUT_CONSTANTS } from '../../constants/layoutConstants';
 import type { UseLoadingStateResult } from '../../hooks/useLoadingState';
 import { useThumbnailCache } from '../../hooks/useThumbnailCache';
@@ -101,6 +109,10 @@ const GalleryContent = memo(
     // 単一の幅管理: GalleryContent が effectiveWidth を一元管理し、
     // PhotoGrid/GroupWithSkeleton に props として渡す
     const [effectiveWidth, setEffectiveWidth] = useState(0);
+    // コールバック内で常に最新の値を参照するための ref
+    // React の本番バッチングでクロージャが古い値を参照する問題を回避
+    const effectiveWidthRef = useRef(effectiveWidth);
+    effectiveWidthRef.current = effectiveWidth;
 
     // ResizeObserver で幅を監視（1箇所に集約）
     useEffect(() => {
@@ -150,16 +162,17 @@ const GalleryContent = memo(
       estimateSize: useCallback(
         (index) => {
           const [, group] = filteredGroups[index];
-          // effectiveWidth state を使用（PhotoGrid/GroupWithSkeleton と同じ値）
+          // ref.current を使用して常に最新の effectiveWidth を取得
+          // クロージャキャプチャの問題を回避し、本番ビルドでも正しく動作
           const estimate = estimateGroupHeight(
             group.photos,
-            effectiveWidth,
+            effectiveWidthRef.current,
             undefined, // キャッシュを使用しない
             layoutCalculator,
           );
           return estimate.height;
         },
-        [filteredGroups, layoutCalculator, effectiveWidth],
+        [filteredGroups, layoutCalculator],
       ),
       // 画面外のグループを多く保持してスクロール時のレイアウトシフトを軽減
       overscan: 5,
@@ -168,7 +181,8 @@ const GalleryContent = memo(
 
     // effectiveWidth が変更されたら virtualizer に再計算させる
     // 初回レンダリング時は effectiveWidth = 0 なので、正しい値になった時点で再計算が必要
-    useEffect(() => {
+    // useLayoutEffect を使用: ペイント前に同期的に実行し、本番ビルドでのタイミング問題を防止
+    useLayoutEffect(() => {
       if (effectiveWidth > 0) {
         virtualizer.measure();
       }
