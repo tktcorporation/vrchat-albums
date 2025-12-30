@@ -10,14 +10,17 @@ import {
 // fs.writeFile をモック
 vi.mock('fs', () => ({
   promises: {
-    writeFile: vi.fn(),
-    mkdir: vi.fn(),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    mkdir: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
 describe('exportService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // モック関数のデフォルト戻り値を再設定
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
   });
 
   describe('getLogStoreExportPath', () => {
@@ -105,8 +108,12 @@ describe('exportService', () => {
         },
       ]);
 
-      const result = await exportLogStoreFromDB(options, mockGetDBLogs);
+      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
 
+      expect(exportResult.isOk()).toBe(true);
+      if (!exportResult.isOk()) return;
+
+      const result = exportResult.value;
       expect(result.exportedFiles).toHaveLength(1);
       // エクスポート日時フォルダが含まれることを確認
       expect(result.exportedFiles[0]).toMatch(
@@ -166,8 +173,12 @@ describe('exportService', () => {
         },
       ]);
 
-      const result = await exportLogStoreFromDB(options, mockGetDBLogs);
+      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
 
+      expect(exportResult.isOk()).toBe(true);
+      if (!exportResult.isOk()) return;
+
+      const result = exportResult.value;
       expect(result.exportedFiles).toHaveLength(2);
       // エクスポート日時フォルダが含まれることを確認
       for (const filePath of result.exportedFiles) {
@@ -177,14 +188,14 @@ describe('exportService', () => {
       }
       expect(
         result.exportedFiles.some(
-          (path) =>
-            path.includes('2023-09') && path.includes('logStore-2023-09.txt'),
+          (p: string) =>
+            p.includes('2023-09') && p.includes('logStore-2023-09.txt'),
         ),
       ).toBe(true);
       expect(
         result.exportedFiles.some(
-          (path) =>
-            path.includes('2023-10') && path.includes('logStore-2023-10.txt'),
+          (p: string) =>
+            p.includes('2023-10') && p.includes('logStore-2023-10.txt'),
         ),
       ).toBe(true);
       expect(result.totalLogLines).toBe(4); // 各worldJoin=2行ずつ
@@ -222,8 +233,12 @@ describe('exportService', () => {
 
       const mockGetDBLogs = vi.fn().mockResolvedValue([]);
 
-      const result = await exportLogStoreFromDB(options, mockGetDBLogs);
+      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
 
+      expect(exportResult.isOk()).toBe(true);
+      if (!exportResult.isOk()) return;
+
+      const result = exportResult.value;
       expect(result.exportedFiles).toHaveLength(0);
       expect(result.totalLogLines).toBe(0);
 
@@ -263,8 +278,12 @@ describe('exportService', () => {
         },
       ]);
 
-      const result = await exportLogStoreFromDB(options, mockGetDBLogs);
+      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
 
+      expect(exportResult.isOk()).toBe(true);
+      if (!exportResult.isOk()) return;
+
+      const result = exportResult.value;
       expect(result.exportedFiles).toHaveLength(1);
       expect(result.totalLogLines).toBe(3); // worldJoin=2行 + playerJoin=1行
 
@@ -304,8 +323,12 @@ describe('exportService', () => {
         },
       ]);
 
-      const result = await exportLogStoreFromDB(options, mockGetDBLogs);
+      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
 
+      expect(exportResult.isOk()).toBe(true);
+      if (!exportResult.isOk()) return;
+
+      const result = exportResult.value;
       expect(result.exportedFiles).toHaveLength(1);
       expect(result.totalLogLines).toBe(2); // worldJoin=2行
 
@@ -316,7 +339,7 @@ describe('exportService', () => {
       // ここではパラメータが正しく渡されることのみ確認
     });
 
-    it('エラーが発生した場合は適切に処理される', async () => {
+    it('DBエラーが発生した場合は適切に処理される', async () => {
       const options: ExportLogStoreOptions = {
         startDate: new Date('2023-10-08T00:00:00'),
         endDate: new Date('2023-10-08T23:59:59'),
@@ -326,12 +349,13 @@ describe('exportService', () => {
         .fn()
         .mockRejectedValue(new Error('Database error'));
 
+      // DBエラーはそのままthrowされる（予期しないエラー）
       await expect(
         exportLogStoreFromDB(options, mockGetDBLogs),
       ).rejects.toThrow('Database error');
     });
 
-    it('書き込みエラーが発生した場合は適切に処理される', async () => {
+    it('書き込みエラーが発生した場合はエラー結果を返す', async () => {
       const options: ExportLogStoreOptions = {
         startDate: new Date('2023-10-08T00:00:00'),
         endDate: new Date('2023-10-08T23:59:59'),
@@ -355,9 +379,13 @@ describe('exportService', () => {
       // ファイル書き込みでエラーを発生させる
       vi.mocked(fs.writeFile).mockRejectedValue(new Error('Write error'));
 
-      await expect(
-        exportLogStoreFromDB(options, mockGetDBLogs),
-      ).rejects.toThrow('Write error');
+      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
+
+      expect(exportResult.isErr()).toBe(true);
+      if (!exportResult.isErr()) return;
+
+      expect(exportResult.error.type).toBe('FILE_WRITE_FAILED');
+      expect(exportResult.error.message).toBe('Write error');
     });
   });
 });

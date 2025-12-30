@@ -76,7 +76,12 @@ describe('exportService integration', () => {
         outputBasePath: tempDir,
       };
 
-      const result = await exportLogStoreFromDB(options, getMockDBLogs);
+      const exportResult = await exportLogStoreFromDB(options, getMockDBLogs);
+
+      expect(exportResult.isOk()).toBe(true);
+      if (!exportResult.isOk()) return;
+
+      const result = exportResult.value;
 
       // 結果を検証
       expect(result.exportedFiles).toHaveLength(1);
@@ -136,12 +141,16 @@ describe('exportService integration', () => {
       };
 
       const outputFilePath = path.join(tempDir, 'single-export.txt');
-      const result = await exportLogStoreToSingleFile(
+      const exportResult = await exportLogStoreToSingleFile(
         options,
         getMockDBLogs,
         outputFilePath,
       );
 
+      expect(exportResult.isOk()).toBe(true);
+      if (!exportResult.isOk()) return;
+
+      const result = exportResult.value;
       expect(result.exportedFiles).toHaveLength(1);
       // 新しい実装では日時付きサブフォルダが作成されるため、パスが変わる
       const actualFilePath = result.exportedFiles[0];
@@ -177,8 +186,12 @@ describe('exportService integration', () => {
         outputBasePath: tempDir,
       };
 
-      const result = await exportLogStoreFromDB(options, getMockDBLogs);
+      const exportResult = await exportLogStoreFromDB(options, getMockDBLogs);
 
+      expect(exportResult.isOk()).toBe(true);
+      if (!exportResult.isOk()) return;
+
+      const result = exportResult.value;
       expect(result.exportedFiles).toHaveLength(0);
       expect(result.totalLogLines).toBe(0);
     } finally {

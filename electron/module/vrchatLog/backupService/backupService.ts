@@ -11,7 +11,10 @@ import {
 } from '../../../lib/pathObject';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import type { LogRecord } from '../converters/dbToLogStore';
-import { exportLogStoreFromDB } from '../exportService/exportService';
+import {
+  exportLogStoreFromDB,
+  getExportErrorMessage,
+} from '../exportService/exportService';
 
 /**
  * バックアップエラー型
@@ -92,13 +95,22 @@ export class BackupService {
     logger.info('Creating pre-import backup using export functionality');
 
     // 1. 既存エクスポート機能で全データエクスポート
-    const exportResult = await exportLogStoreFromDB(
+    const exportResultAsync = await exportLogStoreFromDB(
       {
         // 全期間エクスポート（startDate/endDate指定なし）
         outputBasePath: this.getBackupBasePath(),
       },
       getDBLogs,
     );
+
+    if (exportResultAsync.isErr()) {
+      return neverthrow.err({
+        type: 'EXPORT_FAILED' as const,
+        message: getExportErrorMessage(exportResultAsync.error),
+      });
+    }
+
+    const exportResult = exportResultAsync.value;
 
     // エクスポートファイルが存在しない場合（空のDB）
     if (exportResult.exportedFiles.length === 0) {

@@ -1,6 +1,7 @@
 import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { ok } from 'neverthrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LogRecord } from '../converters/dbToLogStore';
 import type { ExportResult } from '../exportService/exportService';
@@ -75,7 +76,7 @@ describe('backupService', () => {
       };
 
       vi.mocked(exportServiceModule.exportLogStoreFromDB).mockResolvedValue(
-        mockExportResult,
+        ok(mockExportResult),
       );
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);

@@ -1,6 +1,7 @@
 import * as neverthrow from 'neverthrow';
 import { match, P } from 'ts-pattern';
 import z from 'zod';
+import { ERROR_CATEGORIES, UserFacingError } from '../../lib/errors';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
 import * as playerJoinLogService from './../VRChatPlayerJoinLogModel/playerJoinLog.service';
@@ -18,7 +19,10 @@ import {
 import { FILTER_PATTERNS } from './constants/logPatterns';
 import type { LogRecord } from './converters/dbToLogStore';
 import { VRChatLogFileError } from './error';
-import { exportLogStoreFromDB } from './exportService/exportService';
+import {
+  exportLogStoreFromDB,
+  getExportErrorMessage,
+} from './exportService/exportService';
 import {
   getImportErrorMessage,
   importService,
@@ -304,39 +308,44 @@ export const vrchatLogRouter = () =>
             : '全期間';
         logger.info(`exportLogStoreData: ${dateRangeMsg}`);
 
-        try {
-          const result = await exportLogStoreFromDB(
-            {
-              startDate: input.startDate,
-              endDate: input.endDate,
-              outputBasePath: input.outputPath,
-            },
-            getDBLogsFromDatabase,
-          );
+        const exportResult = await exportLogStoreFromDB(
+          {
+            startDate: input.startDate,
+            endDate: input.endDate,
+            outputBasePath: input.outputPath,
+          },
+          getDBLogsFromDatabase,
+        );
 
-          logger.info(
-            `Export completed: ${result.exportedFiles.length} files, ${result.totalLogLines} lines`,
-          );
-
-          eventEmitter.emit(
-            'toast',
-            `エクスポート完了: ${result.exportedFiles.length}ファイル、${result.totalLogLines}行`,
-          );
-
-          return result;
-        } catch (error) {
+        if (exportResult.isErr()) {
+          const errorMessage = getExportErrorMessage(exportResult.error);
           logger.error({
-            message: `Export failed: ${String(error)}`,
+            message: `Export failed: ${errorMessage}`,
           });
-          const errorMessage = match(error)
-            .with(P.instanceOf(Error), (err) => err.message)
-            .otherwise((err) => String(err));
           eventEmitter.emit(
             'toast',
             `エクスポートに失敗しました: ${errorMessage}`,
           );
-          throw error;
+          throw new UserFacingError(errorMessage, {
+            code: 'EXPORT_ERROR',
+            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+            message: errorMessage,
+            userMessage: errorMessage,
+          });
         }
+
+        const result = exportResult.value;
+
+        logger.info(
+          `Export completed: ${result.exportedFiles.length} files, ${result.totalLogLines} lines`,
+        );
+
+        eventEmitter.emit(
+          'toast',
+          `エクスポート完了: ${result.exportedFiles.length}ファイル、${result.totalLogLines}行`,
+        );
+
+        return result;
       }),
     createPreImportBackup: procedure.mutation(async () => {
       logger.info('Creating pre-import backup');
