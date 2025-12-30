@@ -200,32 +200,37 @@ export class ImportService {
 
   /**
    * ディレクトリ内のlogStoreファイルを再帰的に検索
+   * 読み取りエラーは警告ログを出力し、読めたファイルのみを返す（部分的成功パターン）
    */
   private async findLogStoreFilesInDirectory(
     dirPath: string,
   ): Promise<string[]> {
-    const files: string[] = [];
+    const readResult = await neverthrow.ResultAsync.fromPromise(
+      fs.readdir(dirPath, { withFileTypes: true }),
+      (error) => error,
+    );
 
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-      for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-
-        if (entry.isFile()) {
-          if (this.isLogStoreFile(fullPath)) {
-            files.push(fullPath);
-          }
-        } else if (entry.isDirectory()) {
-          // 再帰検索
-          const subDirFiles = await this.findLogStoreFilesInDirectory(fullPath);
-          files.push(...subDirFiles);
-        }
-      }
-    } catch (error) {
-      logger.error({
-        message: `Failed to read directory ${dirPath}: ${String(error)}`,
+    if (readResult.isErr()) {
+      // ディレクトリ読み取り失敗は警告のみ（部分的成功を許容）
+      logger.warn({
+        message: `Failed to read directory ${dirPath}: ${String(readResult.error)}`,
       });
+      return [];
+    }
+
+    const files: string[] = [];
+    for (const entry of readResult.value) {
+      const fullPath = path.join(dirPath, entry.name);
+
+      if (entry.isFile()) {
+        if (this.isLogStoreFile(fullPath)) {
+          files.push(fullPath);
+        }
+      } else if (entry.isDirectory()) {
+        // 再帰検索
+        const subDirFiles = await this.findLogStoreFilesInDirectory(fullPath);
+        files.push(...subDirFiles);
+      }
     }
 
     return files;
