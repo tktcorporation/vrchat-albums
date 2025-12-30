@@ -11,6 +11,7 @@ import {
 } from '../../utils/estimateGroupHeight';
 import { JustifiedLayoutCalculator } from '../../utils/justifiedLayoutCalculator';
 import { AppHeader } from '../AppHeader';
+import { GroupWithSkeleton } from '../GroupWithSkeleton';
 import { LocationGroupHeader } from '../LocationGroupHeader';
 import type { PhotoGalleryData } from '../PhotoGallery';
 import PhotoGrid from '../PhotoGrid';
@@ -301,6 +302,11 @@ const GalleryContent = memo(
           >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const [key, group] = filteredGroups[virtualRow.index];
+              // Immich方式: 全写真がロード済みかどうかで表示を切り替え
+              // スケルトンと実コンテンツが同じ高さを使用するためレイアウトシフトなし
+              const isGroupFullyLoaded =
+                group.photos.length > 0 &&
+                group.photos.every((photo) => isPhotoLoaded(photo));
 
               return (
                 <div
@@ -321,15 +327,18 @@ const GalleryContent = memo(
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
-                  <div className="w-full space-y-0">
-                    <LocationGroupHeader
-                      worldId={group.worldInfo?.worldId ?? null}
-                      worldName={group.worldInfo?.worldName ?? null}
-                      worldInstanceId={group.worldInfo?.worldInstanceId ?? null}
-                      photoCount={group.photos.length}
-                      joinDateTime={group.joinDateTime}
-                    />
-                    {group.photos.length > 0 && (
+                  {isGroupFullyLoaded ? (
+                    // ロード完了: 実際の写真を表示
+                    <div className="w-full space-y-0">
+                      <LocationGroupHeader
+                        worldId={group.worldInfo?.worldId ?? null}
+                        worldName={group.worldInfo?.worldName ?? null}
+                        worldInstanceId={
+                          group.worldInfo?.worldInstanceId ?? null
+                        }
+                        photoCount={group.photos.length}
+                        joinDateTime={group.joinDateTime}
+                      />
                       <div className="w-full rounded-b-lg overflow-hidden">
                         <PhotoGrid
                           photos={group.photos}
@@ -340,8 +349,19 @@ const GalleryContent = memo(
                           onCopySelected={galleryData?.onCopySelected}
                         />
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    // ロード中またはphotoなし: GroupWithSkeletonが両方を統一的に処理
+                    // photos.length === 0 の場合はヘッダーのみ表示
+                    <GroupWithSkeleton
+                      photos={group.photos}
+                      worldId={group.worldInfo?.worldId ?? null}
+                      worldName={group.worldInfo?.worldName ?? null}
+                      worldInstanceId={group.worldInfo?.worldInstanceId ?? null}
+                      photoCount={group.photos.length}
+                      joinDateTime={group.joinDateTime}
+                    />
+                  )}
                 </div>
               );
             })}

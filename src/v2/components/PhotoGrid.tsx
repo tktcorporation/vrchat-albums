@@ -1,4 +1,3 @@
-import clsx from 'clsx';
 import { useMemo } from 'react';
 import { useContainerWidth } from '../hooks/useContainerWidth';
 import type { Photo } from '../types/photo';
@@ -96,7 +95,7 @@ export default function PhotoGrid({
                       width: photo.displayWidth,
                       flexShrink: 0,
                     }}
-                    className={clsx('relative transition-all duration-300')}
+                    className="relative"
                   >
                     <PhotoCard
                       photo={photo}
