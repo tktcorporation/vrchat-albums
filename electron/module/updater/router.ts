@@ -7,7 +7,9 @@ export const updaterRouter = router({
   checkForUpdates: procedure.mutation(async () => {
     // アップデートチェック失敗は非致命的なのでエラーを握りつぶす
     // 結果は呼び出し側で使用しない（バックグラウンド処理）
-    await updaterService.checkForUpdates();
+    const result = await updaterService.checkForUpdates();
+    // エラーの場合もログはサービス側で記録済み、ここでは何もしない
+    return result.unwrapOr(undefined);
   }),
 
   quitAndInstall: procedure.mutation(async () => {
