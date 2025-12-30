@@ -68,6 +68,7 @@ vi.mock('../logSync/service', () => {
 vi.mock('./exportService/exportService', () => {
   const path = require('node:path');
   const fs = require('node:fs');
+  const { ok } = require('neverthrow');
   return {
     exportLogStoreFromDB: vi
       .fn()
@@ -118,12 +119,12 @@ vi.mock('./exportService/exportService', () => {
           });
           console.log('[Mock] Returning exportedFiles:', exportedFiles);
 
-          return {
+          return ok({
             totalLogLines: totalLines,
             exportedFiles: exportedFiles,
             exportStartTime: new Date('2023-12-01T14:30:00'),
             exportEndTime: new Date('2023-12-01T14:30:45'),
-          };
+          });
         },
       ),
   };
