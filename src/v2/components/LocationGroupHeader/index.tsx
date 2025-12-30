@@ -201,7 +201,7 @@ export const LocationGroupHeader = ({
     return (
       <header
         data-testid="location-group-header"
-        className={`w-full glass-panel rounded-t-xl ${SPACING.padding.section} animate-glass-morph`}
+        className={`w-full glass-panel rounded-t-xl ${SPACING.padding.section}`}
       >
         <div className={`flex items-center ${SPACING.inline.relaxed}`}>
           <h2 className={`text-xl font-bold ${TEXT_COLOR.primary}`}>
@@ -222,7 +222,7 @@ export const LocationGroupHeader = ({
     <div
       ref={containerRef}
       data-testid="location-group-header"
-      className="w-full glass-panel rounded-t-lg overflow-hidden transition-all duration-500 group/card animate-glass-morph"
+      className="w-full glass-panel rounded-t-lg overflow-hidden group/card"
     >
       <div className="relative h-24 overflow-hidden flex items-center justify-center">
         <div

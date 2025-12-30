@@ -89,26 +89,6 @@ module.exports = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
-        'glass-morph': {
-          '0%': {
-            opacity: '0',
-            transform: 'translateY(20px) scale(0.95)',
-            backdropFilter: 'blur(0px)',
-          },
-          '100%': {
-            opacity: '1',
-            transform: 'translateY(0) scale(1)',
-            backdropFilter: 'blur(20px)',
-          },
-        },
-        'glass-hover': {
-          '0%': { transform: 'translateY(0)' },
-          '100%': { transform: 'translateY(-2px)' },
-        },
-        'glass-shine': {
-          '0%': { transform: 'translateX(-100%)' },
-          '100%': { transform: 'translateX(100%)' },
-        },
         'gradient-x': {
           '0%, 100%': {
             'background-size': '200% 200%',
@@ -123,9 +103,6 @@ module.exports = {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'glass-morph': 'glass-morph 0.6s ease-out',
-        'glass-hover': 'glass-hover 0.2s ease-out',
-        'glass-shine': 'glass-shine 2s ease-in-out infinite',
         'gradient-x': 'gradient-x 3s ease infinite',
       },
       backdropBlur: {
