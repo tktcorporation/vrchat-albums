@@ -337,8 +337,8 @@ export const LocationGroupHeader = ({
 
               {/* 2行目: プレイヤーリスト */}
               <div className="flex items-center gap-2 w-full">
-                {isPlayersLoading ? (
-                  // ローディング中: スケルトン表示（色は完了状態と統一）
+                {isPlayersLoading || players === null ? (
+                  // ローディング中 or 未取得: スケルトン表示
                   <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <Users
@@ -353,8 +353,8 @@ export const LocationGroupHeader = ({
                       <div className="h-4 w-16 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
                     </div>
                   </div>
-                ) : players && players.length > 0 ? (
-                  // プレイヤーあり: リスト表示
+                ) : players.length > 0 ? (
+                  // プレイヤーあり（取得済み、データあり）: リスト表示
                   <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 hover:bg-white/40 dark:bg-black/30 dark:hover:bg-black/40 px-3 py-1 rounded-full transition-all duration-300 border border-white/20 dark:border-gray-700/30 hover:border-white/30 dark:hover:border-gray-700/40 group/players flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <Users
@@ -425,7 +425,7 @@ export const LocationGroupHeader = ({
                     />
                   </div>
                 ) : (
-                  // プレイヤーなし: 「プレイヤー情報なし」表示
+                  // プレイヤーなし（取得済み、データなし = 0人）: 「プレイヤー情報なし」表示
                   <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <Users
