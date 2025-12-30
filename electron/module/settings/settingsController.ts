@@ -207,37 +207,40 @@ export const settingsRouter = () =>
         let isFirstLaunch = true;
         let syncMode: LogSyncMode = LOG_SYNC_MODE.FULL;
 
-        try {
-          const existingLogs =
-            await vrchatWorldJoinLogService.findVRChatWorldJoinLogList({
-              orderByJoinDateTime: 'desc',
-            });
-          isFirstLaunch = existingLogs.length === 0;
+        await vrchatWorldJoinLogService
+          .findVRChatWorldJoinLogList({
+            orderByJoinDateTime: 'desc',
+          })
+          .then(
+            (existingLogs) => {
+              isFirstLaunch = existingLogs.length === 0;
 
-          // PhotoPath変更の確認
-          const photoPathChanged = hasPhotoPathChanged();
+              // PhotoPath変更の確認
+              const photoPathChanged = hasPhotoPathChanged();
 
-          // 同期モード決定: 初回起動 OR PhotoPath変更時は FULL モード
-          syncMode =
-            isFirstLaunch || photoPathChanged
-              ? LOG_SYNC_MODE.FULL
-              : LOG_SYNC_MODE.INCREMENTAL;
+              // 同期モード決定: 初回起動 OR PhotoPath変更時は FULL モード
+              syncMode =
+                isFirstLaunch || photoPathChanged
+                  ? LOG_SYNC_MODE.FULL
+                  : LOG_SYNC_MODE.INCREMENTAL;
 
-          logger.info(`Found ${existingLogs.length} existing logs`);
-          if (photoPathChanged) {
-            logger.info(
-              'PhotoPath change detected, forcing FULL sync mode for photo re-indexing',
-            );
-          }
-        } catch (error) {
-          // データベースエラー（テーブル未作成など）の場合は初回起動として扱う
-          logger.info(
-            'Database error detected, treating as first launch:',
-            error,
+              logger.info(`Found ${existingLogs.length} existing logs`);
+              if (photoPathChanged) {
+                logger.info(
+                  'PhotoPath change detected, forcing FULL sync mode for photo re-indexing',
+                );
+              }
+            },
+            (error) => {
+              // データベースエラー（テーブル未作成など）の場合は初回起動として扱う
+              logger.info(
+                'Database error detected, treating as first launch:',
+                error,
+              );
+              isFirstLaunch = true;
+              syncMode = LOG_SYNC_MODE.FULL;
+            },
           );
-          isFirstLaunch = true;
-          syncMode = LOG_SYNC_MODE.FULL;
-        }
 
         logger.info(
           `Detected ${
@@ -250,17 +253,18 @@ export const settingsRouter = () =>
           logger.info(
             'Step 3.5: Setting default auto-start enabled for first launch...',
           );
-          try {
-            const { app } = await import('electron');
-            app.setLoginItemSettings({
-              openAtLogin: true,
-              openAsHidden: true,
+          await import('electron')
+            .then(({ app }) => {
+              app.setLoginItemSettings({
+                openAtLogin: true,
+                openAsHidden: true,
+              });
+              logger.info('Auto-start enabled by default for first launch');
+            })
+            .catch((error) => {
+              logger.warn('Failed to set default auto-start:', error);
+              // 自動起動の設定に失敗してもアプリの初期化は続行
             });
-            logger.info('Auto-start enabled by default for first launch');
-          } catch (error) {
-            logger.warn('Failed to set default auto-start:', error);
-            // 自動起動の設定に失敗してもアプリの初期化は続行
-          }
         } else if (isFirstLaunch && process.env.PLAYWRIGHT_TEST) {
           logger.info('Step 3.5: Skipping auto-start setup in Playwright test');
         }
@@ -338,27 +342,27 @@ export const settingsRouter = () =>
      * 旧アプリからの移行が必要かどうかをチェックする
      */
     checkMigrationStatus: procedure.query(async () => {
-      try {
-        // 動的インポートで移行サービスを読み込む
-        const { isMigrationNeeded } = await import('../migration/service');
-        const neededResult = await isMigrationNeeded();
-        // isMigrationNeeded は never エラーなので常に成功
-        const needed = neededResult._unsafeUnwrap();
+      return import('../migration/service')
+        .then(async ({ isMigrationNeeded }) => {
+          const neededResult = await isMigrationNeeded();
+          // isMigrationNeeded は never エラーなので常に成功
+          const needed = neededResult._unsafeUnwrap();
 
-        return {
-          migrationNeeded: needed,
-          oldAppName: 'vrchat-photo-journey',
-          newAppName: 'VRChatAlbums',
-        };
-      } catch (error) {
-        logger.warn('Failed to check migration status:', error);
-        // エラーが発生した場合は移行不要として扱う
-        return {
-          migrationNeeded: false,
-          oldAppName: 'vrchat-photo-journey',
-          newAppName: 'VRChatAlbums',
-        };
-      }
+          return {
+            migrationNeeded: needed,
+            oldAppName: 'vrchat-photo-journey',
+            newAppName: 'VRChatAlbums',
+          };
+        })
+        .catch((error) => {
+          logger.warn('Failed to check migration status:', error);
+          // エラーが発生した場合は移行不要として扱う
+          return {
+            migrationNeeded: false,
+            oldAppName: 'vrchat-photo-journey',
+            newAppName: 'VRChatAlbums',
+          };
+        });
     }),
 
     /**

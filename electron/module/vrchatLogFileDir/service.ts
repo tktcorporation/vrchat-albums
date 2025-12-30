@@ -165,14 +165,14 @@ export const getVRChatLogFilePathList = async (
   // output_log から始まるファイル名のみを取得
   const logFilePathList = logFileNamesResult.value
     .map((fileName) => {
-      try {
-        return VRChatLogFilePathSchema.parse(
-          `${path.join(vrChatlogFilesDir.value, fileName.name.toString())}`,
-        );
-      } catch (e) {
-        logger.debug('generally ignore this log', e);
+      const result = VRChatLogFilePathSchema.safeParse(
+        `${path.join(vrChatlogFilesDir.value, fileName.name.toString())}`,
+      );
+      if (!result.success) {
+        logger.debug('generally ignore this log', result.error);
         return null;
       }
+      return result.data;
     })
     .filter((fileName): fileName is VRChatLogFilePath => fileName !== null);
   return neverthrow.ok(logFilePathList);

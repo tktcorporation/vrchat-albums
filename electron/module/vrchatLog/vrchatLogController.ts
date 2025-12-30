@@ -443,24 +443,18 @@ export const vrchatLogRouter = () =>
     getImportBackupHistory: procedure.query(async () => {
       logger.info('Getting import backup history');
 
-      try {
-        const historyResult = await backupService.getBackupHistory();
+      const historyResult = await backupService.getBackupHistory();
 
-        if (historyResult.isErr()) {
-          const errorMessage = getBackupErrorMessage(historyResult.error);
+      return historyResult.match(
+        (history) => history,
+        (error) => {
+          const errorMessage = getBackupErrorMessage(error);
           logger.error({
             message: `Failed to get backup history: ${errorMessage}`,
           });
           throw new Error(errorMessage);
-        }
-
-        return historyResult.value;
-      } catch (error) {
-        logger.error({
-          message: `Failed to get backup history: ${String(error)}`,
-        });
-        throw error;
-      }
+        },
+      );
     }),
     rollbackToBackup: procedure
       .input(

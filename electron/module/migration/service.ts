@@ -224,46 +224,49 @@ export const performMigration = async (): Promise<
   };
 
   // 1. Migrate settings (config.json)
-  try {
-    const oldConfigPath = path.join(oldAppPath, 'config.json');
-    const newConfigPath = path.join(currentAppPath, 'config.json');
+  const oldConfigPath = path.join(oldAppPath, 'config.json');
+  const newConfigPath = path.join(currentAppPath, 'config.json');
 
-    await nodeFsPromises.copyFile(oldConfigPath, newConfigPath);
-    result.details.settings = true;
-    logger.info('Settings migrated successfully');
-  } catch (error) {
-    logger.warn('Settings migration skipped:', error);
-  }
+  await nodeFsPromises.copyFile(oldConfigPath, newConfigPath).then(
+    () => {
+      result.details.settings = true;
+      logger.info('Settings migrated successfully');
+    },
+    (error) => {
+      logger.warn('Settings migration skipped:', error);
+    },
+  );
 
   // 2. Migrate logStore using importService
-  try {
-    const oldLogStorePath = path.join(oldAppPath, 'logStore');
+  const oldLogStorePath = path.join(oldAppPath, 'logStore');
 
-    // Check if logStore directory exists
-    await nodeFsPromises.access(oldLogStorePath);
-
-    const { importService, getImportErrorMessage } = await import(
-      '../vrchatLog/importService/importService'
-    );
-    const importResult = await importService.importLogStoreFiles(
-      [oldLogStorePath],
-      async () => {
-        // DBLogProvider is not needed for migration
-        return [];
-      },
-    );
-
-    if (importResult.isOk()) {
-      result.details.logStore = true;
-      logger.info('LogStore migrated successfully');
-    } else {
-      result.errors.push(
-        `LogStore import failed: ${getImportErrorMessage(importResult.error)}`,
+  // Check if logStore directory exists, then migrate
+  await nodeFsPromises.access(oldLogStorePath).then(
+    async () => {
+      const { importService, getImportErrorMessage } = await import(
+        '../vrchatLog/importService/importService'
       );
-    }
-  } catch (error) {
-    logger.warn('LogStore migration skipped:', error);
-  }
+      const importResult = await importService.importLogStoreFiles(
+        [oldLogStorePath],
+        async () => {
+          // DBLogProvider is not needed for migration
+          return [];
+        },
+      );
+
+      if (importResult.isOk()) {
+        result.details.logStore = true;
+        logger.info('LogStore migrated successfully');
+      } else {
+        result.errors.push(
+          `LogStore import failed: ${getImportErrorMessage(importResult.error)}`,
+        );
+      }
+    },
+    (error) => {
+      logger.warn('LogStore migration skipped:', error);
+    },
+  );
 
   // 3. Create migration marker if any migration was successful
   if (
@@ -271,24 +274,26 @@ export const performMigration = async (): Promise<
     result.details.logStore ||
     result.details.database
   ) {
-    try {
-      const markerPath = path.join(currentAppPath, '.migration-completed');
-      const markerContent = JSON.stringify(
-        {
-          timestamp: new Date().toISOString(),
-          fromApp: 'vrchat-photo-journey',
-          toApp: 'VRChatAlbums',
-          result: result,
-        },
-        null,
-        2,
-      );
+    const markerPath = path.join(currentAppPath, '.migration-completed');
+    const markerContent = JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        fromApp: 'vrchat-photo-journey',
+        toApp: 'VRChatAlbums',
+        result: result,
+      },
+      null,
+      2,
+    );
 
-      await nodeFsPromises.writeFile(markerPath, markerContent, 'utf-8');
-      result.migrated = true;
-    } catch (error) {
-      result.errors.push(`Failed to create migration marker: ${error}`);
-    }
+    await nodeFsPromises.writeFile(markerPath, markerContent, 'utf-8').then(
+      () => {
+        result.migrated = true;
+      },
+      (error) => {
+        result.errors.push(`Failed to create migration marker: ${error}`);
+      },
+    );
   }
 
   logger.info('Migration completed:', result);
