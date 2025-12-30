@@ -130,57 +130,50 @@ export class RollbackService {
 
     const dbQueue = getDBQueue();
 
+    // dbQueue.transactionは予期しないエラーを自動的にキャッチして
+    // Result<T, DBQueueError>として返すため、内部でtry-catchは不要
     const transactionResult = await dbQueue.transaction(async () => {
-      try {
-        const backupPath = path.join(
-          backupService.getBackupBasePath(),
-          backup.exportFolderPath,
-        );
+      const backupPath = path.join(
+        backupService.getBackupBasePath(),
+        backup.exportFolderPath,
+      );
 
-        // 1. バックアップデータの存在確認
-        const validationResult = await this.validateBackupData(backupPath);
-        if (validationResult.isErr()) {
-          return neverthrow.err(validationResult.error);
-        }
-
-        // 2. 現在のlogStoreをクリア
-        const clearResult = await this.clearCurrentLogStore();
-        if (clearResult.isErr()) {
-          return neverthrow.err(clearResult.error);
-        }
-
-        // 3. バックアップからlogStore復帰
-        const restoreResult = await this.restoreLogStoreFromBackup(backupPath);
-        if (restoreResult.isErr()) {
-          return neverthrow.err(restoreResult.error);
-        }
-
-        // 4. DBを再構築（復帰したlogStoreから）
-        const rebuildResult = await this.rebuildDatabaseFromLogStore();
-        if (rebuildResult.isErr()) {
-          return neverthrow.err(rebuildResult.error);
-        }
-
-        // 5. バックアップ状態更新
-        backup.status = 'rolled_back';
-        const updateResult = await backupService.updateBackupMetadata(backup);
-        if (updateResult.isErr()) {
-          logger.warn(
-            `Failed to update backup metadata after rollback: ${getBackupErrorMessage(updateResult.error)}`,
-          );
-          // ロールバック自体は成功しているので警告のみ
-        }
-
-        logger.info(`Rollback completed successfully: ${backup.id}`);
-        return neverthrow.ok(undefined);
-      } catch (error) {
-        // 予期しないエラーはSentryに送信して再スロー
-        logger.error({
-          message: `Rollback failed with unexpected error`,
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
-        throw error;
+      // 1. バックアップデータの存在確認
+      const validationResult = await this.validateBackupData(backupPath);
+      if (validationResult.isErr()) {
+        return neverthrow.err(validationResult.error);
       }
+
+      // 2. 現在のlogStoreをクリア
+      const clearResult = await this.clearCurrentLogStore();
+      if (clearResult.isErr()) {
+        return neverthrow.err(clearResult.error);
+      }
+
+      // 3. バックアップからlogStore復帰
+      const restoreResult = await this.restoreLogStoreFromBackup(backupPath);
+      if (restoreResult.isErr()) {
+        return neverthrow.err(restoreResult.error);
+      }
+
+      // 4. DBを再構築（復帰したlogStoreから）
+      const rebuildResult = await this.rebuildDatabaseFromLogStore();
+      if (rebuildResult.isErr()) {
+        return neverthrow.err(rebuildResult.error);
+      }
+
+      // 5. バックアップ状態更新
+      backup.status = 'rolled_back';
+      const updateResult = await backupService.updateBackupMetadata(backup);
+      if (updateResult.isErr()) {
+        logger.warn(
+          `Failed to update backup metadata after rollback: ${getBackupErrorMessage(updateResult.error)}`,
+        );
+        // ロールバック自体は成功しているので警告のみ
+      }
+
+      logger.info(`Rollback completed successfully: ${backup.id}`);
+      return neverthrow.ok(undefined);
     });
 
     if (transactionResult.isErr()) {
