@@ -10,6 +10,7 @@ interface LayoutConstants {
   HEADER_HEIGHT: number;
   SPACING: number;
   MAX_LAST_ROW_SCALE: number;
+  GALLERY_CONTAINER_PADDING: number;
 }
 export const LAYOUT_CONSTANTS: LayoutConstants = {
   /** 写真グリッドの目標行高さ (px) */
@@ -26,6 +27,9 @@ export const LAYOUT_CONSTANTS: LayoutConstants = {
 
   /** 最後の行の最大スケール倍率 */
   MAX_LAST_ROW_SCALE: 1.5,
+
+  /** GalleryContent のコンテナ padding (px) - Tailwind の p-4 (16px × 2) に対応 */
+  GALLERY_CONTAINER_PADDING: 32,
 } as const;
 
 export type { LayoutConstants };

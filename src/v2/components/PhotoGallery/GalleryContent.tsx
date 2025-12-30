@@ -2,13 +2,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { LoaderCircle } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LAYOUT_CONSTANTS } from '../../constants/layoutConstants';
 import type { UseLoadingStateResult } from '../../hooks/useLoadingState';
 import { useThumbnailCache } from '../../hooks/useThumbnailCache';
 import { isPhotoLoaded } from '../../types/photo';
-import {
-  estimateGroupHeight,
-  GROUP_HEIGHT_CONSTANTS,
-} from '../../utils/estimateGroupHeight';
+import { estimateGroupHeight } from '../../utils/estimateGroupHeight';
 import { JustifiedLayoutCalculator } from '../../utils/justifiedLayoutCalculator';
 import { AppHeader } from '../AppHeader';
 import { GroupWithSkeleton } from '../GroupWithSkeleton';
@@ -95,7 +93,6 @@ const GalleryContent = memo(
       onGroupingEnd: finishLoadingGrouping,
     });
     const containerRef = useRef<HTMLDivElement>(null);
-    const groupSizesRef = useRef<Map<string, number>>(new Map());
     const [currentGroupIndex, setCurrentGroupIndex] = useState<
       number | undefined
     >(undefined);
@@ -120,20 +117,27 @@ const GalleryContent = memo(
     const layoutCalculator = useMemo(() => new JustifiedLayoutCalculator(), []);
 
     // 仮想スクローラーの設定
+    // measureElement を削除し、事前計算のみを使用することで：
+    // 1. estimateSize と実測値の差異によるレイアウトシフトを防止
+    // 2. 上方向スクロール時の再測定によるジャンプ/スタッターを防止
     const virtualizer = useVirtualizer({
       count: filteredGroups.length,
       getScrollElement: () => containerRef.current,
       estimateSize: useCallback(
         (index) => {
-          const [key, group] = filteredGroups[index];
-          const containerWidth = containerRef.current?.clientWidth ?? 0;
-          const cachedHeight = groupSizesRef.current.get(key);
+          const [, group] = filteredGroups[index];
+          // コンテナ幅を PhotoGrid/GroupWithSkeleton と統一（padding を考慮）
+          const rawWidth = containerRef.current?.clientWidth ?? 0;
+          const effectiveWidth =
+            rawWidth > 0
+              ? rawWidth - LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING
+              : 0;
 
-          // estimateGroupHeight でキャッシュまたは計算による推定を行う
+          // 常に計算値を返す（キャッシュは使わない）
           const estimate = estimateGroupHeight(
             group.photos,
-            containerWidth,
-            cachedHeight,
+            effectiveWidth,
+            undefined, // キャッシュを使用しない
             layoutCalculator,
           );
           return estimate.height;
@@ -142,14 +146,7 @@ const GalleryContent = memo(
       ),
       // 画面外のグループを多く保持してスクロール時のレイアウトシフトを軽減
       overscan: 5,
-      measureElement: useCallback((element: HTMLElement) => {
-        const height = element.getBoundingClientRect().height;
-        const key = element.getAttribute('data-key');
-        if (key) {
-          groupSizesRef.current.set(key, height);
-        }
-        return height + GROUP_HEIGHT_CONSTANTS.GROUP_SPACING;
-      }, []),
+      // measureElement を削除：再測定によるレイアウトシフトと上方向スクロール問題を防止
     });
 
     // 日付ジャンプハンドラー
@@ -314,8 +311,8 @@ const GalleryContent = memo(
                   data-key={key}
                   data-index={virtualRow.index}
                   ref={(el) => {
+                    // IntersectionObserver のみ設定（measureElement は不要）
                     if (el) {
-                      virtualizer.measureElement(el);
                       observerRef.current?.observe(el);
                     }
                   }}
