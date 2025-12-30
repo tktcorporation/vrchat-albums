@@ -56,20 +56,28 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
 
   const tabs: TabConfig[] = [
     {
-      id: 'info',
-      label: t('settings.tabs.info'),
-      icon: SettingsIcon,
-      component: () => (
-        <div className="space-y-8">
-          <AppInfo />
-        </div>
-      ),
+      id: 'paths',
+      label: t('settings.tabs.dataSource'),
+      icon: FolderOpen,
+      component: () => <PathSettings showRefreshAll={true} />,
     },
     {
       id: 'system',
       label: t('settings.tabs.system'),
       icon: SettingsIcon,
       component: SystemSettings,
+    },
+    {
+      id: 'theme',
+      label: t('settings.tabs.theme'),
+      icon: Sun,
+      component: ThemeSelector,
+    },
+    {
+      id: 'language',
+      label: 'Language / 言語',
+      icon: Globe2,
+      component: LanguageSelector,
     },
     {
       id: 'export',
@@ -84,22 +92,14 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
       component: DataImport,
     },
     {
-      id: 'paths',
-      label: t('settings.tabs.dataSource'),
-      icon: FolderOpen,
-      component: () => <PathSettings showRefreshAll={true} />,
-    },
-    {
-      id: 'theme',
-      label: t('settings.tabs.theme'),
-      icon: Sun,
-      component: ThemeSelector,
-    },
-    {
-      id: 'language',
-      label: 'Language / 言語',
-      icon: Globe2,
-      component: LanguageSelector,
+      id: 'info',
+      label: t('settings.tabs.info'),
+      icon: SettingsIcon,
+      component: () => (
+        <div className="space-y-8">
+          <AppInfo />
+        </div>
+      ),
     },
     {
       id: 'license',

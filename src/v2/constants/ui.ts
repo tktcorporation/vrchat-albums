@@ -250,3 +250,23 @@ export const BORDER = {
 } as const;
 
 export type BorderKey = keyof typeof BORDER;
+
+// =============================================================================
+// ステータスバッジ
+// =============================================================================
+
+/**
+ * ステータスバッジ用スタイル定数
+ * インポート履歴やファイル選択表示など、ステータス表示用のバッジスタイル
+ */
+export const STATUS_BADGE = {
+  /** 成功・完了状態 */
+  success:
+    'bg-green-500/10 text-green-600 dark:bg-green-500/20 dark:text-green-400',
+  /** 控えめ・非アクティブ状態 */
+  muted: 'bg-muted text-muted-foreground',
+  /** プライマリ・選択状態 */
+  primary: 'bg-primary/10 text-primary dark:bg-primary/20',
+} as const;
+
+export type StatusBadgeKey = keyof typeof STATUS_BADGE;
