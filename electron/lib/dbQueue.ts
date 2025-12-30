@@ -207,17 +207,13 @@ class DBQueue {
   ): Promise<Result<T, DBQueueError>> {
     return this.addWithResult(async () => {
       const client = getRDBClient().__client;
-      try {
-        return await client.transaction(task);
-      } catch (error) {
-        logger.error({
-          message: 'DBQueue: トランザクション実行中にエラーが発生しました',
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
-        throw error;
-      }
+      return await client.transaction(task);
     }).catch((error) => {
       // addWithResultでスローされた予期せぬエラーを処理
+      logger.error({
+        message: 'DBQueue: トランザクション実行中にエラーが発生しました',
+        stack: error instanceof Error ? error : new Error(String(error)),
+      });
       return err({
         type: 'TRANSACTION_ERROR',
         message: `トランザクションエラー: ${
