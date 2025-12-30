@@ -1,3 +1,4 @@
+import { Result } from 'neverthrow';
 import { z } from 'zod';
 import { executeQuery } from '../../lib/dbHelper';
 import {
@@ -62,14 +63,20 @@ export const debugRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      try {
-        logger.setTransportsLevel(input.level);
-        logger.info(`Log level set to: ${input.level}`);
-        return { success: true };
-      } catch (error: unknown) {
+      const result = Result.fromThrowable(
+        () => {
+          logger.setTransportsLevel(input.level);
+          logger.info(`Log level set to: ${input.level}`);
+          return { success: true };
+        },
+        (error) => error,
+      )();
+
+      if (result.isErr()) {
+        const error = result.error;
         logger.error({
           message: 'Failed to set log level',
-          stack: error as Error,
+          stack: error instanceof Error ? error : new Error(String(error)),
         });
         throw UserFacingError.withStructuredInfo({
           code: ERROR_CODES.UNKNOWN,
@@ -79,6 +86,8 @@ export const debugRouter = router({
           cause: error instanceof Error ? error : new Error(String(error)),
         });
       }
+
+      return result.value;
     }),
   getLogLevel: procedure.query(() => {
     // 現在のファイルログレベルを返す (コンソールレベルも通常は同じはず)
