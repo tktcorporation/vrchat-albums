@@ -1,7 +1,6 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as datefns from 'date-fns';
-import { app } from 'electron';
 import * as neverthrow from 'neverthrow';
 import { ResultAsync } from 'neverthrow';
 import { match } from 'ts-pattern';
@@ -61,17 +60,39 @@ export type DBLogProvider = (
 ) => Promise<LogRecord[]>;
 
 /**
+ * Electronのダウンロードパスを安全に取得
+ * テスト環境などでappが利用できない場合はnullを返す
+ */
+const getElectronDownloadsPath = (): string | null => {
+  // Playwright テスト互換性のため遅延評価
+  // @see CLAUDE.md Electron Module Import パターン
+  const electronApp = (() => {
+    try {
+      return require('electron').app;
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!electronApp) return null;
+
+  try {
+    return electronApp.getPath('downloads');
+  } catch {
+    return null;
+  }
+};
+
+/**
  * デフォルトのlogStoreディレクトリパスを取得
  */
 const getDefaultLogStorePath = (): string => {
-  try {
-    // ダウンロードフォルダ内にlogStoreフォルダを作成
-    const downloadsPath = app.getPath('downloads');
+  const downloadsPath = getElectronDownloadsPath();
+  if (downloadsPath) {
     return path.join(downloadsPath, 'logStore');
-  } catch (_error) {
-    // テスト環境などでappが利用できない場合のフォールバック
-    return path.join(process.cwd(), 'logStore');
   }
+  // テスト環境などでappが利用できない場合のフォールバック
+  return path.join(process.cwd(), 'logStore');
 };
 
 /**
