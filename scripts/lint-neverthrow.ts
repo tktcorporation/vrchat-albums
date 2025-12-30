@@ -1013,10 +1013,13 @@ export class NeverthrowLinter {
 
   /**
    * Check if a try block contains Electron environment detection pattern
-   * Pattern: try { require('electron') } catch { fallback }
+   * Patterns:
+   *   - try { require('electron') } catch { fallback }
+   *   - try { electronApp.getPath(...) } catch { fallback }
+   *   - try { app.getPath(...) } catch { fallback }
    */
   private isElectronEnvDetection(tryNode: ts.TryStatement): boolean {
-    let hasElectronRequire = false;
+    let hasElectronPattern = false;
 
     const visit = (n: ts.Node) => {
       if (ts.isCallExpression(n)) {
@@ -1029,17 +1032,30 @@ export class NeverthrowLinter {
             ts.isStringLiteral(args[0]) &&
             args[0].text === 'electron'
           ) {
-            hasElectronRequire = true;
+            hasElectronPattern = true;
+          }
+        }
+        // Check for electronApp.getPath() or app.getPath()
+        if (
+          ts.isPropertyAccessExpression(expr) &&
+          expr.name.text === 'getPath'
+        ) {
+          const objectExpr = expr.expression;
+          if (ts.isIdentifier(objectExpr)) {
+            const objectName = objectExpr.text;
+            if (objectName === 'app' || objectName === 'electronApp') {
+              hasElectronPattern = true;
+            }
           }
         }
       }
-      if (!hasElectronRequire) {
+      if (!hasElectronPattern) {
         ts.forEachChild(n, visit);
       }
     };
 
     ts.forEachChild(tryNode.tryBlock, visit);
-    return hasElectronRequire;
+    return hasElectronPattern;
   }
 
   /**
