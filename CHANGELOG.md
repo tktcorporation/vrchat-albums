@@ -7,16 +7,23 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add must-use-result check to neverthrow linter (#647)
-- Google Photos風タイムラインバーのデザイン改善
-- DateJumpSidebarにGoogle Photos/immich風機能を追加
+- DateJumpSidebarにGoogle Photos/immich風機能を追加 (#648)
+- 設定画面のトンマナを統一 (#649)
 
 ### 🐛 Bug Fixes
 
 - スクロール時のレイアウトシフトを改善 (#645)
+- レイアウトシフト対策 - Immich方式スケルトン実装とアニメーション削除 (#650)
+- レイアウトシフト・上方向スクロール問題の解消と幅計算の一元化 (#651)
+- 本番ビルドでグループ高さが統一される問題を修正
 
 ### ⚡ Performance
 
 - メモリ使用量を最適化 (#646)
+
+### ⚙️ Miscellaneous Tasks
+
+- Release v0.22.0
 
 ## [0.21.0] - 2025-12-23
 
