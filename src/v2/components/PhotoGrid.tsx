@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useContainerWidth } from '../hooks/useContainerWidth';
 import type { Photo } from '../types/photo';
 import { JustifiedLayoutCalculator } from '../utils/justifiedLayoutCalculator';
 import PhotoCard from './PhotoCard';
@@ -10,6 +9,11 @@ import PhotoCard from './PhotoCard';
 interface PhotoGridProps {
   /** 表示する写真オブジェクトの配列 */
   photos: Photo[];
+  /**
+   * レイアウト計算に使用する幅（px）
+   * 親コンポーネント（GalleryContent）から明示的に渡される
+   */
+  effectiveWidth: number;
   /** 現在選択されている写真のID配列（選択順序を保持） */
   selectedPhotos: string[];
   /** 選択されている写真のID配列を更新する関数 */
@@ -58,23 +62,23 @@ interface PhotoGridProps {
  */
 export default function PhotoGrid({
   photos,
+  effectiveWidth,
   selectedPhotos,
   setSelectedPhotos,
   isMultiSelectMode,
   setIsMultiSelectMode,
   onCopySelected,
 }: PhotoGridProps) {
-  const { containerRef, containerWidth } = useContainerWidth();
   const calculator = useMemo(() => new JustifiedLayoutCalculator(), []);
 
-  // コンテナ幅または写真リストが変わったらレイアウトを再計算
+  // effectiveWidth または写真リストが変わったらレイアウトを再計算
   const layout = useMemo(() => {
-    const result = calculator.calculateLayout(photos, containerWidth);
+    const result = calculator.calculateLayout(photos, effectiveWidth);
     return result.rows;
-  }, [calculator, photos, containerWidth]);
+  }, [calculator, photos, effectiveWidth]);
 
   return (
-    <div ref={containerRef} className="w-full">
+    <div className="w-full">
       <div className="space-y-1">
         {layout.map((row, rowIndex) => {
           const rowKey = `row-${rowIndex}-${row[0]?.id}`;

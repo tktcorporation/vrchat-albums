@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useContainerWidth } from '../hooks/useContainerWidth';
 import type { Photo } from '../types/photo';
 import { JustifiedLayoutCalculator } from '../utils/justifiedLayoutCalculator';
 import { LocationGroupHeader } from './LocationGroupHeader';
@@ -10,6 +9,11 @@ import { LocationGroupHeader } from './LocationGroupHeader';
 interface GroupWithSkeletonProps {
   /** グループ内の写真配列（PhotoMetadataOnly でも可） */
   photos: Photo[];
+  /**
+   * レイアウト計算に使用する幅（px）
+   * 親コンポーネント（GalleryContent）から明示的に渡される
+   */
+  effectiveWidth: number;
   /** ワールドID */
   worldId: string | null;
   /** ワールド名 */
@@ -47,25 +51,25 @@ interface GroupWithSkeletonProps {
  */
 export function GroupWithSkeleton({
   photos,
+  effectiveWidth,
   worldId,
   worldName,
   worldInstanceId,
   photoCount,
   joinDateTime,
 }: GroupWithSkeletonProps) {
-  const { containerRef, containerWidth } = useContainerWidth();
   const calculator = useMemo(() => new JustifiedLayoutCalculator(), []);
 
-  // PhotoGrid と同じレイアウト計算を使用
+  // PhotoGrid と同じレイアウト計算を使用（同じ effectiveWidth を使用）
   const layout = useMemo(() => {
-    if (containerWidth === 0 || photos.length === 0) {
+    if (effectiveWidth === 0 || photos.length === 0) {
       return { rows: [], totalHeight: 0 };
     }
-    return calculator.calculateLayout(photos, containerWidth);
-  }, [calculator, photos, containerWidth]);
+    return calculator.calculateLayout(photos, effectiveWidth);
+  }, [calculator, photos, effectiveWidth]);
 
   return (
-    <div ref={containerRef} className="w-full space-y-0">
+    <div className="w-full space-y-0">
       {/* 実際のヘッダー（スケルトンではない） */}
       <LocationGroupHeader
         worldId={worldId}

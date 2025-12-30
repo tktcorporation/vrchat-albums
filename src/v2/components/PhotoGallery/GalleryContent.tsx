@@ -98,6 +98,30 @@ const GalleryContent = memo(
     >(undefined);
     const observerRef = useRef<IntersectionObserver | null>(null);
 
+    // 単一の幅管理: GalleryContent が effectiveWidth を一元管理し、
+    // PhotoGrid/GroupWithSkeleton に props として渡す
+    const [effectiveWidth, setEffectiveWidth] = useState(0);
+
+    // ResizeObserver で幅を監視（1箇所に集約）
+    useEffect(() => {
+      if (!containerRef.current) return;
+
+      const updateWidth = () => {
+        const rawWidth = containerRef.current?.clientWidth ?? 0;
+        setEffectiveWidth(
+          rawWidth > 0
+            ? rawWidth - LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING
+            : 0,
+        );
+      };
+
+      const observer = new ResizeObserver(updateWidth);
+      observer.observe(containerRef.current);
+      updateWidth(); // 初期値を設定
+
+      return () => observer.disconnect();
+    }, []);
+
     // サムネイルキャッシュ（Google Photos風の高速ローディング）
     const { prefetchThumbnails } = useThumbnailCache();
 
@@ -126,14 +150,7 @@ const GalleryContent = memo(
       estimateSize: useCallback(
         (index) => {
           const [, group] = filteredGroups[index];
-          // コンテナ幅を PhotoGrid/GroupWithSkeleton と統一（padding を考慮）
-          const rawWidth = containerRef.current?.clientWidth ?? 0;
-          const effectiveWidth =
-            rawWidth > 0
-              ? rawWidth - LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING
-              : 0;
-
-          // 常に計算値を返す（キャッシュは使わない）
+          // effectiveWidth state を使用（PhotoGrid/GroupWithSkeleton と同じ値）
           const estimate = estimateGroupHeight(
             group.photos,
             effectiveWidth,
@@ -142,7 +159,7 @@ const GalleryContent = memo(
           );
           return estimate.height;
         },
-        [filteredGroups, layoutCalculator],
+        [filteredGroups, layoutCalculator, effectiveWidth],
       ),
       // 画面外のグループを多く保持してスクロール時のレイアウトシフトを軽減
       overscan: 5,
@@ -339,6 +356,7 @@ const GalleryContent = memo(
                       <div className="w-full rounded-b-lg overflow-hidden">
                         <PhotoGrid
                           photos={group.photos}
+                          effectiveWidth={effectiveWidth}
                           selectedPhotos={selectedPhotos}
                           setSelectedPhotos={setSelectedPhotos}
                           isMultiSelectMode={isMultiSelectMode}
@@ -352,6 +370,7 @@ const GalleryContent = memo(
                     // photos.length === 0 の場合はヘッダーのみ表示
                     <GroupWithSkeleton
                       photos={group.photos}
+                      effectiveWidth={effectiveWidth}
                       worldId={group.worldInfo?.worldId ?? null}
                       worldName={group.worldInfo?.worldName ?? null}
                       worldInstanceId={group.worldInfo?.worldInstanceId ?? null}
