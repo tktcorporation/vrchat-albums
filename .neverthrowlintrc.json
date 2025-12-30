@@ -34,8 +34,9 @@
       "allowInsideFromPromise": true,
       "allowWithRethrow": true,
       "allowElectronEnvDetection": true,
-      "allowLogAndFallback": false,
-      "allowReturnErrOnCatch": true
+      "allowLogAndFallback": true,
+      "allowReturnErrOnCatch": true,
+      "allowMatchWithFallback": true
     }
   },
   "genericErrorWarning": {

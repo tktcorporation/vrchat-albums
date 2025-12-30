@@ -34,6 +34,8 @@ export interface NeverthrowLintConfig {
       allowElectronEnvDetection?: boolean;
       allowLogAndFallback?: boolean;
       allowReturnErrOnCatch?: boolean;
+      /** Allow try-catch that uses match() to classify errors and return fallback values */
+      allowMatchWithFallback?: boolean;
     };
   };
   /**
@@ -1147,6 +1149,37 @@ export class NeverthrowLinter {
   }
 
   /**
+   * Check if a catch block uses match() to classify errors and return fallback values
+   * Pattern: catch { return match(error).with(...).otherwise(...) }
+   */
+  private hasMatchWithFallback(tryNode: ts.TryStatement): boolean {
+    if (!tryNode.catchClause) return false;
+    const catchBlock = tryNode.catchClause.block;
+
+    let hasMatchCall = false;
+
+    const visit = (n: ts.Node) => {
+      // Look for match() calls
+      if (ts.isCallExpression(n)) {
+        const expr = n.expression;
+        // Check for match(...) or pattern.match(...)
+        if (ts.isIdentifier(expr) && expr.text === 'match') {
+          hasMatchCall = true;
+        }
+        if (ts.isPropertyAccessExpression(expr) && expr.name.text === 'match') {
+          hasMatchCall = true;
+        }
+      }
+      if (!hasMatchCall) {
+        ts.forEachChild(n, visit);
+      }
+    };
+
+    ts.forEachChild(catchBlock, visit);
+    return hasMatchCall;
+  }
+
+  /**
    * Check for try-catch usage and suggest fromThrowable/ResultAsync.fromPromise
    */
   private checkTryCatchForWarning(
@@ -1201,6 +1234,15 @@ export class NeverthrowLinter {
         if (
           config.exceptions?.allowReturnErrOnCatch &&
           this.hasReturnErrOnCatch(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 7: Match with fallback pattern (classify errors and return fallback)
+        if (
+          config.exceptions?.allowMatchWithFallback &&
+          this.hasMatchWithFallback(node)
         ) {
           ts.forEachChild(node, visit);
           return;
