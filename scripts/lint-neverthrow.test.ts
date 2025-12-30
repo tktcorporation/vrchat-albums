@@ -300,4 +300,44 @@ describe('Neverthrow Linter', () => {
       expect(tryCatchWarnings.length).toBeGreaterThan(0);
     });
   });
+
+  describe('genericErrorWarning', () => {
+    it('should warn when using err(new Error(...))', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        genericErrorWarning: {
+          enabled: true,
+          path: path.join(fixturesDir, 'generic-error-warning.ts'),
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      const genericErrorWarnings = result.issues.filter(
+        (i) => i.ruleName === 'no-generic-error',
+      );
+      expect(genericErrorWarnings).toHaveLength(1);
+      expect(genericErrorWarnings[0].message).toContain(
+        'Avoid using err(new Error(...))',
+      );
+    });
+
+    it('should warn when using err({ type: "UNEXPECTED", ... })', async () => {
+      const testConfig: NeverthrowLintConfig = {
+        rules: [],
+        genericErrorWarning: {
+          enabled: true,
+          path: path.join(fixturesDir, 'generic-error-warning.ts'),
+        },
+      };
+
+      const result = await lintNeverthrow(testConfig);
+
+      const unexpectedWarnings = result.issues.filter(
+        (i) => i.ruleName === 'no-unexpected-error-type',
+      );
+      expect(unexpectedWarnings).toHaveLength(1);
+      expect(unexpectedWarnings[0].message).toContain('UNEXPECTED');
+    });
+  });
 });

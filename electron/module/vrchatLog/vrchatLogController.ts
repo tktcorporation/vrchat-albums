@@ -7,13 +7,22 @@ import * as playerJoinLogService from './../VRChatPlayerJoinLogModel/playerJoinL
 import * as playerLeaveLogService from './../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import * as vrchatLogFileDirService from './../vrchatLogFileDir/service';
 import * as worldJoinLogService from './../vrchatWorldJoinLog/service';
-import { backupService } from './backupService/backupService';
-import { rollbackService } from './backupService/rollbackService';
+import {
+  backupService,
+  getBackupErrorMessage,
+} from './backupService/backupService';
+import {
+  getRollbackErrorMessage,
+  rollbackService,
+} from './backupService/rollbackService';
 import { FILTER_PATTERNS } from './constants/logPatterns';
 import type { LogRecord } from './converters/dbToLogStore';
 import { VRChatLogFileError } from './error';
 import { exportLogStoreFromDB } from './exportService/exportService';
-import { importService } from './importService/importService';
+import {
+  getImportErrorMessage,
+  importService,
+} from './importService/importService';
 import * as vrchatLogService from './service';
 
 /**
@@ -338,14 +347,12 @@ export const vrchatLogRouter = () =>
         );
 
         if (backupResult.isErr()) {
+          const errorMessage = getBackupErrorMessage(backupResult.error);
           logger.error({
-            message: `Pre-import backup failed: ${backupResult.error.message}`,
+            message: `Pre-import backup failed: ${errorMessage}`,
           });
-          eventEmitter.emit(
-            'toast',
-            `バックアップ作成に失敗しました: ${backupResult.error.message}`,
-          );
-          throw backupResult.error;
+          eventEmitter.emit('toast', errorMessage);
+          throw new Error(errorMessage);
         }
 
         const backup = backupResult.value;
@@ -390,14 +397,12 @@ export const vrchatLogRouter = () =>
           );
 
           if (importResult.isErr()) {
+            const errorMessage = getImportErrorMessage(importResult.error);
             logger.error({
-              message: `LogStore import failed: ${importResult.error.message}`,
+              message: `LogStore import failed: ${errorMessage}`,
             });
-            eventEmitter.emit(
-              'toast',
-              `インポートに失敗しました: ${importResult.error.message}`,
-            );
-            throw importResult.error;
+            eventEmitter.emit('toast', errorMessage);
+            throw new Error(errorMessage);
           }
 
           const result = importResult.value;
@@ -433,10 +438,11 @@ export const vrchatLogRouter = () =>
         const historyResult = await backupService.getBackupHistory();
 
         if (historyResult.isErr()) {
+          const errorMessage = getBackupErrorMessage(historyResult.error);
           logger.error({
-            message: `Failed to get backup history: ${historyResult.error.message}`,
+            message: `Failed to get backup history: ${errorMessage}`,
           });
-          throw historyResult.error;
+          throw new Error(errorMessage);
         }
 
         return historyResult.value;
@@ -460,28 +466,27 @@ export const vrchatLogRouter = () =>
         try {
           const backupResult = await backupService.getBackup(input.backupId);
           if (backupResult.isErr()) {
+            const errorMessage = getBackupErrorMessage(backupResult.error);
             logger.error({
-              message: `Failed to get backup: ${backupResult.error.message}`,
+              message: `Failed to get backup: ${errorMessage}`,
             });
-            eventEmitter.emit(
-              'toast',
-              `バックアップが見つかりません: ${backupResult.error.message}`,
-            );
-            throw backupResult.error;
+            eventEmitter.emit('toast', errorMessage);
+            throw new Error(errorMessage);
           }
 
           const backup = backupResult.value;
 
           const rollbackResult = await rollbackService.rollbackToBackup(backup);
           if (rollbackResult.isErr()) {
+            const errorMessage = getRollbackErrorMessage(rollbackResult.error);
             logger.error({
-              message: `Rollback failed: ${rollbackResult.error.message}`,
+              message: `Rollback failed: ${errorMessage}`,
             });
             eventEmitter.emit(
               'toast',
-              `ロールバックに失敗しました: ${rollbackResult.error.message}`,
+              `ロールバックに失敗しました: ${errorMessage}`,
             );
-            throw rollbackResult.error;
+            throw new Error(errorMessage);
           }
 
           logger.info(`Rollback completed successfully: ${input.backupId}`);

@@ -6,7 +6,7 @@ import type { LogRecord } from '../converters/dbToLogStore';
 import type { ExportResult } from '../exportService/exportService';
 import * as exportServiceModule from '../exportService/exportService';
 import type { DBLogProvider, ImportBackupMetadata } from './backupService';
-import { backupService } from './backupService';
+import { backupService, getBackupErrorMessage } from './backupService';
 
 // モックの設定
 vi.mock('node:fs', () => ({
@@ -114,17 +114,15 @@ describe('backupService', () => {
       );
     });
 
-    it('エクスポートに失敗した場合はエラーを返す', async () => {
+    it('エクスポートに失敗した場合は例外がスローされる', async () => {
+      // 予期しないエラーなので throw される
       vi.mocked(exportServiceModule.exportLogStoreFromDB).mockRejectedValue(
         new Error('Export failed'),
       );
 
-      const result = await backupService.createPreImportBackup(mockGetDBLogs);
-
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(result.error.message).toContain('Export failed');
-      }
+      await expect(
+        backupService.createPreImportBackup(mockGetDBLogs),
+      ).rejects.toThrow('Export failed');
     });
   });
 
@@ -324,7 +322,10 @@ describe('backupService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain('バックアップが見つかりません');
+        expect(result.error.type).toBe('BACKUP_NOT_FOUND');
+        expect(getBackupErrorMessage(result.error)).toContain(
+          'バックアップが見つかりません',
+        );
       }
     });
   });

@@ -242,7 +242,7 @@ export const performMigration = async (): Promise<
     // Check if logStore directory exists
     await nodeFsPromises.access(oldLogStorePath);
 
-    const { importService } = await import(
+    const { importService, getImportErrorMessage } = await import(
       '../vrchatLog/importService/importService'
     );
     const importResult = await importService.importLogStoreFiles(
@@ -258,7 +258,7 @@ export const performMigration = async (): Promise<
       logger.info('LogStore migrated successfully');
     } else {
       result.errors.push(
-        `LogStore import failed: ${importResult.error.message}`,
+        `LogStore import failed: ${getImportErrorMessage(importResult.error)}`,
       );
     }
   } catch (error) {

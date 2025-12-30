@@ -7,9 +7,26 @@ import { ERROR_CATEGORIES, ERROR_CODES, UserFacingError } from './errors';
  */
 
 /**
+ * 構造化エラー型かどうかを判定するtype guard
+ * { type: string } の形式を持つオブジェクトを構造化エラーとして扱う
+ */
+function isStructuredError(error: unknown): error is { type: string } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'type' in error &&
+    typeof (error as { type: unknown }).type === 'string'
+  );
+}
+
+/**
  * エラーを文字列キーに変換する共通ロジック
+ * 構造化エラー（{ type: 'XXX' }）の場合は type を返す
  */
 function getErrorKey<E>(error: E): string {
+  if (isStructuredError(error)) {
+    return error.type;
+  }
   if (error instanceof Error) {
     return error.constructor.name;
   }

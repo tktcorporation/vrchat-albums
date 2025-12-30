@@ -9,7 +9,7 @@ import { VRChatLogFileError } from '../error';
 import * as logStorageManagerModule from '../fileHandlers/logStorageManager';
 import type { ImportBackupMetadata } from './backupService';
 import * as backupServiceModule from './backupService';
-import { rollbackService } from './rollbackService';
+import { getRollbackErrorMessage, rollbackService } from './rollbackService';
 
 // モックの設定
 vi.mock('node:fs', () => ({
@@ -174,7 +174,7 @@ describe('rollbackService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain(
+        expect(getRollbackErrorMessage(result.error)).toContain(
           'バックアップディレクトリが見つかりません',
         );
       }
@@ -201,8 +201,8 @@ describe('rollbackService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain(
-          'バックアップに有効な月別データが見つかりません',
+        expect(getRollbackErrorMessage(result.error)).toContain(
+          '有効な月別データが見つかりません',
         );
       }
     });
@@ -231,7 +231,7 @@ describe('rollbackService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain(
+        expect(getRollbackErrorMessage(result.error)).toContain(
           'バックアップからディレクトリを復帰できませんでした',
         );
       }
@@ -264,7 +264,9 @@ describe('rollbackService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain('DB再構築に失敗しました');
+        expect(getRollbackErrorMessage(result.error)).toContain(
+          'DB再構築に失敗しました',
+        );
       }
     });
 
@@ -284,8 +286,8 @@ describe('rollbackService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain(
-          'ロールバックトランザクションに失敗しました',
+        expect(getRollbackErrorMessage(result.error)).toContain(
+          'トランザクションに失敗しました',
         );
       }
     });
@@ -319,8 +321,8 @@ describe('rollbackService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain(
-          'バックアップメタデータファイルが見つかりません',
+        expect(getRollbackErrorMessage(result.error)).toContain(
+          'メタデータファイルが見つかりません',
         );
       }
     });
@@ -459,7 +461,7 @@ describe('rollbackService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain(
+        expect(getRollbackErrorMessage(result.error)).toContain(
           'バックアップからディレクトリを復帰できませんでした',
         );
       }

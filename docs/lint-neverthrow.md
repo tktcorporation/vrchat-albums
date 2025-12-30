@@ -440,6 +440,72 @@ function getLogPath(): string {
 | `allowWithRethrow` | `true` | 適切な再スローがある場合はスキップ |
 | `allowElectronEnvDetection` | `true` | `require('electron')` を含む環境検出パターンはスキップ |
 
+## 汎用Errorタイプ警告 {#generic-error-warning}
+
+`err(new Error(...))` パターンは、呼び出し側でエラーをパターンマッチできないため避けるべきです。
+
+### 警告パターン
+
+```typescript
+// ❌ Bad: 汎用Error型
+export function readFile(): Result<string, Error> {
+  try {
+    return ok(fs.readFileSync('file.txt', 'utf-8'));
+  } catch (error) {
+    return err(new Error('ファイルが読めませんでした'));
+  }
+}
+
+// ❌ Bad: UNEXPECTEDタイプ
+export function process(): Result<void, { type: 'UNEXPECTED'; message: string }> {
+  if (shouldFail) {
+    return err({ type: 'UNEXPECTED', message: 'エラー' });
+  }
+  return ok(undefined);
+}
+```
+
+### 推奨パターン
+
+```typescript
+// ✅ Good: 具体的なエラー型
+type ReadFileError =
+  | { type: 'FILE_NOT_FOUND'; path: string }
+  | { type: 'PERMISSION_DENIED'; path: string };
+
+export function readFile(path: string): Result<string, ReadFileError> {
+  const accessResult = await accessAsync(path);
+  if (accessResult.isErr()) {
+    return err({ type: 'FILE_NOT_FOUND', path });
+  }
+  // ... 予期しないエラーはthrow
+  return ok(content);
+}
+
+// ✅ Good: エラーメッセージヘルパー関数
+export const getReadFileErrorMessage = (error: ReadFileError): string =>
+  match(error)
+    .with({ type: 'FILE_NOT_FOUND' }, (e) => `ファイルが見つかりません: ${e.path}`)
+    .with({ type: 'PERMISSION_DENIED' }, (e) => `アクセスが拒否されました: ${e.path}`)
+    .exhaustive();
+```
+
+### 設定
+
+```json
+{
+  "genericErrorWarning": {
+    "enabled": true,
+    "path": "electron/**/*.ts"
+  }
+}
+```
+
+| オプション | デフォルト | 説明 |
+|-----------|----------|------|
+| `enabled` | `false` | 警告を有効にするか |
+| `path` | - | 対象ファイルのglobパターン |
+
 ## テスト
 
 リンターのテストは `scripts/lint-neverthrow.test.ts` にあります：

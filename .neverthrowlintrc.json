@@ -33,7 +33,13 @@
       "allowWithFinally": true,
       "allowInsideFromPromise": true,
       "allowWithRethrow": true,
-      "allowElectronEnvDetection": true
+      "allowElectronEnvDetection": true,
+      "allowLogAndFallback": false,
+      "allowReturnErrOnCatch": true
     }
+  },
+  "genericErrorWarning": {
+    "enabled": true,
+    "path": "electron/**/*.ts"
   }
 }

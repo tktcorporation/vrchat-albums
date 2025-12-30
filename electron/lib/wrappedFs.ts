@@ -1,7 +1,6 @@
 import * as fs from 'node:fs';
 import { promisify } from 'node:util';
-import type { Result } from 'neverthrow';
-import { err, ok } from 'neverthrow';
+import { err, fromThrowable, ok, type Result, ResultAsync } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 
 /**
@@ -68,16 +67,18 @@ export const readdirAsync = async (
  * ファイルを書き込み、失敗時には Error を Result として返す同期版ヘルパー。
  * ログ保存処理など複数箇所から利用される。
  */
+const safeWriteFileSync = fromThrowable(
+  (path: string, data: string | Uint8Array) => {
+    fs.writeFileSync(path, data);
+  },
+  (e): Error => (e instanceof Error ? e : new Error(String(e))),
+);
+
 export const writeFileSyncSafe = (
   path: string,
   data: string | Uint8Array,
 ): Result<void, Error> => {
-  try {
-    fs.writeFileSync(path, data);
-    return ok(undefined);
-  } catch (e) {
-    return err(e as Error);
-  }
+  return safeWriteFileSync(path, data);
 };
 
 import typeUtils from 'node:util/types';
@@ -155,15 +156,11 @@ export const appendFileAsync = async (
  * 指定したファイルを削除する非同期関数。
  * 一時ファイルのクリーンアップ処理などで使用される。
  */
-export const unlinkAsync = async (
-  path: string,
-): Promise<Result<void, Error>> => {
-  try {
-    await fs.promises.unlink(path);
-    return ok(undefined);
-  } catch (e) {
-    return err(e as Error);
-  }
+export const unlinkAsync = (path: string): ResultAsync<void, Error> => {
+  return ResultAsync.fromPromise(
+    fs.promises.unlink(path),
+    (e): Error => (e instanceof Error ? e : new Error(String(e))),
+  );
 };
 
 /**
