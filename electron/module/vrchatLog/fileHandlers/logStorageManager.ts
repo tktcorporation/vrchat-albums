@@ -2,6 +2,8 @@ import * as nodeFs from 'node:fs';
 import path from 'node:path';
 import * as datefns from 'date-fns';
 import * as neverthrow from 'neverthrow';
+import { fromThrowable } from 'neverthrow';
+import { logger } from '../../../lib/logger';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import * as fs from '../../../lib/wrappedFs';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../model';
@@ -94,18 +96,28 @@ export const getLogStoreFilePathsInRange = async (
 
     // 同じ月のタイムスタンプ付きのログファイルを検索
     if (nodeFs.existsSync(monthDir)) {
-      try {
-        const files = nodeFs.readdirSync(monthDir);
-        const timestampedLogFiles = files.filter((file) =>
+      const safeReaddir = fromThrowable(
+        () => nodeFs.readdirSync(monthDir),
+        (e): { type: 'READDIR_FAILED'; path: string; message: string } => ({
+          type: 'READDIR_FAILED',
+          path: monthDir,
+          message: e instanceof Error ? e.message : String(e),
+        }),
+      );
+      const readdirResult = safeReaddir();
+      if (readdirResult.isOk()) {
+        const timestampedLogFiles = readdirResult.value.filter((file) =>
           file.match(VRChatLogStoreFilePathRegex),
         );
-
         for (const file of timestampedLogFiles) {
           const fullPath = path.join(monthDir, file);
           logFilePathSet.add(fullPath);
         }
-      } catch (err) {
-        console.error(`Error reading directory ${monthDir}:`, err);
+      } else {
+        // ディレクトリ読み取り失敗は警告のみで継続
+        logger.warn(
+          `Failed to read directory ${readdirResult.error.path}: ${readdirResult.error.message}`,
+        );
       }
     }
 
