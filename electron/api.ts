@@ -47,11 +47,11 @@ export const router = trpcRouter({
     return observable((emit) => {
       /**
        * メインプロセスの `toast` イベントを受け取り
-       * サブスクライバーへ文字列を送信する内部関数。
+       * サブスクライバーへ送信する内部関数。
        * subscribeToast の Observable 内でのみ使用される。
        */
-      function onToast(text: string) {
-        emit.next(text);
+      function onToast(data: unknown) {
+        emit.next(data);
       }
 
       ee.on('toast', onToast);

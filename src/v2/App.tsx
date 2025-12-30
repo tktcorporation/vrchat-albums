@@ -282,11 +282,17 @@ const ToasterWrapper = () => {
             });
           },
         )
-        // その他の場合
+        // その他の場合: 予期しないデータは無視
+        // trpc-electron IPC バグ: query レスポンスが subscription に漏れる問題への対処
+        // 根本原因: trpc-electron v0.1.2 の IPC 実装で query/subscription の分離が不完全
+        // See: https://github.com/tktcorporation/vrchat-albums/issues/570
         .otherwise((c) => {
-          toast({
-            description: JSON.stringify(c),
-          });
+          if (import.meta.env.DEV) {
+            console.warn(
+              '[ToasterWrapper] Ignoring unexpected subscription data (trpc-electron IPC leak):',
+              typeof c,
+            );
+          }
         });
     },
   });
