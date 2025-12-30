@@ -2,13 +2,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { LoaderCircle } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LAYOUT_CONSTANTS } from '../../constants/layoutConstants';
 import type { UseLoadingStateResult } from '../../hooks/useLoadingState';
 import { useThumbnailCache } from '../../hooks/useThumbnailCache';
 import { isPhotoLoaded } from '../../types/photo';
-import {
-  estimateGroupHeight,
-  GROUP_HEIGHT_CONSTANTS,
-} from '../../utils/estimateGroupHeight';
+import { estimateGroupHeight } from '../../utils/estimateGroupHeight';
 import { JustifiedLayoutCalculator } from '../../utils/justifiedLayoutCalculator';
 import { AppHeader } from '../AppHeader';
 import { GroupWithSkeleton } from '../GroupWithSkeleton';
@@ -95,11 +93,34 @@ const GalleryContent = memo(
       onGroupingEnd: finishLoadingGrouping,
     });
     const containerRef = useRef<HTMLDivElement>(null);
-    const groupSizesRef = useRef<Map<string, number>>(new Map());
     const [currentGroupIndex, setCurrentGroupIndex] = useState<
       number | undefined
     >(undefined);
     const observerRef = useRef<IntersectionObserver | null>(null);
+
+    // 単一の幅管理: GalleryContent が effectiveWidth を一元管理し、
+    // PhotoGrid/GroupWithSkeleton に props として渡す
+    const [effectiveWidth, setEffectiveWidth] = useState(0);
+
+    // ResizeObserver で幅を監視（1箇所に集約）
+    useEffect(() => {
+      if (!containerRef.current) return;
+
+      const updateWidth = () => {
+        const rawWidth = containerRef.current?.clientWidth ?? 0;
+        setEffectiveWidth(
+          rawWidth > 0
+            ? rawWidth - LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING
+            : 0,
+        );
+      };
+
+      const observer = new ResizeObserver(updateWidth);
+      observer.observe(containerRef.current);
+      updateWidth(); // 初期値を設定
+
+      return () => observer.disconnect();
+    }, []);
 
     // サムネイルキャッシュ（Google Photos風の高速ローディング）
     const { prefetchThumbnails } = useThumbnailCache();
@@ -120,37 +141,38 @@ const GalleryContent = memo(
     const layoutCalculator = useMemo(() => new JustifiedLayoutCalculator(), []);
 
     // 仮想スクローラーの設定
+    // measureElement を削除し、事前計算のみを使用することで：
+    // 1. estimateSize と実測値の差異によるレイアウトシフトを防止
+    // 2. 上方向スクロール時の再測定によるジャンプ/スタッターを防止
     const virtualizer = useVirtualizer({
       count: filteredGroups.length,
       getScrollElement: () => containerRef.current,
       estimateSize: useCallback(
         (index) => {
-          const [key, group] = filteredGroups[index];
-          const containerWidth = containerRef.current?.clientWidth ?? 0;
-          const cachedHeight = groupSizesRef.current.get(key);
-
-          // estimateGroupHeight でキャッシュまたは計算による推定を行う
+          const [, group] = filteredGroups[index];
+          // effectiveWidth state を使用（PhotoGrid/GroupWithSkeleton と同じ値）
           const estimate = estimateGroupHeight(
             group.photos,
-            containerWidth,
-            cachedHeight,
+            effectiveWidth,
+            undefined, // キャッシュを使用しない
             layoutCalculator,
           );
           return estimate.height;
         },
-        [filteredGroups, layoutCalculator],
+        [filteredGroups, layoutCalculator, effectiveWidth],
       ),
       // 画面外のグループを多く保持してスクロール時のレイアウトシフトを軽減
       overscan: 5,
-      measureElement: useCallback((element: HTMLElement) => {
-        const height = element.getBoundingClientRect().height;
-        const key = element.getAttribute('data-key');
-        if (key) {
-          groupSizesRef.current.set(key, height);
-        }
-        return height + GROUP_HEIGHT_CONSTANTS.GROUP_SPACING;
-      }, []),
+      // measureElement を削除：再測定によるレイアウトシフトと上方向スクロール問題を防止
     });
+
+    // effectiveWidth が変更されたら virtualizer に再計算させる
+    // 初回レンダリング時は effectiveWidth = 0 なので、正しい値になった時点で再計算が必要
+    useEffect(() => {
+      if (effectiveWidth > 0) {
+        virtualizer.measure();
+      }
+    }, [effectiveWidth, virtualizer]);
 
     // 日付ジャンプハンドラー
     const handleJumpToDate = useCallback(
@@ -311,11 +333,10 @@ const GalleryContent = memo(
               return (
                 <div
                   key={key}
-                  data-key={key}
                   data-index={virtualRow.index}
                   ref={(el) => {
+                    // IntersectionObserver のみ設定（measureElement は不要）
                     if (el) {
-                      virtualizer.measureElement(el);
                       observerRef.current?.observe(el);
                     }
                   }}
@@ -342,6 +363,7 @@ const GalleryContent = memo(
                       <div className="w-full rounded-b-lg overflow-hidden">
                         <PhotoGrid
                           photos={group.photos}
+                          effectiveWidth={effectiveWidth}
                           selectedPhotos={selectedPhotos}
                           setSelectedPhotos={setSelectedPhotos}
                           isMultiSelectMode={isMultiSelectMode}
@@ -355,6 +377,7 @@ const GalleryContent = memo(
                     // photos.length === 0 の場合はヘッダーのみ表示
                     <GroupWithSkeleton
                       photos={group.photos}
+                      effectiveWidth={effectiveWidth}
                       worldId={group.worldInfo?.worldId ?? null}
                       worldName={group.worldInfo?.worldName ?? null}
                       worldInstanceId={group.worldInfo?.worldInstanceId ?? null}

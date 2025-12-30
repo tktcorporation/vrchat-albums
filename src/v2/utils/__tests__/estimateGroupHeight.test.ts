@@ -301,6 +301,62 @@ describe('precomputeGroupHeights', () => {
   });
 });
 
+describe('effectiveWidth によるレイアウト変化の保証', () => {
+  /**
+   * このテストグループは GalleryContent との連携で重要なポイントを検証します。
+   *
+   * GalleryContent では effectiveWidth を useState で管理し、
+   * この値が変更されたときに virtualizer.measure() を呼び出して
+   * 全グループの高さを再計算します。
+   *
+   * もし estimateGroupHeight が effectiveWidth を無視するように変更されると、
+   * グループ同士が重なる問題が再発します。
+   */
+
+  it('異なる effectiveWidth で異なる高さが返される', () => {
+    const photos = createMockPhotos(10);
+
+    const narrow = estimateGroupHeight(photos, 600, undefined);
+    const wide = estimateGroupHeight(photos, 1200, undefined);
+
+    // 狭い幅 → 多くの行 → 高さが高い
+    // 広い幅 → 少ない行 → 高さが低い
+    expect(narrow.height).toBeGreaterThan(wide.height);
+  });
+
+  it('effectiveWidth = 0 の場合はデフォルト幅（1200px）で計算される', () => {
+    const photos = createMockPhotos(5);
+
+    const withZero = estimateGroupHeight(photos, 0, undefined);
+    const withDefault = estimateGroupHeight(
+      photos,
+      GROUP_HEIGHT_CONSTANTS.DEFAULT_CONTAINER_WIDTH,
+      undefined,
+    );
+
+    // effectiveWidth = 0 でもデフォルト幅で計算されるため、高さは 0 ではない
+    expect(withZero.height).toBeGreaterThan(0);
+    expect(withZero.source).toBe('calculated');
+
+    // デフォルト幅と同じ結果になる
+    expect(withZero.height).toBe(withDefault.height);
+  });
+
+  it('ウィンドウリサイズ時に高さが再計算される', () => {
+    const photos = createMockPhotos(8);
+
+    // 初期幅
+    const initial = estimateGroupHeight(photos, 1000, undefined);
+
+    // リサイズ後
+    const afterResize = estimateGroupHeight(photos, 800, undefined);
+
+    // 幅が変わると高さも変わる（どちらが大きいかはレイアウト次第）
+    // 重要なのは「幅の変化に応じて高さが再計算される」こと
+    expect(afterResize.height).not.toBe(initial.height);
+  });
+});
+
 describe('GROUP_HEIGHT_CONSTANTS', () => {
   it('GROUP_SPACING は正の値である', () => {
     expect(GROUP_HEIGHT_CONSTANTS.GROUP_SPACING).toBeGreaterThan(0);
