@@ -15,7 +15,7 @@ import {
   Tray,
 } from 'electron';
 import isDev from 'electron-is-dev';
-import { err, ok, type Result } from 'neverthrow';
+import { err, ok, Result, ResultAsync } from 'neverthrow';
 
 import { logger } from './lib/logger';
 // Local
@@ -295,24 +295,33 @@ const setTray = () => {
       : `${app.getAppPath()}`;
     const iconPath = join(appPath, 'assets', 'icon.png');
 
-    // アイコンパスの存在確認とログ出力
-    try {
-      await fs.access(iconPath);
-      logger.info({ message: `トレイアイコンが見つかりました: ${iconPath}` });
-    } catch {
+    // アイコンパスの存在確認
+    const accessResult = await ResultAsync.fromPromise(
+      fs.access(iconPath),
+      () => ({ type: 'ICON_NOT_FOUND' as const, path: iconPath }),
+    );
+    if (accessResult.isErr()) {
       logger.error({ message: `トレイアイコンが見つかりません: ${iconPath}` });
       return;
     }
+    logger.info({ message: `トレイアイコンが見つかりました: ${iconPath}` });
 
-    try {
-      tray = new Tray(iconPath);
-      logger.info({ message: 'トレイの作成に成功しました' });
-    } catch (error) {
+    // トレイ作成（同期処理だがエラーの可能性あり）
+    const trayResult = Result.fromThrowable(
+      () => new Tray(iconPath),
+      (error) => ({
+        type: 'TRAY_CREATE_FAILED' as const,
+        message: JSON.stringify(error),
+      }),
+    )();
+    if (trayResult.isErr()) {
       logger.error({
-        message: `トレイの作成に失敗しました: ${JSON.stringify(error)}`,
+        message: `トレイの作成に失敗しました: ${trayResult.error.message}`,
       });
       return;
     }
+    tray = trayResult.value;
+    logger.info({ message: 'トレイの作成に成功しました' });
 
     const contextMenu = Menu.buildFromTemplate([
       {
