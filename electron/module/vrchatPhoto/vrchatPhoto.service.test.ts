@@ -375,4 +375,326 @@ describe('createVRChatPhotoPathIndex', () => {
       expect(model.createOrUpdateListVRChatPhotoPath).not.toHaveBeenCalled();
     });
   });
+
+  describe('エラーハンドリング', () => {
+    describe('computeFolderDigest エラー', () => {
+      it('フォルダ削除エラー（ENOENT）が発生した場合はスキップしてdebugログを出力する', async () => {
+        // folder-hash がENOENTエラーを返すようにモック
+        vi.mocked(hashElement).mockImplementation(
+          async (folderPath: string) => {
+            if (folderPath === yearMonthFolder2024_01) {
+              const error = new Error('ENOENT: no such file or directory');
+              (error as NodeJS.ErrnoException).code = 'ENOENT';
+              throw error;
+            }
+            return {
+              hash: computeTestDigest(folderPath),
+              name: folderPath,
+              children: [],
+            };
+          },
+        );
+
+        // loggerモジュールをインポート
+        const { logger } = await import('./../../lib/logger');
+
+        await service.createVRChatPhotoPathIndex(false);
+
+        // debugログが呼ばれることを確認
+        expect(logger.debug).toHaveBeenCalledWith(
+          expect.stringContaining('Folder not found'),
+        );
+
+        // 他のフォルダは処理される
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+        const savedPaths = allSavedData.map((d) => d.photoPath);
+        // yearMonthFolder2024_01 は含まれない
+        expect(savedPaths).not.toContain(file1Path);
+        // 他のファイルは処理される
+        expect(savedPaths).toContain(file2Path);
+        expect(savedPaths).toContain(extraFilePath);
+      });
+
+      it('権限エラー（EACCES）が発生した場合はスキップしてwarnログを出力する', async () => {
+        vi.mocked(hashElement).mockImplementation(
+          async (folderPath: string) => {
+            if (folderPath === yearMonthFolder2024_02) {
+              const error = new Error('EACCES: permission denied');
+              (error as NodeJS.ErrnoException).code = 'EACCES';
+              throw error;
+            }
+            return {
+              hash: computeTestDigest(folderPath),
+              name: folderPath,
+              children: [],
+            };
+          },
+        );
+
+        const { logger } = await import('./../../lib/logger');
+
+        await service.createVRChatPhotoPathIndex(false);
+
+        // warnログが呼ばれることを確認
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining('Permission denied'),
+          }),
+        );
+
+        // file2Path（2024-02）は含まれない
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+        const savedPaths = allSavedData.map((d) => d.photoPath);
+        expect(savedPaths).not.toContain(file2Path);
+      });
+
+      it('想定外エラーは再スローする（Sentry送信対象）', async () => {
+        const unexpectedError = new Error('EMFILE: too many open files');
+        (unexpectedError as NodeJS.ErrnoException).code = 'EMFILE';
+        vi.mocked(hashElement).mockRejectedValue(unexpectedError);
+
+        await expect(service.createVRChatPhotoPathIndex(false)).rejects.toThrow(
+          unexpectedError,
+        );
+      });
+    });
+
+    describe('getPhotoFolders エラー（readdir）', () => {
+      it('サブディレクトリの権限エラーをwarnログ出力してスキップする', async () => {
+        // readdir を再モック
+        (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+          async (dirPath: PathLike, options?: unknown) => {
+            const pathStr = dirPath.toString();
+
+            // 2024-01フォルダで権限エラーを発生させる
+            if (pathStr === yearMonthFolder2024_01) {
+              const error = new Error('EACCES: permission denied');
+              (error as NodeJS.ErrnoException).code = 'EACCES';
+              throw error;
+            }
+
+            // withFileTypes: true の場合
+            if (
+              options &&
+              typeof options === 'object' &&
+              'withFileTypes' in options &&
+              (options as { withFileTypes: boolean }).withFileTypes
+            ) {
+              if (pathStr === mockPhotoDir.value) {
+                return [
+                  createMockDirent('2024-01', true),
+                  createMockDirent('2024-02', true),
+                ] as Dirent[];
+              }
+              if (pathStr === mockExtraDir.value) {
+                return [createMockDirent('2024-01', true)] as Dirent[];
+              }
+              if (pathStr === yearMonthFolder2024_02) {
+                return [createMockDirent(file2Name, false)] as Dirent[];
+              }
+              if (pathStr === extraYearMonthFolder) {
+                return [createMockDirent(extraFileName, false)] as Dirent[];
+              }
+              return [] as Dirent[];
+            }
+
+            if (pathStr === yearMonthFolder2024_02) {
+              return [file2Name];
+            }
+            if (pathStr === extraYearMonthFolder) {
+              return [extraFileName];
+            }
+            return [];
+          },
+        );
+
+        const { logger } = await import('./../../lib/logger');
+
+        await service.createVRChatPhotoPathIndex(false);
+
+        // warnログが呼ばれることを確認
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining(
+              'Permission denied reading directory',
+            ),
+          }),
+        );
+
+        // file1Path（2024-01）は含まれない
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+        const savedPaths = allSavedData.map((d) => d.photoPath);
+        expect(savedPaths).not.toContain(file1Path);
+        // 他のファイルは処理される
+        expect(savedPaths).toContain(file2Path);
+      });
+
+      it('readdir の想定外エラーは再スローする', async () => {
+        const unexpectedError = new Error('EMFILE: too many open files');
+        (unexpectedError as NodeJS.ErrnoException).code = 'EMFILE';
+
+        (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+          async (dirPath: PathLike, options?: unknown) => {
+            const pathStr = dirPath.toString();
+
+            // ベースディレクトリへのアクセスで想定外エラー
+            if (
+              pathStr === mockPhotoDir.value &&
+              options &&
+              typeof options === 'object' &&
+              'withFileTypes' in options
+            ) {
+              throw unexpectedError;
+            }
+            return [];
+          },
+        );
+
+        await expect(service.createVRChatPhotoPathIndex(false)).rejects.toThrow(
+          unexpectedError,
+        );
+      });
+    });
+
+    describe('filterNewFilesByMtime エラー（stat）', () => {
+      it('stat中にファイルが削除された場合はdebugログを出力してスキップする', async () => {
+        // ダイジェスト不一致 + lastScannedAt設定でstat呼び出しを発生させる
+        // lastScannedAtを過去に設定することで、mtimeチェックのためにstatが呼ばれる
+        savedScanStates = {
+          [yearMonthFolder2024_01]: {
+            digest: createOldDigest('2024-01'), // 不一致
+            lastScannedAt: twoHoursAgo.toISOString(),
+          },
+          [yearMonthFolder2024_02]: {
+            digest: createOldDigest('2024-02'), // 不一致
+            lastScannedAt: twoHoursAgo.toISOString(),
+          },
+          [extraYearMonthFolder]: {
+            digest: createOldDigest('extra'), // 不一致
+            lastScannedAt: twoHoursAgo.toISOString(),
+          },
+        };
+
+        // statモックを変更: file1Pathで削除エラー
+        vi.mocked(nodefsPromises.stat).mockImplementation(async (filePath) => {
+          const pathStr = filePath.toString();
+          if (pathStr === file1Path) {
+            const error = new Error('ENOENT: no such file or directory');
+            (error as NodeJS.ErrnoException).code = 'ENOENT';
+            throw error;
+          }
+          const stats = {
+            isFile: () => true,
+            isDirectory: () => false,
+            mtime: now, // twoHoursAgoより後なので新規ファイルとして処理される
+          };
+          return stats as unknown as Awaited<
+            ReturnType<typeof nodefsPromises.stat>
+          >;
+        });
+
+        const { logger } = await import('./../../lib/logger');
+
+        await service.createVRChatPhotoPathIndex(true);
+
+        // debugログが呼ばれることを確認
+        expect(logger.debug).toHaveBeenCalledWith(
+          expect.stringContaining('File not found'),
+        );
+
+        // file1Pathは含まれない
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+        const savedPaths = allSavedData.map((d) => d.photoPath);
+        expect(savedPaths).not.toContain(file1Path);
+        // 他のファイルは処理される
+        expect(savedPaths).toContain(file2Path);
+        expect(savedPaths).toContain(extraFilePath);
+      });
+
+      it('ファイル権限エラーはwarnログを出力してスキップする', async () => {
+        // ダイジェスト不一致 + lastScannedAt設定でstat呼び出しを発生させる
+        savedScanStates = {
+          [yearMonthFolder2024_01]: {
+            digest: createOldDigest('2024-01'),
+            lastScannedAt: twoHoursAgo.toISOString(),
+          },
+          [yearMonthFolder2024_02]: {
+            digest: createOldDigest('2024-02'),
+            lastScannedAt: twoHoursAgo.toISOString(),
+          },
+          [extraYearMonthFolder]: {
+            digest: createOldDigest('extra'),
+            lastScannedAt: twoHoursAgo.toISOString(),
+          },
+        };
+
+        vi.mocked(nodefsPromises.stat).mockImplementation(async (filePath) => {
+          const pathStr = filePath.toString();
+          if (pathStr === extraFilePath) {
+            const error = new Error('EACCES: permission denied');
+            (error as NodeJS.ErrnoException).code = 'EACCES';
+            throw error;
+          }
+          const stats = {
+            isFile: () => true,
+            isDirectory: () => false,
+            mtime: now,
+          };
+          return stats as unknown as Awaited<
+            ReturnType<typeof nodefsPromises.stat>
+          >;
+        });
+
+        const { logger } = await import('./../../lib/logger');
+
+        await service.createVRChatPhotoPathIndex(true);
+
+        // warnログが呼ばれることを確認
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: expect.stringContaining(
+              'Permission denied accessing file',
+            ),
+          }),
+        );
+
+        // extraFilePathは含まれない
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+        const savedPaths = allSavedData.map((d) => d.photoPath);
+        expect(savedPaths).not.toContain(extraFilePath);
+        // 他のファイルは処理される
+        expect(savedPaths).toContain(file1Path);
+        expect(savedPaths).toContain(file2Path);
+      });
+
+      it('stat の想定外エラーは再スローする', async () => {
+        // ダイジェスト不一致 + lastScannedAt設定でstat呼び出しを発生させる
+        savedScanStates = {
+          [yearMonthFolder2024_01]: {
+            digest: createOldDigest('2024-01'),
+            lastScannedAt: twoHoursAgo.toISOString(),
+          },
+        };
+
+        const unexpectedError = new Error('EMFILE: too many open files');
+        (unexpectedError as NodeJS.ErrnoException).code = 'EMFILE';
+
+        vi.mocked(nodefsPromises.stat).mockRejectedValue(unexpectedError);
+
+        await expect(service.createVRChatPhotoPathIndex(true)).rejects.toThrow(
+          unexpectedError,
+        );
+      });
+    });
+  });
 });
