@@ -783,11 +783,11 @@ const getChangedFoldersWithFiles = async (
 
     const currentDigest = digestResult.value;
 
-    // ブランド型から生のstring値を取得して比較
+    // ブランド型から生のstring値を取得して比較（オブジェクトキーアクセス用）
     const savedState = savedStates[folderPath as string];
 
-    // ダイジェストが一致すればスキップ（ブランド型をstringとして比較）
-    if (savedState && savedState.digest === (currentDigest as string)) {
+    // ダイジェストが一致すればスキップ（FolderDigest同士は直接比較可能）
+    if (savedState && savedState.digest === currentDigest) {
       logger.debug(`Folder unchanged (digest match): ${folderPath}`);
       continue;
     }
@@ -825,8 +825,10 @@ const getChangedFoldersWithFiles = async (
         .with(P.union('EACCES', 'EPERM'), () => {
           skipStats.readdirErrors.permissionDenied++;
         })
-        .otherwise(() => {
-          // 予期しないコードはカウントしない（既にre-throwされているはず）
+        .otherwise((code) => {
+          // 上記のreaddirエラーマッパーで想定外エラーはre-throwされるため、
+          // ここに到達するコードはEACCES/EPERM以外の期待されたエラーコードのみ
+          logger.debug(`readdir error code not tracked in statistics: ${code}`);
         });
       continue;
     }
@@ -993,6 +995,19 @@ async function processPhotoBatch(
       const metadata = metadataResult.value;
       const height = metadata.height ?? 720;
       const width = metadata.width ?? 1280;
+
+      // メタデータが不完全な場合は警告ログを出力（デバッグ用）
+      if (!metadata.height || !metadata.width) {
+        logger.warn({
+          message: `Missing dimension metadata for photo, using defaults`,
+          details: {
+            photoPath,
+            hasHeight: !!metadata.height,
+            hasWidth: !!metadata.width,
+            defaultsUsed: { height, width },
+          },
+        });
+      }
 
       return {
         photoPath,
