@@ -15,6 +15,7 @@ import { Button } from '../../../components/ui/button';
 import { Label } from '../../../components/ui/label';
 import {
   SPACING,
+  STATUS_BADGE,
   SURFACE_COLOR,
   TEXT_COLOR,
   TYPOGRAPHY,
@@ -267,7 +268,7 @@ const DataImport = memo(() => {
                 {selectedPaths.map((pathItem) => (
                   <div
                     key={pathItem}
-                    className="text-xs text-primary bg-primary/10 dark:bg-primary/20 p-2 rounded"
+                    className={`${TYPOGRAPHY.body.small} ${STATUS_BADGE.primary} p-2 rounded`}
                   >
                     {getFilenameFromPath(pathItem)}
                     <div className={`${TEXT_COLOR.muted} truncate`}>
@@ -360,8 +361,8 @@ const DataImport = memo(() => {
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                         backup.status === 'completed'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200'
-                          : 'bg-muted text-muted-foreground'
+                          ? STATUS_BADGE.success
+                          : STATUS_BADGE.muted
                       }`}
                     >
                       {backup.status === 'completed'

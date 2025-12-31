@@ -61,36 +61,36 @@ describe('DataExport', () => {
     render(<DataExport />, { wrapper: createWrapper() });
 
     const allTimeButton = screen.getByRole('button', { name: '全期間' });
-    const monthButton = screen.getByRole('button', { name: '過去1ヶ月' });
+    const recent3MonthsButton = screen.getByRole('button', {
+      name: '過去3ヶ月',
+    });
+    const customButton = screen.getByRole('button', { name: 'カスタム期間' });
 
     // ボタンが存在することを確認
     expect(allTimeButton).toBeDefined();
-    expect(monthButton).toBeDefined();
+    expect(recent3MonthsButton).toBeDefined();
+    expect(customButton).toBeDefined();
   });
 
-  it('全期間選択時は日付入力が無効化される', () => {
+  it('全期間選択時は日付入力が表示されない', () => {
     render(<DataExport />, { wrapper: createWrapper() });
+
+    // 全期間選択時は日付入力が表示されない
+    expect(screen.queryByLabelText(/開始日/)).toBeNull();
+    expect(screen.queryByLabelText(/終了日/)).toBeNull();
+  });
+
+  it('カスタム期間を選択すると日付入力が表示される', async () => {
+    render(<DataExport />, { wrapper: createWrapper() });
+
+    const customButton = screen.getByRole('button', { name: 'カスタム期間' });
+    fireEvent.click(customButton);
 
     const startDateInput = screen.getByLabelText(/開始日/);
     const endDateInput = screen.getByLabelText(/終了日/);
 
-    expect((startDateInput as HTMLInputElement).disabled).toBe(true);
-    expect((endDateInput as HTMLInputElement).disabled).toBe(true);
-  });
-
-  it('期間プリセットボタンをクリックすると日付入力が有効になる', async () => {
-    render(<DataExport />, { wrapper: createWrapper() });
-
-    const monthButton = screen.getByRole('button', { name: '過去1ヶ月' });
-    fireEvent.click(monthButton);
-
-    const startDateInput = screen.getByLabelText(/開始日/);
-    const endDateInput = screen.getByLabelText(/終了日/);
-
-    expect((startDateInput as HTMLInputElement).disabled).toBe(false);
-    expect((endDateInput as HTMLInputElement).disabled).toBe(false);
-    expect((startDateInput as HTMLInputElement).value).toBeTruthy(); // 日付が設定される
-    expect((endDateInput as HTMLInputElement).value).toBeTruthy(); // 日付が設定される
+    expect(startDateInput).toBeDefined();
+    expect(endDateInput).toBeDefined();
   });
 
   it('全期間選択時はエクスポートボタンが有効', () => {
@@ -102,16 +102,14 @@ describe('DataExport', () => {
     expect((exportButton as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('期間指定時に日付が未入力の場合はエクスポートボタンが無効', async () => {
+  it('カスタム期間指定時に日付が未入力の場合はエクスポートボタンが無効', async () => {
     render(<DataExport />, { wrapper: createWrapper() });
 
-    // 過去1ヶ月を選択して日付をクリア
-    const monthButton = screen.getByRole('button', { name: '過去1ヶ月' });
-    fireEvent.click(monthButton);
+    // カスタム期間を選択
+    const customButton = screen.getByRole('button', { name: 'カスタム期間' });
+    fireEvent.click(customButton);
 
-    const startDateInput = screen.getByLabelText(/開始日/);
-    fireEvent.change(startDateInput, { target: { value: '' } });
-
+    // 日付が未入力のまま
     const exportButton = screen.getByRole('button', {
       name: 'エクスポート開始',
     });
@@ -146,7 +144,7 @@ describe('DataExport', () => {
     });
   });
 
-  it('期間指定エクスポート時にローカルタイムとして処理される', async () => {
+  it('カスタム期間エクスポート時にローカルタイムとして処理される', async () => {
     render(<DataExport />, { wrapper: createWrapper() });
 
     // useEffectの完了を待つ - outputPathが設定されるまで待機
@@ -160,9 +158,9 @@ describe('DataExport', () => {
       { timeout: 3000 },
     );
 
-    // 期間を選択
-    const monthButton = screen.getByRole('button', { name: '過去1ヶ月' });
-    fireEvent.click(monthButton);
+    // カスタム期間を選択
+    const customButton = screen.getByRole('button', { name: 'カスタム期間' });
+    fireEvent.click(customButton);
 
     // 特定の日付を設定
     const startDateInput = screen.getByLabelText(/開始日/);
@@ -187,7 +185,7 @@ describe('DataExport', () => {
     });
   });
 
-  it('期間指定時に開始日が終了日以降の場合はエラーメッセージが表示される', async () => {
+  it('カスタム期間指定時に開始日が終了日以降の場合はエラーメッセージが表示される', async () => {
     render(<DataExport />, { wrapper: createWrapper() });
 
     // useEffectの完了を待つ - outputPathが設定されるまで待機
@@ -201,9 +199,9 @@ describe('DataExport', () => {
       { timeout: 3000 },
     );
 
-    // 期間を選択
-    const monthButton = screen.getByRole('button', { name: '過去1ヶ月' });
-    fireEvent.click(monthButton);
+    // カスタム期間を選択
+    const customButton = screen.getByRole('button', { name: 'カスタム期間' });
+    fireEvent.click(customButton);
 
     // 無効な日付範囲を設定
     const startDateInput = screen.getByLabelText(/開始日/);
@@ -228,23 +226,57 @@ describe('DataExport', () => {
     expect(mockMutate).not.toHaveBeenCalled();
   });
 
-  it('全期間ボタンを再クリックで日付入力が無効化される', async () => {
+  it('全期間ボタンを選択すると日付入力が非表示になる', async () => {
     render(<DataExport />, { wrapper: createWrapper() });
 
-    // まず期間を選択
-    const monthButton = screen.getByRole('button', { name: '過去1ヶ月' });
-    fireEvent.click(monthButton);
+    // まずカスタム期間を選択
+    const customButton = screen.getByRole('button', { name: 'カスタム期間' });
+    fireEvent.click(customButton);
 
-    // 日付入力が有効になることを確認
-    const startDateInput = screen.getByLabelText(/開始日/);
-    expect((startDateInput as HTMLInputElement).disabled).toBe(false);
+    // 日付入力が表示されることを確認
+    expect(screen.getByLabelText(/開始日/)).toBeDefined();
 
     // 全期間ボタンをクリック
     const allTimeButton = screen.getByRole('button', { name: '全期間' });
     fireEvent.click(allTimeButton);
 
-    // 日付入力が再び無効化されることを確認
-    expect((startDateInput as HTMLInputElement).disabled).toBe(true);
-    expect((startDateInput as HTMLInputElement).value).toBe(''); // 値もクリアされる
+    // 日付入力が非表示になることを確認
+    expect(screen.queryByLabelText(/開始日/)).toBeNull();
+  });
+
+  it('過去3ヶ月エクスポート時に日付範囲付きで呼び出される', async () => {
+    render(<DataExport />, { wrapper: createWrapper() });
+
+    // useEffect完了を待つ - outputPathが設定されるまで待機
+    await waitFor(
+      () => {
+        const outputPathInput = screen.getByLabelText(/出力先ディレクトリ/);
+        expect((outputPathInput as HTMLInputElement).value).toBe(
+          '/home/user/Downloads',
+        );
+      },
+      { timeout: 3000 },
+    );
+
+    // 過去3ヶ月を選択
+    const recent3MonthsButton = screen.getByRole('button', {
+      name: '過去3ヶ月',
+    });
+    fireEvent.click(recent3MonthsButton);
+
+    const exportButton = screen.getByRole('button', {
+      name: 'エクスポート開始',
+    });
+    fireEvent.click(exportButton);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          startDate: expect.any(Date),
+          endDate: expect.any(Date),
+          outputPath: '/home/user/Downloads',
+        }),
+      );
+    });
   });
 });

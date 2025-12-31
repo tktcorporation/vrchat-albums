@@ -1,6 +1,13 @@
-import { Calendar, Download, FolderOpen } from 'lucide-react';
+import {
+  Calendar,
+  CalendarRange,
+  Download,
+  FolderOpen,
+  Infinity as InfinityIcon,
+} from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 
+import { cn } from '@/components/lib/utils';
 import { trpcClient, trpcReact } from '@/trpc';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -8,6 +15,8 @@ import { Label } from '../../../components/ui/label';
 import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
 import { SettingsInfoBox, SettingsSection } from './common';
+
+type PeriodPreset = 'all' | 'recent3months' | 'custom';
 
 /**
  * ログデータのエクスポート機能を提供するコンポーネント
@@ -18,7 +27,7 @@ const DataExport = memo(() => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [outputPath, setOutputPath] = useState('');
-  const [useFullPeriod, setUseFullPeriod] = useState(true);
+  const [selectedPreset, setSelectedPreset] = useState<PeriodPreset>('all');
 
   // コンポーネント初期化時にデフォルトパスを設定
   useEffect(() => {
@@ -65,8 +74,8 @@ const DataExport = memo(() => {
     });
 
   const handleExport = () => {
-    // 全期間指定の場合は日付チェックをスキップ
-    if (!useFullPeriod) {
+    // カスタム期間の場合は日付チェック
+    if (selectedPreset === 'custom') {
       if (!startDate || !endDate) {
         toast({
           title: '入力エラー',
@@ -97,6 +106,17 @@ const DataExport = memo(() => {
         endDate: end,
         outputPath: outputPath || undefined,
       });
+    } else if (selectedPreset === 'recent3months') {
+      // 過去3ヶ月の場合
+      const end = new Date();
+      const start = new Date();
+      start.setMonth(start.getMonth() - 3);
+
+      exportLogStore({
+        startDate: start,
+        endDate: end,
+        outputPath: outputPath || undefined,
+      });
     } else {
       // 全期間指定の場合は日付パラメータなしでエクスポート
       exportLogStore({
@@ -105,21 +125,20 @@ const DataExport = memo(() => {
     }
   };
 
-  const setDateRange = (months: number) => {
-    const end = new Date();
-    const start = new Date();
-    start.setMonth(start.getMonth() - months);
-
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(end.toISOString().split('T')[0]);
-    setUseFullPeriod(false);
+  const handlePresetSelect = (preset: PeriodPreset) => {
+    setSelectedPreset(preset);
+    // カスタム期間以外の場合は日付をクリア
+    if (preset !== 'custom') {
+      setStartDate('');
+      setEndDate('');
+    }
   };
 
-  const setAllTimeRange = () => {
-    setUseFullPeriod(true);
-    setStartDate('');
-    setEndDate('');
-  };
+  const periodPresets = [
+    { value: 'all' as const, label: '全期間', icon: InfinityIcon },
+    { value: 'recent3months' as const, label: '過去3ヶ月', icon: Calendar },
+    { value: 'custom' as const, label: 'カスタム期間', icon: CalendarRange },
+  ];
 
   return (
     <SettingsSection
@@ -136,104 +155,87 @@ const DataExport = memo(() => {
             エクスポート期間
           </Label>
 
-          {/* プリセットボタン */}
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              type="button"
-              variant={useFullPeriod ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setAllTimeRange()}
-              className="text-xs"
-            >
-              全期間
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setDateRange(1)}
-              className="text-xs"
-            >
-              過去1ヶ月
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setDateRange(3)}
-              className="text-xs"
-            >
-              過去3ヶ月
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setDateRange(6)}
-              className="text-xs"
-            >
-              過去6ヶ月
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setDateRange(12)}
-              className="text-xs"
-            >
-              過去1年
-            </Button>
+          {/* プリセット選択 - ThemeSelectorパターン */}
+          <div className="grid grid-cols-3 gap-3">
+            {periodPresets.map(({ value, label, icon: Icon }) => (
+              <button
+                type="button"
+                key={value}
+                onClick={() => handlePresetSelect(value)}
+                className={cn(
+                  'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors',
+                  selectedPreset === value
+                    ? 'border-primary bg-primary/10 dark:bg-primary/20'
+                    : 'border-border hover:border-primary/50',
+                )}
+              >
+                <Icon
+                  className={cn(
+                    'h-5 w-5',
+                    selectedPreset === value
+                      ? 'text-primary'
+                      : TEXT_COLOR.muted,
+                  )}
+                />
+                <span
+                  className={cn(
+                    TYPOGRAPHY.body.emphasis,
+                    selectedPreset === value
+                      ? 'text-primary'
+                      : TEXT_COLOR.secondary,
+                  )}
+                >
+                  {label}
+                </span>
+              </button>
+            ))}
           </div>
 
-          {/* 日付入力 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label
-                htmlFor="startDate"
-                className={`${TYPOGRAPHY.body.small} ${
-                  useFullPeriod ? TEXT_COLOR.muted : TEXT_COLOR.secondary
-                }`}
-              >
-                開始日{useFullPeriod && ' (全期間選択時は無効)'}
-              </Label>
-              <div className="relative">
-                <Calendar
-                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
-                />
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  disabled={useFullPeriod}
-                  className="pl-10"
-                />
+          {/* カスタム期間入力 - カスタム選択時のみ表示 */}
+          {selectedPreset === 'custom' && (
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div>
+                <Label
+                  htmlFor="startDate"
+                  className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
+                >
+                  開始日
+                </Label>
+                <div className="relative">
+                  <Calendar
+                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
+                  />
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label
+                  htmlFor="endDate"
+                  className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
+                >
+                  終了日
+                </Label>
+                <div className="relative">
+                  <Calendar
+                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
+                  />
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
             </div>
-            <div>
-              <Label
-                htmlFor="endDate"
-                className={`${TYPOGRAPHY.body.small} ${
-                  useFullPeriod ? TEXT_COLOR.muted : TEXT_COLOR.secondary
-                }`}
-              >
-                終了日{useFullPeriod && ' (全期間選択時は無効)'}
-              </Label>
-              <div className="relative">
-                <Calendar
-                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
-                />
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  disabled={useFullPeriod}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* 出力パス設定 */}
@@ -277,7 +279,8 @@ const DataExport = memo(() => {
           <Button
             onClick={handleExport}
             disabled={
-              isExporting || (!useFullPeriod && (!startDate || !endDate))
+              isExporting ||
+              (selectedPreset === 'custom' && (!startDate || !endDate))
             }
             className="w-full"
           >
