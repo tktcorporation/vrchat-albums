@@ -18,7 +18,7 @@ export const PlatformBadge = memo(({ platform }: PlatformBadgeProps) => {
         ? 'Quest'
         : platform;
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-sm font-medium bg-muted text-muted-foreground">
       <Laptop className={`${ICON_SIZE.xs.class} mr-1`} />
       {platformName}
     </span>

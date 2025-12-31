@@ -35,11 +35,13 @@ const textVariants = cva('', {
       /** アクセントカラー */
       accent: 'text-primary',
       /** 成功 */
-      success: 'text-green-800 dark:text-green-200',
+      success: 'text-success',
       /** 警告 */
-      warning: 'text-yellow-800 dark:text-yellow-200',
+      warning: 'text-warning',
       /** エラー */
       error: 'text-destructive',
+      /** 情報 */
+      info: 'text-info',
     },
   },
   defaultVariants: {

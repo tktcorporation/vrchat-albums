@@ -80,12 +80,12 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleCancel}>
-      <DialogContent className="max-w-[500px] bg-white dark:bg-gray-900">
+      <DialogContent className="max-w-[500px] bg-popover">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <DialogTitle className="text-xl font-semibold text-foreground">
             {t('migration.title')}
           </DialogTitle>
-          <DialogDescription className="text-gray-600 dark:text-gray-400">
+          <DialogDescription className="text-muted-foreground">
             {t('migration.description')}
           </DialogDescription>
         </DialogHeader>
@@ -94,33 +94,33 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
           {/* 移行の流れ */}
           <div className="flex items-center justify-center gap-4 py-4">
             <div className="flex flex-col items-center gap-2">
-              <div className="w-16 h-16 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                <FolderOpen className="h-8 w-8 text-gray-600 dark:text-gray-400" />
+              <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center">
+                <FolderOpen className="h-8 w-8 text-muted-foreground" />
               </div>
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 {t('migration.labels.oldApp')}
               </span>
             </div>
             <ArrowRight className="h-6 w-6 text-primary" />
             <div className="flex flex-col items-center gap-2">
-              <div className="w-16 h-16 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center">
                 <FolderOpen className="h-8 w-8 text-primary" />
               </div>
-              <span className="text-xs text-gray-600 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 {t('migration.labels.newApp')}
               </span>
             </div>
           </div>
 
           {/* 移行内容 */}
-          <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 space-y-3">
+          <div className="bg-muted/50 rounded-lg p-4 space-y-3">
             <div className="flex items-start gap-3">
               <Database className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <p className="text-sm font-medium text-foreground">
                   {t('migration.labels.dataToMigrate')}
                 </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {t('migration.labels.dataDescription')}
                 </p>
               </div>
@@ -128,14 +128,14 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
           </div>
 
           {/* 注意事項 */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg p-4">
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
             <div className="flex gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <AlertCircle className="h-5 w-5 text-warning flex-shrink-0" />
               <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                <p className="text-sm font-medium text-warning">
                   {t('migration.labels.notes')}
                 </p>
-                <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1 ml-2">
+                <ul className="text-xs text-warning/80 space-y-1 ml-2">
                   <li>• {t('migration.labels.note1')}</li>
                   <li>• {t('migration.labels.note2')}</li>
                 </ul>

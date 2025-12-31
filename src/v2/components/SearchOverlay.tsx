@@ -235,12 +235,12 @@ const SearchOverlay = memo(
       >
         <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none">
           <div
-            className="max-w-2xl mx-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl rounded-2xl border border-gray-200/20 dark:border-gray-700/30 shadow-2xl pointer-events-auto"
+            className="max-w-2xl mx-auto bg-popover/95 backdrop-blur-2xl rounded-2xl border border-border/20 shadow-2xl pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
             {/* 検索入力部分 */}
-            <div className="flex items-center p-4 border-b border-gray-200/30 dark:border-gray-700/30">
+            <div className="flex items-center p-4 border-b border-border/30">
               <Search
                 className={`${ICON_SIZE.md.class} text-muted-foreground/40 mr-3 flex-shrink-0`}
               />
@@ -261,7 +261,7 @@ const SearchOverlay = memo(
                     setQuery('');
                     onSearch('');
                   }}
-                  className="ml-3 p-1.5 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-lg transition-colors duration-150"
+                  className="ml-3 p-1.5 hover:bg-muted/50 rounded-lg transition-colors duration-150"
                   aria-label="検索をクリア"
                 >
                   <X
@@ -296,7 +296,7 @@ const SearchOverlay = memo(
                       className={`flex items-center px-3 py-2.5 rounded-xl cursor-pointer transition-colors duration-150 ${
                         index === highlightedIndex
                           ? 'bg-primary/10 dark:bg-primary/20'
-                          : 'hover:bg-gray-100/50 dark:hover:bg-gray-800/50'
+                          : 'hover:bg-muted/50'
                       }`}
                       onClick={() => handleSelect(suggestion)}
                       onKeyDown={(e) => {
@@ -319,16 +319,16 @@ const SearchOverlay = memo(
                           className={`${ICON_SIZE.sm.class} mr-3 text-muted-foreground`}
                         />
                       )}
-                      <span className="flex-1 font-medium text-gray-900 dark:text-gray-100">
+                      <span className="flex-1 font-medium text-foreground">
                         {suggestion.label}
                       </span>
                       {suggestion.type === 'world' && (
-                        <span className="text-xs text-muted-foreground/60 bg-gray-100/50 dark:bg-gray-800/50 px-2 py-1 rounded-md">
+                        <span className="text-xs text-muted-foreground/60 bg-muted/50 px-2 py-1 rounded-md">
                           ワールド
                         </span>
                       )}
                       {suggestion.type === 'player' && (
-                        <span className="text-xs text-muted-foreground/60 bg-gray-100/50 dark:bg-gray-800/50 px-2 py-1 rounded-md">
+                        <span className="text-xs text-muted-foreground/60 bg-muted/50 px-2 py-1 rounded-md">
                           プレイヤー
                         </span>
                       )}
@@ -340,7 +340,7 @@ const SearchOverlay = memo(
 
             {/* フッター（オプション） */}
             {query.trim() && (
-              <div className="border-t border-gray-200/30 dark:border-gray-700/30 p-3">
+              <div className="border-t border-border/30 p-3">
                 <button
                   type="button"
                   onClick={handleSearch}

@@ -22,15 +22,15 @@ const ErrorFallback: React.FC<{
   };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-white dark:bg-gray-900">
+    <div className="flex items-center justify-center h-screen bg-background">
       <div className="text-center p-4 max-w-md mx-auto">
-        <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">
+        <h2 className="text-xl font-semibold text-destructive">
           予期せぬエラーが発生しました
         </h2>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
+        <p className="mt-2 text-muted-foreground">
           {error.message || 'アプリケーションで問題が発生しました'}
         </p>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-sm text-muted-foreground/80">
           再読み込みを試してください
         </p>
         <button

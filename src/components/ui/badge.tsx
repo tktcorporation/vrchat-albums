@@ -18,19 +18,16 @@ const badgeVariants = cva(
         secondary:
           'bg-secondary text-secondary-foreground border border-secondary/50',
         /** 成功 - 完了、有効などのポジティブな状態 */
-        success:
-          'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200 border border-green-200 dark:border-green-800',
+        success: 'bg-success/10 text-success border border-success/20',
         /** 警告 - 注意が必要な状態 */
-        warning:
-          'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-800',
+        warning: 'bg-warning/10 text-warning border border-warning/20',
         /** エラー - 問題がある状態 */
         error:
           'bg-destructive/10 text-destructive border border-destructive/20',
         /** 情報 - 補足情報 */
-        info: 'bg-primary/10 text-primary border border-primary/20',
+        info: 'bg-info/10 text-info border border-info/20',
         /** Glass - Glass morphism効果 */
-        glass:
-          'backdrop-blur-sm bg-white/30 dark:bg-black/30 border border-white/20 dark:border-gray-700/30',
+        glass: 'backdrop-blur-sm bg-glass border border-glass-border',
         /** アウトライン - ボーダーのみ */
         outline: 'border border-border bg-transparent text-foreground',
       },

@@ -225,7 +225,7 @@ export const LocationGroupHeader = ({
       className="w-full glass-panel rounded-t-lg overflow-hidden group/card"
     >
       <div className="relative h-24 overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200/80 dark:from-gray-800 dark:to-gray-900/80">
           {details?.thumbnailImageUrl && isVisible && (
             <>
               <div
@@ -237,10 +237,10 @@ export const LocationGroupHeader = ({
                   filter: 'blur(26px) saturate(120%) brightness(0.9)',
                 }}
               />
-              <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/50 backdrop-blur-[1px] group-hover/card:backdrop-blur-[2px] transition-all duration-500" />
+              <div className="absolute inset-0 bg-white/70 dark:bg-black/50 backdrop-blur-[1px] group-hover/card:backdrop-blur-[2px] transition-all duration-500" />
               <div className="absolute inset-0">
-                <div className="absolute inset-0 bg-gradient-to-r from-white/60 to-white/40 dark:from-gray-900/30 dark:to-gray-900/10 mix-blend-overlay" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.6),rgba(255,255,255,0.3)_70%)] dark:bg-[radial-gradient(circle_at_50%_120%,rgba(17,24,39,0.4),rgba(17,24,39,0.2)_70%)]" />
+                <div className="absolute inset-0 bg-gradient-to-r from-white/60 to-white/40 dark:from-black/30 dark:to-black/10 mix-blend-overlay" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.6),rgba(255,255,255,0.3)_70%)] dark:bg-[radial-gradient(circle_at_50%_120%,rgba(0,0,0,0.4),rgba(0,0,0,0.2)_70%)]" />
               </div>
             </>
           )}
@@ -253,7 +253,7 @@ export const LocationGroupHeader = ({
             <div className="flex-shrink-0">
               {details?.thumbnailImageUrl ? (
                 <div
-                  className="h-20 rounded-lg overflow-hidden border border-white/20 dark:border-gray-700/30 shadow-md"
+                  className="h-20 rounded-lg overflow-hidden border border-border/20 shadow-md"
                   style={{ aspectRatio: '4/3' }}
                 >
                   <img

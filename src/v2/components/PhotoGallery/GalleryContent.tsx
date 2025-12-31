@@ -44,12 +44,12 @@ interface GalleryContentProps
 
 const SkeletonGroup = () => (
   <div className="space-y-2 animate-pulse">
-    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-2/3" />
+    <div className="h-8 bg-muted rounded-lg w-2/3" />
     <div className="grid grid-cols-4 gap-4">
       {Array.from({ length: 8 }).map((_, _i) => (
         <div
           key={`skeleton-photo-${crypto.randomUUID()}`}
-          className="aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg"
+          className="aspect-square bg-muted rounded-lg"
         />
       ))}
     </div>
@@ -404,9 +404,9 @@ const GalleryContent = memo(
             })}
           </div>
           {isLoading && (
-            <div className="fixed bottom-4 right-6 flex items-center space-x-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
-              <LoaderCircle className="w-4 h-4 animate-spin text-gray-500" />
-              <div className="text-sm text-gray-500">読み込み中...</div>
+            <div className="fixed bottom-4 right-6 flex items-center space-x-2 bg-background/80 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
+              <LoaderCircle className="w-4 h-4 animate-spin text-muted-foreground" />
+              <div className="text-sm text-muted-foreground">読み込み中...</div>
             </div>
           )}
         </div>

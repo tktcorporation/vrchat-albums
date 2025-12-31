@@ -106,7 +106,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <div
-      className="flex h-11 items-center justify-between px-2 select-none border-b dark:border-gray-700"
+      className="flex h-11 items-center justify-between px-2 select-none border-b border-border"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       onDoubleClick={handleMaximize}
     >
@@ -188,7 +188,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => quitAndInstall.mutate()}
-            className="h-7 w-7 p-0 hover:bg-green-500/15 text-green-500/70 hover:text-green-500 transition-colors duration-150"
+            className="h-7 w-7 p-0 hover:bg-success/15 text-success/70 hover:text-success transition-colors duration-150"
             title="アップデートをインストール"
           >
             <Download className={ICON_SIZE.sm.class} />
@@ -214,7 +214,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleClose}
-          className="h-7 w-7 p-0 hover:bg-red-500/80 text-muted-foreground/60 hover:text-white transition-colors duration-150"
+          className="h-7 w-7 p-0 hover:bg-destructive/80 text-muted-foreground/60 hover:text-white transition-colors duration-150"
         >
           <X className={ICON_SIZE.sm.class} />
         </Button>

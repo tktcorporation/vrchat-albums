@@ -102,7 +102,7 @@ export function GroupWithSkeleton({
                           width: photo.displayWidth,
                           flexShrink: 0,
                         }}
-                        className="bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                        className="bg-muted rounded animate-pulse"
                       />
                     );
                   })}

@@ -542,7 +542,7 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
               >
                 {/* 年ラベル（年の最初の月のみ表示） */}
                 {monthSummary.isFirstOfYear && (
-                  <span className="text-xs font-medium text-foreground/70 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                  <span className="text-xs font-medium text-foreground/70 bg-muted px-1.5 py-0.5 rounded">
                     {monthSummary.year}
                   </span>
                 )}
@@ -591,12 +591,12 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
           <div
             className={cn(
               'absolute right-6 z-30 pointer-events-none',
-              'bg-gray-100/95 dark:bg-gray-800/95 backdrop-blur-sm',
+              'bg-muted/95 backdrop-blur-sm',
               'rounded-md',
               'px-2 py-1',
               'text-[11px] font-medium text-foreground',
               'whitespace-nowrap',
-              'shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]',
+              'shadow-lg',
               'transition-opacity duration-100',
             )}
             style={{
