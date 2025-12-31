@@ -100,8 +100,8 @@ const getThumbnailCacheDir = (): string => {
       return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
     } catch (error) {
       // アプリ未初期化時はフォールバック
-      // 本番環境で頻発する場合は調査が必要
-      logger.debug({
+      // 本番環境で可視化するためinfoレベルでログ出力
+      logger.info({
         message: 'app.getPath("temp") failed, using os.tmpdir() fallback',
         stack: error instanceof Error ? error : new Error(String(error)),
       });
@@ -931,7 +931,12 @@ async function processPhotoBatch(
             })
             .otherwise(() => {
               // sharpの内部エラー、破損ファイル等 → Sentry送信のため再スロー
-              throw error;
+              // デバッグのためファイルパス情報を付加
+              const contextualError = new Error(
+                `Sharp processing failed for: ${photoPath}`,
+                { cause: error },
+              );
+              throw contextualError;
             });
         },
       );

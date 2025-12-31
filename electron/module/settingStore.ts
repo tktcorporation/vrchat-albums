@@ -309,10 +309,16 @@ const setSettingStore = (name: StoreName) => {
         .with({ success: true }, (r) => r.data)
         .with({ success: false }, (r) => {
           // バリデーションエラー時はログ出力して空オブジェクトを返す
+          // データ破損は予期しないエラーのため logger.error を使用（Sentry送信対象）
           if (value !== null && value !== undefined) {
-            logger.warn({
-              message: 'Invalid photoFolderScanStates data, resetting to empty',
+            logger.error({
+              message:
+                'Invalid photoFolderScanStates data, resetting to empty. This may indicate a bug or data corruption.',
               stack: new Error(r.error.message),
+              details: {
+                valueType: typeof value,
+                isArray: Array.isArray(value),
+              },
             });
             // 破損データをクリアして次回から正常に動作させる
             set('photoFolderScanStates', {});
