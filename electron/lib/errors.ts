@@ -39,6 +39,9 @@ export const ERROR_CODES = {
   // 一般的なエラー
   INITIALIZATION_FAILED: 'INITIALIZATION_FAILED',
   UNKNOWN: 'UNKNOWN',
+
+  // エクスポート関連
+  EXPORT_ERROR: 'EXPORT_ERROR',
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

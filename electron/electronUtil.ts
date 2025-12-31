@@ -15,7 +15,7 @@ import {
   Tray,
 } from 'electron';
 import isDev from 'electron-is-dev';
-import { err, ok, type Result } from 'neverthrow';
+import { err, fromThrowable, Result, ResultAsync } from 'neverthrow';
 
 import { logger } from './lib/logger';
 // Local
@@ -176,50 +176,55 @@ function createWindow(): BrowserWindow {
       });
     }
 
-    try {
-      const currentBounds = mainWindow.getBounds();
-      const currentDisplay = screen.getDisplayNearestPoint({
-        x: currentBounds.x,
-        y: currentBounds.y,
-      });
+    const adjustBounds = fromThrowable(
+      () => {
+        const currentBounds = mainWindow.getBounds();
+        const currentDisplay = screen.getDisplayNearestPoint({
+          x: currentBounds.x,
+          y: currentBounds.y,
+        });
 
-      // ウィンドウが表示可能な領域に収まるように調整
-      const adjustedBounds = {
-        width: Math.min(currentBounds.width, currentDisplay.workAreaSize.width),
-        height: Math.min(
-          currentBounds.height,
-          currentDisplay.workAreaSize.height,
-        ),
-        x: Math.max(
-          currentDisplay.workArea.x, // Ensure x is within workArea.x
-          Math.min(
-            currentBounds.x,
-            currentDisplay.workArea.x +
-              currentDisplay.workAreaSize.width -
-              currentBounds.width,
+        // ウィンドウが表示可能な領域に収まるように調整
+        const adjustedBounds = {
+          width: Math.min(
+            currentBounds.width,
+            currentDisplay.workAreaSize.width,
           ),
-        ),
-        y: Math.max(
-          currentDisplay.workArea.y, // Ensure y is within workArea.y
-          Math.min(
-            currentBounds.y,
-            currentDisplay.workArea.y +
-              currentDisplay.workAreaSize.height -
-              currentBounds.height,
+          height: Math.min(
+            currentBounds.height,
+            currentDisplay.workAreaSize.height,
           ),
-        ),
-      };
+          x: Math.max(
+            currentDisplay.workArea.x, // Ensure x is within workArea.x
+            Math.min(
+              currentBounds.x,
+              currentDisplay.workArea.x +
+                currentDisplay.workAreaSize.width -
+                currentBounds.width,
+            ),
+          ),
+          y: Math.max(
+            currentDisplay.workArea.y, // Ensure y is within workArea.y
+            Math.min(
+              currentBounds.y,
+              currentDisplay.workArea.y +
+                currentDisplay.workAreaSize.height -
+                currentBounds.height,
+            ),
+          ),
+        };
 
-      mainWindow.setBounds(adjustedBounds);
-      return ok(undefined);
-    } catch (error) {
-      return err({
+        mainWindow.setBounds(adjustedBounds);
+      },
+      (error): DisplayMetricsError => ({
         code: 'BOUNDS_ADJUSTMENT_FAILED' as const,
         message: `Failed to adjust window bounds: ${
           error instanceof Error ? error.message : String(error)
         }`,
-      });
-    }
+      }),
+    );
+
+    return adjustBounds();
   };
 
   const displayMetricsChangedWrapper = () => {
@@ -295,24 +300,33 @@ const setTray = () => {
       : `${app.getAppPath()}`;
     const iconPath = join(appPath, 'assets', 'icon.png');
 
-    // アイコンパスの存在確認とログ出力
-    try {
-      await fs.access(iconPath);
-      logger.info({ message: `トレイアイコンが見つかりました: ${iconPath}` });
-    } catch {
+    // アイコンパスの存在確認
+    const accessResult = await ResultAsync.fromPromise(
+      fs.access(iconPath),
+      () => ({ type: 'ICON_NOT_FOUND' as const, path: iconPath }),
+    );
+    if (accessResult.isErr()) {
       logger.error({ message: `トレイアイコンが見つかりません: ${iconPath}` });
       return;
     }
+    logger.info({ message: `トレイアイコンが見つかりました: ${iconPath}` });
 
-    try {
-      tray = new Tray(iconPath);
-      logger.info({ message: 'トレイの作成に成功しました' });
-    } catch (error) {
+    // トレイ作成（同期処理だがエラーの可能性あり）
+    const trayResult = Result.fromThrowable(
+      () => new Tray(iconPath),
+      (error) => ({
+        type: 'TRAY_CREATE_FAILED' as const,
+        message: JSON.stringify(error),
+      }),
+    )();
+    if (trayResult.isErr()) {
       logger.error({
-        message: `トレイの作成に失敗しました: ${JSON.stringify(error)}`,
+        message: `トレイの作成に失敗しました: ${trayResult.error.message}`,
       });
       return;
     }
+    tray = trayResult.value;
+    logger.info({ message: 'トレイの作成に成功しました' });
 
     const contextMenu = Menu.buildFromTemplate([
       {

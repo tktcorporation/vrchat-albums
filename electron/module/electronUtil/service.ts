@@ -13,6 +13,14 @@ import { FileIOError } from './error';
 type OpenPathError = { type: 'OPEN_PATH_FAILED'; message: string };
 
 /**
+ * downloadImageAsPng のエラー型
+ */
+export type DownloadImageError =
+  | { type: 'CANCELED' }
+  | { type: 'SAVE_FILE_FAILED'; message: string }
+  | { type: 'PNG_PROCESSING_FAILED'; message: string };
+
+/**
  * shell.openPath() をラップした共通ヘルパー関数。
  * エクスプローラー、フォトビューア、関連付けアプリでの開く操作で共通利用される。
  * shell.openPath() はエラー時に文字列を返し、成功時は空文字列を返す。
@@ -156,7 +164,7 @@ const copyImageByBase64 = (options: {
 const downloadImageAsPng = async (options: {
   pngBase64: string;
   filenameWithoutExt: string;
-}): Promise<neverthrow.Result<void, Error | 'canceled'>> => {
+}): Promise<neverthrow.Result<void, DownloadImageError>> => {
   let tempDir = '';
   try {
     const base64Data = options.pngBase64.replace(
@@ -177,7 +185,7 @@ const downloadImageAsPng = async (options: {
       await fs
         .rm(tempDir, { recursive: true, force: true })
         .catch(console.error);
-      return neverthrow.err('canceled');
+      return neverthrow.err({ type: 'CANCELED' });
     }
 
     const saveResult = await saveFileToPath(
@@ -185,25 +193,17 @@ const downloadImageAsPng = async (options: {
       dialogResult.filePath,
     );
     if (saveResult.isErr()) {
-      return neverthrow.err(
-        new Error('Failed to save file', { cause: saveResult.error }),
-      );
+      return neverthrow.err({
+        type: 'SAVE_FILE_FAILED',
+        message: saveResult.error.message,
+      });
     }
 
     return neverthrow.ok(undefined);
   } catch (error) {
     console.error('Error in downloadImageAsPng:', error);
-    if (error instanceof Error && error.message === 'canceled') {
-      return neverthrow.err('canceled');
-    }
-    return neverthrow.err(
-      match(error)
-        .with(
-          P.instanceOf(Error),
-          (err) => new Error('Failed to handle png file', { cause: err }),
-        )
-        .otherwise(() => new Error('Failed to handle png file')),
-    );
+    // 予期しないエラーは Sentry に送信するために throw
+    throw error;
   } finally {
     if (tempDir) {
       await fs

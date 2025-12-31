@@ -3,11 +3,50 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as exiftool from 'exiftool-vendored';
 import type { Result } from 'neverthrow';
-import { err, ok } from 'neverthrow';
+import { err, ok, ResultAsync } from 'neverthrow';
 import { v4 as uuidv4 } from 'uuid';
 import type { ExifOperationError } from './errorHelpers';
 import { logger } from './logger';
 import * as fs from './wrappedFs';
+
+/**
+ * 非クリティカルなクリーンアップ処理
+ * エラーが発生してもログのみ記録し、処理を継続
+ */
+const safeRmdir = async (dirPath: string): Promise<void> => {
+  await nodeFs.promises.rmdir(dirPath).catch((error) => {
+    logger.debug(`Failed to remove temp directory: ${dirPath}`, error);
+  });
+};
+
+const safeUnlink = async (filePath: string): Promise<void> => {
+  await nodeFs.promises.unlink(filePath).catch((error) => {
+    logger.debug(`Failed to remove temp file: ${filePath}`, error);
+  });
+};
+
+/**
+ * 一時ディレクトリとファイルパスを作成するヘルパー
+ * ResultAsync を使用して非同期エラーを型安全に処理
+ */
+const createTempFile = (): ResultAsync<
+  { tempDir: string; tempFilePath: string },
+  ExifOperationError
+> =>
+  ResultAsync.fromPromise(
+    nodeFs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-')),
+    (error): ExifOperationError => {
+      logger.debug('Failed to create temporary directory', error);
+      return {
+        code: 'EXIF_TEMP_DIR_CREATE_FAILED',
+        message: 'Failed to create temporary directory',
+        cause: error,
+      };
+    },
+  ).map((tempDir) => ({
+    tempDir,
+    tempFilePath: path.join(tempDir, `${uuidv4()}.png`),
+  }));
 
 let exiftoolInstance: exiftool.ExifTool | null = null;
 
@@ -52,31 +91,17 @@ export const setExifToBuffer = async (
   },
 ): Promise<Result<Buffer, ExifOperationError>> => {
   // Windows短縮パス問題を回避するため、一時ディレクトリを作成
-  let tempDir: string;
-  let tempFilePath: string;
-
-  try {
-    tempDir = await nodeFs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-'));
-    tempFilePath = path.join(tempDir, `${uuidv4()}.png`);
-  } catch (error) {
-    logger.debug('Failed to create temporary directory', error);
-    return err({
-      code: 'EXIF_TEMP_DIR_CREATE_FAILED',
-      message: 'Failed to create temporary directory',
-      cause: error,
-    });
+  const tempFileResult = await createTempFile();
+  if (tempFileResult.isErr()) {
+    return err(tempFileResult.error);
   }
+  const { tempDir, tempFilePath } = tempFileResult.value;
 
   // 一時ファイルに書き込み
   const write_r = fs.writeFileSyncSafe(tempFilePath, new Uint8Array(buffer));
   if (write_r.isErr()) {
-    // クリーンアップ
-    try {
-      await nodeFs.promises.rmdir(tempDir);
-    } catch (error) {
-      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
-      // Non-critical error, continue
-    }
+    // 非クリティカルなクリーンアップ
+    await safeRmdir(tempDir);
     logger.debug('Failed to write buffer to temporary file', write_r.error);
     return err({
       code: 'EXIF_TEMP_FILE_WRITE_FAILED',
@@ -116,19 +141,9 @@ export const setExifToBuffer = async (
       filePath: tempFilePath,
     });
   } finally {
-    // クリーンアップ
-    try {
-      await nodeFs.promises.unlink(tempFilePath);
-    } catch (error) {
-      logger.debug(`Failed to remove temp file: ${tempFilePath}`, error);
-      // Non-critical error, continue
-    }
-    try {
-      await nodeFs.promises.rmdir(tempDir);
-    } catch (error) {
-      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
-      // Non-critical error, continue
-    }
+    // 非クリティカルなクリーンアップ
+    await safeUnlink(tempFilePath);
+    await safeRmdir(tempDir);
   }
 };
 
@@ -142,31 +157,17 @@ export const readExifByBuffer = async (
   buffer: Buffer,
 ): Promise<Result<exiftool.Tags, ExifOperationError>> => {
   // Windows短縮パス問題を回避するため、一時ディレクトリを作成
-  let tempDir: string;
-  let tempFilePath: string;
-
-  try {
-    tempDir = await nodeFs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-'));
-    tempFilePath = path.join(tempDir, `${uuidv4()}.png`);
-  } catch (error) {
-    logger.debug('Failed to create temporary directory', error);
-    return err({
-      code: 'EXIF_TEMP_DIR_CREATE_FAILED',
-      message: 'Failed to create temporary directory',
-      cause: error,
-    });
+  const tempFileResult = await createTempFile();
+  if (tempFileResult.isErr()) {
+    return err(tempFileResult.error);
   }
+  const { tempDir, tempFilePath } = tempFileResult.value;
 
   // 一時ファイルに書き込み
   const write_r = fs.writeFileSyncSafe(tempFilePath, new Uint8Array(buffer));
   if (write_r.isErr()) {
-    // クリーンアップ
-    try {
-      await nodeFs.promises.rmdir(tempDir);
-    } catch (error) {
-      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
-      // Non-critical error, continue
-    }
+    // 非クリティカルなクリーンアップ
+    await safeRmdir(tempDir);
     logger.debug('Failed to write buffer to temporary file', write_r.error);
     return err({
       code: 'EXIF_TEMP_FILE_WRITE_FAILED',
@@ -188,19 +189,9 @@ export const readExifByBuffer = async (
       filePath: tempFilePath,
     });
   } finally {
-    // クリーンアップ
-    try {
-      await nodeFs.promises.unlink(tempFilePath);
-    } catch (error) {
-      logger.debug(`Failed to remove temp file: ${tempFilePath}`, error);
-      // Non-critical error, continue
-    }
-    try {
-      await nodeFs.promises.rmdir(tempDir);
-    } catch (error) {
-      logger.debug(`Failed to remove temp directory: ${tempDir}`, error);
-      // Non-critical error, continue
-    }
+    // 非クリティカルなクリーンアップ
+    await safeUnlink(tempFilePath);
+    await safeRmdir(tempDir);
   }
 };
 

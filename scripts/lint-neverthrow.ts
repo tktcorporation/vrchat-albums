@@ -24,6 +24,29 @@ export interface NeverthrowLintConfig {
     enabled: boolean;
     path: string;
   };
+  tryCatchWarning?: {
+    enabled: boolean;
+    path: string;
+    exceptions?: {
+      allowWithFinally?: boolean;
+      allowInsideFromPromise?: boolean;
+      allowWithRethrow?: boolean;
+      allowElectronEnvDetection?: boolean;
+      allowLogAndFallback?: boolean;
+      allowReturnErrOnCatch?: boolean;
+      /** Allow try-catch that uses match() to classify errors and return fallback values */
+      allowMatchWithFallback?: boolean;
+    };
+  };
+  /**
+   * Warn about using err(new Error(...)) pattern
+   * This makes error handling on the caller side difficult because
+   * generic Error type cannot be pattern matched
+   */
+  genericErrorWarning?: {
+    enabled: boolean;
+    path: string;
+  };
 }
 
 export interface NeverthrowIssue {
@@ -127,6 +150,52 @@ export class NeverthrowLinter {
         // Check for must-use-result if enabled
         if (this.config.mustUseResult?.enabled) {
           this.checkMustUseResult(sourceFile);
+        }
+        // Check for try-catch warning if enabled
+        if (this.config.tryCatchWarning?.enabled) {
+          const tryCatchPath = this.config.tryCatchWarning.path;
+          let shouldCheck = false;
+
+          if (path.isAbsolute(tryCatchPath)) {
+            // If path is absolute, compare directly
+            shouldCheck =
+              sourceFile.fileName === NormalizedPathSchema.parse(tryCatchPath);
+          } else {
+            // Otherwise, use minimatch with relative path
+            const relativePath = path.relative(
+              process.cwd(),
+              sourceFile.fileName,
+            );
+            shouldCheck = minimatch(relativePath, tryCatchPath);
+          }
+
+          if (shouldCheck) {
+            this.checkTryCatchForWarning(
+              sourceFile,
+              this.config.tryCatchWarning,
+            );
+          }
+        }
+        // Check for generic Error in err() if enabled
+        if (this.config.genericErrorWarning?.enabled) {
+          const genericErrorPath = this.config.genericErrorWarning.path;
+          let shouldCheck = false;
+
+          if (path.isAbsolute(genericErrorPath)) {
+            shouldCheck =
+              sourceFile.fileName ===
+              NormalizedPathSchema.parse(genericErrorPath);
+          } else {
+            const relativePath = path.relative(
+              process.cwd(),
+              sourceFile.fileName,
+            );
+            shouldCheck = minimatch(relativePath, genericErrorPath);
+          }
+
+          if (shouldCheck) {
+            this.checkGenericErrorWarning(sourceFile);
+          }
         }
       }
     }
@@ -873,6 +942,437 @@ export class NeverthrowLinter {
 
     ts.forEachChild(node.body, visit);
   }
+
+  /**
+   * Check if a try statement is inside a neverthrow utility function like
+   * ResultAsync.fromPromise() or fromThrowable()
+   */
+  private isInsideNeverthrowCallForTry(node: ts.TryStatement): boolean {
+    let parent = node.parent;
+
+    while (parent) {
+      if (ts.isCallExpression(parent)) {
+        const expr = parent.expression;
+
+        // Check for ResultAsync.fromPromise, ResultAsync.fromSafePromise, fromThrowable
+        if (ts.isPropertyAccessExpression(expr)) {
+          const methodName = expr.name.text;
+          const neverthrowMethods = [
+            'fromPromise',
+            'fromSafePromise',
+            'fromThrowable',
+          ];
+
+          if (neverthrowMethods.includes(methodName)) {
+            return true;
+          }
+        }
+      }
+
+      parent = parent.parent;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a try-catch has proper error classification with rethrow
+   * This means: has if/match for error classification AND has throw for unexpected errors
+   */
+  private hasProperRethrow(tryNode: ts.TryStatement): boolean {
+    if (!tryNode.catchClause) return false;
+    const catchBlock = tryNode.catchClause.block;
+
+    let hasThrow = false;
+    let hasMatch = false;
+    let hasIfStatement = false;
+
+    const visit = (n: ts.Node) => {
+      if (ts.isThrowStatement(n)) {
+        hasThrow = true;
+      }
+      if (ts.isIfStatement(n)) {
+        hasIfStatement = true;
+      }
+      if (ts.isCallExpression(n)) {
+        const expr = n.expression;
+        if (ts.isPropertyAccessExpression(expr) && expr.name.text === 'match') {
+          hasMatch = true;
+        }
+        // Also check for standalone match() calls from ts-pattern
+        if (ts.isIdentifier(expr) && expr.text === 'match') {
+          hasMatch = true;
+        }
+      }
+      ts.forEachChild(n, visit);
+    };
+
+    ts.forEachChild(catchBlock, visit);
+
+    // Proper rethrow requires: (match or if) AND throw
+    return hasThrow && (hasMatch || hasIfStatement);
+  }
+
+  /**
+   * Check if a try block contains Electron environment detection pattern
+   * Patterns:
+   *   - try { require('electron') } catch { fallback }
+   *   - try { electronApp.getPath(...) } catch { fallback }
+   *   - try { app.getPath(...) } catch { fallback }
+   */
+  private isElectronEnvDetection(tryNode: ts.TryStatement): boolean {
+    let hasElectronPattern = false;
+
+    const visit = (n: ts.Node) => {
+      if (ts.isCallExpression(n)) {
+        const expr = n.expression;
+        // Check for require('electron')
+        if (ts.isIdentifier(expr) && expr.text === 'require') {
+          const args = n.arguments;
+          if (
+            args.length > 0 &&
+            ts.isStringLiteral(args[0]) &&
+            args[0].text === 'electron'
+          ) {
+            hasElectronPattern = true;
+          }
+        }
+        // Check for electronApp.getPath() or app.getPath()
+        if (
+          ts.isPropertyAccessExpression(expr) &&
+          expr.name.text === 'getPath'
+        ) {
+          const objectExpr = expr.expression;
+          if (ts.isIdentifier(objectExpr)) {
+            const objectName = objectExpr.text;
+            if (objectName === 'app' || objectName === 'electronApp') {
+              hasElectronPattern = true;
+            }
+          }
+        }
+      }
+      if (!hasElectronPattern) {
+        ts.forEachChild(n, visit);
+      }
+    };
+
+    ts.forEachChild(tryNode.tryBlock, visit);
+    return hasElectronPattern;
+  }
+
+  /**
+   * Check if a catch block contains a log call (log/console/logger methods)
+   * Pattern: catch { log.warn(...); return fallback; }
+   */
+  private hasLogAndFallback(tryNode: ts.TryStatement): boolean {
+    if (!tryNode.catchClause) return false;
+    const catchBlock = tryNode.catchClause.block;
+
+    let hasLogCall = false;
+
+    const visit = (n: ts.Node) => {
+      if (ts.isCallExpression(n)) {
+        const expr = n.expression;
+        // Check for log.xxx(), console.xxx(), logger.xxx()
+        if (ts.isPropertyAccessExpression(expr)) {
+          const objectExpr = expr.expression;
+          if (ts.isIdentifier(objectExpr)) {
+            const objectName = objectExpr.text;
+            const methodName = expr.name.text;
+            const logObjects = ['log', 'console', 'logger'];
+            const logMethods = [
+              'warn',
+              'error',
+              'debug',
+              'info',
+              'log',
+              'trace',
+            ];
+            if (
+              logObjects.includes(objectName) &&
+              logMethods.includes(methodName)
+            ) {
+              hasLogCall = true;
+            }
+          }
+        }
+      }
+      if (!hasLogCall) {
+        ts.forEachChild(n, visit);
+      }
+    };
+
+    ts.forEachChild(catchBlock, visit);
+    return hasLogCall;
+  }
+
+  /**
+   * Check if a catch block returns err() directly (equivalent to fromPromise pattern)
+   * Pattern: catch { return err(...); }
+   */
+  private hasReturnErrOnCatch(tryNode: ts.TryStatement): boolean {
+    if (!tryNode.catchClause) return false;
+    const catchBlock = tryNode.catchClause.block;
+
+    let hasReturnErr = false;
+
+    const visit = (n: ts.Node) => {
+      if (ts.isReturnStatement(n) && n.expression) {
+        // Check for return err(...) or return neverthrow.err(...)
+        if (ts.isCallExpression(n.expression)) {
+          const callExpr = n.expression;
+          const callee = callExpr.expression;
+
+          // Check for err(...)
+          if (ts.isIdentifier(callee) && callee.text === 'err') {
+            hasReturnErr = true;
+          }
+
+          // Check for neverthrow.err(...)
+          if (
+            ts.isPropertyAccessExpression(callee) &&
+            ts.isIdentifier(callee.expression) &&
+            callee.expression.text === 'neverthrow' &&
+            callee.name.text === 'err'
+          ) {
+            hasReturnErr = true;
+          }
+        }
+      }
+      if (!hasReturnErr) {
+        ts.forEachChild(n, visit);
+      }
+    };
+
+    ts.forEachChild(catchBlock, visit);
+    return hasReturnErr;
+  }
+
+  /**
+   * Check if a catch block uses match() to classify errors and return fallback values
+   * Pattern: catch { return match(error).with(...).otherwise(...) }
+   */
+  private hasMatchWithFallback(tryNode: ts.TryStatement): boolean {
+    if (!tryNode.catchClause) return false;
+    const catchBlock = tryNode.catchClause.block;
+
+    let hasMatchCall = false;
+
+    const visit = (n: ts.Node) => {
+      // Look for match() calls
+      if (ts.isCallExpression(n)) {
+        const expr = n.expression;
+        // Check for match(...) or pattern.match(...)
+        if (ts.isIdentifier(expr) && expr.text === 'match') {
+          hasMatchCall = true;
+        }
+        if (ts.isPropertyAccessExpression(expr) && expr.name.text === 'match') {
+          hasMatchCall = true;
+        }
+      }
+      if (!hasMatchCall) {
+        ts.forEachChild(n, visit);
+      }
+    };
+
+    ts.forEachChild(catchBlock, visit);
+    return hasMatchCall;
+  }
+
+  /**
+   * Check for try-catch usage and suggest fromThrowable/ResultAsync.fromPromise
+   */
+  private checkTryCatchForWarning(
+    sourceFile: ts.SourceFile,
+    config: NonNullable<NeverthrowLintConfig['tryCatchWarning']>,
+  ) {
+    const visit = (node: ts.Node) => {
+      if (ts.isTryStatement(node)) {
+        // Exception 1: Inside fromPromise/fromThrowable callback
+        if (
+          config.exceptions?.allowInsideFromPromise &&
+          this.isInsideNeverthrowCallForTry(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 2: Has finally block for resource cleanup
+        if (config.exceptions?.allowWithFinally && node.finallyBlock) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 3: Has proper error classification with rethrow
+        if (
+          config.exceptions?.allowWithRethrow &&
+          this.hasProperRethrow(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 4: Electron environment detection pattern
+        if (
+          config.exceptions?.allowElectronEnvDetection &&
+          this.isElectronEnvDetection(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 5: Log and fallback pattern (catch { log.xxx(); return fallback; })
+        if (
+          config.exceptions?.allowLogAndFallback &&
+          this.hasLogAndFallback(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 6: Return err() on catch pattern (equivalent to fromPromise)
+        if (
+          config.exceptions?.allowReturnErrOnCatch &&
+          this.hasReturnErrOnCatch(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Exception 7: Match with fallback pattern (classify errors and return fallback)
+        if (
+          config.exceptions?.allowMatchWithFallback &&
+          this.hasMatchWithFallback(node)
+        ) {
+          ts.forEachChild(node, visit);
+          return;
+        }
+
+        // Issue warning
+        const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+          node.getStart(),
+        );
+
+        // Avoid duplicate warnings
+        const isDuplicate = this.issues.some(
+          (issue) =>
+            issue.file === sourceFile.fileName &&
+            issue.line === line + 1 &&
+            issue.column === character + 1 &&
+            issue.ruleName === 'prefer-fromThrowable',
+        );
+
+        if (!isDuplicate) {
+          this.issues.push({
+            file: sourceFile.fileName,
+            line: line + 1,
+            column: character + 1,
+            message:
+              'Consider using fromThrowable() or ResultAsync.fromPromise() instead of try-catch.\n' +
+              '  - Sync: fromThrowable(() => op(), (e) => mapError(e))\n' +
+              '  - Async: ResultAsync.fromPromise(asyncOp(), (e) => mapError(e))',
+            severity: 'warning',
+            ruleName: 'prefer-fromThrowable',
+          });
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    ts.forEachChild(sourceFile, visit);
+  }
+
+  /**
+   * Check for err(new Error(...)) pattern which makes caller-side handling difficult.
+   * Specific error types should be used instead of generic Error.
+   */
+  private checkGenericErrorWarning(sourceFile: ts.SourceFile) {
+    const visit = (node: ts.Node) => {
+      // Look for err(...) calls
+      if (ts.isCallExpression(node)) {
+        const expr = node.expression;
+
+        // Check if it's a call to 'err'
+        const isErrCall =
+          (ts.isIdentifier(expr) && expr.text === 'err') ||
+          (ts.isPropertyAccessExpression(expr) &&
+            expr.name.text === 'err' &&
+            ts.isIdentifier(expr.expression) &&
+            expr.expression.text === 'neverthrow');
+
+        if (isErrCall && node.arguments.length > 0) {
+          const arg = node.arguments[0];
+
+          // Check for 'new Error(...)'
+          if (ts.isNewExpression(arg)) {
+            const newExpr = arg.expression;
+            if (ts.isIdentifier(newExpr) && newExpr.text === 'Error') {
+              this.reportGenericErrorWarning(sourceFile, node);
+            }
+          }
+
+          // Check for { type: 'UNEXPECTED', ... } pattern
+          if (ts.isObjectLiteralExpression(arg)) {
+            for (const prop of arg.properties) {
+              if (
+                ts.isPropertyAssignment(prop) &&
+                ts.isIdentifier(prop.name) &&
+                prop.name.text === 'type' &&
+                ts.isStringLiteral(prop.initializer) &&
+                prop.initializer.text === 'UNEXPECTED'
+              ) {
+                this.reportUnexpectedTypeWarning(sourceFile, node);
+              }
+            }
+          }
+        }
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    ts.forEachChild(sourceFile, visit);
+  }
+
+  private reportGenericErrorWarning(sourceFile: ts.SourceFile, node: ts.Node) {
+    const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+      node.getStart(),
+    );
+
+    this.issues.push({
+      file: sourceFile.fileName,
+      line: line + 1,
+      column: character + 1,
+      message:
+        'Avoid using err(new Error(...)). Use a specific error type instead.\n' +
+        "  - Define specific error types: { type: 'FILE_NOT_FOUND'; path: string }\n" +
+        '  - For unexpected errors, throw instead of returning err()',
+      severity: 'warning',
+      ruleName: 'no-generic-error',
+    });
+  }
+
+  private reportUnexpectedTypeWarning(
+    sourceFile: ts.SourceFile,
+    node: ts.Node,
+  ) {
+    const { line, character } = sourceFile.getLineAndCharacterOfPosition(
+      node.getStart(),
+    );
+
+    this.issues.push({
+      file: sourceFile.fileName,
+      line: line + 1,
+      column: character + 1,
+      message:
+        "Avoid returning err({ type: 'UNEXPECTED', ... }). Throw unexpected errors instead.\n" +
+        '  - Unexpected errors should be thrown to be caught by Sentry\n' +
+        '  - Only return err() for expected, handleable errors',
+      severity: 'warning',
+      ruleName: 'no-unexpected-error-type',
+    });
+  }
 }
 
 export async function loadConfig(
@@ -940,6 +1440,14 @@ export async function lintNeverthrow(config: NeverthrowLintConfig): Promise<{
   // Also include mustUseResult path if enabled
   if (config.mustUseResult?.enabled && config.mustUseResult.path) {
     patterns.add(config.mustUseResult.path);
+  }
+  // Also include tryCatchWarning path if enabled
+  if (config.tryCatchWarning?.enabled && config.tryCatchWarning.path) {
+    patterns.add(config.tryCatchWarning.path);
+  }
+  // Also include genericErrorWarning path if enabled
+  if (config.genericErrorWarning?.enabled && config.genericErrorWarning.path) {
+    patterns.add(config.genericErrorWarning.path);
   }
 
   // Convert Set to Array for processing

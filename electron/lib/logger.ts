@@ -1,5 +1,6 @@
 import { captureException } from '@sentry/electron/main';
 import * as log from 'electron-log';
+import { Result } from 'neverthrow';
 import path from 'pathe';
 import { stackWithCauses } from 'pony-cause';
 import { match, P } from 'ts-pattern';
@@ -101,17 +102,19 @@ const error = ({ message, stack, details }: ErrorLogParams): void => {
   );
 
   // 規約同意済みかどうかを確認
-  const termsAccepted = match(undefined)
-    .with(undefined, () => {
-      try {
-        const settingStore = getSettingStore();
-        return settingStore.getTermsAccepted();
-      } catch (error) {
-        log.warn('Failed to get terms accepted:', error);
-        return false;
-      }
-    })
-    .exhaustive();
+  const termsAccepted = Result.fromThrowable(
+    () => {
+      const settingStore = getSettingStore();
+      return settingStore.getTermsAccepted();
+    },
+    (error) => error,
+  )().match(
+    (accepted) => accepted,
+    (error) => {
+      log.warn('Failed to get terms accepted:', error);
+      return false;
+    },
+  );
 
   // UserFacingErrorの場合はSentryに送信しない（意図的に処理されたエラーのため）
   const shouldSendToSentry = !(normalizedError instanceof UserFacingError);
@@ -120,20 +123,25 @@ const error = ({ message, stack, details }: ErrorLogParams): void => {
   match({ termsAccepted, shouldSendToSentry })
     .with({ termsAccepted: true, shouldSendToSentry: true }, () => {
       log.debug('Attempting to send error to Sentry...');
-      try {
-        captureException(errorInfo, {
-          extra: {
-            ...(stack ? { stack: stackWithCauses(stack) } : {}),
-            ...(details ? { details } : {}),
-          },
-          tags: {
-            source: 'electron-main',
-          },
-        });
-        log.debug('Error sent to Sentry successfully');
-      } catch (sentryError) {
-        log.debug('Failed to send error to Sentry:', sentryError);
-      }
+      const sendResult = Result.fromThrowable(
+        () => {
+          captureException(errorInfo, {
+            extra: {
+              ...(stack ? { stack: stackWithCauses(stack) } : {}),
+              ...(details ? { details } : {}),
+            },
+            tags: {
+              source: 'electron-main',
+            },
+          });
+        },
+        (error) => error,
+      )();
+      sendResult.match(
+        () => log.debug('Error sent to Sentry successfully'),
+        (sentryError) =>
+          log.debug('Failed to send error to Sentry:', sentryError),
+      );
     })
     .with({ termsAccepted: true, shouldSendToSentry: false }, () => {
       log.debug('UserFacingError detected, skipping Sentry (handled error)');

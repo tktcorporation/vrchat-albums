@@ -169,21 +169,17 @@ describe('DBQueue', () => {
     expect(result._unsafeUnwrap()).toBe('transaction result');
   });
 
-  it('トランザクションでエラーが発生した場合にエラーをResult型で返すこと', async () => {
+  it('トランザクションで予期しないエラーが発生した場合にエラーをthrowすること', async () => {
     const queue = getDBQueue();
     const error = new Error('Transaction error');
     const transactionTask = vi.fn().mockRejectedValue(error);
 
-    const result = await queue.transaction(transactionTask);
+    // 予期しないエラーはthrowされる（Sentryに送信される）
+    await expect(queue.transaction(transactionTask)).rejects.toThrow(
+      'Transaction error',
+    );
 
     expect(transactionTask).toHaveBeenCalledTimes(1);
-    expect(result.isErr()).toBe(true);
-    // トランザクションエラーはDBQueueError型に変換されることを確認
-    const unwrappedError = result._unsafeUnwrapErr();
-    expect(unwrappedError).toEqual({
-      type: 'TRANSACTION_ERROR',
-      message: `トランザクションエラー: ${error.message}`,
-    });
   });
 
   it('クエリを実行できること', async () => {
@@ -227,7 +223,7 @@ describe('DBQueue', () => {
     getRDBClient().__client = originalClient;
   });
 
-  it('queryWithResultでエラーが発生した場合にエラーをResult型で返すこと', async () => {
+  it('queryWithResultで予期しないエラーが発生した場合にエラーをthrowすること', async () => {
     const queue = getDBQueue();
     const error = new Error('Query error');
 
@@ -236,13 +232,14 @@ describe('DBQueue', () => {
     const mockQuery = vi.fn().mockRejectedValue(error);
     getRDBClient().__client.query = mockQuery;
 
-    const result = await queue.queryWithResult('SELECT * FROM test_table');
+    // 予期しないエラーはthrowされる（Sentryに送信される）
+    await expect(
+      queue.queryWithResult('SELECT * FROM test_table'),
+    ).rejects.toThrow('Query error');
 
     expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM test_table', {
       type: 'SELECT',
     });
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().message).toContain('Query error');
 
     // モックをリストア
     getRDBClient().__client = originalClient;

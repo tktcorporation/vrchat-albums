@@ -13,12 +13,19 @@ const getVrcWorldInfoByWorldId = async (
   const result = await vrchatApiService.getVrcWorldInfoByWorldId(worldId);
   if (result.isErr()) {
     return match(result.error)
-      .with('WORLD_NOT_FOUND', () => {
+      .with({ type: 'WORLD_NOT_FOUND' }, () => {
         return null;
       })
-      .otherwise((error) => {
-        throw error;
-      });
+      .with({ type: 'API_REQUEST_FAILED' }, (error) => {
+        // API リクエストエラーはログに残して null を返す
+        logger.warn(`VRChat API request failed: ${error.message}`);
+        return null;
+      })
+      .with({ type: 'PARSE_ERROR' }, (error) => {
+        // パースエラーは予期しないエラーとして throw（Sentry に送信）
+        throw new Error(`VRChat API parse error: ${error.issues}`);
+      })
+      .exhaustive();
   }
   return result.value;
 };

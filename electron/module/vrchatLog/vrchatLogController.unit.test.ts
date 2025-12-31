@@ -15,14 +15,21 @@ vi.mock('../../lib/wrappedApp', () => ({
   getAppUserDataPath: vi.fn(() => testUserDataDir),
 }));
 
-vi.mock('./exportService/exportService', () => ({
-  exportLogStoreFromDB: vi.fn(async ({ outputBasePath }) => ({
-    totalLogLines: 0,
-    exportedFiles: [
-      `${outputBasePath}/vrchat-albums-export_2023-12-01_14-30-45/2023-11/logStore-2023-11.txt`,
-    ],
-  })),
-}));
+vi.mock('./exportService/exportService', () => {
+  const { ok } = require('neverthrow');
+  return {
+    exportLogStoreFromDB: vi.fn(async ({ outputBasePath }) =>
+      ok({
+        totalLogLines: 0,
+        exportedFiles: [
+          `${outputBasePath}/vrchat-albums-export_2023-12-01_14-30-45/2023-11/logStore-2023-11.txt`,
+        ],
+        exportStartTime: new Date(),
+        exportEndTime: new Date(),
+      }),
+    ),
+  };
+});
 
 vi.mock('../logSync/service', () => {
   const { ok } = require('neverthrow');

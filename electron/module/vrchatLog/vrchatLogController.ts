@@ -1,19 +1,33 @@
 import * as neverthrow from 'neverthrow';
-import { match, P } from 'ts-pattern';
+import { ResultAsync } from 'neverthrow';
+import { match } from 'ts-pattern';
 import z from 'zod';
+import { ERROR_CATEGORIES, UserFacingError } from '../../lib/errors';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
 import * as playerJoinLogService from './../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as playerLeaveLogService from './../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import * as vrchatLogFileDirService from './../vrchatLogFileDir/service';
 import * as worldJoinLogService from './../vrchatWorldJoinLog/service';
-import { backupService } from './backupService/backupService';
-import { rollbackService } from './backupService/rollbackService';
+import {
+  backupService,
+  getBackupErrorMessage,
+} from './backupService/backupService';
+import {
+  getRollbackErrorMessage,
+  rollbackService,
+} from './backupService/rollbackService';
 import { FILTER_PATTERNS } from './constants/logPatterns';
 import type { LogRecord } from './converters/dbToLogStore';
 import { VRChatLogFileError } from './error';
-import { exportLogStoreFromDB } from './exportService/exportService';
-import { importService } from './importService/importService';
+import {
+  exportLogStoreFromDB,
+  getExportErrorMessage,
+} from './exportService/exportService';
+import {
+  getImportErrorMessage,
+  importService,
+} from './importService/importService';
 import * as vrchatLogService from './service';
 
 /**
@@ -74,56 +88,69 @@ export const appendLoglinesToFileFromLogFilePathList = async (
 
   logger.info(`Found ${logFilePathList.value.length} log files to process`);
 
-  let totalProcessedLines = 0;
-  let hasProcessedAnyLines = false;
+  // ResultAsync.fromPromise でストリーミング処理のエラーを処理
+  const streamResult = await ResultAsync.fromPromise(
+    (async () => {
+      let totalProcessedLines = 0;
+      let hasProcessedAnyLines = false;
 
-  try {
-    // ストリーミング処理で各バッチを処理
-    for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
-      {
-        logFilePathList: logFilePathList.value,
-        includesList: [...FILTER_PATTERNS],
-        batchSize: 1000, // バッチサイズを指定
-        maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
-      },
-    )) {
-      // ログ行をフィルタリング（processAll=trueの場合はスキップ）
-      const filteredLogLines = processAll
-        ? logLineBatch
-        : vrchatLogService.filterLogLinesByDate(logLineBatch, startDate);
+      // ストリーミング処理で各バッチを処理
+      for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
+        {
+          logFilePathList: logFilePathList.value,
+          includesList: [...FILTER_PATTERNS],
+          batchSize: 1000, // バッチサイズを指定
+          maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
+        },
+      )) {
+        // ログ行をフィルタリング（processAll=trueの場合はスキップ）
+        const filteredLogLines = processAll
+          ? logLineBatch
+          : vrchatLogService.filterLogLinesByDate(logLineBatch, startDate);
 
-      if (filteredLogLines.length > 0) {
-        hasProcessedAnyLines = true;
-        totalProcessedLines += filteredLogLines.length;
+        if (filteredLogLines.length > 0) {
+          hasProcessedAnyLines = true;
+          totalProcessedLines += filteredLogLines.length;
 
-        logger.debug(
-          `Processing batch of ${filteredLogLines.length} log lines`,
-        );
+          logger.debug(
+            `Processing batch of ${filteredLogLines.length} log lines`,
+          );
 
-        // 各バッチを保存
-        const result = await vrchatLogService.appendLoglinesToFile({
-          logLines: filteredLogLines,
-        });
-        if (result.isErr()) {
-          return neverthrow.err(result.error);
+          // 各バッチを保存
+          const result = await vrchatLogService.appendLoglinesToFile({
+            logLines: filteredLogLines,
+          });
+          if (result.isErr()) {
+            // エラーをthrowしてerror handlerで処理
+            throw result.error;
+          }
         }
       }
-    }
-  } catch (error) {
-    // VRChatLogFileError は予期されたエラーなのでそのまま返す
-    if (error instanceof VRChatLogFileError) {
-      return neverthrow.err(error);
-    }
-    // その他のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
-    throw error;
+
+      return { totalProcessedLines, hasProcessedAnyLines };
+    })(),
+    (error): VRChatLogFileError => {
+      // VRChatLogFileError は予期されたエラーなのでそのまま返す
+      if (error instanceof VRChatLogFileError) {
+        return error;
+      }
+      // その他のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
+      throw error;
+    },
+  );
+
+  if (streamResult.isErr()) {
+    return neverthrow.err(streamResult.error);
   }
 
-  if (!hasProcessedAnyLines) {
+  if (!streamResult.value.hasProcessedAnyLines) {
     logger.info('No new log lines to process after filtering');
     return neverthrow.ok(undefined);
   }
 
-  logger.info(`Processing completed: ${totalProcessedLines} log lines`);
+  logger.info(
+    `Processing completed: ${streamResult.value.totalProcessedLines} log lines`,
+  );
 
   return neverthrow.ok(undefined);
 };
@@ -295,81 +322,75 @@ export const vrchatLogRouter = () =>
             : '全期間';
         logger.info(`exportLogStoreData: ${dateRangeMsg}`);
 
-        try {
-          const result = await exportLogStoreFromDB(
-            {
-              startDate: input.startDate,
-              endDate: input.endDate,
-              outputBasePath: input.outputPath,
-            },
-            getDBLogsFromDatabase,
-          );
+        const exportResult = await exportLogStoreFromDB(
+          {
+            startDate: input.startDate,
+            endDate: input.endDate,
+            outputBasePath: input.outputPath,
+          },
+          getDBLogsFromDatabase,
+        );
 
-          logger.info(
-            `Export completed: ${result.exportedFiles.length} files, ${result.totalLogLines} lines`,
-          );
-
-          eventEmitter.emit(
-            'toast',
-            `エクスポート完了: ${result.exportedFiles.length}ファイル、${result.totalLogLines}行`,
-          );
-
-          return result;
-        } catch (error) {
+        if (exportResult.isErr()) {
+          const errorMessage = getExportErrorMessage(exportResult.error);
           logger.error({
-            message: `Export failed: ${String(error)}`,
+            message: `Export failed: ${errorMessage}`,
           });
-          const errorMessage = match(error)
-            .with(P.instanceOf(Error), (err) => err.message)
-            .otherwise((err) => String(err));
           eventEmitter.emit(
             'toast',
             `エクスポートに失敗しました: ${errorMessage}`,
           );
-          throw error;
+          throw new UserFacingError(errorMessage, {
+            code: 'EXPORT_ERROR',
+            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+            message: errorMessage,
+            userMessage: errorMessage,
+          });
         }
+
+        const result = exportResult.value;
+
+        logger.info(
+          `Export completed: ${result.exportedFiles.length} files, ${result.totalLogLines} lines`,
+        );
+
+        eventEmitter.emit(
+          'toast',
+          `エクスポート完了: ${result.exportedFiles.length}ファイル、${result.totalLogLines}行`,
+        );
+
+        return result;
       }),
     createPreImportBackup: procedure.mutation(async () => {
       logger.info('Creating pre-import backup');
 
-      try {
-        const backupResult = await backupService.createPreImportBackup(
-          getDBLogsFromDatabase,
-        );
+      // backupService.createPreImportBackup は Result 型を返すため、try-catch は不要
+      // 予期しないエラーは自動的に throw されて Sentry に送信される
+      const backupResult = await backupService.createPreImportBackup(
+        getDBLogsFromDatabase,
+      );
 
-        if (backupResult.isErr()) {
-          logger.error({
-            message: `Pre-import backup failed: ${backupResult.error.message}`,
-          });
-          eventEmitter.emit(
-            'toast',
-            `バックアップ作成に失敗しました: ${backupResult.error.message}`,
-          );
-          throw backupResult.error;
-        }
-
-        const backup = backupResult.value;
-
-        logger.info(`Pre-import backup created successfully: ${backup.id}`);
-        eventEmitter.emit(
-          'toast',
-          `バックアップ作成完了: ${backup.exportFolderPath}`,
-        );
-
-        return backup;
-      } catch (error) {
+      if (backupResult.isErr()) {
+        const errorMessage = getBackupErrorMessage(backupResult.error);
         logger.error({
-          message: `Pre-import backup failed: ${String(error)}`,
+          message: `Pre-import backup failed: ${errorMessage}`,
         });
-        const errorMessage = match(error)
-          .with(P.instanceOf(Error), (err) => err.message)
-          .otherwise((err) => String(err));
         eventEmitter.emit(
           'toast',
           `バックアップ作成に失敗しました: ${errorMessage}`,
         );
-        throw error;
+        throw new Error(errorMessage);
       }
+
+      const backup = backupResult.value;
+
+      logger.info(`Pre-import backup created successfully: ${backup.id}`);
+      eventEmitter.emit(
+        'toast',
+        `バックアップ作成完了: ${backup.exportFolderPath}`,
+      );
+
+      return backup;
     }),
     importLogStoreFiles: procedure
       .input(
@@ -383,69 +404,53 @@ export const vrchatLogRouter = () =>
           `Starting logStore import for ${input.filePaths.length} files`,
         );
 
-        try {
-          const importResult = await importService.importLogStoreFiles(
-            input.filePaths,
-            getDBLogsFromDatabase,
-          );
+        // importService.importLogStoreFiles は Result 型を返すため、try-catch は不要
+        // 予期しないエラーは自動的に throw されて Sentry に送信される
+        const importResult = await importService.importLogStoreFiles(
+          input.filePaths,
+          getDBLogsFromDatabase,
+        );
 
-          if (importResult.isErr()) {
-            logger.error({
-              message: `LogStore import failed: ${importResult.error.message}`,
-            });
-            eventEmitter.emit(
-              'toast',
-              `インポートに失敗しました: ${importResult.error.message}`,
-            );
-            throw importResult.error;
-          }
-
-          const result = importResult.value;
-
-          logger.info(
-            `LogStore import completed: ${result.importedData.totalLines} lines from ${result.importedData.processedFiles.length} files`,
-          );
-
-          eventEmitter.emit(
-            'toast',
-            `インポート完了: ${result.importedData.totalLines}行、${result.importedData.processedFiles.length}ファイル`,
-          );
-
-          return result;
-        } catch (error) {
+        if (importResult.isErr()) {
+          const errorMessage = getImportErrorMessage(importResult.error);
           logger.error({
-            message: `LogStore import failed: ${String(error)}`,
+            message: `LogStore import failed: ${errorMessage}`,
           });
-          const errorMessage = match(error)
-            .with(P.instanceOf(Error), (err) => err.message)
-            .otherwise((err) => String(err));
           eventEmitter.emit(
             'toast',
             `インポートに失敗しました: ${errorMessage}`,
           );
-          throw error;
+          throw new Error(errorMessage);
         }
+
+        const result = importResult.value;
+
+        logger.info(
+          `LogStore import completed: ${result.importedData.totalLines} lines from ${result.importedData.processedFiles.length} files`,
+        );
+
+        eventEmitter.emit(
+          'toast',
+          `インポート完了: ${result.importedData.totalLines}行、${result.importedData.processedFiles.length}ファイル`,
+        );
+
+        return result;
       }),
     getImportBackupHistory: procedure.query(async () => {
       logger.info('Getting import backup history');
 
-      try {
-        const historyResult = await backupService.getBackupHistory();
+      const historyResult = await backupService.getBackupHistory();
 
-        if (historyResult.isErr()) {
+      return historyResult.match(
+        (history) => history,
+        (error) => {
+          const errorMessage = getBackupErrorMessage(error);
           logger.error({
-            message: `Failed to get backup history: ${historyResult.error.message}`,
+            message: `Failed to get backup history: ${errorMessage}`,
           });
-          throw historyResult.error;
-        }
-
-        return historyResult.value;
-      } catch (error) {
-        logger.error({
-          message: `Failed to get backup history: ${String(error)}`,
-        });
-        throw error;
-      }
+          throw new Error(errorMessage);
+        },
+      );
     }),
     rollbackToBackup: procedure
       .input(
@@ -457,52 +462,42 @@ export const vrchatLogRouter = () =>
         const { input } = opts;
         logger.info(`Starting rollback to backup: ${input.backupId}`);
 
-        try {
-          const backupResult = await backupService.getBackup(input.backupId);
-          if (backupResult.isErr()) {
-            logger.error({
-              message: `Failed to get backup: ${backupResult.error.message}`,
-            });
-            eventEmitter.emit(
-              'toast',
-              `バックアップが見つかりません: ${backupResult.error.message}`,
-            );
-            throw backupResult.error;
-          }
-
-          const backup = backupResult.value;
-
-          const rollbackResult = await rollbackService.rollbackToBackup(backup);
-          if (rollbackResult.isErr()) {
-            logger.error({
-              message: `Rollback failed: ${rollbackResult.error.message}`,
-            });
-            eventEmitter.emit(
-              'toast',
-              `ロールバックに失敗しました: ${rollbackResult.error.message}`,
-            );
-            throw rollbackResult.error;
-          }
-
-          logger.info(`Rollback completed successfully: ${input.backupId}`);
+        // backupService.getBackup, rollbackService.rollbackToBackup は Result 型を返すため、try-catch は不要
+        // 予期しないエラーは自動的に throw されて Sentry に送信される
+        const backupResult = await backupService.getBackup(input.backupId);
+        if (backupResult.isErr()) {
+          const errorMessage = getBackupErrorMessage(backupResult.error);
+          logger.error({
+            message: `Failed to get backup: ${errorMessage}`,
+          });
           eventEmitter.emit(
             'toast',
-            `ロールバック完了: ${backup.exportFolderPath}に復帰しました`,
+            `バックアップの取得に失敗しました: ${errorMessage}`,
           );
+          throw new Error(errorMessage);
+        }
 
-          return { success: true, backup };
-        } catch (error) {
+        const backup = backupResult.value;
+
+        const rollbackResult = await rollbackService.rollbackToBackup(backup);
+        if (rollbackResult.isErr()) {
+          const errorMessage = getRollbackErrorMessage(rollbackResult.error);
           logger.error({
-            message: `Rollback failed: ${String(error)}`,
+            message: `Rollback failed: ${errorMessage}`,
           });
-          const errorMessage = match(error)
-            .with(P.instanceOf(Error), (err) => err.message)
-            .otherwise((err) => String(err));
           eventEmitter.emit(
             'toast',
             `ロールバックに失敗しました: ${errorMessage}`,
           );
-          throw error;
+          throw new Error(errorMessage);
         }
+
+        logger.info(`Rollback completed successfully: ${input.backupId}`);
+        eventEmitter.emit(
+          'toast',
+          `ロールバック完了: ${backup.exportFolderPath}に復帰しました`,
+        );
+
+        return { success: true, backup };
       }),
   });

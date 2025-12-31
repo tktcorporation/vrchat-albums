@@ -3,11 +3,14 @@ import { promises as fs } from 'node:fs';
 import * as neverthrow from 'neverthrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as logSyncModule from '../../logSync/service';
-import type { DBLogProvider } from '../backupService/backupService';
+import type {
+  BackupError,
+  DBLogProvider,
+} from '../backupService/backupService';
 import * as backupServiceModule from '../backupService/backupService';
 import type { LogRecord } from '../converters/dbToLogStore';
 import * as logStorageManagerModule from '../fileHandlers/logStorageManager';
-import { importService } from './importService';
+import { getImportErrorMessage, importService } from './importService';
 
 // モックの設定
 vi.mock('fs', () => ({
@@ -19,12 +22,17 @@ vi.mock('fs', () => ({
   },
 }));
 
-vi.mock('../backupService/backupService', () => ({
-  backupService: {
-    createPreImportBackup: vi.fn(),
-    updateBackupMetadata: vi.fn(),
-  },
-}));
+vi.mock('../backupService/backupService', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../backupService/backupService')>();
+  return {
+    ...actual,
+    backupService: {
+      createPreImportBackup: vi.fn(),
+      updateBackupMetadata: vi.fn(),
+    },
+  };
+});
 
 vi.mock('../fileHandlers/logStorageManager', () => ({
   appendLoglinesToFile: vi.fn(),
@@ -212,7 +220,8 @@ describe('importService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain(
+        expect(result.error.type).toBe('NO_FILES_FOUND');
+        expect(getImportErrorMessage(result.error)).toContain(
           'インポート対象のlogStoreファイルが見つかりませんでした',
         );
       }
@@ -226,9 +235,13 @@ describe('importService', () => {
         isFile: () => true,
         isDirectory: () => false,
       } as Stats);
+      const backupError: BackupError = {
+        type: 'EXPORT_FAILED',
+        message: 'Backup failed',
+      };
       vi.mocked(
         backupServiceModule.backupService.createPreImportBackup,
-      ).mockResolvedValue(neverthrow.err(new Error('Backup failed')));
+      ).mockResolvedValue(neverthrow.err(backupError));
 
       const result = await importService.importLogStoreFiles(
         filePaths,
@@ -237,7 +250,8 @@ describe('importService', () => {
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
-        expect(result.error.message).toContain('Backup failed');
+        expect(result.error.type).toBe('BACKUP_FAILED');
+        expect(getImportErrorMessage(result.error)).toContain('Backup failed');
       }
     });
   });

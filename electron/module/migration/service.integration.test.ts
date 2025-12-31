@@ -31,6 +31,11 @@ vi.mock('../vrchatLog/importService/importService', () => ({
   importService: {
     importLogStoreFiles: vi.fn(),
   },
+  getImportErrorMessage: vi.fn((error: { type: string }) => {
+    // テスト用の簡易実装
+    if (error.type === 'DB_SYNC_FAILED') return error.type;
+    return error.type;
+  }),
 }));
 
 describe('migration service integration', () => {
@@ -208,9 +213,9 @@ describe('migration service integration', () => {
         'log content',
       );
 
-      // Mock import failure
+      // Mock import failure with specific ImportError type
       vi.mocked(importService.importLogStoreFiles).mockResolvedValue(
-        err(new Error('Import failed')),
+        err({ type: 'DB_SYNC_FAILED', message: 'Import failed' }),
       );
 
       const result = await migrationService.performMigration();
@@ -218,7 +223,7 @@ describe('migration service integration', () => {
       expect(result.isOk()).toBe(true);
       const migrationResult = result._unsafeUnwrap();
       expect(migrationResult.errors).toContain(
-        'LogStore import failed: Import failed',
+        'LogStore import failed: DB_SYNC_FAILED',
       );
       expect(migrationResult.details.logStore).toBe(false);
     });
@@ -321,9 +326,9 @@ describe('migration service integration', () => {
       const logStorePath = path.join(mockOldAppPath, 'logStore');
       await nodeFsPromises.mkdir(logStorePath, { recursive: true });
 
-      // Mock import failure
+      // Mock import failure with specific ImportError type
       vi.mocked(importService.importLogStoreFiles).mockResolvedValue(
-        err(new Error('Critical failure')),
+        err({ type: 'DB_SYNC_FAILED', message: 'Critical failure' }),
       );
 
       // Should succeed (Result type with void value)

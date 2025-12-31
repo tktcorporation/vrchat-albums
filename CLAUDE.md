@@ -173,6 +173,12 @@
           with logger.error() before returning (Sentry-notified error pattern).
         </generic-error-types-warning>
       </lint-enforcement>
+
+      <fromThrowable-preference priority="warning" jp="推奨パターン">
+        <principle>try-catch よりも fromThrowable/ResultAsync.fromPromise を優先</principle>
+        <exceptions>finally句、ts-patternでの分類+再スロー、Electron環境検出</exceptions>
+        <reference>docs/lint-neverthrow.md#fromthrowable-vs-try-catch (詳細・コード例)</reference>
+      </fromThrowable-preference>
     </pattern>
 
     <pattern name="ts-pattern Usage" priority="critical" jp="型安全・表現力向上必須">

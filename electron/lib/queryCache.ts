@@ -1,13 +1,5 @@
-import { err, ok, type Result } from 'neverthrow';
+import { ok, type Result } from 'neverthrow';
 import { logger } from './logger';
-
-export type CacheError = {
-  code: 'CACHE_ERROR';
-  message: string;
-  originalError: unknown;
-  cacheKey: string;
-  operation: string;
-};
 
 interface CacheEntry<T> {
   data: T;
@@ -44,46 +36,34 @@ export class QueryCache {
     key: string,
     fetcher: () => Promise<Result<T, E>>,
     options?: { ttl?: number },
-  ): Promise<Result<T, E | CacheError>> {
-    try {
-      // Check if cached and not expired
-      const cached = this.cache.get(key);
-      const ttl = options?.ttl ?? this.ttl;
+  ): Promise<Result<T, E>> {
+    // Check if cached and not expired
+    const cached = this.cache.get(key);
+    const ttl = options?.ttl ?? this.ttl;
 
-      if (cached && Date.now() - cached.timestamp < ttl) {
-        cached.hits++;
-        this.updateAccessOrder(key);
-        logger.debug(`Cache hit for key: ${key} (hits: ${cached.hits})`);
-        return ok(cached.data as T);
-      }
-
-      // Remove expired entry
-      if (cached) {
-        this.cache.delete(key);
-        this.removeFromAccessOrder(key);
-      }
-
-      // Fetch new data
-      const result = await fetcher();
-
-      if (result.isOk()) {
-        this.set(key, result.value);
-      }
-
-      return result;
-    } catch (error) {
-      logger.error({
-        message: `Cache error for key "${key}": ${error}`,
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
-      return err({
-        code: 'CACHE_ERROR',
-        message: `Cache operation failed for key "${key}": ${error}`,
-        originalError: error,
-        cacheKey: key,
-        operation: 'getOrFetch',
-      });
+    if (cached && Date.now() - cached.timestamp < ttl) {
+      cached.hits++;
+      this.updateAccessOrder(key);
+      logger.debug(`Cache hit for key: ${key} (hits: ${cached.hits})`);
+      return ok(cached.data as T);
     }
+
+    // Remove expired entry
+    if (cached) {
+      this.cache.delete(key);
+      this.removeFromAccessOrder(key);
+    }
+
+    // Fetch new data
+    // Note: fetcher() should return Result, not throw.
+    // Any unexpected exceptions will propagate to Sentry.
+    const result = await fetcher();
+
+    if (result.isOk()) {
+      this.set(key, result.value);
+    }
+
+    return result;
   }
 
   set<T>(key: string, data: T): void {
