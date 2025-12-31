@@ -1,7 +1,16 @@
 import * as fs from 'node:fs';
 import { promisify } from 'node:util';
-import { err, ok, type Result, ResultAsync } from 'neverthrow';
+import typeUtils from 'node:util/types';
+import { fromThrowable, type Result, ResultAsync } from 'neverthrow';
 import { match, P } from 'ts-pattern';
+
+/**
+ * Node.js のエラーオブジェクトかどうかを判定するユーティリティ。
+ * ファイル操作ヘルパー群から内部的に利用される。
+ */
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return typeUtils.isNativeError(error);
+}
 
 /**
  * 同期的にファイルを読み込み、存在しない場合はエラー情報を返す。
@@ -14,23 +23,24 @@ export const readFileSyncSafe = (
   Buffer,
   { code: 'ENOENT' | string; message: string; error: Error }
 > => {
-  try {
-    const content = fs.readFileSync(filePath, options);
-    return ok(content);
-  } catch (e) {
-    if (!isNodeError(e)) {
-      throw e;
-    }
-    const error = match(e)
-      .with({ code: 'ENOENT', message: P.string }, (ee) =>
-        err({ code: 'ENOENT' as const, message: ee.message, error: ee }),
-      )
-      .otherwise(() => null);
-    if (error) {
-      return error;
-    }
-    throw e;
-  }
+  const safeRead = fromThrowable(
+    () => fs.readFileSync(filePath, options),
+    (e): { code: 'ENOENT' | string; message: string; error: Error } => {
+      if (!isNodeError(e)) {
+        throw e; // 予期しないエラーをre-throw
+      }
+      return match(e)
+        .with({ code: 'ENOENT', message: P.string }, (ee) => ({
+          code: 'ENOENT' as const,
+          message: ee.message,
+          error: ee,
+        }))
+        .otherwise((ee) => {
+          throw ee; // 分類できないエラーをre-throw
+        });
+    },
+  );
+  return safeRead();
 };
 
 export type FSError = 'ENOENT';
@@ -41,27 +51,25 @@ type ReaddirReturn = PromiseType<ReturnType<typeof readdirPromisified>>;
  * 非同期でディレクトリを読み込み、存在しない場合はエラーを返す。
  * VRChat ログ検索処理などで使用される。
  */
-export const readdirAsync = async (
+export const readdirAsync = (
   ...args: Parameters<typeof readdirPromisified>
-): Promise<
-  Result<ReaddirReturn, { code: 'ENOENT'; error: NodeJS.ErrnoException }>
-> => {
-  try {
-    const data = await readdirPromisified(...args);
-    return ok(data);
-  } catch (e) {
-    if (!isNodeError(e)) {
-      throw e;
-    }
-    const error = match(e)
-      .with({ code: 'ENOENT' }, (ee) => err({ code: ee.code, error: ee }))
-      .otherwise(() => null);
-    if (error) {
-      return error;
-    }
-    throw e;
-  }
-};
+): ResultAsync<
+  ReaddirReturn,
+  { code: 'ENOENT'; error: NodeJS.ErrnoException }
+> =>
+  ResultAsync.fromPromise(
+    readdirPromisified(...args),
+    (e): { code: 'ENOENT'; error: NodeJS.ErrnoException } => {
+      if (!isNodeError(e)) {
+        throw e; // 予期しないエラーをre-throw
+      }
+      return match(e)
+        .with({ code: 'ENOENT' }, (ee) => ({ code: ee.code, error: ee }))
+        .otherwise((ee) => {
+          throw ee; // 分類できないエラーをre-throw
+        });
+    },
+  );
 
 /**
  * ファイル書き込みエラー型
@@ -80,67 +88,55 @@ export const writeFileSyncSafe = (
   path: string,
   data: string | Uint8Array,
 ): Result<void, WriteFileError> => {
-  try {
-    fs.writeFileSync(path, data);
-    return ok(undefined);
-  } catch (e) {
-    if (!isNodeError(e)) {
-      // 予期しないエラーはre-throw（Sentry通知）
-      throw e;
-    }
-    return match(e)
-      .with({ code: 'ENOENT' }, (ee) =>
-        err({ type: 'ENOENT' as const, message: ee.message }),
-      )
-      .with({ code: 'EACCES' }, (ee) =>
-        err({ type: 'EACCES' as const, message: ee.message }),
-      )
-      .with({ code: 'ENOSPC' }, (ee) =>
-        err({ type: 'ENOSPC' as const, message: ee.message }),
-      )
-      .otherwise((ee) =>
-        err({
+  const safeWrite = fromThrowable(
+    () => fs.writeFileSync(path, data),
+    (e): WriteFileError => {
+      if (!isNodeError(e)) {
+        throw e; // 予期しないエラーはre-throw（Sentry通知）
+      }
+      return match(e)
+        .with({ code: 'ENOENT' }, (ee) => ({
+          type: 'ENOENT' as const,
+          message: ee.message,
+        }))
+        .with({ code: 'EACCES' }, (ee) => ({
+          type: 'EACCES' as const,
+          message: ee.message,
+        }))
+        .with({ code: 'ENOSPC' }, (ee) => ({
+          type: 'ENOSPC' as const,
+          message: ee.message,
+        }))
+        .otherwise((ee) => ({
           type: 'IO_ERROR' as const,
           message: ee.message,
           code: ee.code,
-        }),
-      );
-  }
+        }));
+    },
+  );
+  return safeWrite();
 };
-
-import typeUtils from 'node:util/types';
-
-/**
- * Node.js のエラーオブジェクトかどうかを判定するユーティリティ。
- * ファイル操作ヘルパー群から内部的に利用される。
- */
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return typeUtils.isNativeError(error);
-}
 
 /**
  * ディレクトリを作成し、既に存在する場合はエラー情報を返す非同期関数。
  * VRChat 写真保存処理などで使用される。
  */
-export const mkdirSyncSafe = async (
+export const mkdirSyncSafe = (
   dirPath: string,
-): Promise<Result<void, { code: 'EEXIST'; error: NodeJS.ErrnoException }>> => {
-  try {
-    await promisify(fs.mkdir)(dirPath);
-    return ok(undefined);
-  } catch (e) {
-    if (!isNodeError(e)) {
-      throw e;
-    }
-    const error = match(e)
-      .with({ code: 'EEXIST' }, (ee) => err({ code: ee.code, error: ee }))
-      .otherwise(() => null);
-    if (error) {
-      return error;
-    }
-    throw e;
-  }
-};
+): ResultAsync<void, { code: 'EEXIST'; error: NodeJS.ErrnoException }> =>
+  ResultAsync.fromPromise(
+    promisify(fs.mkdir)(dirPath),
+    (e): { code: 'EEXIST'; error: NodeJS.ErrnoException } => {
+      if (!isNodeError(e)) {
+        throw e; // 予期しないエラーをre-throw
+      }
+      return match(e)
+        .with({ code: 'EEXIST' }, (ee) => ({ code: ee.code, error: ee }))
+        .otherwise((ee) => {
+          throw ee; // 分類できないエラーをre-throw
+        });
+    },
+  );
 
 /**
  * fs.existsSync の薄いラッパー
@@ -159,25 +155,25 @@ type AppendFileReturn = PromiseType<ReturnType<typeof appendFilePromisified>>;
  * ファイル末尾にデータを追記する非同期関数。
  * ログファイル更新処理で利用される。
  */
-export const appendFileAsync = async (
+export const appendFileAsync = (
   ...args: Parameters<typeof appendFilePromisified>
-): Promise<
-  Result<AppendFileReturn, { code: 'ENOENT'; error: NodeJS.ErrnoException }>
-> => {
-  try {
-    const data = await appendFilePromisified(...args);
-    return ok(data);
-  } catch (e) {
-    if (!isNodeError(e)) {
-      throw e;
-    }
-    const error = match(e).otherwise(() => null);
-    if (error) {
-      return error;
-    }
-    throw e;
-  }
-};
+): ResultAsync<
+  AppendFileReturn,
+  { code: 'ENOENT'; error: NodeJS.ErrnoException }
+> =>
+  ResultAsync.fromPromise(
+    appendFilePromisified(...args),
+    (e): { code: 'ENOENT'; error: NodeJS.ErrnoException } => {
+      if (!isNodeError(e)) {
+        throw e; // 予期しないエラーをre-throw
+      }
+      return match(e)
+        .with({ code: 'ENOENT' }, (ee) => ({ code: ee.code, error: ee }))
+        .otherwise((ee) => {
+          throw ee; // 分類できないエラーをre-throw
+        });
+    },
+  );
 
 /**
  * ファイル削除エラー型
