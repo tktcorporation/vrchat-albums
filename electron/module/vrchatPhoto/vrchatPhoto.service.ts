@@ -100,8 +100,8 @@ const getThumbnailCacheDir = (): string => {
       return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
     } catch (error) {
       // アプリ未初期化時はフォールバック
-      // 本番環境で可視化するためinfoレベルでログ出力
-      logger.info({
+      // 本番環境での調査が必要なためwarnレベルでログ出力
+      logger.warn({
         message: 'app.getPath("temp") failed, using os.tmpdir() fallback',
         stack: error instanceof Error ? error : new Error(String(error)),
       });
@@ -653,7 +653,21 @@ const computeFolderDigest = (
           throw error;
         });
     },
-  ).map((result) => FolderDigestSchema.parse(result.hash));
+  ).andThen((result) =>
+    neverthrow.fromThrowable(
+      () => FolderDigestSchema.parse(result.hash),
+      (error): FolderDigestError => {
+        // folder-hashライブラリが予期しないハッシュ形式を返した場合
+        // これはライブラリのバグまたは破壊的変更を示すため、Sentryに送信
+        logger.error({
+          message: 'Invalid hash format from folder-hash library',
+          stack: error instanceof Error ? error : new Error(String(error)),
+          details: { hash: result.hash, folderPath: folderPath as string },
+        });
+        throw error;
+      },
+    )(),
+  );
 };
 
 /**
@@ -827,8 +841,12 @@ const getChangedFoldersWithFiles = async (
         })
         .otherwise((code) => {
           // 上記のreaddirエラーマッパーで想定外エラーはre-throwされるため、
-          // ここに到達するコードはEACCES/EPERM以外の期待されたエラーコードのみ
-          logger.debug(`readdir error code not tracked in statistics: ${code}`);
+          // このブランチは到達不能のはず。到達した場合は調査が必要
+          logger.warn({
+            message:
+              'Unexpected readdir error code reached statistics tracking',
+            details: { code },
+          });
         });
       continue;
     }
