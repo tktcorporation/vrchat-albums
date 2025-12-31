@@ -16,8 +16,23 @@ const settingStoreKey = [
   'termsAccepted',
   'termsVersion',
   'migrationNoticeShown',
+  'photoFolderScanStates',
 ] as const;
 type SettingStoreKey = (typeof settingStoreKey)[number];
+
+/**
+ * フォルダスキャン状態（永続化用）
+ * 各フォルダのダイジェストと最終スキャン日時を保持
+ */
+export interface FolderScanState {
+  /** ファイル一覧のダイジェスト（ハッシュ値） */
+  digest: string;
+  /** 最終スキャン日時（ISO文字列） */
+  lastScannedAt: string;
+}
+
+/** フォルダパス → スキャン状態のマップ */
+export type PhotoFolderScanStates = Record<string, FolderScanState>;
 
 /**
  * 設定ストアの操作エラー
@@ -273,6 +288,22 @@ const setSettingStore = (name: StoreName) => {
     setTermsVersion: setTermsVersion(set),
     getMigrationNoticeShown: getMigrationNoticeShown(getB),
     setMigrationNoticeShown: setMigrationNoticeShown(set),
+    getPhotoFolderScanStates: (): PhotoFolderScanStates => {
+      const value = get('photoFolderScanStates');
+      return match(value)
+        .when(
+          (v): v is PhotoFolderScanStates =>
+            v !== null && typeof v === 'object' && !Array.isArray(v),
+          (v) => v,
+        )
+        .otherwise(() => ({}));
+    },
+    setPhotoFolderScanStates: (states: PhotoFolderScanStates) => {
+      set('photoFolderScanStates', states);
+    },
+    clearPhotoFolderScanStates: () => {
+      set('photoFolderScanStates', {});
+    },
   };
   settingStore = _settingStore;
   return _settingStore;
@@ -335,6 +366,9 @@ export interface SettingStore {
   setTermsVersion: (version: string) => void;
   getMigrationNoticeShown: () => boolean;
   setMigrationNoticeShown: (shown: boolean) => void;
+  getPhotoFolderScanStates: () => PhotoFolderScanStates;
+  setPhotoFolderScanStates: (states: PhotoFolderScanStates) => void;
+  clearPhotoFolderScanStates: () => void;
 }
 
 export { getSettingStore, initSettingStore, initSettingStoreForTest };

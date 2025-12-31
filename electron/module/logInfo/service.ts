@@ -482,13 +482,11 @@ export async function loadLogInfoIndexFromVRChatLog({
   );
 
   // 6. 写真のインデックス処理
+  // excludeOldLogLoad=true → 差分スキャン（ダイジェスト・mtime使用）
+  // excludeOldLogLoad=false → フルスキャン
   const photoIndexStartTime = performance.now();
-  const latestPhotoDate = await match(excludeOldLogLoad)
-    .with(true, async () => await vrchatPhotoService.getLatestPhotoDate())
-    .with(false, () => null)
-    .exhaustive();
   const photoResults =
-    await vrchatPhotoService.createVRChatPhotoPathIndex(latestPhotoDate);
+    await vrchatPhotoService.createVRChatPhotoPathIndex(excludeOldLogLoad);
   results.createdVRChatPhotoPathModelList = photoResults ?? [];
   const photoIndexEndTime = performance.now();
   logger.debug(

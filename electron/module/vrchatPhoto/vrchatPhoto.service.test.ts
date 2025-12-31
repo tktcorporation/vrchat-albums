@@ -1,43 +1,23 @@
-import * as nodefsPromises from 'node:fs/promises'; // 明示的にインポート
+import * as crypto from 'node:crypto';
+import type { Dirent, PathLike } from 'node:fs';
+import * as nodefsPromises from 'node:fs/promises';
 import * as dateFns from 'date-fns';
-import { glob } from 'glob';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getSettingStore, type SettingStore } from '../settingStore';
+import {
+  getSettingStore,
+  type PhotoFolderScanStates,
+  type SettingStore,
+} from '../settingStore';
 import * as model from './model/vrchatPhotoPath.model';
 import { VRChatPhotoDirPathSchema } from './valueObjects';
 import * as service from './vrchatPhoto.service';
 
 // --- Mocks ---
-vi.mock('glob');
-// モックの変更 - fs/promises の代わりに node:fs/promises をモック
-vi.mock('node:fs/promises', () => ({
-  stat: vi.fn().mockImplementation(async (path) => {
-    const pathStr = path.toString();
-    // この allStats オブジェクトはテストコード内のグローバルスコープで定義されているので
-    // モックの実装内で直接参照できません。代わりに条件分岐で返り値を判断します。
-    if (
-      pathStr.includes('/mock/photos/VRChat_') ||
-      pathStr.includes('/mock/extra_photos/VRChat_')
-    ) {
-      const now = new Date();
-      // 仮のstatsを返す
-      return {
-        mtime: pathStr.includes('mock/photos/subdir')
-          ? dateFns.subHours(now, 3) // 3時間前
-          : pathStr.includes('mock/extra_photos')
-            ? now // 現在
-            : dateFns.subHours(now, 1), // 1時間前
-        isFile: () => true,
-        isDirectory: () => false,
-      };
-    }
-    throw new Error(`ENOENT: no such file or directory, stat '${pathStr}'`);
-  }),
-}));
+vi.mock('node:fs/promises');
 vi.mock('./model/vrchatPhotoPath.model');
 vi.mock('../settingStore');
+vi.mock('folder-hash');
 vi.mock('sharp', () => {
-  // sharp() is chainable, so mock constructor and methods
   const mockSharpInstance = {
     metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
     resize: vi.fn().mockReturnThis(),
@@ -55,34 +35,34 @@ vi.mock('./../../lib/logger', () => ({
   },
 }));
 
-// Helper to create mock file stats
-// const _createMockStat = (mtime: Date): fs.Stats => ({
-//   mtime,
-//   isFile: () => true,
-//   isDirectory: () => false,
-//   isBlockDevice: () => false,
-//   isCharacterDevice: () => false,
-//   isSymbolicLink: () => false,
-//   isFIFO: () => false,
-//   isSocket: () => false,
-//   dev: 0,
-//   ino: 0,
-//   mode: 0,
-//   nlink: 0,
-//   uid: 0,
-//   gid: 0,
-//   rdev: 0,
-//   size: 1024,
-//   blksize: 4096,
-//   blocks: 1,
-//   atimeMs: mtime.getTime(),
-//   mtimeMs: mtime.getTime(),
-//   ctimeMs: mtime.getTime(),
-//   birthtimeMs: mtime.getTime(),
-//   atime: mtime,
-//   ctime: mtime,
-//   birthtime: mtime,
-// });
+// folder-hash のインポート
+import { hashElement } from 'folder-hash';
+
+/**
+ * フォルダパスからモックダイジェストを生成（folder-hash モック用）
+ * folder-hash はフォルダのコンテンツに基づいてハッシュを計算するので、
+ * テストではフォルダパスベースで一意のハッシュを返す
+ */
+const computeTestDigest = (folderPath: string): string => {
+  return crypto.createHash('md5').update(folderPath).digest('hex');
+};
+
+/**
+ * Direntオブジェクトを作成するヘルパー
+ */
+const createMockDirent = (
+  name: string,
+  isDirectory: boolean,
+): Partial<Dirent> => ({
+  name,
+  isDirectory: () => isDirectory,
+  isFile: () => !isDirectory,
+  isBlockDevice: () => false,
+  isCharacterDevice: () => false,
+  isFIFO: () => false,
+  isSocket: () => false,
+  isSymbolicLink: () => false,
+});
 
 describe('createVRChatPhotoPathIndex', () => {
   const mockPhotoDir = VRChatPhotoDirPathSchema.parse('/mock/photos');
@@ -92,73 +72,128 @@ describe('createVRChatPhotoPathIndex', () => {
   const twoHoursAgo = dateFns.subHours(now, 2);
   const threeHoursAgo = dateFns.subHours(now, 3);
 
-  const mockMainFiles = [
-    `/mock/photos/VRChat_${dateFns.format(
-      oneHourAgo,
-      'yyyy-MM-dd_HH-mm-ss.SSS',
-    )}_1920x1080.png`,
-    `/mock/photos/subdir/VRChat_${dateFns.format(
-      threeHoursAgo,
-      'yyyy-MM-dd_HH-mm-ss.SSS',
-    )}_1280x720.png`,
-  ];
-  const mockExtraFiles = [
-    `/mock/extra_photos/VRChat_${dateFns.format(
-      now,
-      'yyyy-MM-dd_HH-mm-ss.SSS',
-    )}_1920x1080.png`,
-  ];
-  const allFiles = [...mockMainFiles, ...mockExtraFiles];
+  // 年月フォルダ
+  const yearMonthFolder2024_01 = '/mock/photos/2024-01';
+  const yearMonthFolder2024_02 = '/mock/photos/2024-02';
+  const extraYearMonthFolder = '/mock/extra_photos/2024-01';
 
-  // const _allStats = { ...mockMainStats, ...mockExtraStats };
+  // ファイル名（年月フォルダ内）
+  const file1Name = `VRChat_${dateFns.format(oneHourAgo, 'yyyy-MM-dd_HH-mm-ss.SSS')}_1920x1080.png`;
+  const file2Name = `VRChat_${dateFns.format(threeHoursAgo, 'yyyy-MM-dd_HH-mm-ss.SSS')}_1280x720.png`;
+  const extraFileName = `VRChat_${dateFns.format(now, 'yyyy-MM-dd_HH-mm-ss.SSS')}_1920x1080.png`;
+
+  // フルパス
+  const file1Path = `${yearMonthFolder2024_01}/${file1Name}`;
+  const file2Path = `${yearMonthFolder2024_02}/${file2Name}`;
+  const extraFilePath = `${extraYearMonthFolder}/${extraFileName}`;
+
+  // モック用データ
+  let mockSettingStore: Partial<SettingStore>;
+  let savedScanStates: PhotoFolderScanStates;
 
   beforeEach(() => {
-    // Mock settings store
-    const mockSettingStore: Partial<SettingStore> = {
+    savedScanStates = {};
+
+    mockSettingStore = {
       getVRChatPhotoDir: vi.fn().mockReturnValue(mockPhotoDir.value),
       getVRChatPhotoExtraDirList: vi.fn().mockReturnValue([mockExtraDir]),
-      // other methods are not used in this test, so mock them minimally
+      getPhotoFolderScanStates: vi
+        .fn()
+        .mockImplementation(() => savedScanStates),
+      setPhotoFolderScanStates: vi.fn().mockImplementation((states) => {
+        savedScanStates = states;
+      }),
+      clearPhotoFolderScanStates: vi.fn(),
     };
 
     vi.mocked(getSettingStore).mockReturnValue(
       mockSettingStore as unknown as SettingStore,
     );
 
-    // Mock glob and glob.stream
-    vi.mocked(glob).mockImplementation(async (pattern: string | string[]) => {
-      const patternStr = Array.isArray(pattern) ? pattern.join(',') : pattern;
-      if (typeof patternStr !== 'string') {
-        return [];
-      }
-      if (patternStr.startsWith(`${mockPhotoDir.value}/**/`)) {
-        return mockMainFiles;
-      }
-      if (patternStr.startsWith(`${mockExtraDir.value}/**/`)) {
-        return mockExtraFiles;
-      }
-      return [];
-    });
+    // folder-hash モック - フォルダパスに基づいて一意のハッシュを返す
+    vi.mocked(hashElement).mockImplementation(async (folderPath: string) => ({
+      hash: computeTestDigest(folderPath),
+      name: folderPath,
+      children: [],
+    }));
 
-    // Mock glob.stream (used for streaming file enumeration)
-    // @ts-expect-error - glob.stream is being mocked
-    glob.stream = vi.fn().mockImplementation((pattern: string) => {
-      // Create an async iterable from the files
-      const files = pattern.startsWith(`${mockPhotoDir.value}/**/`)
-        ? mockMainFiles
-        : pattern.startsWith(`${mockExtraDir.value}/**/`)
-          ? mockExtraFiles
-          : [];
+    // readdir モック - withFileTypesオプションの有無で振る舞いを変える
+    // readdir は複雑なオーバーロードを持つため、any を使ってモック
+    (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+      async (dirPath: PathLike, options?: unknown) => {
+        const pathStr = dirPath.toString();
 
-      return {
-        [Symbol.asyncIterator]: async function* () {
-          for (const file of files) {
-            yield file;
+        // withFileTypes: true の場合は Dirent[] を返す
+        // getPhotoFolders が再帰スキャンで使用
+        if (
+          options &&
+          typeof options === 'object' &&
+          'withFileTypes' in options &&
+          (options as { withFileTypes: boolean }).withFileTypes
+        ) {
+          // ベースディレクトリ: サブフォルダを返す
+          if (pathStr === mockPhotoDir.value) {
+            return [
+              createMockDirent('2024-01', true),
+              createMockDirent('2024-02', true),
+            ] as Dirent[];
           }
-        },
+          if (pathStr === mockExtraDir.value) {
+            return [createMockDirent('2024-01', true)] as Dirent[];
+          }
+          // 年月フォルダ: VRChat写真ファイルを返す（hasVRChatPhotos チェック用）
+          if (pathStr === yearMonthFolder2024_01) {
+            return [
+              createMockDirent(file1Name, false), // VRChat写真ファイル
+              createMockDirent('not-a-vrchat-file.txt', false),
+            ] as Dirent[];
+          }
+          if (pathStr === yearMonthFolder2024_02) {
+            return [createMockDirent(file2Name, false)] as Dirent[];
+          }
+          if (pathStr === extraYearMonthFolder) {
+            return [createMockDirent(extraFileName, false)] as Dirent[];
+          }
+          return [] as Dirent[];
+        }
+
+        // withFileTypes なしの場合は string[] を返す（ファイル一覧取得用）
+        if (pathStr === yearMonthFolder2024_01) {
+          return [file1Name, 'not-a-vrchat-file.txt'];
+        }
+        if (pathStr === yearMonthFolder2024_02) {
+          return [file2Name];
+        }
+        if (pathStr === extraYearMonthFolder) {
+          return [extraFileName];
+        }
+        return [];
+      },
+    );
+
+    // stat モック - mtimeを返す
+    vi.mocked(nodefsPromises.stat).mockImplementation(async (filePath) => {
+      const pathStr = filePath.toString();
+      const stats = {
+        isFile: () => true,
+        isDirectory: () => false,
+        mtime: now, // デフォルト
       };
+
+      if (pathStr === file1Path) {
+        stats.mtime = oneHourAgo;
+      } else if (pathStr === file2Path) {
+        stats.mtime = threeHoursAgo;
+      } else if (pathStr === extraFilePath) {
+        stats.mtime = now;
+      }
+
+      return stats as unknown as Awaited<
+        ReturnType<typeof nodefsPromises.stat>
+      >;
     });
 
-    // Mock DB model
+    // DB model モック
     vi.mocked(model.createOrUpdateListVRChatPhotoPath).mockResolvedValue([]);
   });
 
@@ -166,75 +201,166 @@ describe('createVRChatPhotoPathIndex', () => {
     vi.clearAllMocks();
   });
 
-  it('初回実行時はすべての写真ファイルを処理する', async () => {
-    await service.createVRChatPhotoPathIndex(null);
+  describe('フルスキャン（isIncremental = false）', () => {
+    it('すべての写真ファイルを処理する', async () => {
+      await service.createVRChatPhotoPathIndex(false);
 
-    // Check glob.stream calls (streaming API is now used)
-    expect(glob.stream).toHaveBeenCalledTimes(2);
-    expect(glob.stream).toHaveBeenCalledWith(
-      `${mockPhotoDir.value}/**/VRChat_*.png`,
-    );
-    expect(glob.stream).toHaveBeenCalledWith(
-      `${mockExtraDir.value}/**/VRChat_*.png`,
-    );
+      // DB保存が呼ばれる
+      expect(model.createOrUpdateListVRChatPhotoPath).toHaveBeenCalled();
 
-    // Check stat calls (should NOT be called when no lastProcessedDate)
-    expect(nodefsPromises.stat).toHaveBeenCalledTimes(0);
+      // 全ファイルが処理される
+      const allSavedData = vi
+        .mocked(model.createOrUpdateListVRChatPhotoPath)
+        .mock.calls.flatMap((call) => call[0]);
 
-    // Check DB save call - now called multiple times due to batching
-    expect(model.createOrUpdateListVRChatPhotoPath).toHaveBeenCalled();
+      expect(allSavedData).toHaveLength(3);
+      const savedPaths = allSavedData.map((d) => d.photoPath);
+      expect(savedPaths).toContain(file1Path);
+      expect(savedPaths).toContain(file2Path);
+      expect(savedPaths).toContain(extraFilePath);
+    });
 
-    // Collect all saved data across all batches
-    const allSavedData = vi
-      .mocked(model.createOrUpdateListVRChatPhotoPath)
-      .mock.calls.flatMap((call) => call[0]);
+    it('スキャン状態が保存される', async () => {
+      await service.createVRChatPhotoPathIndex(false);
 
-    expect(allSavedData).toHaveLength(allFiles.length);
-    const savedPaths = allSavedData.map((d) => d.photoPath);
-    expect(savedPaths).toEqual(expect.arrayContaining(allFiles));
+      expect(mockSettingStore.setPhotoFolderScanStates).toHaveBeenCalled();
+      const setStatesMock = mockSettingStore.setPhotoFolderScanStates;
+      expect(setStatesMock).toBeDefined();
+      const savedStates = vi.mocked(
+        setStatesMock as SettingStore['setPhotoFolderScanStates'],
+      ).mock.calls[0][0];
+
+      // 各フォルダの状態が保存される
+      expect(savedStates[yearMonthFolder2024_01]).toBeDefined();
+      expect(savedStates[yearMonthFolder2024_02]).toBeDefined();
+      expect(savedStates[extraYearMonthFolder]).toBeDefined();
+
+      // ダイジェストが正しく計算される（folder-hash はフォルダパスベースでハッシュ）
+      expect(savedStates[yearMonthFolder2024_01].digest).toBe(
+        computeTestDigest(yearMonthFolder2024_01),
+      );
+    });
   });
 
-  it('差分実行時は更新された写真ファイルのみ処理する', async () => {
-    const lastProcessedDate = twoHoursAgo;
+  describe('差分スキャン（isIncremental = true）', () => {
+    it('ダイジェストが一致するフォルダはスキップする', async () => {
+      // 事前にスキャン状態を設定（2024-01は変更なし、他は古いダイジェスト）
+      const digest2024_01 = computeTestDigest(yearMonthFolder2024_01);
+      savedScanStates = {
+        [yearMonthFolder2024_01]: {
+          digest: digest2024_01,
+          lastScannedAt: twoHoursAgo.toISOString(),
+        },
+        // 2024-02は古いダイジェスト（変更あり）+ 前回スキャン日時あり
+        [yearMonthFolder2024_02]: {
+          digest: 'old-digest',
+          lastScannedAt: twoHoursAgo.toISOString(),
+        },
+        // extraも古いダイジェスト（変更あり）+ 前回スキャン日時あり
+        [extraYearMonthFolder]: {
+          digest: 'old-digest',
+          lastScannedAt: twoHoursAgo.toISOString(),
+        },
+      };
 
-    await service.createVRChatPhotoPathIndex(lastProcessedDate);
+      await service.createVRChatPhotoPathIndex(true);
 
-    // Check glob.stream calls
-    expect(glob.stream).toHaveBeenCalledTimes(2);
+      // 2024-01フォルダのファイルはstatが呼ばれない（ダイジェスト一致でスキップ）
+      const statCalls = vi
+        .mocked(nodefsPromises.stat)
+        .mock.calls.map((call) => call[0].toString());
+      expect(statCalls).not.toContain(file1Path);
 
-    // Check stat calls for all files (to check mtime)
-    expect(nodefsPromises.stat).toHaveBeenCalledTimes(allFiles.length);
+      // 2024-02とextraフォルダは処理される（ダイジェスト不一致 → mtime比較 → stat呼び出し）
+      expect(statCalls).toContain(file2Path);
+      expect(statCalls).toContain(extraFilePath);
+    });
 
-    // Check DB save call with only updated files
-    const expectedUpdatedFiles = [
-      mockMainFiles[0], // modified 1 hour ago
-      mockExtraFiles[0], // modified now
-    ];
-    expect(model.createOrUpdateListVRChatPhotoPath).toHaveBeenCalled();
+    it('mtimeが前回スキャン以前のファイルはスキップする', async () => {
+      // 2024-02フォルダは変更あり（ダイジェスト不一致）だがmtimeは古い
+      savedScanStates = {
+        [yearMonthFolder2024_02]: {
+          digest: 'old-digest-different',
+          lastScannedAt: twoHoursAgo.toISOString(), // file2は3時間前なのでスキップ
+        },
+      };
 
-    // Collect all saved data across all batches
-    const allSavedData = vi
-      .mocked(model.createOrUpdateListVRChatPhotoPath)
-      .mock.calls.flatMap((call) => call[0]);
+      await service.createVRChatPhotoPathIndex(true);
 
-    expect(allSavedData).toHaveLength(expectedUpdatedFiles.length);
-    const savedPaths = allSavedData.map((d) => d.photoPath);
-    expect(savedPaths).toEqual(expect.arrayContaining(expectedUpdatedFiles));
-    expect(savedPaths).not.toContain(mockMainFiles[1]); // Should not contain the file modified 3 hours ago
+      // DB保存データを確認
+      const allSavedData = vi
+        .mocked(model.createOrUpdateListVRChatPhotoPath)
+        .mock.calls.flatMap((call) => call[0]);
+
+      const savedPaths = allSavedData.map((d) => d.photoPath);
+      // file2Path（3時間前）は含まれない
+      expect(savedPaths).not.toContain(file2Path);
+      // file1Path（1時間前）とextraFilePath（現在）は含まれる
+      expect(savedPaths).toContain(file1Path);
+      expect(savedPaths).toContain(extraFilePath);
+    });
+
+    it('前回スキャン日時がないフォルダは全ファイルを処理する', async () => {
+      // 2024-01はダイジェスト不一致（初回スキャン扱い）
+      savedScanStates = {};
+
+      await service.createVRChatPhotoPathIndex(true);
+
+      // 全ファイルが処理される
+      const allSavedData = vi
+        .mocked(model.createOrUpdateListVRChatPhotoPath)
+        .mock.calls.flatMap((call) => call[0]);
+
+      expect(allSavedData).toHaveLength(3);
+    });
+
+    it('更新されたファイルがない場合はDB保存処理を呼び出さない', async () => {
+      // 全フォルダが変更なし（folder-hash はフォルダパスベースでハッシュ）
+      savedScanStates = {
+        [yearMonthFolder2024_01]: {
+          digest: computeTestDigest(yearMonthFolder2024_01),
+          lastScannedAt: now.toISOString(),
+        },
+        [yearMonthFolder2024_02]: {
+          digest: computeTestDigest(yearMonthFolder2024_02),
+          lastScannedAt: now.toISOString(),
+        },
+        [extraYearMonthFolder]: {
+          digest: computeTestDigest(extraYearMonthFolder),
+          lastScannedAt: now.toISOString(),
+        },
+      };
+
+      await service.createVRChatPhotoPathIndex(true);
+
+      // DB保存が呼ばれない
+      expect(model.createOrUpdateListVRChatPhotoPath).not.toHaveBeenCalled();
+    });
   });
 
-  it('更新されたファイルがない場合はDB保存処理を呼び出さない', async () => {
-    const lastProcessedDate = dateFns.addMinutes(now, 1);
+  describe('デフォルトパラメータ', () => {
+    it('引数なしで呼び出すと差分スキャン（isIncremental = true）になる', async () => {
+      // 全フォルダを変更なしにしてスキップを確認
+      savedScanStates = {
+        [yearMonthFolder2024_01]: {
+          digest: computeTestDigest(yearMonthFolder2024_01),
+          lastScannedAt: now.toISOString(),
+        },
+        [yearMonthFolder2024_02]: {
+          digest: computeTestDigest(yearMonthFolder2024_02),
+          lastScannedAt: now.toISOString(),
+        },
+        [extraYearMonthFolder]: {
+          digest: computeTestDigest(extraYearMonthFolder),
+          lastScannedAt: now.toISOString(),
+        },
+      };
 
-    await service.createVRChatPhotoPathIndex(lastProcessedDate);
+      // 引数なしで呼び出し
+      await service.createVRChatPhotoPathIndex();
 
-    // Check glob.stream calls
-    expect(glob.stream).toHaveBeenCalledTimes(2);
-
-    // Check stat calls
-    expect(nodefsPromises.stat).toHaveBeenCalledTimes(allFiles.length);
-
-    // Check DB save call (should NOT be called)
-    expect(model.createOrUpdateListVRChatPhotoPath).not.toHaveBeenCalled();
+      // 差分スキャンなのでDB保存は呼ばれない
+      expect(model.createOrUpdateListVRChatPhotoPath).not.toHaveBeenCalled();
+    });
   });
 });

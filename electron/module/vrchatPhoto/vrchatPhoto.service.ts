@@ -1,17 +1,24 @@
 import * as crypto from 'node:crypto';
+import type { Dirent } from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
 import * as dateFns from 'date-fns';
-import { glob } from 'glob';
+import { hashElement } from 'folder-hash';
 import * as neverthrow from 'neverthrow';
 import { ResultAsync } from 'neverthrow';
 import * as path from 'pathe';
 import sharp from 'sharp';
 import { match, P } from 'ts-pattern';
+import {
+  type FolderDigest,
+  FolderDigestSchema,
+  type VRChatPhotoContainingFolderPath,
+  VRChatPhotoContainingFolderPathSchema,
+} from './../../lib/brandedTypes';
 import { logger } from './../../lib/logger';
 import * as fs from './../../lib/wrappedFs';
-import { getSettingStore } from '../settingStore';
+import { getSettingStore, type PhotoFolderScanStates } from '../settingStore';
 import * as model from './model/vrchatPhotoPath.model';
 import {
   type VRChatPhotoDirPath,
@@ -587,103 +594,171 @@ export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
 
 // バッチサイズ定数
 const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（sharp処理は重いため小さく）
-const MAX_MEMORY_USAGE_MB = 500; // メモリ使用量の上限
 
 /**
- * メモリ使用量をチェックする
+ * フォルダ内のVRChatファイル一覧からダイジェスト（ハッシュ）を計算
+ * folder-hashライブラリを使用して信頼性の高いハッシュを生成
+ *
+ * @param folderPath VRChat写真を含むフォルダのパス
+ * @returns FolderDigest ブランド型でラップされたMD5ハッシュ
  */
-const checkMemoryUsage = (): { heapUsedMB: number; isHighUsage: boolean } => {
-  const memUsage = process.memoryUsage();
-  const heapUsedMB = memUsage.heapUsed / 1024 / 1024;
-  return {
-    heapUsedMB,
-    isHighUsage: heapUsedMB > MAX_MEMORY_USAGE_MB,
+const computeFolderDigest = async (
+  folderPath: VRChatPhotoContainingFolderPath,
+): Promise<FolderDigest> => {
+  const options = {
+    algo: 'md5' as const,
+    encoding: 'hex' as const,
+    files: { include: ['VRChat_*.png'] },
   };
+  const result = await hashElement(folderPath, options);
+  return FolderDigestSchema.parse(result.hash);
 };
 
 /**
- * 写真パスをバッチごとに取得するジェネレータ関数
- * glob.stream() を使用してメモリ効率を改善
+ * VRChat写真を含むフォルダを全て探索（再帰的）
+ * ユーザーが独自のフォルダ分けをしている場合にも対応
+ *
+ * @param basePath ユーザー設定のベースディレクトリ
+ * @returns VRChat写真を含むフォルダパスの配列（ブランド型）
  */
-async function* getPhotoPathBatches(
-  dirPath: VRChatPhotoDirPath,
-  lastProcessedDate?: Date | null,
-): AsyncGenerator<string[], void, unknown> {
-  const targetDir = dirPath.value;
-  if (!targetDir) {
-    return;
-  }
+const getPhotoFolders = async (
+  basePath: VRChatPhotoDirPath,
+): Promise<VRChatPhotoContainingFolderPath[]> => {
+  const photoFolders: string[] = [];
 
-  // Convert to POSIX format for glob pattern matching
-  const normalizedTargetDir = path.normalize(targetDir).replace(/\\/g, '/');
-
-  // glob.stream() を使用してストリーミング処理（メモリ効率向上）
-  const globStream = glob.stream(`${normalizedTargetDir}/**/VRChat_*.png`);
-
-  let batch: string[] = [];
-  let processedCount = 0;
-
-  for await (const photoPath of globStream) {
-    const photoPathStr =
-      typeof photoPath === 'string' ? photoPath : String(photoPath);
-
-    // 日付フィルタリングが必要な場合
-    if (lastProcessedDate) {
-      const statsResult = await neverthrow.ResultAsync.fromPromise(
-        fsPromises.stat(photoPathStr),
-        (error): { type: 'STAT_ERROR'; message: string } => {
-          const nodeError = error as NodeJS.ErrnoException;
-          // ENOENT はファイル削除のレースコンディションで予期される
-          if (nodeError.code === 'ENOENT') {
-            return { type: 'STAT_ERROR', message: 'File not found' };
-          }
-          // その他のエラーはログ出力
-          logger.error({
-            message: `Failed to get stats for ${photoPathStr}`,
-            stack: error instanceof Error ? error : new Error(String(error)),
-          });
-          return { type: 'STAT_ERROR', message: nodeError.message };
-        },
-      );
-
-      if (statsResult.isErr()) {
-        continue; // エラー時はスキップ
-      }
-
-      if (statsResult.value.mtime <= lastProcessedDate) {
-        continue; // 古いファイルはスキップ
-      }
+  const scanDir = async (dirPath: string): Promise<void> => {
+    let entries: Dirent[];
+    try {
+      entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
+    } catch (_error) {
+      // ディレクトリが読めない場合はスキップ（権限エラーなど）
+      logger.debug(`Cannot read directory: ${dirPath}`);
+      return;
     }
 
-    batch.push(photoPathStr);
-    processedCount++;
+    // VRChat写真があるかチェック
+    const hasVRChatPhotos = entries.some(
+      (e) =>
+        e.isFile() && e.name.startsWith('VRChat_') && e.name.endsWith('.png'),
+    );
 
-    // バッチサイズに達したらyield
-    if (batch.length >= PHOTO_METADATA_BATCH_SIZE) {
-      yield batch;
-      batch = [];
+    if (hasVRChatPhotos) {
+      photoFolders.push(dirPath);
+    }
 
-      // メモリ使用量をチェック
-      if (processedCount % 1000 === 0) {
-        const { heapUsedMB, isHighUsage } = checkMemoryUsage();
-        if (isHighUsage) {
-          logger.warn(
-            `High memory usage detected: ${heapUsedMB.toFixed(2)}MB. Consider processing in smaller batches.`,
-          );
-          // GCを促すためのヒント
-          if (global.gc) {
-            global.gc();
-          }
-        }
+    // サブディレクトリを再帰探索
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        await scanDir(path.join(dirPath, entry.name));
       }
     }
-  }
+  };
 
-  // 残りのバッチをyield
-  if (batch.length > 0) {
-    yield batch;
-  }
+  await scanDir(basePath.value);
+  // 発見したフォルダパスをブランド型に変換
+  return photoFolders.map((p) =>
+    VRChatPhotoContainingFolderPathSchema.parse(p),
+  );
+};
+
+/**
+ * Stage 1: フォルダダイジェストチェック
+ * 変更があったフォルダとそのファイル一覧を返す
+ */
+interface ChangedFolder {
+  folderPath: VRChatPhotoContainingFolderPath;
+  fileNames: string[];
+  currentDigest: FolderDigest;
 }
+
+const getChangedFoldersWithFiles = async (
+  basePath: VRChatPhotoDirPath,
+  savedStates: PhotoFolderScanStates,
+): Promise<ChangedFolder[]> => {
+  // VRChat写真を含むフォルダを全て探索（再帰的）
+  const folders = await getPhotoFolders(basePath);
+  const changedFolders: ChangedFolder[] = [];
+
+  for (const folderPath of folders) {
+    // folder-hash でダイジェスト計算
+    const currentDigest = await computeFolderDigest(folderPath);
+
+    // ブランド型から生のstring値を取得して比較
+    const savedState = savedStates[folderPath as string];
+
+    // ダイジェストが一致すればスキップ（ブランド型をstringとして比較）
+    if (savedState && savedState.digest === (currentDigest as string)) {
+      logger.debug(`Folder unchanged (digest match): ${folderPath}`);
+      continue;
+    }
+
+    // 変更があったフォルダのファイル一覧を取得
+    const fileNames = await fsPromises.readdir(folderPath as string);
+
+    logger.debug(
+      `Folder changed: ${folderPath} (saved: ${savedState?.digest ?? 'none'}, current: ${currentDigest})`,
+    );
+    changedFolders.push({ folderPath, fileNames, currentDigest });
+  }
+
+  return changedFolders;
+};
+
+/**
+ * Stage 2: ファイルmtimeチェック
+ * 変更フォルダ内のファイルをmtimeでフィルタし、新規/更新ファイルのパスを返す
+ */
+const filterNewFilesByMtime = async (
+  changedFolder: ChangedFolder,
+  lastScannedAt: Date | null,
+): Promise<string[]> => {
+  const { folderPath, fileNames } = changedFolder;
+  // ブランド型をstringにキャストしてpath.joinに渡す
+  const folderPathStr = folderPath as string;
+  const newFiles: string[] = [];
+
+  for (const fileName of fileNames) {
+    // VRChat写真のみ対象
+    if (!fileName.startsWith('VRChat_') || !fileName.endsWith('.png')) {
+      continue;
+    }
+
+    const filePath = path.join(folderPathStr, fileName);
+
+    // 前回スキャン日時がなければ全件対象
+    if (!lastScannedAt) {
+      newFiles.push(filePath);
+      continue;
+    }
+
+    // ファイルのmtimeを取得
+    const statsResult = await neverthrow.ResultAsync.fromPromise(
+      fsPromises.stat(filePath),
+      (error): { type: 'STAT_ERROR'; message: string } => {
+        const nodeError = error as NodeJS.ErrnoException;
+        if (nodeError.code === 'ENOENT') {
+          return { type: 'STAT_ERROR', message: 'File not found' };
+        }
+        logger.error({
+          message: `Failed to get stats for ${filePath}`,
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
+        return { type: 'STAT_ERROR', message: nodeError.message };
+      },
+    );
+
+    if (statsResult.isErr()) {
+      continue;
+    }
+
+    // mtime > lastScannedAt なら新規/更新ファイル
+    if (statsResult.value.mtime > lastScannedAt) {
+      newFiles.push(filePath);
+    }
+  }
+
+  return newFiles;
+};
 
 /**
  * 写真情報のバッチを処理する
@@ -771,10 +846,15 @@ async function processPhotoBatch(
 /**
  * 写真ディレクトリを走査してインデックスを更新する
  * logSync などから呼び出される
+ *
+ * ## 3段階フィルタリング
+ * - Stage 1: フォルダダイジェストチェック（変更がないフォルダをスキップ）
+ * - Stage 2: ファイルmtimeチェック（変更フォルダ内の新規ファイルを抽出）
+ * - Stage 3: sharp処理 + DB保存
+ *
+ * @param isIncremental true: 差分スキャン（ダイジェスト・mtime使用）、false: フルスキャン
  */
-export const createVRChatPhotoPathIndex = async (
-  lastProcessedDate?: Date | null,
-) => {
+export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   const startTime = performance.now();
   const targetDir = getVRChatPhotoDirPath();
   const settingStore = getSettingStore();
@@ -785,68 +865,103 @@ export const createVRChatPhotoPathIndex = async (
   let batchNumber = 0;
   const allCreatedModels: model.VRChatPhotoPathModel[] = [];
 
+  // フォルダスキャン状態を取得（差分スキャン用）
+  const savedStates = isIncremental
+    ? settingStore.getPhotoFolderScanStates()
+    : {};
+  const updatedStates: PhotoFolderScanStates = { ...savedStates };
+
   logger.info(
-    `Starting photo index creation with ${allDirs.length} directories`,
+    `Starting photo index creation with ${allDirs.length} directories (mode: ${isIncremental ? 'incremental' : 'full'})`,
   );
 
   // 各ディレクトリを順番に処理
   for (const dir of allDirs) {
     logger.debug(`Processing photos from directory: ${dir.value}`);
 
-    // バッチごとに処理
-    for await (const photoBatch of getPhotoPathBatches(
-      dir,
-      lastProcessedDate,
-    )) {
-      if (photoBatch.length === 0) continue;
+    // Stage 1: フォルダダイジェストチェック
+    const changedFolders = await getChangedFoldersWithFiles(dir, savedStates);
 
-      batchNumber++;
-      const batchStartTime = performance.now();
+    if (changedFolders.length === 0) {
+      logger.debug(`No changed folders in: ${dir.value}`);
+      continue;
+    }
 
-      // バッチ内の写真情報を処理
-      const processedBatch = await processPhotoBatch(photoBatch);
+    logger.debug(
+      `Found ${changedFolders.length} changed folders in: ${dir.value}`,
+    );
 
-      if (processedBatch.length > 0) {
-        // DBに保存
-        const dbStartTime = performance.now();
-        const createdModels = await model.createOrUpdateListVRChatPhotoPath(
-          processedBatch.map((photo) => ({
-            photoPath: photo.photoPath,
-            photoTakenAt: photo.takenAt,
-            width: photo.width,
-            height: photo.height,
-          })),
-        );
-        const dbEndTime = performance.now();
+    // 各変更フォルダを処理
+    for (const changedFolder of changedFolders) {
+      // ブランド型をstringにキャストしてストレージアクセス
+      const folderPathStr = changedFolder.folderPath as string;
+      const digestStr = changedFolder.currentDigest as string;
 
-        allCreatedModels.push(...createdModels);
-        totalProcessed += processedBatch.length;
+      const savedState = savedStates[folderPathStr];
+      const lastScannedAt = savedState
+        ? new Date(savedState.lastScannedAt)
+        : null;
 
-        const batchEndTime = performance.now();
-        logger.debug(
-          `Batch ${batchNumber}: Processed ${
-            processedBatch.length
-          } photos in ${(batchEndTime - batchStartTime).toFixed(
-            2,
-          )} ms (metadata: ${(dbStartTime - batchStartTime).toFixed(
-            2,
-          )} ms, DB: ${(dbEndTime - dbStartTime).toFixed(2)} ms)`,
-        );
+      // Stage 2: ファイルmtimeチェック
+      const newFiles = await filterNewFilesByMtime(
+        changedFolder,
+        lastScannedAt,
+      );
 
-        // メモリ使用量のログ（デバッグ用）
-        if (batchNumber % 10 === 0) {
-          const memUsage = process.memoryUsage();
+      if (newFiles.length === 0) {
+        // ファイル削除のみの場合など（ダイジェスト変更だがmtimeでフィルタ後0件）
+        // ダイジェストは更新する
+        updatedStates[folderPathStr] = {
+          digest: digestStr,
+          lastScannedAt: new Date().toISOString(),
+        };
+        continue;
+      }
+
+      logger.debug(
+        `Found ${newFiles.length} new files in: ${changedFolder.folderPath}`,
+      );
+
+      // Stage 3: バッチ処理（sharp + DB保存）
+      for (let i = 0; i < newFiles.length; i += PHOTO_METADATA_BATCH_SIZE) {
+        const batch = newFiles.slice(i, i + PHOTO_METADATA_BATCH_SIZE);
+        batchNumber++;
+
+        const batchStartTime = performance.now();
+        const processedBatch = await processPhotoBatch(batch);
+
+        if (processedBatch.length > 0) {
+          const dbStartTime = performance.now();
+          const createdModels = await model.createOrUpdateListVRChatPhotoPath(
+            processedBatch.map((photo) => ({
+              photoPath: photo.photoPath,
+              photoTakenAt: photo.takenAt,
+              width: photo.width,
+              height: photo.height,
+            })),
+          );
+          const dbEndTime = performance.now();
+
+          allCreatedModels.push(...createdModels);
+          totalProcessed += processedBatch.length;
+
+          const batchEndTime = performance.now();
           logger.debug(
-            `Memory usage after batch ${batchNumber}: RSS=${(
-              memUsage.rss / 1024 / 1024
-            ).toFixed(2)}MB, Heap=${(memUsage.heapUsed / 1024 / 1024).toFixed(
-              2,
-            )}MB`,
+            `Batch ${batchNumber}: Processed ${processedBatch.length} photos in ${(batchEndTime - batchStartTime).toFixed(2)} ms (metadata: ${(dbStartTime - batchStartTime).toFixed(2)} ms, DB: ${(dbEndTime - dbStartTime).toFixed(2)} ms)`,
           );
         }
       }
+
+      // フォルダスキャン状態を更新（ブランド型→string）
+      updatedStates[folderPathStr] = {
+        digest: digestStr,
+        lastScannedAt: new Date().toISOString(),
+      };
     }
   }
+
+  // スキャン状態を永続化
+  settingStore.setPhotoFolderScanStates(updatedStates);
 
   const totalEndTime = performance.now();
 
@@ -856,9 +971,7 @@ export const createVRChatPhotoPathIndex = async (
   }
 
   logger.info(
-    `Photo index creation completed: ${totalProcessed} photos processed in ${
-      totalEndTime - startTime
-    } ms (${batchNumber} batches)`,
+    `Photo index creation completed: ${totalProcessed} photos processed in ${(totalEndTime - startTime).toFixed(2)} ms (${batchNumber} batches)`,
   );
 
   return allCreatedModels;

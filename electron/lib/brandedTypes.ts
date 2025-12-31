@@ -187,3 +187,35 @@ export const VRChatLogFilePathSchema = z
   .brand<'VRChatLogFilePath'>();
 
 export type VRChatLogFilePath = z.infer<typeof VRChatLogFilePathSchema>;
+
+// ============================================================================
+// Folder Digest (ハッシュ値)
+// ============================================================================
+
+/**
+ * フォルダ内容のダイジェスト（MD5ハッシュ）
+ * folder-hash ライブラリが生成するハッシュ値
+ */
+export const FolderDigestSchema = z
+  .string()
+  .regex(/^[a-f0-9]{32}$/, 'Invalid MD5 hash format')
+  .brand<'FolderDigest'>();
+
+export type FolderDigest = z.infer<typeof FolderDigestSchema>;
+
+// ============================================================================
+// VRChat Photo Containing Folder Path
+// ============================================================================
+
+/**
+ * VRChat写真を含むフォルダのパス
+ * スキャンによって発見された、VRChat_*.png を含むフォルダ
+ */
+export const VRChatPhotoContainingFolderPathSchema = z
+  .string()
+  .min(1, 'Folder path cannot be empty')
+  .brand<'VRChatPhotoContainingFolderPath'>();
+
+export type VRChatPhotoContainingFolderPath = z.infer<
+  typeof VRChatPhotoContainingFolderPathSchema
+>;
