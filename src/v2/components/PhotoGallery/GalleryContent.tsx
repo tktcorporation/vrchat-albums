@@ -1,19 +1,14 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { LoaderCircle } from 'lucide-react';
 import type React from 'react';
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { match } from 'ts-pattern';
 import { LAYOUT_CONSTANTS } from '../../constants/layoutConstants';
+import { useContainerWidth } from '../../hooks/useContainerWidth';
 import type { UseLoadingStateResult } from '../../hooks/useLoadingState';
 import { useThumbnailCache } from '../../hooks/useThumbnailCache';
 import { isPhotoLoaded } from '../../types/photo';
+import type { ValidWidth } from '../../types/validWidth';
 import { estimateGroupHeight } from '../../utils/estimateGroupHeight';
 import { JustifiedLayoutCalculator } from '../../utils/justifiedLayoutCalculator';
 import { AppHeader } from '../AppHeader';
@@ -42,184 +37,133 @@ interface GalleryContentProps
   galleryData?: PhotoGalleryData;
 }
 
-const SkeletonGroup = () => (
+/**
+ * スケルトン行の共通コンポーネント
+ */
+const SkeletonRow = () => (
   <div className="space-y-2 animate-pulse">
     <div className="h-8 bg-muted rounded-lg w-2/3" />
     <div className="grid grid-cols-4 gap-4">
-      {Array.from({ length: 8 }).map((_, _i) => (
-        <div
-          key={`skeleton-photo-${crypto.randomUUID()}`}
-          className="aspect-square bg-muted rounded-lg"
-        />
-      ))}
+      <div className="aspect-square bg-muted rounded-lg" />
+      <div className="aspect-square bg-muted rounded-lg" />
+      <div className="aspect-square bg-muted rounded-lg" />
+      <div className="aspect-square bg-muted rounded-lg" />
+      <div className="aspect-square bg-muted rounded-lg" />
+      <div className="aspect-square bg-muted rounded-lg" />
+      <div className="aspect-square bg-muted rounded-lg" />
+      <div className="aspect-square bg-muted rounded-lg" />
     </div>
   </div>
 );
 
 /**
- * 写真グリッドを表示するメインコンテンツエリア
- * 仮想スクロールを使用して大量の写真を効率的にレンダリングします。
- *
- * ## アーキテクチャ設計：動的レイアウトとバーチャルスクロールの協調
- *
- * このコンポーネントは以下の2つのシステムが密接に連携して動作します：
- *
- * 1. **PhotoGrid の動的幅計算**
- *    - コンテナ幅に基づいて各写真のサイズを動的に計算
- *    - ResizeObserver で幅の変化を検知し、レイアウトを再計算
- *    - 各行の写真を親要素の幅にジャストフィットさせる
- *
- * 2. **Virtualizer の高さ管理**
- *    - estimateSize で事前計算による高さ推定（estimateGroupHeight）
- *    - measureElement で実際のDOM要素の高さを測定・キャッシュ
- *    - キャッシュがある場合は実測値、なければ計算値を使用
- *
- * ## レイアウトシフト対策
- *
- * - **事前計算**: JustifiedLayoutCalculator で高さを事前推定
- * - **overscan**: 画面外のグループを多く保持してスクロールを安定化
- *
- * @see estimateGroupHeight - 高さ推定ロジック
- * @see JustifiedLayoutCalculator - レイアウト計算
+ * 幅測定中のスケルトン表示
  */
-const GalleryContent = memo(
+const MeasuringSkeleton = () => (
+  <div className="flex-1 p-4 space-y-8">
+    <SkeletonRow />
+    <SkeletonRow />
+    <SkeletonRow />
+  </div>
+);
+
+/**
+ * グルーピング中のスケルトン表示
+ */
+const GroupingSkeleton = () => (
+  <div className="flex-1 overflow-y-auto p-4 space-y-8">
+    <SkeletonRow />
+    <SkeletonRow />
+    <SkeletonRow />
+  </div>
+);
+
+/**
+ * 仮想スクロールギャラリーのプロパティ
+ */
+interface VirtualizedGalleryProps {
+  width: ValidWidth;
+  filteredGroups: Array<[string, GroupedPhoto]>;
+  groupsArray: GroupedPhoto[];
+  selectedPhotos: string[];
+  setSelectedPhotos: (
+    update: string[] | ((prev: string[]) => string[]),
+  ) => void;
+  isMultiSelectMode: boolean;
+  setIsMultiSelectMode: (value: boolean) => void;
+  isLoading: boolean;
+  galleryData?: PhotoGalleryData;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}
+
+/**
+ * 仮想スクロールを使用するギャラリー本体
+ *
+ * width が ValidWidth 型で保証されているため、レイアウト計算は常に成功する。
+ */
+const VirtualizedGallery = memo(
   ({
-    searchQuery,
-    searchType,
-    isLoadingStartupSync,
-    isLoadingGrouping,
-    finishLoadingGrouping,
+    width,
+    filteredGroups,
+    groupsArray,
+    selectedPhotos,
+    setSelectedPhotos,
+    isMultiSelectMode,
+    setIsMultiSelectMode,
+    isLoading,
     galleryData,
-  }: GalleryContentProps) => {
-    const {
-      groupedPhotos,
-      selectedPhotos,
-      setSelectedPhotos,
-      isMultiSelectMode,
-      setIsMultiSelectMode,
-    } = usePhotoGallery(searchQuery, searchType, {
-      onGroupingEnd: finishLoadingGrouping,
-    });
-    const containerRef = useRef<HTMLDivElement>(null);
+    containerRef,
+  }: VirtualizedGalleryProps) => {
     const [currentGroupIndex, setCurrentGroupIndex] = useState<
       number | undefined
     >(undefined);
     const observerRef = useRef<IntersectionObserver | null>(null);
 
-    // 単一の幅管理: GalleryContent が effectiveWidth を一元管理し、
-    // PhotoGrid/GroupWithSkeleton に props として渡す
-    const [effectiveWidth, setEffectiveWidth] = useState(0);
-    // コールバック内で常に最新の値を参照するための ref
-    // React の本番バッチングでクロージャが古い値を参照する問題を回避
-    const effectiveWidthRef = useRef(effectiveWidth);
-    effectiveWidthRef.current = effectiveWidth;
-
-    // ResizeObserver で幅を監視（1箇所に集約）
-    // Electron起動直後はDOMレイアウトが確定していない場合があるため、
-    // clientWidth が 0 の場合はリトライする
-    useEffect(() => {
-      if (!containerRef.current) return;
-
-      let retryTimeoutId: number | undefined;
-      let retryCount = 0;
-      const MAX_RETRIES = 10;
-      const RETRY_DELAY = 50; // ms
-
-      const updateWidth = () => {
-        const rawWidth = containerRef.current?.clientWidth ?? 0;
-
-        if (rawWidth > 0) {
-          setEffectiveWidth(
-            rawWidth - LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING,
-          );
-          retryCount = MAX_RETRIES; // 成功したらリトライを停止
-        } else if (retryCount < MAX_RETRIES) {
-          // 幅が0の場合、次のフレームで再測定をスケジュール
-          retryCount++;
-          retryTimeoutId = window.setTimeout(() => {
-            requestAnimationFrame(updateWidth);
-          }, RETRY_DELAY);
-        }
-      };
-
-      const observer = new ResizeObserver(updateWidth);
-      observer.observe(containerRef.current);
-      updateWidth(); // 初期値を設定
-
-      return () => {
-        observer.disconnect();
-        if (retryTimeoutId !== undefined) {
-          window.clearTimeout(retryTimeoutId);
-        }
-      };
-    }, []);
+    // ValidWidth を number として使用（型は保証済み）
+    const widthValue = width as number;
+    const widthRef = useRef(widthValue);
+    widthRef.current = widthValue;
 
     // サムネイルキャッシュ（Google Photos風の高速ローディング）
     const { prefetchThumbnails } = useThumbnailCache();
-
-    // 全てのグループを表示（写真があるグループもないグループも）
-    const filteredGroups = useMemo(() => {
-      return Object.entries(groupedPhotos);
-    }, [groupedPhotos]);
-
-    // DateJumpSidebar用のグループ配列
-    const groupsArray = useMemo<GroupedPhoto[]>(() => {
-      return filteredGroups.map(([_, group]) => group);
-    }, [filteredGroups]);
-
-    const isLoading = isLoadingGrouping || isLoadingStartupSync;
 
     // レイアウト計算機（再利用のためメモ化）
     const layoutCalculator = useMemo(() => new JustifiedLayoutCalculator(), []);
 
     // 仮想スクローラーの設定
-    // measureElement を削除し、事前計算のみを使用することで：
-    // 1. estimateSize と実測値の差異によるレイアウトシフトを防止
-    // 2. 上方向スクロール時の再測定によるジャンプ/スタッターを防止
     const virtualizer = useVirtualizer({
       count: filteredGroups.length,
       getScrollElement: () => containerRef.current,
       estimateSize: useCallback(
         (index) => {
           const [, group] = filteredGroups[index];
-          // ref.current を使用して常に最新の effectiveWidth を取得
-          // クロージャキャプチャの問題を回避し、本番ビルドでも正しく動作
           const estimate = estimateGroupHeight(
             group.photos,
-            effectiveWidthRef.current,
-            undefined, // キャッシュを使用しない
+            widthRef.current,
+            undefined,
             layoutCalculator,
           );
           return estimate.height;
         },
         [filteredGroups, layoutCalculator],
       ),
-      // 画面外のグループを多く保持してスクロール時のレイアウトシフトを軽減
       overscan: 5,
-      // measureElement を削除：再測定によるレイアウトシフトと上方向スクロール問題を防止
     });
 
-    // effectiveWidth が変更されたら virtualizer に再計算させる
-    // 初回レンダリング時は effectiveWidth = 0 なので、正しい値になった時点で再計算が必要
-    // useLayoutEffect を使用: ペイント前に同期的に実行し、本番ビルドでのタイミング問題を防止
-    useLayoutEffect(() => {
-      if (effectiveWidth > 0) {
-        virtualizer.measure();
-      }
-    }, [effectiveWidth, virtualizer]);
+    // 幅が変更されたら virtualizer に再計算させる
+    useEffect(() => {
+      virtualizer.measure();
+    }, [widthValue, virtualizer]);
 
     // 日付ジャンプハンドラー
     const handleJumpToDate = useCallback(
       (groupIndex: number) => {
-        // 即座にジャンプ（アニメーションなし）
         virtualizer.scrollToIndex(groupIndex, {
           behavior: 'auto',
           align: 'start',
         });
 
-        // バーチャルスクロールの更新を強制
         requestAnimationFrame(() => {
-          // 再度確実にジャンプ（バーチャルスクロールの測定が完了後）
           virtualizer.scrollToIndex(groupIndex, {
             behavior: 'auto',
             align: 'start',
@@ -229,18 +173,16 @@ const GalleryContent = memo(
       [virtualizer],
     );
 
-    // 表示中のグループの写真をプリフェッチ（Google Photos風の先読み）
+    // 表示中のグループの写真をプリフェッチ
     useEffect(() => {
       const virtualItems = virtualizer.getVirtualItems();
       if (virtualItems.length === 0) return;
 
-      // 表示中 + 前後のグループのインデックスを計算
       const firstIndex = virtualItems[0].index;
       const lastIndex = virtualItems[virtualItems.length - 1].index;
-      const prefetchStart = Math.max(0, firstIndex - 2); // 2グループ前から
-      const prefetchEnd = Math.min(filteredGroups.length, lastIndex + 5); // 5グループ先まで
+      const prefetchStart = Math.max(0, firstIndex - 2);
+      const prefetchEnd = Math.min(filteredGroups.length, lastIndex + 5);
 
-      // プリフェッチ対象の写真パスを収集（完全ロード済みのみ）
       const pathsToPrefetch: string[] = [];
       for (let i = prefetchStart; i < prefetchEnd; i++) {
         const [, group] = filteredGroups[i];
@@ -251,7 +193,6 @@ const GalleryContent = memo(
         }
       }
 
-      // バッチでプリフェッチ
       if (pathsToPrefetch.length > 0) {
         prefetchThumbnails(pathsToPrefetch);
       }
@@ -267,7 +208,6 @@ const GalleryContent = memo(
             (entry) => entry.isIntersecting,
           );
           if (visibleEntries.length > 0) {
-            // 最も上にある可視グループを取得
             const topEntry = visibleEntries.reduce((prev, current) => {
               return prev.boundingClientRect.top <
                 current.boundingClientRect.top
@@ -282,7 +222,7 @@ const GalleryContent = memo(
         },
         {
           root: containerRef.current,
-          rootMargin: '-10% 0px -80% 0px', // 上部10%付近のグループを検知
+          rootMargin: '-10% 0px -80% 0px',
           threshold: 0,
         },
       );
@@ -292,11 +232,8 @@ const GalleryContent = memo(
       return () => {
         observer.disconnect();
       };
-    }, []);
+    }, [containerRef]);
 
-    /**
-     * 背景（コンテナ自身）がクリックされた場合に写真の選択を解除するハンドラ
-     */
     const handleBackgroundClick = useCallback(
       (
         event:
@@ -308,36 +245,17 @@ const GalleryContent = memo(
           setIsMultiSelectMode(false);
         }
       },
-      [isMultiSelectMode, setSelectedPhotos, setIsMultiSelectMode],
+      [
+        containerRef,
+        isMultiSelectMode,
+        setSelectedPhotos,
+        setIsMultiSelectMode,
+      ],
     );
 
-    if (isLoadingGrouping) {
-      return (
-        <div className="flex-1 overflow-y-auto p-4 space-y-8">
-          {Array.from({ length: 3 }).map((_, _i) => (
-            <SkeletonGroup key={`skeleton-group-${crypto.randomUUID()}`} />
-          ))}
-        </div>
-      );
-    }
-
     return (
-      <GalleryErrorBoundary>
-        {galleryData && (
-          <AppHeader
-            searchQuery={galleryData.searchQuery}
-            setSearchQuery={galleryData.setSearchQuery}
-            onOpenSettings={galleryData.onOpenSettings}
-            selectedPhotoCount={galleryData.selectedPhotoCount}
-            onClearSelection={galleryData.onClearSelection}
-            isMultiSelectMode={galleryData.isMultiSelectMode}
-            onCopySelected={galleryData.onCopySelected}
-            loadingState={galleryData.loadingState}
-            showGalleryControls={true}
-          />
-        )}
+      <>
         <div
-          ref={containerRef}
           className="flex-1 overflow-y-auto p-4 pr-4 scrollbar-none"
           onClick={handleBackgroundClick}
           onKeyDown={(e) => {
@@ -358,8 +276,6 @@ const GalleryContent = memo(
           >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const [key, group] = filteredGroups[virtualRow.index];
-              // Immich方式: 全写真がロード済みかどうかで表示を切り替え
-              // スケルトンと実コンテンツが同じ高さを使用するためレイアウトシフトなし
               const isGroupFullyLoaded =
                 group.photos.length > 0 &&
                 group.photos.every((photo) => isPhotoLoaded(photo));
@@ -369,7 +285,6 @@ const GalleryContent = memo(
                   key={key}
                   data-index={virtualRow.index}
                   ref={(el) => {
-                    // IntersectionObserver のみ設定（measureElement は不要）
                     if (el) {
                       observerRef.current?.observe(el);
                     }
@@ -383,7 +298,6 @@ const GalleryContent = memo(
                   }}
                 >
                   {isGroupFullyLoaded ? (
-                    // ロード完了: 実際の写真を表示
                     <div className="w-full space-y-0">
                       <LocationGroupHeader
                         worldId={group.worldInfo?.worldId ?? null}
@@ -397,7 +311,7 @@ const GalleryContent = memo(
                       <div className="w-full rounded-b-lg overflow-hidden">
                         <PhotoGrid
                           photos={group.photos}
-                          effectiveWidth={effectiveWidth}
+                          effectiveWidth={widthValue}
                           selectedPhotos={selectedPhotos}
                           setSelectedPhotos={setSelectedPhotos}
                           isMultiSelectMode={isMultiSelectMode}
@@ -407,11 +321,9 @@ const GalleryContent = memo(
                       </div>
                     </div>
                   ) : (
-                    // ロード中またはphotoなし: GroupWithSkeletonが両方を統一的に処理
-                    // photos.length === 0 の場合はヘッダーのみ表示
                     <GroupWithSkeleton
                       photos={group.photos}
-                      effectiveWidth={effectiveWidth}
+                      effectiveWidth={widthValue}
                       worldId={group.worldInfo?.worldId ?? null}
                       worldName={group.worldInfo?.worldName ?? null}
                       worldInstanceId={group.worldInfo?.worldInstanceId ?? null}
@@ -436,6 +348,115 @@ const GalleryContent = memo(
           currentGroupIndex={currentGroupIndex}
           scrollContainer={containerRef.current}
         />
+      </>
+    );
+  },
+);
+
+VirtualizedGallery.displayName = 'VirtualizedGallery';
+
+/**
+ * 写真グリッドを表示するメインコンテンツエリア
+ *
+ * ## アーキテクチャ設計：動的レイアウトとバーチャルスクロールの協調
+ *
+ * このコンポーネントは以下のパターンで動作します：
+ *
+ * 1. **useContainerWidth フック**
+ *    - コンテナ幅を測定し、ValidWidth 型で保証
+ *    - 測定中（measuring）と準備完了（ready）の状態を区別
+ *
+ * 2. **条件付きレンダリング**
+ *    - 測定中: MeasuringSkeleton を表示
+ *    - 準備完了: VirtualizedGallery を表示（width は常に > 0 が保証）
+ *
+ * ## 型安全性
+ *
+ * ValidWidth 型により、レイアウト計算コードでの width === 0 のチェックが不要。
+ * 型レベルで 0 以下の値が排除される。
+ *
+ * @see useContainerWidth - 幅測定フック
+ * @see ValidWidth - 有効な幅の Branded Type
+ */
+const GalleryContent = memo(
+  ({
+    searchQuery,
+    searchType,
+    isLoadingStartupSync,
+    isLoadingGrouping,
+    finishLoadingGrouping,
+    galleryData,
+  }: GalleryContentProps) => {
+    const {
+      groupedPhotos,
+      selectedPhotos,
+      setSelectedPhotos,
+      isMultiSelectMode,
+      setIsMultiSelectMode,
+    } = usePhotoGallery(searchQuery, searchType, {
+      onGroupingEnd: finishLoadingGrouping,
+    });
+
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // useContainerWidth で幅を測定（ValidWidth 型を保証）
+    const widthState = useContainerWidth(
+      containerRef,
+      LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING,
+    );
+
+    // 全てのグループを表示（写真があるグループもないグループも）
+    const filteredGroups = useMemo(() => {
+      return Object.entries(groupedPhotos);
+    }, [groupedPhotos]);
+
+    // DateJumpSidebar用のグループ配列
+    const groupsArray = useMemo<GroupedPhoto[]>(() => {
+      return filteredGroups.map(([_, group]) => group);
+    }, [filteredGroups]);
+
+    const isLoading = isLoadingGrouping || isLoadingStartupSync;
+
+    // グルーピング中はスケルトンを表示
+    if (isLoadingGrouping) {
+      return <GroupingSkeleton />;
+    }
+
+    return (
+      <GalleryErrorBoundary>
+        {galleryData && (
+          <AppHeader
+            searchQuery={galleryData.searchQuery}
+            setSearchQuery={galleryData.setSearchQuery}
+            onOpenSettings={galleryData.onOpenSettings}
+            selectedPhotoCount={galleryData.selectedPhotoCount}
+            onClearSelection={galleryData.onClearSelection}
+            isMultiSelectMode={galleryData.isMultiSelectMode}
+            onCopySelected={galleryData.onCopySelected}
+            loadingState={galleryData.loadingState}
+            showGalleryControls={true}
+          />
+        )}
+        {/* コンテナは常にレンダリング（幅測定のため） */}
+        <div ref={containerRef} className="flex-1 flex flex-col">
+          {match(widthState)
+            .with({ status: 'measuring' }, () => <MeasuringSkeleton />)
+            .with({ status: 'ready' }, ({ width }) => (
+              <VirtualizedGallery
+                width={width}
+                filteredGroups={filteredGroups}
+                groupsArray={groupsArray}
+                selectedPhotos={selectedPhotos}
+                setSelectedPhotos={setSelectedPhotos}
+                isMultiSelectMode={isMultiSelectMode}
+                setIsMultiSelectMode={setIsMultiSelectMode}
+                isLoading={isLoading}
+                galleryData={galleryData}
+                containerRef={containerRef}
+              />
+            ))
+            .exhaustive()}
+        </div>
       </GalleryErrorBoundary>
     );
   },

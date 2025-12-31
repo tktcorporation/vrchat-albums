@@ -113,21 +113,8 @@ describe('estimateGroupHeight', () => {
       expect(result.source).toBe('calculated');
     });
 
-    it('containerWidth = 0 の場合はデフォルト幅で計算する', () => {
-      const photos = createMockPhotos(5);
-      const calculator = new JustifiedLayoutCalculator();
-      const expectedHeight = calculator.calculateTotalHeight(
-        photos,
-        GROUP_HEIGHT_CONSTANTS.DEFAULT_CONTAINER_WIDTH,
-      );
-
-      const result = estimateGroupHeight(photos, 0, undefined, calculator);
-
-      expect(result.height).toBe(
-        expectedHeight + GROUP_HEIGHT_CONSTANTS.GROUP_SPACING,
-      );
-      expect(result.source).toBe('calculated');
-    });
+    // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
+    // そのため containerWidth = 0 のテストは削除
 
     it('calculator が渡されない場合は内部で作成する', () => {
       const photos = createMockPhotos(3);
@@ -248,16 +235,8 @@ describe('precomputeGroupHeights', () => {
     expect(cache.get('group-2')).toBeGreaterThan(0); // 新規計算
   });
 
-  it('containerWidth = 0 の場合は計算をスキップする', () => {
-    const groups = [
-      { key: 'group-1', photos: createMockPhotos(3) },
-      { key: 'group-2', photos: createMockPhotos(5) },
-    ];
-
-    const cache = precomputeGroupHeights(groups, 0);
-
-    expect(cache.size).toBe(0);
-  });
+  // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
+  // そのため containerWidth = 0 のテストは削除
 
   it('空のグループ配列でも正常に動作する', () => {
     const cache = precomputeGroupHeights([], 1000);
@@ -324,23 +303,8 @@ describe('effectiveWidth によるレイアウト変化の保証', () => {
     expect(narrow.height).toBeGreaterThan(wide.height);
   });
 
-  it('effectiveWidth = 0 の場合はデフォルト幅（1200px）で計算される', () => {
-    const photos = createMockPhotos(5);
-
-    const withZero = estimateGroupHeight(photos, 0, undefined);
-    const withDefault = estimateGroupHeight(
-      photos,
-      GROUP_HEIGHT_CONSTANTS.DEFAULT_CONTAINER_WIDTH,
-      undefined,
-    );
-
-    // effectiveWidth = 0 でもデフォルト幅で計算されるため、高さは 0 ではない
-    expect(withZero.height).toBeGreaterThan(0);
-    expect(withZero.source).toBe('calculated');
-
-    // デフォルト幅と同じ結果になる
-    expect(withZero.height).toBe(withDefault.height);
-  });
+  // Note: effectiveWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
+  // そのため effectiveWidth = 0 のテストは削除
 
   it('ウィンドウリサイズ時に高さが再計算される', () => {
     const photos = createMockPhotos(8);
@@ -362,10 +326,7 @@ describe('GROUP_HEIGHT_CONSTANTS', () => {
     expect(GROUP_HEIGHT_CONSTANTS.GROUP_SPACING).toBeGreaterThan(0);
   });
 
-  it('DEFAULT_CONTAINER_WIDTH は妥当な画面幅である', () => {
-    expect(GROUP_HEIGHT_CONSTANTS.DEFAULT_CONTAINER_WIDTH).toBeGreaterThan(800);
-    expect(GROUP_HEIGHT_CONSTANTS.DEFAULT_CONTAINER_WIDTH).toBeLessThan(2000);
-  });
+  // Note: DEFAULT_CONTAINER_WIDTH は削除済み（ValidWidth 型により不要）
 
   it('FALLBACK_EMPTY_HEIGHT は LAYOUT_CONSTANTS と整合性がある', () => {
     expect(GROUP_HEIGHT_CONSTANTS.FALLBACK_EMPTY_HEIGHT).toBe(

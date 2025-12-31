@@ -60,10 +60,7 @@ export class JustifiedLayoutCalculator {
    * PhotoGrid でのレンダリングに使用される
    */
   calculateLayout(photos: Photo[], containerWidth: number): LayoutResult {
-    if (containerWidth === 0) {
-      return { rows: [], totalHeight: 0, gridHeight: 0 };
-    }
-
+    // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
     const rows: LayoutPhoto[][] = [];
     let currentRow: LayoutPhoto[] = [];
     let rowWidth = 0;
@@ -122,8 +119,7 @@ export class JustifiedLayoutCalculator {
    * GalleryContent での高さ予測に使用される
    */
   calculateTotalHeight(photos: Photo[], containerWidth: number): number {
-    if (containerWidth === 0) return 0;
-
+    // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
     let totalHeight = this.constants.HEADER_HEIGHT + this.constants.SPACING;
 
     // 写真がない場合は固定の高さを返す
