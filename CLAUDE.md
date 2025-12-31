@@ -176,38 +176,8 @@
 
       <fromThrowable-preference priority="warning" jp="推奨パターン">
         <principle>try-catch よりも fromThrowable/ResultAsync.fromPromise を優先</principle>
-
-        <recommended>
-          <pattern name="同期関数">
-            <![CDATA[
-            import { fromThrowable } from 'neverthrow';
-            const safeParse = fromThrowable(
-              (str: string) => JSON.parse(str),
-              (error): ParseError => ({ type: 'PARSE_ERROR', message: String(error) })
-            );
-            ]]>
-          </pattern>
-          <pattern name="非同期関数">
-            <![CDATA[
-            import { ResultAsync } from 'neverthrow';
-            function fetchData(url: string): ResultAsync<Data, FetchError> {
-              return ResultAsync.fromPromise(
-                fetch(url).then(r => r.json()),
-                (error): FetchError => ({ type: 'FETCH_ERROR', message: String(error) })
-              );
-            }
-            ]]>
-          </pattern>
-        </recommended>
-
-        <acceptable-try-catch jp="例外的にtry-catchが適切な場合">
-          <case>リソースのクリーンアップを伴うfinally句がある場合</case>
-          <case>ts-patternでエラーを分類し、予期しないエラーを再スローする場合</case>
-          <case>Electron環境検出など、フォールバック値を返すパターン</case>
-        </acceptable-try-catch>
-
-        <lint-command>yarn lint:neverthrow (prefer-fromThrowable warning)</lint-command>
-        <reference>docs/lint-neverthrow.md#fromthrowable-vs-try-catch</reference>
+        <exceptions>finally句、ts-patternでの分類+再スロー、Electron環境検出</exceptions>
+        <reference>docs/lint-neverthrow.md#fromthrowable-vs-try-catch (詳細・コード例)</reference>
       </fromThrowable-preference>
     </pattern>
 
