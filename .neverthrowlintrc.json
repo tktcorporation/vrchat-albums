@@ -35,7 +35,7 @@
       "allowWithRethrow": true,
       "allowElectronEnvDetection": true,
       "allowLogAndFallback": false,
-      "allowReturnErrOnCatch": true,
+      "allowReturnErrOnCatch": false,
       "allowMatchWithFallback": false
     }
   },

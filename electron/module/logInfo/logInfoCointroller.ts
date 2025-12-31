@@ -287,42 +287,10 @@ export const getPlayerJoinListInSameWorld = async (
   );
   const cacheKey = `playerList:${sessionStartTime}:${recentWorldJoin.worldId}:${recentWorldJoin.worldInstanceId}`;
 
-  const cacheResult = await playerListCache.getOrFetch(cacheKey, async () => {
+  // Note: 予期しないエラーは自動的に throw され Sentry に通知される
+  return playerListCache.getOrFetch(cacheKey, async () => {
     return getPlayerJoinListInSameWorldCore(datetime, recentWorldJoin);
   });
-
-  // キャッシュエラーの詳細情報をログに出力してからログノットファウンドとして処理
-  if (
-    cacheResult.isErr() &&
-    typeof cacheResult.error === 'object' &&
-    'code' in cacheResult.error &&
-    cacheResult.error.code === 'CACHE_ERROR'
-  ) {
-    logger.error({
-      message: `Cache error in getPlayerJoinListInSameWorld: ${
-        cacheResult.error.message
-      } (cacheKey: ${cacheResult.error.cacheKey}, operation: ${
-        cacheResult.error.operation
-      }, datetime: ${datetime.toISOString()})`,
-      stack: match(cacheResult.error.originalError)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise((err) => new Error(String(err))),
-    });
-    return neverthrow.err('RECENT_JOIN_LOG_NOT_FOUND' as const);
-  }
-
-  // キャッシュ結果の型を適切にキャストして返す
-  return cacheResult as neverthrow.Result<
-    {
-      id: string;
-      playerId: string | null;
-      playerName: string;
-      joinDateTime: Date;
-      createdAt: Date;
-      updatedAt: Date;
-    }[],
-    'RECENT_JOIN_LOG_NOT_FOUND'
-  >;
 };
 
 /**
