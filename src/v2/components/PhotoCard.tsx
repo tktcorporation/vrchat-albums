@@ -241,9 +241,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         className={clsx(
           'photo-card group relative overflow-hidden transition-all duration-150',
           'cursor-pointer flex items-center justify-center',
-          isSelected
-            ? 'bg-gray-200 dark:bg-gray-700'
-            : 'bg-gray-100 dark:bg-gray-800',
+          isSelected ? 'bg-muted' : 'bg-muted/60',
           !isMultiSelectMode && 'hover:brightness-105 hover:shadow-sm',
         )}
         style={{
@@ -330,7 +328,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
                   />
                 ) : (
                   <div
-                    className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse"
+                    className="absolute inset-0 bg-muted animate-pulse"
                     style={{ aspectRatio: `${photo.width / photo.height}` }}
                   />
                 )}

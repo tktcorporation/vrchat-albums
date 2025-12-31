@@ -127,9 +127,9 @@ export const ShareDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="h-[70vh] flex flex-col p-0 backdrop-blur-xl bg-white/80 dark:bg-gray-900/80 border border-white/20 dark:border-gray-700/30 shadow-2xl">
-        <DialogHeader className="px-6 pt-4 pb-2 border-b border-white/10 dark:border-gray-700/20 flex flex-row items-center justify-between">
-          <DialogTitle className="text-lg font-semibold text-gray-800 dark:text-white">
+      <DialogContent className="h-[70vh] flex flex-col p-0 backdrop-blur-xl bg-popover/80 border border-border/20 shadow-2xl">
+        <DialogHeader className="px-6 pt-4 pb-2 border-b border-border/20 flex flex-row items-center justify-between">
+          <DialogTitle className="text-lg font-semibold text-foreground">
             {t('locationHeader.share')}
           </DialogTitle>
           <div className="flex items-center gap-2">
@@ -137,7 +137,7 @@ export const ShareDialog = ({
               type="button"
               onClick={handleCopyShareImageToClipboard}
               disabled={isLoading}
-              className="p-2 rounded-lg bg-white/20 dark:bg-gray-800/50 hover:bg-white/30 dark:hover:bg-gray-800/60 border border-white/10 dark:border-gray-700/30 text-gray-700 dark:text-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-background/20 hover:bg-background/30 border border-border/30 text-muted-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               title={t('locationHeader.copyToClipboard')}
             >
               <Copy className={ICON_SIZE.md.class} />
@@ -146,7 +146,7 @@ export const ShareDialog = ({
               type="button"
               onClick={handleDownloadShareImagePng}
               disabled={isLoading}
-              className="p-2 rounded-lg bg-white/20 dark:bg-gray-800/50 hover:bg-white/30 dark:hover:bg-gray-800/60 border border-white/10 dark:border-gray-700/30 text-gray-700 dark:text-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 rounded-lg bg-background/20 hover:bg-background/30 border border-border/30 text-muted-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               title={t('locationHeader.downloadImage')}
             >
               <Download className={ICON_SIZE.md.class} />
@@ -154,7 +154,7 @@ export const ShareDialog = ({
           </div>
         </DialogHeader>
         <div className="flex flex-col pb-6 px-6 h-[calc(100vh-130px)] items-center justify-center">
-          <div className="h-full aspect-[4/3] overflow-y-auto border border-white/10 dark:border-gray-700/20 rounded-lg">
+          <div className="h-full aspect-[4/3] overflow-y-auto border border-border/20 rounded-lg">
             <ContextMenu>
               <ContextMenuTrigger className="w-full">
                 <div className="h-full rounded-lg overflow-y-auto">
@@ -179,9 +179,9 @@ export const ShareDialog = ({
                   </div>
                 </div>
               </ContextMenuTrigger>
-              <ContextMenuContent className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-white/20 dark:border-gray-700/30 shadow-lg">
+              <ContextMenuContent className="bg-popover/95 backdrop-blur-md border border-border/30 shadow-lg">
                 <ContextMenuItem
-                  className="hover:bg-white/50 dark:hover:bg-gray-800/50 focus:bg-white/60 dark:focus:bg-gray-800/60 flex items-center gap-2"
+                  className="hover:bg-muted/50 focus:bg-muted/60 flex items-center gap-2"
                   onClick={handleCopyShareImageToClipboard}
                   disabled={isLoading}
                 >
@@ -189,7 +189,7 @@ export const ShareDialog = ({
                   <span>{t('locationHeader.copyToClipboard')}</span>
                 </ContextMenuItem>
                 <ContextMenuItem
-                  className="hover:bg-white/50 dark:hover:bg-gray-800/50 focus:bg-white/60 dark:focus:bg-gray-800/60 flex items-center gap-2"
+                  className="hover:bg-muted/50 focus:bg-muted/60 flex items-center gap-2"
                   onClick={handleDownloadShareImagePng}
                   disabled={isLoading}
                 >
@@ -200,17 +200,17 @@ export const ShareDialog = ({
             </ContextMenu>
           </div>
         </div>
-        <DialogFooter className="px-6 py-4 border-t border-white/10 dark:border-gray-700/20">
+        <DialogFooter className="px-6 py-4 border-t border-border/20">
           <div className="flex items-center space-x-2">
             <Switch
               id="show-all-players"
-              className="data-[state=checked]:bg-primary-500/90 data-[state=unchecked]:bg-white/20 dark:data-[state=unchecked]:bg-gray-800/50"
+              className="data-[state=checked]:bg-primary/90 data-[state=unchecked]:bg-muted"
               checked={showAllPlayers}
               onCheckedChange={setShowAllPlayers}
             />
             <Label
               htmlFor="show-all-players"
-              className="text-sm text-gray-800 dark:text-gray-200 cursor-pointer"
+              className="text-sm text-foreground cursor-pointer"
             >
               {t('locationHeader.showAllPlayers')}
             </Label>

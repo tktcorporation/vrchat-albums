@@ -51,6 +51,18 @@
 
     --radius: 0.75rem;
 
+    /* Status colors - semantic feedback colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 38 92% 20%;
+    --info: 200 98% 39%;
+    --info-foreground: 0 0% 100%;
+
+    /* Surface hierarchy */
+    --surface-elevated: 0 0% 100% / 0.9;
+    --surface-sunken: 220 5% 96% / 0.6;
+
     /* Arc Browser style subtle gradient background - reduced brightness for better contrast */
     --gradient-start: 220 15% 92%;
     --gradient-middle: 225 12% 90%;
@@ -68,7 +80,7 @@
     --foreground: 220 15% 85%;
 
     --muted: 220 27% 12% / 0.4;
-    --muted-foreground: 220 10% 60%;
+    --muted-foreground: 220 10% 65%; /* Increased contrast from 60% */
 
     --accent: 220 27% 18% / 0.6;
     --accent-foreground: 220 15% 85%;
@@ -94,6 +106,18 @@
     --ring: 32 95% 55% / 0.3;
 
     --radius: 0.75rem;
+
+    /* Status colors - dark mode variants */
+    --success: 142 70% 45%;
+    --success-foreground: 142 70% 10%;
+    --warning: 38 88% 55%;
+    --warning-foreground: 38 88% 10%;
+    --info: 200 90% 50%;
+    --info-foreground: 200 90% 10%;
+
+    /* Surface hierarchy - dark mode */
+    --surface-elevated: 220 27% 14% / 0.9;
+    --surface-sunken: 220 27% 6% / 0.6;
 
     /* Dark mode subtle gradient */
     --gradient-start: 220 27% 10%;

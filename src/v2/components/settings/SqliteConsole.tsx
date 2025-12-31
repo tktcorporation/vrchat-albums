@@ -113,15 +113,15 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[800px] h-[80vh] flex flex-col gap-0 p-0 bg-white dark:bg-gray-800">
-        <DialogHeader className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <DialogTitle className="flex items-center text-xl font-semibold text-gray-900 dark:text-white">
-            <Database className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
+      <DialogContent className="w-[800px] h-[80vh] flex flex-col gap-0 p-0 bg-popover">
+        <DialogHeader className="px-6 py-4 border-b border-border">
+          <DialogTitle className="flex items-center text-xl font-semibold text-foreground">
+            <Database className="h-5 w-5 mr-2 text-info" />
             {t('debug.sqliteConsole.title') || 'SQLite Console'}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center space-x-2">
+        <div className="px-6 py-4 border-b border-border flex items-center space-x-2">
           <Checkbox
             id="debug-log-enable"
             checked={isDebugLogEnabled}
@@ -137,7 +137,7 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
           </Label>
         </div>
 
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-border">
           <Button
             onClick={handleThrowError}
             disabled={isThrowingError}
@@ -152,11 +152,11 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
             <div className="flex items-center justify-between">
               <label
                 htmlFor="query"
-                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                className="text-sm font-medium text-muted-foreground"
               >
                 {t('debug.sqliteConsole.queryLabel') || 'SQL Query'}
               </label>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-muted-foreground/80">
                 {t('debug.sqliteConsole.shortcut') ||
                   'Press Cmd/Ctrl + Enter to execute'}
               </span>
@@ -183,7 +183,7 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
                 placeholder={
                   t('debug.sqliteConsole.placeholder') || 'Enter SQL query...'
                 }
-                className="font-mono text-sm min-h-[120px] resize-none bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                className="font-mono text-sm min-h-[120px] resize-none bg-background border-border text-foreground placeholder-muted-foreground"
               />
               <Button
                 size="sm"
@@ -198,11 +198,11 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
           </div>
 
           <div className="flex-1 overflow-hidden flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="text-sm font-medium text-muted-foreground">
               {t('debug.sqliteConsole.resultLabel') || 'Result'}
             </label>
-            <div className="flex-1 overflow-auto rounded-lg bg-gray-50 dark:bg-gray-900/50">
-              <pre className="h-full p-4 font-mono text-sm text-gray-900 dark:text-white">
+            <div className="flex-1 overflow-auto rounded-lg bg-muted">
+              <pre className="h-full p-4 font-mono text-sm text-foreground">
                 {result ||
                   t('debug.sqliteConsole.noResult') ||
                   'Results will appear here...'}

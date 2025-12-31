@@ -37,7 +37,7 @@ const SearchCombobox = memo(
         <button
           type="button"
           onClick={handleOpenOverlay}
-          className={`relative flex items-center w-full h-7 bg-white/60 dark:bg-gray-900/40 backdrop-blur-xl rounded-2xl border-0 px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-white/70 dark:hover:bg-gray-900/50 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-white/5 ${
+          className={`relative flex items-center w-full h-7 bg-popover/60 backdrop-blur-xl rounded-2xl border-0 px-4 py-2 text-sm font-medium transition-all duration-300 hover:bg-popover/70 hover:shadow-md hover:shadow-black/5 dark:hover:shadow-white/5 ${
             className || ''
           }`}
           aria-label="検索を開く"
@@ -47,7 +47,7 @@ const SearchCombobox = memo(
             {searchQuery || t('common.search.placeholder')}
           </span>
           {searchQuery && (
-            <div className="ml-2 text-xs text-muted-foreground/60 bg-gray-100/50 dark:bg-gray-800/50 px-2 py-0.5 rounded-md">
+            <div className="ml-2 text-xs text-muted-foreground/60 bg-muted/50 px-2 py-0.5 rounded-md">
               検索中
             </div>
           )}

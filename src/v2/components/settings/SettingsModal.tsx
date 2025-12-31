@@ -115,14 +115,14 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent className="h-[90vh] w-[800px] max-w-[800px] p-0 glass-panel">
-        <DialogHeader className="px-6 py-4 border-b border-gray-200/40 dark:border-gray-700/40 backdrop-blur-sm">
+        <DialogHeader className="px-6 py-4 border-b border-border/40 backdrop-blur-sm">
           <DialogTitle className="text-xl font-semibold">
             {t('common.settings')}
           </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 flex h-[calc(90vh-80px)]">
-          <div className="flex-none w-48 border-r border-gray-200/30 dark:border-gray-700/30">
+          <div className="flex-none w-48 border-r border-border/30">
             <nav className="flex flex-col p-2" aria-label="Tabs">
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button

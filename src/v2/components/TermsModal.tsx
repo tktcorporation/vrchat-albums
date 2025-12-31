@@ -25,22 +25,22 @@ import { useI18n } from '../i18n/store';
  */
 const markdownComponents = {
   h2: ({ children }: { children?: React.ReactNode }) => (
-    <h2 className="text-base font-bold text-gray-900 dark:text-gray-100 mt-6 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+    <h2 className="text-base font-bold text-foreground mt-6 mb-3 pb-2 border-b border-border">
       {children}
     </h2>
   ),
   h3: ({ children }: { children?: React.ReactNode }) => (
-    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-4 mb-2">
+    <h3 className="text-sm font-semibold text-foreground/90 mt-4 mb-2">
       {children}
     </h3>
   ),
   p: ({ children }: { children?: React.ReactNode }) => (
-    <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-3">
+    <p className="text-sm leading-relaxed text-muted-foreground mb-3">
       {children}
     </p>
   ),
   ul: ({ children }: { children?: React.ReactNode }) => (
-    <ul className="list-disc list-inside text-sm text-gray-700 dark:text-gray-300 mb-3 space-y-1 ml-2">
+    <ul className="list-disc list-inside text-sm text-muted-foreground mb-3 space-y-1 ml-2">
       {children}
     </ul>
   ),
@@ -48,9 +48,7 @@ const markdownComponents = {
     <li className="leading-relaxed">{children}</li>
   ),
   strong: ({ children }: { children?: React.ReactNode }) => (
-    <strong className="font-semibold text-gray-900 dark:text-gray-100">
-      {children}
-    </strong>
+    <strong className="font-semibold text-foreground">{children}</strong>
   ),
 };
 
@@ -121,11 +119,11 @@ export const TermsModal = ({
   return (
     <Dialog open={open} onOpenChange={canClose ? () => {} : undefined}>
       <DialogContent
-        className="max-w-[800px] h-[80vh] bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-gray-200/50 dark:border-gray-700/50 shadow-2xl"
+        className="max-w-[800px] h-[80vh] bg-popover/95 backdrop-blur-md border border-border/50 shadow-2xl"
         showCloseButton={canClose}
       >
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-gray-900 dark:text-gray-100">
+          <DialogTitle className="text-xl font-bold text-foreground">
             {isUpdate ? t('terms.updateTitle') : t('terms.title')}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -140,7 +138,7 @@ export const TermsModal = ({
                 <FileText className="h-5 w-5" />
                 {terms.sections.termsOfService.title}
               </h3>
-              <div className="bg-gray-50/80 dark:bg-gray-800/80 rounded-lg p-6 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
+              <div className="bg-muted/80 rounded-lg p-6 backdrop-blur-sm border border-border/50">
                 <Markdown
                   remarkPlugins={[remarkGfm]}
                   components={markdownComponents}
@@ -155,7 +153,7 @@ export const TermsModal = ({
                 <Shield className="h-5 w-5" />
                 {terms.sections.privacyPolicy.title}
               </h3>
-              <div className="bg-gray-50/80 dark:bg-gray-800/80 rounded-lg p-6 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
+              <div className="bg-muted/80 rounded-lg p-6 backdrop-blur-sm border border-border/50">
                 <Markdown
                   remarkPlugins={[remarkGfm]}
                   components={markdownComponents}
