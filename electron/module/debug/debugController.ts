@@ -21,40 +21,23 @@ export const debugRouter = router({
       }),
     )
     .mutation(async ({ input }: { input: QueryInput }) => {
-      try {
-        // DBQueueを使用してクエリを実行
-        const result = await executeQuery(input.query);
-        if (result.isErr()) {
-          throw UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.DATABASE_ERROR,
-            category: ERROR_CATEGORIES.DATABASE_ERROR,
-            message: 'SQL query execution failed',
-            userMessage: `SQLクエリの実行に失敗しました: ${result.error.message}`,
-            cause:
-              result.error instanceof Error
-                ? result.error
-                : new Error(String(result.error)),
-          });
-        }
-        return result.value;
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          throw UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.DATABASE_ERROR,
-            category: ERROR_CATEGORIES.DATABASE_ERROR,
-            message: 'SQL query execution failed',
-            userMessage: `SQLクエリの実行に失敗しました: ${error.message}`,
-            cause: error,
-          });
-        }
+      // DBQueueを使用してクエリを実行
+      // executeQuery は Result 型を返すため、try-catch は不要
+      // 予期しないエラーは自動的に throw されて Sentry に送信される
+      const result = await executeQuery(input.query);
+
+      if (result.isErr()) {
+        const error = result.error;
         throw UserFacingError.withStructuredInfo({
-          code: ERROR_CODES.UNKNOWN,
-          category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-          message: 'Unexpected error during SQL query execution',
-          userMessage: 'SQLクエリの実行中に予期しないエラーが発生しました。',
-          cause: error instanceof Error ? error : new Error(String(error)),
+          code: ERROR_CODES.DATABASE_ERROR,
+          category: ERROR_CATEGORIES.DATABASE_ERROR,
+          message: 'SQL query execution failed',
+          userMessage: `SQLクエリの実行に失敗しました: ${error.message}`,
+          cause: new Error(error.message),
         });
       }
+
+      return result.value;
     }),
   setLogLevel: procedure
     .input(
