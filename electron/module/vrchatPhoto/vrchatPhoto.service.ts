@@ -756,6 +756,10 @@ interface SkipStatistics {
     folderNotFound: number;
     permissionDenied: number;
   };
+  statErrors: {
+    fileNotFound: number;
+    permissionDenied: number;
+  };
 }
 
 /**
@@ -776,6 +780,7 @@ const getChangedFoldersWithFiles = async (
   const skipStats: SkipStatistics = {
     digestErrors: { folderNotFound: 0, permissionDenied: 0 },
     readdirErrors: { folderNotFound: 0, permissionDenied: 0 },
+    statErrors: { fileNotFound: 0, permissionDenied: 0 },
   };
 
   for (const folderPath of folders) {
@@ -863,17 +868,29 @@ const getChangedFoldersWithFiles = async (
 };
 
 /**
+ * filterNewFilesByMtime の戻り値
+ */
+interface FilterMtimeResult {
+  newFiles: string[];
+  statErrors: {
+    fileNotFound: number;
+    permissionDenied: number;
+  };
+}
+
+/**
  * Stage 2: ファイルmtimeチェック
  * 変更フォルダ内のファイルをmtimeでフィルタし、新規/更新ファイルのパスを返す
  */
 const filterNewFilesByMtime = async (
   changedFolder: ChangedFolder,
   lastScannedAt: Date | null,
-): Promise<string[]> => {
+): Promise<FilterMtimeResult> => {
   const { folderPath, fileNames } = changedFolder;
   // ブランド型をstringにキャストしてpath.joinに渡す
   const folderPathStr = folderPath as string;
   const newFiles: string[] = [];
+  const statErrors = { fileNotFound: 0, permissionDenied: 0 };
 
   for (const fileName of fileNames) {
     // VRChat写真のみ対象
@@ -892,13 +909,18 @@ const filterNewFilesByMtime = async (
     // ファイルのmtimeを取得
     const statsResult = await neverthrow.ResultAsync.fromPromise(
       fsPromises.stat(filePath),
-      (error): { type: 'STAT_ERROR'; message: string } => {
+      (
+        error,
+      ): { type: 'FILE_NOT_FOUND' | 'PERMISSION_DENIED'; message: string } => {
         const nodeError = error as NodeJS.ErrnoException;
         return match(nodeError.code)
           .with('ENOENT', () => {
             // スキャン中にファイルが削除された → 想定内
             logger.debug(`File not found (deleted during scan): ${filePath}`);
-            return { type: 'STAT_ERROR' as const, message: 'File not found' };
+            return {
+              type: 'FILE_NOT_FOUND' as const,
+              message: 'File not found',
+            };
           })
           .with(P.union('EACCES', 'EPERM'), () => {
             // 権限エラー → ユーザーに通知すべき
@@ -907,7 +929,7 @@ const filterNewFilesByMtime = async (
               stack: error instanceof Error ? error : new Error(String(error)),
             });
             return {
-              type: 'STAT_ERROR' as const,
+              type: 'PERMISSION_DENIED' as const,
               message: nodeError.message ?? 'Permission denied',
             };
           })
@@ -919,6 +941,15 @@ const filterNewFilesByMtime = async (
     );
 
     if (statsResult.isErr()) {
+      // エラー種別に応じて統計を更新
+      match(statsResult.error.type)
+        .with('FILE_NOT_FOUND', () => {
+          statErrors.fileNotFound++;
+        })
+        .with('PERMISSION_DENIED', () => {
+          statErrors.permissionDenied++;
+        })
+        .exhaustive();
       continue;
     }
 
@@ -928,7 +959,7 @@ const filterNewFilesByMtime = async (
     }
   }
 
-  return newFiles;
+  return { newFiles, statErrors };
 };
 
 /**
@@ -957,6 +988,12 @@ async function processPhotoBatch(
         /VRChat_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.\d{3})/,
       );
       if (!matchResult) {
+        // VRChat写真のファイル名パターンにマッチしない場合
+        // これは通常発生しないが、ファイル名が破損している可能性がある
+        logger.debug({
+          message: 'Photo filename did not match expected pattern, skipping',
+          details: { photoPath },
+        });
         return null;
       }
 
@@ -1078,6 +1115,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   const totalSkipStats: SkipStatistics = {
     digestErrors: { folderNotFound: 0, permissionDenied: 0 },
     readdirErrors: { folderNotFound: 0, permissionDenied: 0 },
+    statErrors: { fileNotFound: 0, permissionDenied: 0 },
   };
 
   // フォルダスキャン状態を取得（差分スキャン用）
@@ -1133,10 +1171,15 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
           : null;
 
         // Stage 2: ファイルmtimeチェック
-        const newFiles = await filterNewFilesByMtime(
+        const { newFiles, statErrors } = await filterNewFilesByMtime(
           changedFolder,
           lastScannedAt,
         );
+
+        // stat統計を集計
+        totalSkipStats.statErrors.fileNotFound += statErrors.fileNotFound;
+        totalSkipStats.statErrors.permissionDenied +=
+          statErrors.permissionDenied;
 
         if (newFiles.length === 0) {
           // ファイル削除のみの場合など（ダイジェスト変更だがmtimeでフィルタ後0件）
@@ -1228,16 +1271,20 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
 
   const totalEndTime = performance.now();
 
-  // スキップされたフォルダがあれば警告ログを出力
-  const totalSkipped =
+  // スキップされたフォルダ/ファイルがあれば警告ログを出力
+  const totalFolderSkipped =
     totalSkipStats.digestErrors.folderNotFound +
     totalSkipStats.digestErrors.permissionDenied +
     totalSkipStats.readdirErrors.folderNotFound +
     totalSkipStats.readdirErrors.permissionDenied;
 
-  if (totalSkipped > 0) {
+  const totalFileSkipped =
+    totalSkipStats.statErrors.fileNotFound +
+    totalSkipStats.statErrors.permissionDenied;
+
+  if (totalFolderSkipped > 0 || totalFileSkipped > 0) {
     logger.warn({
-      message: `Photo scan skipped ${totalSkipped} folders due to errors`,
+      message: `Photo scan skipped items due to errors: ${totalFolderSkipped} folders, ${totalFileSkipped} files`,
       details: {
         digestErrors: {
           folderNotFound: totalSkipStats.digestErrors.folderNotFound,
@@ -1246,6 +1293,10 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
         readdirErrors: {
           folderNotFound: totalSkipStats.readdirErrors.folderNotFound,
           permissionDenied: totalSkipStats.readdirErrors.permissionDenied,
+        },
+        statErrors: {
+          fileNotFound: totalSkipStats.statErrors.fileNotFound,
+          permissionDenied: totalSkipStats.statErrors.permissionDenied,
         },
       },
     });
@@ -1469,41 +1520,48 @@ export const getBatchThumbnails = async (
 
     const thumbnailPromises = batch.map(async (photoPath) => {
       // getVRChatPhotoItemData は予期しないエラーを throw するため
-      // allSettled で個別にハンドリングする
-      const result = await getVRChatPhotoItemData({ photoPath, width });
-      return { photoPath, result };
+      // エラーをキャッチして photoPath と共に返す
+      try {
+        const result = await getVRChatPhotoItemData({ photoPath, width });
+        return { photoPath, result, unexpectedError: null as Error | null };
+      } catch (error) {
+        // 予期しないエラー（sharp内部エラー等）はここでキャッチ
+        return {
+          photoPath,
+          result: null,
+          unexpectedError:
+            error instanceof Error ? error : new Error(String(error)),
+        };
+      }
     });
 
-    // Promise.allSettled で1ファイルの失敗が全体を止めないようにする
-    const settledResults = await Promise.allSettled(thumbnailPromises);
+    // 全てのPromiseが成功するため Promise.all を使用
+    const results = await Promise.all(thumbnailPromises);
 
-    for (const settled of settledResults) {
-      if (settled.status === 'fulfilled') {
-        const { photoPath, result } = settled.value;
-        result.match(
-          (data) => success.set(photoPath, data),
+    for (const item of results) {
+      if (item.unexpectedError) {
+        // 予期しないエラー（sharp内部エラー等）をログ出力
+        // Sentryに送信されるのは logger.error() 経由
+        logger.error({
+          message: 'Unexpected error during batch thumbnail fetch',
+          stack: item.unexpectedError,
+          details: { photoPath: item.photoPath },
+        });
+        failed.push({
+          photoPath: item.photoPath,
+          reason: 'unexpected_error',
+          message: item.unexpectedError.message,
+        });
+      } else if (item.result) {
+        item.result.match(
+          (data) => success.set(item.photoPath, data),
           (error) =>
             failed.push({
-              photoPath,
+              photoPath: item.photoPath,
               reason: 'file_not_found',
               message: error,
             }),
         );
-      } else {
-        // 予期しないエラー（sharp内部エラー等）をログ出力
-        // Sentryに送信されるのは logger.error() 経由
-        const errorMessage =
-          settled.reason instanceof Error
-            ? settled.reason.message
-            : String(settled.reason);
-        logger.error({
-          message: 'Unexpected error during batch thumbnail fetch',
-          stack:
-            settled.reason instanceof Error
-              ? settled.reason
-              : new Error(errorMessage),
-        });
-        // rejected の場合は photoPath を特定できないが、バッチ処理は継続
       }
     }
   }
