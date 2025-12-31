@@ -61,8 +61,9 @@ export function GroupWithSkeleton({
   const calculator = useMemo(() => new JustifiedLayoutCalculator(), []);
 
   // PhotoGrid と同じレイアウト計算を使用（同じ effectiveWidth を使用）
+  // Note: effectiveWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
   const layout = useMemo(() => {
-    if (effectiveWidth === 0 || photos.length === 0) {
+    if (photos.length === 0) {
       return { rows: [], totalHeight: 0 };
     }
     return calculator.calculateLayout(photos, effectiveWidth);

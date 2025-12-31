@@ -8,8 +8,6 @@ import { JustifiedLayoutCalculator } from './justifiedLayoutCalculator';
 export const GROUP_HEIGHT_CONSTANTS = {
   /** バーチャルスクロールのグループ間スペース (px) */
   GROUP_SPACING: 32,
-  /** コンテナ幅が未確定の場合のフォールバック幅 (px) */
-  DEFAULT_CONTAINER_WIDTH: 1200,
   /** 写真がない場合のフォールバック高さ (px) */
   FALLBACK_EMPTY_HEIGHT:
     LAYOUT_CONSTANTS.HEADER_HEIGHT + LAYOUT_CONSTANTS.SPACING,
@@ -37,7 +35,7 @@ export interface GroupHeightEstimate {
  * 3. フォールバック値（写真がない場合）
  *
  * @param photos - グループ内の写真配列
- * @param containerWidth - コンテナの幅（0の場合はデフォルト幅を使用）
+ * @param containerWidth - コンテナの幅（ValidWidth 型により > 0 が保証される）
  * @param cachedHeight - キャッシュされた高さ（あれば）
  * @param calculator - レイアウト計算機のインスタンス（再利用のため外部から渡す）
  * @returns 推定高さと推定方法
@@ -66,15 +64,10 @@ export function estimateGroupHeight(
     };
   }
 
-  // 3. 幅が未確定の場合はデフォルト幅を使用
-  const effectiveWidth =
-    containerWidth > 0
-      ? containerWidth
-      : GROUP_HEIGHT_CONSTANTS.DEFAULT_CONTAINER_WIDTH;
-
-  // 4. 計算機がなければ新規作成
+  // 3. 計算機がなければ新規作成
+  // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
   const calc = calculator ?? new JustifiedLayoutCalculator();
-  const calculatedHeight = calc.calculateTotalHeight(photos, effectiveWidth);
+  const calculatedHeight = calc.calculateTotalHeight(photos, containerWidth);
 
   return {
     height: calculatedHeight + GROUP_HEIGHT_CONSTANTS.GROUP_SPACING,
@@ -98,10 +91,7 @@ export function precomputeGroupHeights(
   containerWidth: number,
   existingCache: Map<string, number> = new Map(),
 ): Map<string, number> {
-  if (containerWidth === 0) {
-    return existingCache;
-  }
-
+  // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
   const calculator = new JustifiedLayoutCalculator();
 
   for (const { key, photos } of groups) {

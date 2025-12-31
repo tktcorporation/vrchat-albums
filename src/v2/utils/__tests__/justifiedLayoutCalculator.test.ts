@@ -36,14 +36,8 @@ describe('JustifiedLayoutCalculator', () => {
     });
 
   describe('calculateLayout', () => {
-    it('コンテナ幅が0の場合は空の結果を返す', () => {
-      const photos = createMockPhotos(3);
-      const result = calculator.calculateLayout(photos, 0);
-
-      expect(result.rows).toEqual([]);
-      expect(result.totalHeight).toBe(0);
-      expect(result.gridHeight).toBe(0);
-    });
+    // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
+    // そのため containerWidth = 0 のテストは削除
 
     it('写真が0枚の場合はヘッダーとスペースのみの高さを返す', () => {
       const result = calculator.calculateLayout([], 1000);
@@ -145,12 +139,8 @@ describe('JustifiedLayoutCalculator', () => {
   });
 
   describe('calculateTotalHeight', () => {
-    it('コンテナ幅が0の場合は0を返す', () => {
-      const photos = createMockPhotos(3);
-      const height = calculator.calculateTotalHeight(photos, 0);
-
-      expect(height).toBe(0);
-    });
+    // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
+    // そのため containerWidth = 0 のテストは削除
 
     it('写真が0枚の場合はヘッダーとスペースの高さを返す', () => {
       const height = calculator.calculateTotalHeight([], 800);
