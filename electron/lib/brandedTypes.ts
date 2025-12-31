@@ -193,12 +193,18 @@ export type VRChatLogFilePath = z.infer<typeof VRChatLogFilePathSchema>;
 // ============================================================================
 
 /**
+ * MD5ハッシュ形式の正規表現（32文字の小文字16進数）
+ * folder-hashライブラリとの互換性を保証
+ */
+export const MD5_HASH_REGEX = /^[a-f0-9]{32}$/;
+
+/**
  * フォルダ内容のダイジェスト（MD5ハッシュ）
  * folder-hash ライブラリが生成するハッシュ値
  */
 export const FolderDigestSchema = z
   .string()
-  .regex(/^[a-f0-9]{32}$/, 'Invalid MD5 hash format')
+  .regex(MD5_HASH_REGEX, 'Invalid MD5 hash format')
   .brand<'FolderDigest'>();
 
 export type FolderDigest = z.infer<typeof FolderDigestSchema>;

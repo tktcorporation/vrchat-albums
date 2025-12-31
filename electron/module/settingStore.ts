@@ -4,6 +4,7 @@ import type * as neverthrow from 'neverthrow';
 import { fromThrowable } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
+import { MD5_HASH_REGEX } from '../lib/brandedTypes';
 
 type TestPlaywrightStoreName = `test-playwright-settings-${string}`;
 type StoreName = 'v0-settings' | 'test-settings' | TestPlaywrightStoreName;
@@ -27,7 +28,7 @@ type SettingStoreKey = (typeof settingStoreKey)[number];
  */
 export const FolderScanStateSchema = z.object({
   /** ファイル一覧のダイジェスト（MD5ハッシュ値） */
-  digest: z.string().regex(/^[a-f0-9]{32}$/, 'Invalid MD5 hash format'),
+  digest: z.string().regex(MD5_HASH_REGEX, 'Invalid MD5 hash format'),
   /** 最終スキャン日時（ISO文字列） */
   lastScannedAt: z
     .string()
