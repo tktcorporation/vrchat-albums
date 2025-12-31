@@ -209,6 +209,12 @@ export const FolderDigestSchema = z
 
 export type FolderDigest = z.infer<typeof FolderDigestSchema>;
 
+/**
+ * 文字列がFolderDigestの形式（MD5ハッシュ）として有効かどうかを検証
+ */
+export const isValidFolderDigest = (value: string): boolean =>
+  MD5_HASH_REGEX.test(value);
+
 // ============================================================================
 // VRChat Photo Containing Folder Path
 // ============================================================================
@@ -232,3 +238,11 @@ export const VRChatPhotoContainingFolderPathSchema = z
 export type VRChatPhotoContainingFolderPath = z.infer<
   typeof VRChatPhotoContainingFolderPathSchema
 >;
+
+/**
+ * 文字列がVRChatPhotoContainingFolderPathの形式として有効かどうかを検証
+ * 注意: この関数は形式のみを検証し、実際にVRChat写真が含まれているかは検証しない
+ */
+export const isValidVRChatPhotoContainingFolderPath = (
+  value: string,
+): boolean => value.length > 0;

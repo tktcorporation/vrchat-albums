@@ -730,20 +730,54 @@ interface ChangedFolder {
   currentDigest: FolderDigest;
 }
 
+/**
+ * スキップされたフォルダの統計情報
+ */
+interface SkipStatistics {
+  digestErrors: {
+    folderNotFound: number;
+    permissionDenied: number;
+  };
+  readdirErrors: {
+    folderNotFound: number;
+    permissionDenied: number;
+  };
+}
+
+/**
+ * getChangedFoldersWithFiles の戻り値
+ */
+interface ChangedFoldersResult {
+  changedFolders: ChangedFolder[];
+  skipStats: SkipStatistics;
+}
+
 const getChangedFoldersWithFiles = async (
   basePath: VRChatPhotoDirPath,
   savedStates: PhotoFolderScanStates,
-): Promise<ChangedFolder[]> => {
+): Promise<ChangedFoldersResult> => {
   // VRChat写真を含むフォルダを全て探索（再帰的）
   const folders = await getPhotoFolders(basePath);
   const changedFolders: ChangedFolder[] = [];
+  const skipStats: SkipStatistics = {
+    digestErrors: { folderNotFound: 0, permissionDenied: 0 },
+    readdirErrors: { folderNotFound: 0, permissionDenied: 0 },
+  };
 
   for (const folderPath of folders) {
     // folder-hash でダイジェスト計算（エラー時はスキップ）
     const digestResult = await computeFolderDigest(folderPath);
 
     if (digestResult.isErr()) {
-      // FOLDER_NOT_FOUND/PERMISSION_DENIED はログ済みなのでスキップ
+      // FOLDER_NOT_FOUND/PERMISSION_DENIED はログ済み、統計を記録してスキップ
+      match(digestResult.error.type)
+        .with('FOLDER_NOT_FOUND', () => {
+          skipStats.digestErrors.folderNotFound++;
+        })
+        .with('PERMISSION_DENIED', () => {
+          skipStats.digestErrors.permissionDenied++;
+        })
+        .exhaustive();
       continue;
     }
 
@@ -783,6 +817,17 @@ const getChangedFoldersWithFiles = async (
     );
 
     if (fileNamesResult.isErr()) {
+      // 統計を記録してスキップ
+      match(fileNamesResult.error.code)
+        .with('ENOENT', () => {
+          skipStats.readdirErrors.folderNotFound++;
+        })
+        .with(P.union('EACCES', 'EPERM'), () => {
+          skipStats.readdirErrors.permissionDenied++;
+        })
+        .otherwise(() => {
+          // 予期しないコードはカウントしない（既にre-throwされているはず）
+        });
       continue;
     }
 
@@ -794,7 +839,7 @@ const getChangedFoldersWithFiles = async (
     changedFolders.push({ folderPath, fileNames, currentDigest });
   }
 
-  return changedFolders;
+  return { changedFolders, skipStats };
 };
 
 /**
@@ -996,6 +1041,12 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   let batchNumber = 0;
   const allCreatedModels: model.VRChatPhotoPathModel[] = [];
 
+  // スキップ統計の集計用
+  const totalSkipStats: SkipStatistics = {
+    digestErrors: { folderNotFound: 0, permissionDenied: 0 },
+    readdirErrors: { folderNotFound: 0, permissionDenied: 0 },
+  };
+
   // フォルダスキャン状態を取得（差分スキャン用）
   const savedStates = isIncremental
     ? settingStore.getPhotoFolderScanStates()
@@ -1012,7 +1063,20 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
       logger.debug(`Processing photos from directory: ${dir.value}`);
 
       // Stage 1: フォルダダイジェストチェック
-      const changedFolders = await getChangedFoldersWithFiles(dir, savedStates);
+      const { changedFolders, skipStats } = await getChangedFoldersWithFiles(
+        dir,
+        savedStates,
+      );
+
+      // スキップ統計を集計
+      totalSkipStats.digestErrors.folderNotFound +=
+        skipStats.digestErrors.folderNotFound;
+      totalSkipStats.digestErrors.permissionDenied +=
+        skipStats.digestErrors.permissionDenied;
+      totalSkipStats.readdirErrors.folderNotFound +=
+        skipStats.readdirErrors.folderNotFound;
+      totalSkipStats.readdirErrors.permissionDenied +=
+        skipStats.readdirErrors.permissionDenied;
 
       if (changedFolders.length === 0) {
         logger.debug(`No changed folders in: ${dir.value}`);
@@ -1065,14 +1129,34 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
 
           if (processedBatch.length > 0) {
             const dbStartTime = performance.now();
-            const createdModels = await model.createOrUpdateListVRChatPhotoPath(
-              processedBatch.map((photo) => ({
-                photoPath: photo.photoPath,
-                photoTakenAt: photo.takenAt,
-                width: photo.width,
-                height: photo.height,
-              })),
-            );
+            // DBエラーは予期しないエラーとしてSentryに送信
+            // batch情報をログに記録してから再スロー
+            let createdModels: model.VRChatPhotoPathModel[];
+            try {
+              createdModels = await model.createOrUpdateListVRChatPhotoPath(
+                processedBatch.map((photo) => ({
+                  photoPath: photo.photoPath,
+                  photoTakenAt: photo.takenAt,
+                  width: photo.width,
+                  height: photo.height,
+                })),
+              );
+            } catch (dbError) {
+              logger.error({
+                message: `Database error saving photo batch ${batchNumber}`,
+                stack:
+                  dbError instanceof Error
+                    ? dbError
+                    : new Error(String(dbError)),
+                details: {
+                  batchNumber,
+                  batchSize: processedBatch.length,
+                  folderPath: folderPathStr,
+                  firstPhotoPath: processedBatch[0]?.photoPath,
+                },
+              });
+              throw dbError;
+            }
             const dbEndTime = performance.now();
 
             allCreatedModels.push(...createdModels);
@@ -1094,10 +1178,45 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
     }
   } finally {
     // エラー発生時も途中経過を保存（次回スキャンで未処理分が再処理される）
-    settingStore.setPhotoFolderScanStates(updatedStates);
+    // このtry-catchはオリジナルエラーを隠さないために内部で処理
+    try {
+      settingStore.setPhotoFolderScanStates(updatedStates);
+    } catch (stateError) {
+      logger.error({
+        message: 'Failed to persist photo folder scan states',
+        stack:
+          stateError instanceof Error
+            ? stateError
+            : new Error(String(stateError)),
+      });
+      // オリジナルエラーが伝播するようにここではre-throwしない
+    }
   }
 
   const totalEndTime = performance.now();
+
+  // スキップされたフォルダがあれば警告ログを出力
+  const totalSkipped =
+    totalSkipStats.digestErrors.folderNotFound +
+    totalSkipStats.digestErrors.permissionDenied +
+    totalSkipStats.readdirErrors.folderNotFound +
+    totalSkipStats.readdirErrors.permissionDenied;
+
+  if (totalSkipped > 0) {
+    logger.warn({
+      message: `Photo scan skipped ${totalSkipped} folders due to errors`,
+      details: {
+        digestErrors: {
+          folderNotFound: totalSkipStats.digestErrors.folderNotFound,
+          permissionDenied: totalSkipStats.digestErrors.permissionDenied,
+        },
+        readdirErrors: {
+          folderNotFound: totalSkipStats.readdirErrors.folderNotFound,
+          permissionDenied: totalSkipStats.readdirErrors.permissionDenied,
+        },
+      },
+    });
+  }
 
   if (totalProcessed === 0) {
     logger.debug('No new photos found to index.');
