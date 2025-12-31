@@ -46,6 +46,17 @@ vi.mock('sharp', () => {
 describe('vrchatPhoto.service', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // mkdir モックを再設定（ensureCacheDir で使用）
+    vi.mocked(fsPromises.mkdir).mockResolvedValue(undefined);
+    // stat モックのデフォルト設定（ENOENT = キャッシュミス）
+    const enoentError = new Error('ENOENT') as Error & { code: string };
+    enoentError.code = 'ENOENT';
+    vi.mocked(fsPromises.stat).mockRejectedValue(enoentError);
+    // readdir モックのデフォルト設定
+    // biome-ignore lint/suspicious/noExplicitAny: Mock return type
+    vi.mocked(fsPromises.readdir).mockResolvedValue([] as any);
+    // unlink モックのデフォルト設定
+    vi.mocked(fsPromises.unlink).mockResolvedValue(undefined);
   });
 
   // この関数は、指定された画像ファイルのパスとリサイズ幅を受け取り、
@@ -190,11 +201,8 @@ describe('vrchatPhoto.service', () => {
     const mockStat = vi.mocked(fsPromises.stat);
     const mockUnlink = vi.mocked(fsPromises.unlink);
 
-    beforeEach(() => {
-      mockReaddir.mockReset();
-      mockStat.mockReset();
-      mockUnlink.mockReset();
-    });
+    // 各テストでモックを上書き設定するため、beforeEach で追加設定は不要
+    // グローバルの beforeEach で mkdir, unlink がデフォルト設定済み
 
     it('キャッシュサイズが閾値以下の場合はクリーンアップしない', async () => {
       // 400MB = 400 * 1024 * 1024 bytes (閾値450MB未満)
@@ -326,6 +334,7 @@ describe('vrchatPhoto.service', () => {
   });
 
   describe('getBatchThumbnails', () => {
+    const mockStat = vi.mocked(fsPromises.stat);
     let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
     let mockSharpInstance: {
       metadata: ReturnType<typeof vi.fn>;
@@ -349,6 +358,11 @@ describe('vrchatPhoto.service', () => {
       sharpFactory.mockReturnValue(
         mockSharpInstance as unknown as ReturnType<typeof sharp>,
       );
+
+      // キャッシュミスを強制（ENOENT）
+      const enoentError = new Error('ENOENT') as Error & { code: string };
+      enoentError.code = 'ENOENT';
+      mockStat.mockRejectedValue(enoentError);
     });
 
     it('空の配列を渡すと空の結果を返す', async () => {
@@ -545,6 +559,7 @@ describe('vrchatPhoto.service', () => {
 
   describe('Concurrent Cache Writes (pendingCacheWrites)', () => {
     const mockWriteFile = vi.mocked(fsPromises.writeFile);
+    const mockMkdir = vi.mocked(fsPromises.mkdir);
     const mockStat = vi.mocked(fsPromises.stat);
     let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
     let mockSharpInstance: {
@@ -570,6 +585,9 @@ describe('vrchatPhoto.service', () => {
       sharpFactory.mockReturnValue(
         mockSharpInstance as unknown as ReturnType<typeof sharp>,
       );
+
+      // mkdir モックを設定（ensureCacheDir で使用）
+      mockMkdir.mockResolvedValue(undefined);
 
       // キャッシュミスを強制（ENOENT）
       const enoentError = new Error('ENOENT') as Error & { code: string };
@@ -636,6 +654,7 @@ describe('vrchatPhoto.service', () => {
   describe('Cache Failure Threshold', () => {
     const mockWriteFile = vi.mocked(fsPromises.writeFile);
     const mockRename = vi.mocked(fsPromises.rename);
+    const mockMkdir = vi.mocked(fsPromises.mkdir);
     const mockStat = vi.mocked(fsPromises.stat);
     let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
     let mockSharpInstance: {
@@ -661,6 +680,9 @@ describe('vrchatPhoto.service', () => {
       sharpFactory.mockReturnValue(
         mockSharpInstance as unknown as ReturnType<typeof sharp>,
       );
+
+      // mkdir モックを設定（ensureCacheDir で使用）
+      mockMkdir.mockResolvedValue(undefined);
 
       // キャッシュミスを強制（ENOENT）
       const enoentError = new Error('ENOENT') as Error & { code: string };

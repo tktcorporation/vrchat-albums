@@ -1,5 +1,6 @@
 import { Sequelize } from '@sequelize/core';
 import { SqliteDialect } from '@sequelize/sqlite3';
+import { ResultAsync } from 'neverthrow';
 import path from 'pathe';
 import { match } from 'ts-pattern';
 import { uuidv7 } from 'uuidv7';
@@ -211,20 +212,13 @@ export const checkMigrationRDBClient = async (appVersion: string) => {
 /**
  * `Migrations` テーブルが存在するか確認する内部関数。
  */
-const isExistsMigrationTable = async () => {
-  try {
-    await Migrations.findAll();
-    return true;
-  } catch (e) {
+const isExistsMigrationTable = (): Promise<boolean> =>
+  ResultAsync.fromPromise(Migrations.findAll(), (e): boolean => {
     return match(e)
-      .with(
-        {
-          name: 'SequelizeDatabaseError',
-        },
-        () => false,
-      )
+      .with({ name: 'SequelizeDatabaseError' }, () => false)
       .otherwise(() => {
-        throw e;
+        throw e; // 予期しないエラーはre-throw
       });
-  }
-};
+  })
+    .map(() => true)
+    .unwrapOr(false);

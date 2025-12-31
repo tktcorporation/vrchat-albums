@@ -1,5 +1,9 @@
+import { ok } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DBLogProvider } from './exportService/exportService';
+import type {
+  DBLogProvider,
+  ExportResult,
+} from './exportService/exportService';
 import * as exportService from './exportService/exportService';
 import { vrchatLogRouter } from './vrchatLogController';
 
@@ -56,7 +60,7 @@ describe('vrchatLogController', () => {
 
   describe('exportLogStoreData', () => {
     it('全期間指定でエクスポートが実行される', async () => {
-      const mockExportResult = {
+      const mockExportResult: ExportResult = {
         exportedFiles: ['/path/to/export/logStore-2023-10.txt'],
         totalLogLines: 100,
         exportStartTime: new Date('2023-10-08T10:00:00Z'),
@@ -64,7 +68,7 @@ describe('vrchatLogController', () => {
       };
 
       vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
-        mockExportResult,
+        ok(mockExportResult),
       );
 
       const router = vrchatLogRouter();
@@ -93,7 +97,7 @@ describe('vrchatLogController', () => {
     });
 
     it('期間指定でエクスポートが実行される（ローカルタイム処理）', async () => {
-      const mockExportResult = {
+      const mockExportResult: ExportResult = {
         exportedFiles: ['/path/to/export/logStore-2023-10.txt'],
         totalLogLines: 50,
         exportStartTime: new Date('2023-10-08T10:00:00Z'),
@@ -101,7 +105,7 @@ describe('vrchatLogController', () => {
       };
 
       vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
-        mockExportResult,
+        ok(mockExportResult),
       );
 
       const router = vrchatLogRouter();
@@ -169,7 +173,7 @@ describe('vrchatLogController', () => {
 
   describe('getDBLogsFromDatabase (timezone handling)', () => {
     it('期間指定なしで全データ取得が呼ばれる', async () => {
-      const mockExportResult = {
+      const mockExportResult: ExportResult = {
         exportedFiles: [],
         totalLogLines: 0,
         exportStartTime: new Date(),
@@ -177,7 +181,7 @@ describe('vrchatLogController', () => {
       };
 
       vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
-        mockExportResult,
+        ok(mockExportResult),
       );
 
       const router = vrchatLogRouter();
@@ -209,12 +213,12 @@ describe('vrchatLogController', () => {
       vi.mocked(exportService.exportLogStoreFromDB).mockImplementation(
         async (_options, getDBLogs) => {
           capturedGetDBLogs = getDBLogs;
-          return {
+          return ok({
             exportedFiles: [],
             totalLogLines: 0,
             exportStartTime: new Date(),
             exportEndTime: new Date(),
-          };
+          });
         },
       );
 

@@ -5,7 +5,7 @@ import { match } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import * as fs from '../../../lib/wrappedFs';
 import type { VRChatLogFilePath } from '../../vrchatLogFileDir/model';
-import { VRChatLogFileError } from '../error';
+import type { VRChatLogFileError } from '../error';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../model';
 import { VRChatLogLineSchema } from '../model';
 import type { PartialSuccessResult } from '../types/partialSuccess';
@@ -144,7 +144,19 @@ export const getLogLinesByLogFilePathList = async (props: {
           errors.push(result.error);
           return [];
         }
-        return result.value.map((line) => VRChatLogLineSchema.parse(line));
+        // 各行をパースし、失敗した行はスキップ
+        const validLines: VRChatLogLine[] = [];
+        for (const line of result.value) {
+          const parseResult = VRChatLogLineSchema.safeParse(line);
+          if (parseResult.success) {
+            validLines.push(parseResult.data);
+          } else {
+            logger.warn(
+              `Failed to parse log line in ${logFilePath.value}: ${parseResult.error.message}`,
+            );
+          }
+        }
+        return validLines;
       }),
     );
 
@@ -208,28 +220,29 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
     const batch = props.logFilePathList.slice(i, i + config.concurrency);
     const batchResults = await Promise.all(
       batch.map(async (logFilePath) => {
-        try {
-          const result = await getLogLinesFromLogFile({
-            logFilePath,
-            includesList: props.includesList,
-          });
-          if (result.isErr()) {
-            errors.push({ path: logFilePath.value, error: result.error });
-            return [];
-          }
-          return result.value.map((line) => VRChatLogLineSchema.parse(line));
-        } catch (e) {
-          // パースエラーなど予期しないエラーもキャッチ
-          logger.warn(`Failed to process log file: ${logFilePath.value}`, e);
-          errors.push({
-            path: logFilePath.value,
-            error: new VRChatLogFileError({
-              code: 'LOG_PARSE_ERROR',
-              message: e instanceof Error ? e.message : 'Unknown parse error',
-            }),
-          });
+        const result = await getLogLinesFromLogFile({
+          logFilePath,
+          includesList: props.includesList,
+        });
+        if (result.isErr()) {
+          errors.push({ path: logFilePath.value, error: result.error });
           return [];
         }
+
+        // 各行をパースし、失敗した行はスキップ
+        const validLines: VRChatLogLine[] = [];
+        for (const line of result.value) {
+          const parseResult = VRChatLogLineSchema.safeParse(line);
+          if (parseResult.success) {
+            validLines.push(parseResult.data);
+          } else {
+            // パースエラーは警告として記録し、処理を継続
+            logger.warn(
+              `Failed to parse log line in ${logFilePath.value}: ${parseResult.error.message}`,
+            );
+          }
+        }
+        return validLines;
       }),
     );
 
@@ -317,7 +330,19 @@ export async function* getLogLinesByLogFilePathListStreaming(props: {
         if (result.isErr()) {
           throw result.error;
         }
-        return result.value.map((line) => VRChatLogLineSchema.parse(line));
+        // 各行をパースし、失敗した行はスキップ
+        const validLines: VRChatLogLine[] = [];
+        for (const line of result.value) {
+          const parseResult = VRChatLogLineSchema.safeParse(line);
+          if (parseResult.success) {
+            validLines.push(parseResult.data);
+          } else {
+            logger.warn(
+              `Failed to parse log line in ${logFilePath.value}: ${parseResult.error.message}`,
+            );
+          }
+        }
+        return validLines;
       }),
     );
 

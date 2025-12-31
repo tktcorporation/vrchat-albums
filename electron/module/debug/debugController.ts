@@ -1,3 +1,4 @@
+import { Result } from 'neverthrow';
 import { z } from 'zod';
 import { executeQuery } from '../../lib/dbHelper';
 import {
@@ -20,40 +21,23 @@ export const debugRouter = router({
       }),
     )
     .mutation(async ({ input }: { input: QueryInput }) => {
-      try {
-        // DBQueueを使用してクエリを実行
-        const result = await executeQuery(input.query);
-        if (result.isErr()) {
-          throw UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.DATABASE_ERROR,
-            category: ERROR_CATEGORIES.DATABASE_ERROR,
-            message: 'SQL query execution failed',
-            userMessage: `SQLクエリの実行に失敗しました: ${result.error.message}`,
-            cause:
-              result.error instanceof Error
-                ? result.error
-                : new Error(String(result.error)),
-          });
-        }
-        return result.value;
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          throw UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.DATABASE_ERROR,
-            category: ERROR_CATEGORIES.DATABASE_ERROR,
-            message: 'SQL query execution failed',
-            userMessage: `SQLクエリの実行に失敗しました: ${error.message}`,
-            cause: error,
-          });
-        }
+      // DBQueueを使用してクエリを実行
+      // executeQuery は Result 型を返すため、try-catch は不要
+      // 予期しないエラーは自動的に throw されて Sentry に送信される
+      const result = await executeQuery(input.query);
+
+      if (result.isErr()) {
+        const error = result.error;
         throw UserFacingError.withStructuredInfo({
-          code: ERROR_CODES.UNKNOWN,
-          category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-          message: 'Unexpected error during SQL query execution',
-          userMessage: 'SQLクエリの実行中に予期しないエラーが発生しました。',
-          cause: error instanceof Error ? error : new Error(String(error)),
+          code: ERROR_CODES.DATABASE_ERROR,
+          category: ERROR_CATEGORIES.DATABASE_ERROR,
+          message: 'SQL query execution failed',
+          userMessage: `SQLクエリの実行に失敗しました: ${error.message}`,
+          cause: new Error(error.message),
         });
       }
+
+      return result.value;
     }),
   setLogLevel: procedure
     .input(
@@ -62,14 +46,20 @@ export const debugRouter = router({
       }),
     )
     .mutation(async ({ input }) => {
-      try {
-        logger.setTransportsLevel(input.level);
-        logger.info(`Log level set to: ${input.level}`);
-        return { success: true };
-      } catch (error: unknown) {
+      const result = Result.fromThrowable(
+        () => {
+          logger.setTransportsLevel(input.level);
+          logger.info(`Log level set to: ${input.level}`);
+          return { success: true };
+        },
+        (error) => error,
+      )();
+
+      if (result.isErr()) {
+        const error = result.error;
         logger.error({
           message: 'Failed to set log level',
-          stack: error as Error,
+          stack: error instanceof Error ? error : new Error(String(error)),
         });
         throw UserFacingError.withStructuredInfo({
           code: ERROR_CODES.UNKNOWN,
@@ -79,6 +69,8 @@ export const debugRouter = router({
           cause: error instanceof Error ? error : new Error(String(error)),
         });
       }
+
+      return result.value;
     }),
   getLogLevel: procedure.query(() => {
     // 現在のファイルログレベルを返す (コンソールレベルも通常は同じはず)

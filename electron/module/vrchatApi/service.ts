@@ -1,7 +1,35 @@
 import * as neverthrow from 'neverthrow';
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { getData } from '../../lib/getData';
 import type { VRChatWorldId } from '../vrchatLog/model';
+
+/**
+ * VRChat API エラー型
+ */
+export type VRChatApiError =
+  | { type: 'WORLD_NOT_FOUND'; worldId: string }
+  | { type: 'API_REQUEST_FAILED'; message: string }
+  | { type: 'PARSE_ERROR'; issues: string };
+
+/**
+ * VRChatApiError からユーザー向けメッセージを取得
+ */
+export const getVRChatApiErrorMessage = (error: VRChatApiError): string =>
+  match(error)
+    .with(
+      { type: 'WORLD_NOT_FOUND' },
+      (e) => `ワールドが見つかりません: ${e.worldId}`,
+    )
+    .with(
+      { type: 'API_REQUEST_FAILED' },
+      (e) => `VRChat API リクエストに失敗しました: ${e.message}`,
+    )
+    .with(
+      { type: 'PARSE_ERROR' },
+      (e) => `VRChat API レスポンスの解析に失敗しました: ${e.issues}`,
+    )
+    .exhaustive();
 
 /**
  * id: 'wrld_6fecf18a-ab96-43f2-82dc-ccf79f17c34f',
@@ -98,28 +126,24 @@ const VRChatWorldInfoFromApiSchema = z.object({
  */
 export const getVrcWorldInfoByWorldId = async (
   worldId: VRChatWorldId,
-): Promise<
-  neverthrow.Result<VRChatWorldInfoFromApi, Error | 'WORLD_NOT_FOUND'>
-> => {
+): Promise<neverthrow.Result<VRChatWorldInfoFromApi, VRChatApiError>> => {
   const reqUrl = `https://api.vrchat.cloud/api/1/worlds/${worldId}`;
   const response = await getData(reqUrl);
   if (!response.isOk()) {
     if (response.error.status === 404) {
-      return neverthrow.err('WORLD_NOT_FOUND' as const);
+      return neverthrow.err({ type: 'WORLD_NOT_FOUND', worldId });
     }
-    return neverthrow.err(
-      new Error(`getVrcWorldInfoByWorldId: ${response.error.message}`),
-    );
+    return neverthrow.err({
+      type: 'API_REQUEST_FAILED',
+      message: response.error.message,
+    });
   }
   const result = VRChatWorldInfoFromApiSchema.safeParse(response.value);
   if (!result.success) {
-    return neverthrow.err(
-      new Error(
-        `fail to parse VRChatWorldInfoFromApi: ${JSON.stringify(
-          result.error.issues,
-        )}`,
-      ),
-    );
+    return neverthrow.err({
+      type: 'PARSE_ERROR',
+      issues: JSON.stringify(result.error.issues),
+    });
   }
   return neverthrow.ok(result.data);
 };

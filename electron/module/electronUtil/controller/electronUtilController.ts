@@ -65,7 +65,7 @@ export const electronUtilRouter = () =>
         const result = await utilsService.downloadImageAsPng(ctx.input);
         const downloadResult = handleResultErrorWithSilent(
           result,
-          ['canceled'],
+          ['CANCELED'],
           fileOperationErrorMappings,
         );
         return downloadResult !== null;

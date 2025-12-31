@@ -25,5 +25,22 @@
   "mustUseResult": {
     "enabled": true,
     "path": "electron/**/*.ts"
+  },
+  "tryCatchWarning": {
+    "enabled": true,
+    "path": "electron/**/*.ts",
+    "exceptions": {
+      "allowWithFinally": true,
+      "allowInsideFromPromise": true,
+      "allowWithRethrow": false,
+      "allowElectronEnvDetection": true,
+      "allowLogAndFallback": false,
+      "allowReturnErrOnCatch": false,
+      "allowMatchWithFallback": false
+    }
+  },
+  "genericErrorWarning": {
+    "enabled": true,
+    "path": "electron/**/*.ts"
   }
 }

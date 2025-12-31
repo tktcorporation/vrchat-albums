@@ -1,7 +1,8 @@
 import type { Rectangle } from 'electron';
 import Store from 'electron-store';
-import * as neverthrow from 'neverthrow';
-import { match } from 'ts-pattern';
+import type * as neverthrow from 'neverthrow';
+import { fromThrowable } from 'neverthrow';
+import { match, P } from 'ts-pattern';
 
 type TestPlaywrightStoreName = `test-playwright-settings-${string}`;
 type StoreName = 'v0-settings' | 'test-settings' | TestPlaywrightStoreName;
@@ -17,6 +18,15 @@ const settingStoreKey = [
   'migrationNoticeShown',
 ] as const;
 type SettingStoreKey = (typeof settingStoreKey)[number];
+
+/**
+ * 設定ストアの操作エラー
+ */
+export type SettingStoreError = {
+  type: 'STORAGE_ERROR';
+  message: string;
+  key: SettingStoreKey;
+};
 
 const getValue =
   (settingsStore: Store) =>
@@ -163,19 +173,23 @@ const clearAllStoredSettings = (settingsStore: Store) => () => {
  */
 const clearStoredSetting =
   (settingsStore: Store) =>
-  (key: SettingStoreKey): neverthrow.Result<void, Error> => {
-    try {
-      return neverthrow.ok(settingsStore.delete(key));
-    } catch (error) {
-      return match(error)
-        .when(
-          (e): e is Error => e instanceof Error,
-          (e) => neverthrow.err(e),
-        )
-        .otherwise((e) => {
-          throw e;
-        });
-    }
+  (key: SettingStoreKey): neverthrow.Result<void, SettingStoreError> => {
+    const safeDelete = fromThrowable(
+      () => settingsStore.delete(key),
+      (error): SettingStoreError => {
+        return match(error)
+          .with(P.instanceOf(Error), (e) => ({
+            type: 'STORAGE_ERROR' as const,
+            message: e.message,
+            key,
+          }))
+          .otherwise((e) => {
+            // 予期しないエラーはre-throw（Sentry通知）
+            throw e;
+          });
+      },
+    );
+    return safeDelete();
   };
 
 import path from 'node:path';
@@ -310,7 +324,9 @@ export interface SettingStore {
   getBackgroundFileCreateFlag: () => boolean | null;
   setBackgroundFileCreateFlag: (flag: boolean) => void;
   clearAllStoredSettings: () => void;
-  clearStoredSetting: (key: SettingStoreKey) => neverthrow.Result<void, Error>;
+  clearStoredSetting: (
+    key: SettingStoreKey,
+  ) => neverthrow.Result<void, SettingStoreError>;
   getWindowBounds: () => Rectangle | undefined;
   setWindowBounds: (bounds: Rectangle) => void;
   getTermsAccepted: () => boolean;

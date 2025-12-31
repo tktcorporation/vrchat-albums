@@ -1,4 +1,5 @@
 import type { UpdateCheckResult } from 'electron-updater';
+import { ResultAsync } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 import { reloadMainWindow } from '../../electronUtil';
 import {
@@ -207,37 +208,40 @@ export const settingsRouter = () =>
         let isFirstLaunch = true;
         let syncMode: LogSyncMode = LOG_SYNC_MODE.FULL;
 
-        try {
-          const existingLogs =
-            await vrchatWorldJoinLogService.findVRChatWorldJoinLogList({
-              orderByJoinDateTime: 'desc',
-            });
-          isFirstLaunch = existingLogs.length === 0;
+        await vrchatWorldJoinLogService
+          .findVRChatWorldJoinLogList({
+            orderByJoinDateTime: 'desc',
+          })
+          .then(
+            (existingLogs) => {
+              isFirstLaunch = existingLogs.length === 0;
 
-          // PhotoPath変更の確認
-          const photoPathChanged = hasPhotoPathChanged();
+              // PhotoPath変更の確認
+              const photoPathChanged = hasPhotoPathChanged();
 
-          // 同期モード決定: 初回起動 OR PhotoPath変更時は FULL モード
-          syncMode =
-            isFirstLaunch || photoPathChanged
-              ? LOG_SYNC_MODE.FULL
-              : LOG_SYNC_MODE.INCREMENTAL;
+              // 同期モード決定: 初回起動 OR PhotoPath変更時は FULL モード
+              syncMode =
+                isFirstLaunch || photoPathChanged
+                  ? LOG_SYNC_MODE.FULL
+                  : LOG_SYNC_MODE.INCREMENTAL;
 
-          logger.info(`Found ${existingLogs.length} existing logs`);
-          if (photoPathChanged) {
-            logger.info(
-              'PhotoPath change detected, forcing FULL sync mode for photo re-indexing',
-            );
-          }
-        } catch (error) {
-          // データベースエラー（テーブル未作成など）の場合は初回起動として扱う
-          logger.info(
-            'Database error detected, treating as first launch:',
-            error,
+              logger.info(`Found ${existingLogs.length} existing logs`);
+              if (photoPathChanged) {
+                logger.info(
+                  'PhotoPath change detected, forcing FULL sync mode for photo re-indexing',
+                );
+              }
+            },
+            (error) => {
+              // データベースエラー（テーブル未作成など）の場合は初回起動として扱う
+              logger.info(
+                'Database error detected, treating as first launch:',
+                error,
+              );
+              isFirstLaunch = true;
+              syncMode = LOG_SYNC_MODE.FULL;
+            },
           );
-          isFirstLaunch = true;
-          syncMode = LOG_SYNC_MODE.FULL;
-        }
 
         logger.info(
           `Detected ${
@@ -250,17 +254,18 @@ export const settingsRouter = () =>
           logger.info(
             'Step 3.5: Setting default auto-start enabled for first launch...',
           );
-          try {
-            const { app } = await import('electron');
-            app.setLoginItemSettings({
-              openAtLogin: true,
-              openAsHidden: true,
+          await import('electron')
+            .then(({ app }) => {
+              app.setLoginItemSettings({
+                openAtLogin: true,
+                openAsHidden: true,
+              });
+              logger.info('Auto-start enabled by default for first launch');
+            })
+            .catch((error) => {
+              logger.warn('Failed to set default auto-start:', error);
+              // 自動起動の設定に失敗してもアプリの初期化は続行
             });
-            logger.info('Auto-start enabled by default for first launch');
-          } catch (error) {
-            logger.warn('Failed to set default auto-start:', error);
-            // 自動起動の設定に失敗してもアプリの初期化は続行
-          }
         } else if (isFirstLaunch && process.env.PLAYWRIGHT_TEST) {
           logger.info('Step 3.5: Skipping auto-start setup in Playwright test');
         }
@@ -338,84 +343,94 @@ export const settingsRouter = () =>
      * 旧アプリからの移行が必要かどうかをチェックする
      */
     checkMigrationStatus: procedure.query(async () => {
-      try {
-        // 動的インポートで移行サービスを読み込む
-        const { isMigrationNeeded } = await import('../migration/service');
-        const neededResult = await isMigrationNeeded();
-        // isMigrationNeeded は never エラーなので常に成功
-        const needed = neededResult._unsafeUnwrap();
+      return import('../migration/service')
+        .then(async ({ isMigrationNeeded }) => {
+          const neededResult = await isMigrationNeeded();
+          // isMigrationNeeded は never エラーなので常に成功
+          const needed = neededResult._unsafeUnwrap();
 
-        return {
-          migrationNeeded: needed,
-          oldAppName: 'vrchat-photo-journey',
-          newAppName: 'VRChatAlbums',
-        };
-      } catch (error) {
-        logger.warn('Failed to check migration status:', error);
-        // エラーが発生した場合は移行不要として扱う
-        return {
-          migrationNeeded: false,
-          oldAppName: 'vrchat-photo-journey',
-          newAppName: 'VRChatAlbums',
-        };
-      }
+          return {
+            migrationNeeded: needed,
+            oldAppName: 'vrchat-photo-journey',
+            newAppName: 'VRChatAlbums',
+          };
+        })
+        .catch((error) => {
+          logger.warn('Failed to check migration status:', error);
+          // エラーが発生した場合は移行不要として扱う
+          return {
+            migrationNeeded: false,
+            oldAppName: 'vrchat-photo-journey',
+            newAppName: 'VRChatAlbums',
+          };
+        });
     }),
 
     /**
      * ユーザーの承認を得て旧アプリからのデータ移行を実行する
      */
     performMigration: procedure.mutation(async () => {
-      try {
-        // 動的インポートで移行サービスを読み込む
-        const { performMigration } = await import('../migration/service');
-        const result = await performMigration();
+      // ResultAsync.fromPromise でエラーハンドリングを統一
+      return ResultAsync.fromPromise(
+        (async () => {
+          // 動的インポートで移行サービスを読み込む
+          const { performMigration } = await import('../migration/service');
+          const result = await performMigration();
 
-        // performMigration は Result<MigrationResult, never> を返すため、
-        // エラーは発生しない。neverthrow標準の.match()を使用
-        return result.match(
-          (migrationResult) => {
-            // エラーは MigrationResult.errors 配列に格納される
-            if (migrationResult.errors.length > 0) {
-              logger.error({
-                message: `Migration failed with errors: ${migrationResult.errors.join(
-                  ', ',
-                )}`,
-              });
-              throw new UserFacingError(
-                `データ移行に失敗しました: ${migrationResult.errors.join(
-                  ', ',
-                )}`,
+          // performMigration は Result<MigrationResult, never> を返すため、
+          // エラーは発生しない。neverthrow標準の.match()を使用
+          return result.match(
+            (migrationResult) => {
+              // エラーは MigrationResult.errors 配列に格納される
+              if (migrationResult.errors.length > 0) {
+                logger.error({
+                  message: `Migration failed with errors: ${migrationResult.errors.join(
+                    ', ',
+                  )}`,
+                });
+                throw new UserFacingError(
+                  `データ移行に失敗しました: ${migrationResult.errors.join(
+                    ', ',
+                  )}`,
+                );
+              }
+              return migrationResult;
+            },
+            // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
+            () => {
+              throw new Error(
+                'Unreachable: performMigration should never return an error',
               );
-            }
-            return migrationResult;
-          },
-          // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
-          () => {
-            throw new Error(
-              'Unreachable: performMigration should never return an error',
-            );
-          },
-        );
-      } catch (error) {
-        logger.error({
-          message: `Failed to perform migration: ${match(error)
-            .with(P.instanceOf(Error), (err) => err.message)
-            .otherwise(() => 'Unknown error')}`,
-          stack: match(error)
-            .with(P.instanceOf(Error), (err) => err)
-            .otherwise(() => undefined),
-        });
+            },
+          );
+        })(),
+        (error): never => {
+          logger.error({
+            message: `Failed to perform migration: ${match(error)
+              .with(P.instanceOf(Error), (err) => err.message)
+              .otherwise(() => 'Unknown error')}`,
+            stack: match(error)
+              .with(P.instanceOf(Error), (err) => err)
+              .otherwise(() => undefined),
+          });
 
-        // UserFacingErrorの場合はそのまま再スロー
-        if (error instanceof UserFacingError) {
-          throw error;
-        }
+          // UserFacingErrorの場合はそのまま再スロー
+          if (error instanceof UserFacingError) {
+            throw error;
+          }
 
-        // その他のエラーの場合
-        throw new UserFacingError(
-          'データ移行中に予期しないエラーが発生しました',
-        );
-      }
+          // その他のエラーの場合
+          throw new UserFacingError(
+            'データ移行中に予期しないエラーが発生しました',
+          );
+        },
+      ).match(
+        (result) => result,
+        () => {
+          // error handler always throws, so this branch is unreachable
+          throw new Error('unreachable');
+        },
+      );
     }),
 
     /**

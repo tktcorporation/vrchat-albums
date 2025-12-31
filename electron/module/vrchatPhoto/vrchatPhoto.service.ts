@@ -5,6 +5,7 @@ import { performance } from 'node:perf_hooks';
 import * as dateFns from 'date-fns';
 import { glob } from 'glob';
 import * as neverthrow from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import * as path from 'pathe';
 import sharp from 'sharp';
 import { match, P } from 'ts-pattern';
@@ -120,32 +121,44 @@ interface CacheDirError {
 /**
  * キャッシュディレクトリを初期化
  *
- * @returns Result<cacheDir, CacheDirError> - 成功時はディレクトリパス、失敗時はエラー
+ * @returns ResultAsync<cacheDir, CacheDirError> - 成功時はディレクトリパス、失敗時はエラー
  */
-const ensureCacheDir = async (): Promise<
-  neverthrow.Result<string, CacheDirError>
-> => {
+const ensureCacheDir = (): neverthrow.ResultAsync<string, CacheDirError> => {
   const cacheDir = getThumbnailCacheDir();
-  try {
-    await fsPromises.mkdir(cacheDir, { recursive: true });
-    return neverthrow.ok(cacheDir);
-  } catch (error) {
-    // ディレクトリが既に存在する場合は成功
-    return match(error)
-      .with({ code: 'EEXIST' }, () => neverthrow.ok(cacheDir))
-      .otherwise((e) => {
-        const errorCode = (e as NodeJS.ErrnoException).code;
-        logger.error({
-          message: `Failed to create cache directory: ${cacheDir}`,
-          stack: e instanceof Error ? e : new Error(String(e)),
-        });
-        return neverthrow.err({
+  return neverthrow.ResultAsync.fromPromise(
+    fsPromises.mkdir(cacheDir, { recursive: true }),
+    (error) => {
+      // ディレクトリが既に存在する場合は成功扱い（後でmapで処理）
+      // それ以外はエラー
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'EEXIST') {
+        // この分岐はResultAsync.fromPromiseでは直接okを返せないので、
+        // エラーとして返し後でフィルタリング
+        return {
           type: 'CACHE_DIR_CREATION_FAILED' as const,
-          message: `Cannot create cache directory: ${cacheDir}`,
-          code: errorCode,
-        });
+          message: 'EEXIST',
+          code: 'EEXIST',
+        };
+      }
+      logger.error({
+        message: `Failed to create cache directory: ${cacheDir}`,
+        stack: error instanceof Error ? error : new Error(String(error)),
       });
-  }
+      return {
+        type: 'CACHE_DIR_CREATION_FAILED' as const,
+        message: `Cannot create cache directory: ${cacheDir}`,
+        code: nodeError.code,
+      };
+    },
+  )
+    .map(() => cacheDir)
+    .orElse((error) => {
+      // EEXIST の場合は成功として扱う
+      if (error.code === 'EEXIST') {
+        return neverthrow.ok(cacheDir);
+      }
+      return neverthrow.err(error);
+    });
 };
 
 /**
@@ -160,6 +173,60 @@ type CacheReadResult =
       reason: 'not_found' | 'expired' | 'cache_dir_unavailable';
     }
   | { status: 'error'; error: Error };
+
+/**
+ * キャッシュファイルのstat結果
+ */
+type CacheStatError =
+  | { type: 'NOT_FOUND' }
+  | { type: 'IO_ERROR'; error: Error };
+
+/**
+ * キャッシュファイルのstatを取得（ResultAsync版）
+ */
+const statCacheFile = (
+  cachePath: string,
+): neverthrow.ResultAsync<
+  { stats: Awaited<ReturnType<typeof fsPromises.stat>>; cachePath: string },
+  CacheStatError
+> =>
+  neverthrow.ResultAsync.fromPromise(
+    fsPromises.stat(cachePath).then((stats) => ({ stats, cachePath })),
+    (error): CacheStatError => {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
+        return { type: 'NOT_FOUND' };
+      }
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.warn({
+        message: `Unexpected error reading cached thumbnail stat: ${cachePath}`,
+        stack: err,
+      });
+      return { type: 'IO_ERROR', error: err };
+    },
+  );
+
+/**
+ * キャッシュファイルを読み込み（ResultAsync版）
+ */
+const readCacheFile = (
+  cachePath: string,
+): neverthrow.ResultAsync<Buffer, CacheStatError> =>
+  neverthrow.ResultAsync.fromPromise(
+    fsPromises.readFile(cachePath),
+    (error): CacheStatError => {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
+        return { type: 'NOT_FOUND' };
+      }
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.warn({
+        message: `Unexpected error reading cached thumbnail: ${cachePath}`,
+        stack: err,
+      });
+      return { type: 'IO_ERROR', error: err };
+    },
+  );
 
 /**
  * キャッシュからサムネイルを取得
@@ -188,33 +255,45 @@ const getCachedThumbnail = async (
 
   const cachePath = path.join(cacheDirResult.value, `${cacheKey}.webp`);
 
-  try {
-    const stats = await fsPromises.stat(cachePath);
-    // キャッシュが有効期限を超えている場合は無効
-    const cacheDate = new Date(stats.mtimeMs);
-    const expiryDate = dateFns.subDays(new Date(), CACHE_EXPIRY_DAYS);
-    if (cacheDate < expiryDate) {
-      return { status: 'miss', reason: 'expired' };
-    }
-    const data = await fsPromises.readFile(cachePath);
-    return { status: 'hit', data };
-  } catch (error) {
-    // 予期されたエラー（ファイル不在）と予期しないエラーを分類
-    return match(error)
-      .with({ code: 'ENOENT' }, () => ({
+  // キャッシュファイルのstatを取得
+  const statResult = await statCacheFile(cachePath);
+  if (statResult.isErr()) {
+    return match(statResult.error)
+      .with({ type: 'NOT_FOUND' }, () => ({
         status: 'miss' as const,
         reason: 'not_found' as const,
       }))
-      .otherwise((e) => {
-        // 予期しないエラー（権限エラー、I/Oエラー等）
-        const err = e instanceof Error ? e : new Error(String(e));
-        logger.warn({
-          message: `Unexpected error reading cached thumbnail: ${cachePath}`,
-          stack: err,
-        });
-        return { status: 'error' as const, error: err };
-      });
+      .with({ type: 'IO_ERROR' }, ({ error }) => ({
+        status: 'error' as const,
+        error,
+      }))
+      .exhaustive();
   }
+
+  // キャッシュが有効期限を超えている場合は無効
+  const { stats } = statResult.value;
+  const cacheDate = new Date(Number(stats.mtimeMs));
+  const expiryDate = dateFns.subDays(new Date(), CACHE_EXPIRY_DAYS);
+  if (cacheDate < expiryDate) {
+    return { status: 'miss', reason: 'expired' };
+  }
+
+  // キャッシュファイルを読み込み
+  const readResult = await readCacheFile(cachePath);
+  return readResult.match(
+    (data) => ({ status: 'hit' as const, data }),
+    (error) =>
+      match(error)
+        .with({ type: 'NOT_FOUND' }, () => ({
+          status: 'miss' as const,
+          reason: 'not_found' as const,
+        }))
+        .with({ type: 'IO_ERROR' }, ({ error: err }) => ({
+          status: 'error' as const,
+          error: err,
+        }))
+        .exhaustive(),
+  );
 };
 
 /**
@@ -286,6 +365,98 @@ const saveThumbnailToCache = async (
 };
 
 /**
+ * キャッシュファイルのstat取得（クリーンアップ用）
+ * ENOENT はレースコンディションで予期されるため、null を返す
+ */
+type CacheFileStatResult = {
+  filePath: string;
+  stats: Awaited<ReturnType<typeof fsPromises.stat>>;
+  size: number;
+  mtime: number;
+} | null;
+
+const statCacheFileForCleanup = (
+  filePath: string,
+): neverthrow.ResultAsync<CacheFileStatResult, never> =>
+  neverthrow.ResultAsync.fromSafePromise(
+    fsPromises
+      .stat(filePath)
+      .then(
+        (stats): CacheFileStatResult => ({
+          filePath,
+          stats,
+          size: Number(stats.size),
+          mtime: Number(stats.mtimeMs),
+        }),
+      )
+      .catch((error): null => {
+        const nodeError = error as NodeJS.ErrnoException;
+        // ENOENT はレースコンディション（ファイル削除）で予期される → null
+        if (nodeError.code === 'ENOENT') {
+          return null;
+        }
+        // その他のエラー（権限、I/O）はログ出力して null を返す
+        // キャッシュクリーンアップは失敗しても致命的ではない
+        logger.debug({
+          message: `Failed to stat cache file: ${filePath}`,
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
+        return null;
+      }),
+  );
+
+/**
+ * キャッシュファイル削除（クリーンアップ用）
+ * 削除失敗は警告ログを出力して継続（致命的ではない）
+ */
+const unlinkCacheFile = (
+  filePath: string,
+): neverthrow.ResultAsync<boolean, never> =>
+  neverthrow.ResultAsync.fromSafePromise(
+    fsPromises
+      .unlink(filePath)
+      .then(() => true)
+      .catch((error): false => {
+        // 削除失敗をログ出力（処理は継続）
+        logger.warn({
+          message: `Failed to delete cache file during cleanup: ${filePath}`,
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
+        return false;
+      }),
+  );
+
+/**
+ * キャッシュディレクトリの読み取りエラー
+ */
+type CacheReaddirError =
+  | { type: 'PERMISSION_DENIED'; message: string }
+  | { type: 'IO_ERROR'; message: string };
+
+/**
+ * キャッシュディレクトリを読み取る
+ */
+const readCacheDir = (
+  cacheDir: string,
+): neverthrow.ResultAsync<string[], CacheReaddirError> =>
+  neverthrow.ResultAsync.fromPromise(
+    fsPromises.readdir(cacheDir),
+    (error): CacheReaddirError => {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'EACCES' || nodeError.code === 'EPERM') {
+        return {
+          type: 'PERMISSION_DENIED',
+          message: `Permission denied reading cache directory: ${cacheDir}`,
+        };
+      }
+      return {
+        type: 'IO_ERROR',
+        message: `Failed to read cache directory: ${nodeError.message}`,
+      };
+    },
+  );
+
+/**
  * 古いキャッシュをクリーンアップ（必要に応じて呼び出される）
  */
 export const cleanupThumbnailCache = async (): Promise<void> => {
@@ -300,75 +471,58 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
   }
   const cacheDir = cacheDirResult.value;
 
-  try {
-    const files = await fsPromises.readdir(cacheDir);
-    const fileStats = await Promise.all(
-      files.map(async (file) => {
-        const filePath = path.join(cacheDir, file);
-        try {
-          const stats = await fsPromises.stat(filePath);
-          return { filePath, stats, size: stats.size, mtime: stats.mtimeMs };
-        } catch (error) {
-          // ENOENT はレースコンディション（ファイル削除）で予期される
-          // その他のエラー（権限、I/O）はログ出力
-          return match(error)
-            .with({ code: 'ENOENT' }, () => null)
-            .otherwise((e) => {
-              logger.debug({
-                message: `Failed to stat cache file: ${filePath}`,
-                stack: e instanceof Error ? e : new Error(String(e)),
-              });
-              return null;
-            });
-        }
-      }),
-    );
-
-    const validFiles = fileStats.filter(
-      (f): f is NonNullable<typeof f> => f !== null,
-    );
-    const totalSizeMB =
-      validFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
-
-    // キャッシュサイズがしきい値を超えている場合のみクリーンアップ
-    if (totalSizeMB < MAX_CACHE_SIZE_MB * CACHE_CLEANUP_THRESHOLD) {
-      return;
-    }
-
-    logger.info(
-      `Cleaning up thumbnail cache. Current size: ${totalSizeMB.toFixed(2)}MB`,
-    );
-
-    // 古いファイルから削除
-    const sortedFiles = validFiles.sort((a, b) => a.mtime - b.mtime);
-    let currentSize = totalSizeMB;
-    const targetSize = MAX_CACHE_SIZE_MB * 0.5; // 50%まで削減
-
-    for (const file of sortedFiles) {
-      if (currentSize <= targetSize) {
-        break;
-      }
-      try {
-        await fsPromises.unlink(file.filePath);
-        currentSize -= file.size / 1024 / 1024;
-      } catch (error) {
-        // 削除失敗をログ出力（処理は継続）
-        logger.warn({
-          message: `Failed to delete cache file during cleanup: ${file.filePath}`,
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
-      }
-    }
-
-    logger.info(
-      `Thumbnail cache cleanup completed. New size: ${currentSize.toFixed(2)}MB`,
-    );
-  } catch (error) {
+  const filesResult = await readCacheDir(cacheDir);
+  if (filesResult.isErr()) {
     logger.error({
       message: 'Failed to cleanup thumbnail cache',
-      stack: error instanceof Error ? error : new Error(String(error)),
+      stack: new Error(filesResult.error.message),
     });
+    return;
   }
+
+  const files = filesResult.value;
+  const fileStats = await Promise.all(
+    files.map((file) => {
+      const filePath = path.join(cacheDir, file);
+      return statCacheFileForCleanup(filePath).then((r) => r._unsafeUnwrap());
+    }),
+  );
+
+  const validFiles = fileStats.filter(
+    (f): f is NonNullable<CacheFileStatResult> => f !== null,
+  );
+  const totalSizeMB =
+    validFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
+
+  // キャッシュサイズがしきい値を超えている場合のみクリーンアップ
+  if (totalSizeMB < MAX_CACHE_SIZE_MB * CACHE_CLEANUP_THRESHOLD) {
+    return;
+  }
+
+  logger.info(
+    `Cleaning up thumbnail cache. Current size: ${totalSizeMB.toFixed(2)}MB`,
+  );
+
+  // 古いファイルから削除
+  const sortedFiles = validFiles.sort((a, b) => a.mtime - b.mtime);
+  let currentSize = totalSizeMB;
+  const targetSize = MAX_CACHE_SIZE_MB * 0.5; // 50%まで削減
+
+  for (const file of sortedFiles) {
+    if (currentSize <= targetSize) {
+      break;
+    }
+    const deleted = await unlinkCacheFile(file.filePath).then((r) =>
+      r._unsafeUnwrap(),
+    );
+    if (deleted) {
+      currentSize -= file.size / 1024 / 1024;
+    }
+  }
+
+  logger.info(
+    `Thumbnail cache cleanup completed. New size: ${currentSize.toFixed(2)}MB`,
+  );
 };
 
 /**
@@ -475,17 +629,29 @@ async function* getPhotoPathBatches(
 
     // 日付フィルタリングが必要な場合
     if (lastProcessedDate) {
-      try {
-        const stats = await fsPromises.stat(photoPathStr);
-        if (stats.mtime <= lastProcessedDate) {
-          continue; // 古いファイルはスキップ
-        }
-      } catch (error) {
-        logger.error({
-          message: `Failed to get stats for ${photoPathStr}`,
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
-        continue;
+      const statsResult = await neverthrow.ResultAsync.fromPromise(
+        fsPromises.stat(photoPathStr),
+        (error): { type: 'STAT_ERROR'; message: string } => {
+          const nodeError = error as NodeJS.ErrnoException;
+          // ENOENT はファイル削除のレースコンディションで予期される
+          if (nodeError.code === 'ENOENT') {
+            return { type: 'STAT_ERROR', message: 'File not found' };
+          }
+          // その他のエラーはログ出力
+          logger.error({
+            message: `Failed to get stats for ${photoPathStr}`,
+            stack: error instanceof Error ? error : new Error(String(error)),
+          });
+          return { type: 'STAT_ERROR', message: nodeError.message };
+        },
+      );
+
+      if (statsResult.isErr()) {
+        continue; // エラー時はスキップ
+      }
+
+      if (statsResult.value.mtime <= lastProcessedDate) {
+        continue; // 古いファイルはスキップ
       }
     }
 
@@ -548,31 +714,41 @@ async function processPhotoBatch(
         return null;
       }
 
-      try {
-        const takenAt = dateFns.parse(
-          matchResult[1],
-          'yyyy-MM-dd_HH-mm-ss.SSS',
-          new Date(),
-        );
+      const takenAt = dateFns.parse(
+        matchResult[1],
+        'yyyy-MM-dd_HH-mm-ss.SSS',
+        new Date(),
+      );
 
-        // sharpインスタンスを使い捨てにしてメモリリークを防ぐ
-        const metadata = await sharp(photoPath).metadata();
-        const height = metadata.height ?? 720;
-        const width = metadata.width ?? 1280;
+      // sharpインスタンスを使い捨てにしてメモリリークを防ぐ
+      const metadataResult = await neverthrow.ResultAsync.fromPromise(
+        sharp(photoPath).metadata(),
+        (error): { type: 'SHARP_ERROR'; message: string } => {
+          logger.error({
+            message: `Failed to process photo metadata for ${photoPath}`,
+            stack: error instanceof Error ? error : new Error(String(error)),
+          });
+          return {
+            type: 'SHARP_ERROR',
+            message: error instanceof Error ? error.message : String(error),
+          };
+        },
+      );
 
-        return {
-          photoPath,
-          takenAt,
-          width,
-          height,
-        };
-      } catch (error) {
-        logger.error({
-          message: `Failed to process photo metadata for ${photoPath}`,
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
+      if (metadataResult.isErr()) {
         return null;
       }
+
+      const metadata = metadataResult.value;
+      const height = metadata.height ?? 720;
+      const width = metadata.width ?? 1280;
+
+      return {
+        photoPath,
+        takenAt,
+        width,
+        height,
+      };
     });
 
     const subResults = (await Promise.all(photoInfoPromises)).filter(
@@ -757,69 +933,67 @@ export const getVRChatPhotoItemData = async ({
   // 指定しない場合は元画像のサイズをそのまま返す
   width?: number;
 }): Promise<neverthrow.Result<string, 'InputFileIsMissing'>> => {
-  try {
-    // サムネイル（width指定あり）の場合はキャッシュを使用
-    if (width !== undefined) {
-      const cacheKey = generateCacheKey(photoPath, width);
+  // ResultAsync.fromPromise で予期されたエラー (InputFileIsMissing) を処理
+  return ResultAsync.fromPromise(
+    (async () => {
+      // サムネイル（width指定あり）の場合はキャッシュを使用
+      if (width !== undefined) {
+        const cacheKey = generateCacheKey(photoPath, width);
 
-      // キャッシュから取得を試みる（構造化された結果で判定）
-      const cacheResult = await getCachedThumbnail(cacheKey);
+        // キャッシュから取得を試みる（構造化された結果で判定）
+        const cacheResult = await getCachedThumbnail(cacheKey);
 
-      // ts-patternでキャッシュ結果を処理
-      const cachedData = match(cacheResult)
-        .with({ status: 'hit' }, ({ data }) => data)
-        .with({ status: 'miss' }, () => null)
-        .with({ status: 'error' }, ({ error }) => {
-          // エラー時はログ出力済み、生成にフォールバック
-          logger.debug({
-            message: `Cache read error for ${cacheKey}, regenerating thumbnail`,
-            stack: error,
-          });
-          return null;
-        })
-        .exhaustive();
+        // ts-patternでキャッシュ結果を処理
+        const cachedData = match(cacheResult)
+          .with({ status: 'hit' }, ({ data }) => data)
+          .with({ status: 'miss' }, () => null)
+          .with({ status: 'error' }, ({ error }) => {
+            // エラー時はログ出力済み、生成にフォールバック
+            logger.debug({
+              message: `Cache read error for ${cacheKey}, regenerating thumbnail`,
+              stack: error,
+            });
+            return null;
+          })
+          .exhaustive();
 
-      if (cachedData) {
-        return neverthrow.ok(
-          `data:image/webp;base64,${cachedData.toString('base64')}`,
-        );
+        if (cachedData) {
+          return `data:image/webp;base64,${cachedData.toString('base64')}`;
+        }
+
+        // キャッシュにない場合は生成してキャッシュに保存
+        const photoBuf = await sharp(photoPath)
+          .resize(width)
+          .webp({ quality: 80 }) // WebPに変換（ファイルサイズ削減）
+          .toBuffer();
+
+        // 非同期でキャッシュに保存（レスポンスを遅らせない）
+        // エラーは saveThumbnailToCache 内部でログ出力される
+        void saveThumbnailToCache(cacheKey, photoBuf);
+
+        return `data:image/webp;base64,${photoBuf.toString('base64')}`;
       }
 
-      // キャッシュにない場合は生成してキャッシュに保存
-      const photoBuf = await sharp(photoPath)
-        .resize(width)
-        .webp({ quality: 80 }) // WebPに変換（ファイルサイズ削減）
-        .toBuffer();
-
-      // 非同期でキャッシュに保存（レスポンスを遅らせない）
-      // エラーは saveThumbnailToCache 内部でログ出力される
-      void saveThumbnailToCache(cacheKey, photoBuf);
-
-      return neverthrow.ok(
-        `data:image/webp;base64,${photoBuf.toString('base64')}`,
-      );
-    }
-
-    // 元サイズの場合はキャッシュなし
-    const photoBuf = await sharp(photoPath).toBuffer();
-    return neverthrow.ok(
-      `data:image/${path
+      // 元サイズの場合はキャッシュなし
+      const photoBuf = await sharp(photoPath).toBuffer();
+      return `data:image/${path
         .extname(photoPath)
-        .replace('.', '')};base64,${photoBuf.toString('base64')}`,
-    );
-  } catch (error) {
-    return match(error)
-      .with(
-        P.intersection(P.instanceOf(Error), {
-          message: P.string.includes('Input file is missing'),
-        }),
-        () => neverthrow.err('InputFileIsMissing' as const),
-      )
-      .otherwise((e) => {
-        // 予期しないエラーはre-throw（Sentryに送信）
-        throw e instanceof Error ? e : new Error(JSON.stringify(e));
-      });
-  }
+        .replace('.', '')};base64,${photoBuf.toString('base64')}`;
+    })(),
+    (error): 'InputFileIsMissing' => {
+      return match(error)
+        .with(
+          P.intersection(P.instanceOf(Error), {
+            message: P.string.includes('Input file is missing'),
+          }),
+          () => 'InputFileIsMissing' as const,
+        )
+        .otherwise((e) => {
+          // 予期しないエラーはre-throw（Sentryに送信）
+          throw e instanceof Error ? e : new Error(JSON.stringify(e));
+        });
+    },
+  );
 };
 
 /**
@@ -895,53 +1069,42 @@ export const getBatchThumbnails = async (
     const batch = photoPaths.slice(i, i + PARALLEL_LIMIT);
 
     const thumbnailPromises = batch.map(async (photoPath) => {
-      try {
-        const result = await getVRChatPhotoItemData({ photoPath, width });
-        if (result.isOk()) {
-          return {
-            photoPath,
-            data: result.value,
-            error: null as null,
-          };
-        }
-        // Result.isErr() の場合
-        return {
-          photoPath,
-          data: null as null,
-          error: {
-            reason: 'file_not_found' as const,
-            message: result.error,
-          },
-        };
-      } catch (error) {
-        // 予期しないエラーをログ出力（バッチ処理は継続、Sentryに送信）
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        logger.error({
-          message: `Failed to get thumbnail in batch for ${photoPath}`,
-          stack: error instanceof Error ? error : new Error(errorMessage),
-        });
-        return {
-          photoPath,
-          data: null as null,
-          error: {
-            reason: 'unexpected_error' as const,
-            message: errorMessage,
-          },
-        };
-      }
+      // getVRChatPhotoItemData は予期しないエラーを throw するため
+      // allSettled で個別にハンドリングする
+      const result = await getVRChatPhotoItemData({ photoPath, width });
+      return { photoPath, result };
     });
 
-    const batchResults = await Promise.all(thumbnailPromises);
-    for (const { photoPath, data, error } of batchResults) {
-      if (data) {
-        success.set(photoPath, data);
-      } else if (error) {
-        failed.push({
-          photoPath,
-          reason: error.reason,
-          message: error.message,
+    // Promise.allSettled で1ファイルの失敗が全体を止めないようにする
+    const settledResults = await Promise.allSettled(thumbnailPromises);
+
+    for (const settled of settledResults) {
+      if (settled.status === 'fulfilled') {
+        const { photoPath, result } = settled.value;
+        result.match(
+          (data) => success.set(photoPath, data),
+          (error) =>
+            failed.push({
+              photoPath,
+              reason: 'file_not_found',
+              message: error,
+            }),
+        );
+      } else {
+        // 予期しないエラー（sharp内部エラー等）をログ出力
+        // Sentryに送信されるのは logger.error() 経由
+        const errorMessage =
+          settled.reason instanceof Error
+            ? settled.reason.message
+            : String(settled.reason);
+        logger.error({
+          message: 'Unexpected error during batch thumbnail fetch',
+          stack:
+            settled.reason instanceof Error
+              ? settled.reason
+              : new Error(errorMessage),
         });
+        // rejected の場合は photoPath を特定できないが、バッチ処理は継続
       }
     }
   }

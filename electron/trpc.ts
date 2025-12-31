@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { initTRPC, TRPCError } from '@trpc/server';
+import { ResultAsync } from 'neverthrow';
 import superjson from 'superjson';
 import { match, P } from 'ts-pattern';
 import type { ZodError } from 'zod';
@@ -209,7 +210,8 @@ const logError = (
 };
 
 const errorHandler = t.middleware(async (opts) => {
-  try {
+  // ResultAsync.fromPromise でミドルウェアのエラーハンドリングを統一
+  const executeMiddleware = async () => {
     const result = await opts.next(opts);
     if (!result.ok) {
       const originalError = match(result.error.cause)
@@ -221,7 +223,9 @@ const errorHandler = t.middleware(async (opts) => {
       logError(originalError, requestInfo, originalError);
     }
     return result;
-  } catch (cause) {
+  };
+
+  const handleError = (cause: unknown): never => {
     const error = match(cause)
       .with(P.instanceOf(Error), (err) => err)
       .otherwise(() => new Error(String(cause)));
@@ -236,7 +240,15 @@ const errorHandler = t.middleware(async (opts) => {
       message: error.message,
       cause: error,
     });
-  }
+  };
+
+  return ResultAsync.fromPromise(executeMiddleware(), handleError).match(
+    (result) => result,
+    () => {
+      // error handler always throws, so this branch is unreachable
+      throw new Error('unreachable');
+    },
+  );
 });
 
 const logRequest = t.middleware(async (opts) => {
