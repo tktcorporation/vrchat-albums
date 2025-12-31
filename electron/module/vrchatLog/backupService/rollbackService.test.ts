@@ -15,6 +15,7 @@ import { getRollbackErrorMessage, rollbackService } from './rollbackService';
 vi.mock('node:fs', () => ({
   promises: {
     access: vi.fn(),
+    stat: vi.fn(),
     readdir: vi.fn(),
     rm: vi.fn(),
     mkdir: vi.fn(),
@@ -81,7 +82,7 @@ describe('rollbackService', () => {
   describe('rollbackToBackup', () => {
     it('バックアップからロールバックできる', async () => {
       // バックアップデータの存在確認
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: '2023-11',
@@ -110,11 +111,11 @@ describe('rollbackService', () => {
       ]);
 
       // logStoreディレクトリのクリア
-      vi.mocked(fs.rm).mockResolvedValue(undefined);
+      vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
 
       // logStore復帰
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-      vi.mocked(fs.cp).mockResolvedValue(undefined);
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
+      vi.mocked(fs.cp).mockResolvedValue(undefined as unknown as never);
 
       // DB再構築
       vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
@@ -168,7 +169,7 @@ describe('rollbackService', () => {
 
     it('バックアップデータが存在しない場合はエラーを返す', async () => {
       // バックアップディレクトリが存在しない
-      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
+      vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
 
       const result = await rollbackService.rollbackToBackup(mockBackup);
 
@@ -181,7 +182,7 @@ describe('rollbackService', () => {
     });
 
     it('月別データが存在しない場合はエラーを返す', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: 'backup-metadata.json',
@@ -208,7 +209,7 @@ describe('rollbackService', () => {
     });
 
     it('logStore復帰に失敗した場合は予期しないエラーとしてthrowされる', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: '2023-11',
@@ -223,8 +224,8 @@ describe('rollbackService', () => {
           parentPath: '',
         } as unknown as Dirent<Buffer>,
       ]);
-      vi.mocked(fs.rm).mockResolvedValue(undefined);
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.cp).mockRejectedValue(new Error('Copy failed'));
 
       // ファイルシステムエラーは予期しないエラーとしてthrowされる（Sentryに送信）
@@ -234,7 +235,7 @@ describe('rollbackService', () => {
     });
 
     it('DB再構築に失敗した場合はエラーを返す', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: '2023-11',
@@ -249,9 +250,9 @@ describe('rollbackService', () => {
           parentPath: '',
         } as unknown as Dirent<Buffer>,
       ]);
-      vi.mocked(fs.rm).mockResolvedValue(undefined);
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-      vi.mocked(fs.cp).mockResolvedValue(undefined);
+      vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
+      vi.mocked(fs.cp).mockResolvedValue(undefined as unknown as never);
       vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
         neverthrow.err(new VRChatLogFileError('LOG_FILES_NOT_FOUND')),
       );
@@ -306,11 +307,11 @@ describe('rollbackService', () => {
   describe('validateBackupData (private)', () => {
     // プライベートメソッドのテストはrollbackToBackup経由で行う
     it('メタデータファイルが存在しない場合は検証エラー', async () => {
-      vi.mocked(fs.access).mockImplementation(async (p) => {
+      vi.mocked(fs.stat).mockImplementation(async (p) => {
         if (p.toString().includes('backup-metadata.json')) {
           throw new Error('ENOENT');
         }
-        return undefined;
+        return {} as never;
       });
       vi.mocked(fs.readdir).mockResolvedValue([
         {
@@ -342,7 +343,7 @@ describe('rollbackService', () => {
     // logStoreディレクトリのクリア処理のテスト
     // fs.rm は force: true で呼ばれるので、ディレクトリが存在しなくてもエラーにならない
     it('logStoreディレクトリをクリアする', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: '2023-11',
@@ -357,9 +358,9 @@ describe('rollbackService', () => {
           parentPath: '',
         } as unknown as Dirent<Buffer>,
       ]);
-      vi.mocked(fs.rm).mockResolvedValue(undefined);
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-      vi.mocked(fs.cp).mockResolvedValue(undefined);
+      vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
+      vi.mocked(fs.cp).mockResolvedValue(undefined as unknown as never);
       vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
         neverthrow.ok({
           createdWorldJoinLogModelList: [],
@@ -388,7 +389,7 @@ describe('rollbackService', () => {
   describe('restoreLogStoreFromBackup (private)', () => {
     // ファイルシステムエラーは予期しないエラーとしてthrow（Sentryに送信）
     it('ディレクトリ復帰に失敗した場合は予期しないエラーとしてthrowされる', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.stat).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: '2023-11',
@@ -403,8 +404,8 @@ describe('rollbackService', () => {
           parentPath: '',
         } as unknown as Dirent<Buffer>,
       ]);
-      vi.mocked(fs.rm).mockResolvedValue(undefined);
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.cp).mockRejectedValue(new Error('Copy failed'));
 
       // ファイルシステムエラーは予期しないエラーとしてthrowされる

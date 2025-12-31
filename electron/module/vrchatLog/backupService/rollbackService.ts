@@ -58,15 +58,12 @@ export const getRollbackErrorMessage = (error: RollbackError): string =>
 
 /**
  * ファイル/ディレクトリの存在確認
+ * fs.statを使用してtry-catchを避ける
  * @returns true if exists, false if not
  */
 const existsAsync = async (targetPath: string): Promise<boolean> => {
-  try {
-    await fs.access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
+  const stat = await fs.stat(targetPath).catch(() => null);
+  return stat !== null;
 };
 
 import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
