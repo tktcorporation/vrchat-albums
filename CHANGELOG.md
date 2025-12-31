@@ -6,6 +6,27 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
+- Redesign settings screen tab layout (#657)
+
+### 🐛 Bug Fixes
+
+- プレイヤーリストの初期状態をスケルトン表示に統一 (#654)
+- Trpc-electron IPC バグによる巨大toast表示を抑制 (#655)
+
+### 🚜 Refactor
+
+- Neverthrow error handling patterns improvement (#656)
+- デザインシステム刷新 - 8pxグリッド・セマンティックトークン統一 (#658)
+- 写真スキャン最適化 + Zod brand型で型安全性向上 (#659)
+
+### ⚙️ Miscellaneous Tasks
+
+- Release v0.23.0
+
+## [0.22.0] - 2025-12-30
+
+### 🚀 Features
+
 - Add must-use-result check to neverthrow linter (#647)
 - DateJumpSidebarにGoogle Photos/immich風機能を追加 (#648)
 - 設定画面のトンマナを統一 (#649)
@@ -23,7 +44,7 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Release v0.22.0
+- Release v0.22.0 (#653)
 
 ## [0.21.0] - 2025-12-23
 
