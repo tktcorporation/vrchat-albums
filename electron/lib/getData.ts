@@ -1,4 +1,4 @@
-import { err, ok, type Result } from 'neverthrow';
+import { type Result, ResultAsync } from 'neverthrow';
 import { ofetch } from 'ofetch';
 import { match, P } from 'ts-pattern';
 import type { QueryObject } from 'ufo';
@@ -50,14 +50,14 @@ export class FetchError extends Error {
  * ofetch を利用して HTTP リクエストを行うユーティリティ
  * getData からのみ呼ばれ、成功可否を Result 型で返す
  */
-const fetchWithResult = async <T = unknown>(
+const fetchWithResult = <T = unknown>(
   url: string,
   options?: RequestInit & { query?: QueryObject },
-): Promise<Result<T, FetchError>> => {
-  try {
-    // ちゃんとした User-Agent を設定する
-    const userAgent = `Electron ${process.versions.electron}; ${process.platform}; ${process.arch}`;
-    const response = await ofetch<T>(url, {
+): ResultAsync<T, FetchError> => {
+  // ちゃんとした User-Agent を設定する
+  const userAgent = `Electron ${process.versions.electron}; ${process.platform}; ${process.arch}`;
+  return ResultAsync.fromPromise(
+    ofetch<T>(url, {
       headers: {
         'User-Agent': userAgent,
         ...options?.headers,
@@ -73,15 +73,15 @@ const fetchWithResult = async <T = unknown>(
           responseBody: response._data,
         });
       },
-    });
-    return ok(response);
-  } catch (error: unknown) {
-    return match(error)
-      .with(P.instanceOf(FetchError), (e) => err(e))
-      .otherwise((e) => {
-        throw e; // FetchError でない場合はそのまま throw する
-      });
-  }
+    }),
+    (error): FetchError => {
+      return match(error)
+        .with(P.instanceOf(FetchError), (e) => e)
+        .otherwise((e) => {
+          throw e; // FetchError でない場合はそのまま throw する
+        });
+    },
+  );
 };
 
 /**

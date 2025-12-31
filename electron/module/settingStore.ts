@@ -1,6 +1,7 @@
 import type { Rectangle } from 'electron';
 import Store from 'electron-store';
-import * as neverthrow from 'neverthrow';
+import type * as neverthrow from 'neverthrow';
+import { fromThrowable } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 
 type TestPlaywrightStoreName = `test-playwright-settings-${string}`;
@@ -173,22 +174,22 @@ const clearAllStoredSettings = (settingsStore: Store) => () => {
 const clearStoredSetting =
   (settingsStore: Store) =>
   (key: SettingStoreKey): neverthrow.Result<void, SettingStoreError> => {
-    try {
-      return neverthrow.ok(settingsStore.delete(key));
-    } catch (error) {
-      return match(error)
-        .with(P.instanceOf(Error), (e) =>
-          neverthrow.err({
+    const safeDelete = fromThrowable(
+      () => settingsStore.delete(key),
+      (error): SettingStoreError => {
+        return match(error)
+          .with(P.instanceOf(Error), (e) => ({
             type: 'STORAGE_ERROR' as const,
             message: e.message,
             key,
-          }),
-        )
-        .otherwise((e) => {
-          // 予期しないエラーはre-throw（Sentry通知）
-          throw e;
-        });
-    }
+          }))
+          .otherwise((e) => {
+            // 予期しないエラーはre-throw（Sentry通知）
+            throw e;
+          });
+      },
+    );
+    return safeDelete();
   };
 
 import path from 'node:path';
