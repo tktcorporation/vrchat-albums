@@ -2,7 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.23.0] - 2025-12-31
+
+### 🚀 Features
+
+- Redesign settings screen tab layout (#657)
+
+### 🐛 Bug Fixes
+
+- プレイヤーリストの初期状態をスケルトン表示に統一 (#654)
+- Trpc-electron IPC バグによる巨大toast表示を抑制 (#655)
+
+### 🚜 Refactor
+
+- Neverthrow error handling patterns improvement (#656)
+- デザインシステム刷新 - 8pxグリッド・セマンティックトークン統一 (#658)
+- 写真スキャン最適化 + Zod brand型で型安全性向上 (#659)
+
+## [0.22.0] - 2025-12-30
 
 ### 🚀 Features
 
@@ -23,7 +40,7 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Release v0.22.0
+- Release v0.22.0 (#653)
 
 ## [0.21.0] - 2025-12-23
 
