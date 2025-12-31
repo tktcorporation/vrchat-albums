@@ -17,7 +17,7 @@ import * as service from './vrchatPhoto.service';
 vi.mock('node:fs/promises');
 vi.mock('./model/vrchatPhotoPath.model');
 vi.mock('../settingStore');
-vi.mock('folder-hash');
+vi.mock('hash-wasm');
 vi.mock('sharp', () => {
   const mockSharpInstance = {
     metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
@@ -37,16 +37,16 @@ vi.mock('./../../lib/logger', () => ({
   },
 }));
 
-// folder-hash のインポート
-import { hashElement } from 'folder-hash';
+// hash-wasm のインポート
+import { xxhash128 } from 'hash-wasm';
 
 /**
- * フォルダパスからモックダイジェストを生成（folder-hash モック用）
- * folder-hash はフォルダのコンテンツに基づいてハッシュを計算するので、
- * テストではフォルダパスベースで一意のハッシュを返す
+ * ファイル名リストからモックダイジェストを生成（hash-wasm モック用）
+ * 実際の xxhash128 はファイル名リストをハッシュ化するので、
+ * テストでは入力文字列ベースで一意のハッシュを返す
  */
-const computeTestDigest = (folderPath: string): FolderDigest => {
-  const hash = crypto.createHash('md5').update(folderPath).digest('hex');
+const computeTestDigest = (input: string): FolderDigest => {
+  const hash = crypto.createHash('md5').update(input).digest('hex');
   return FolderDigestSchema.parse(hash);
 };
 
@@ -57,6 +57,20 @@ const computeTestDigest = (folderPath: string): FolderDigest => {
 const createOldDigest = (suffix: string): FolderDigest => {
   const hash = crypto.createHash('md5').update(`old-${suffix}`).digest('hex');
   return FolderDigestSchema.parse(hash);
+};
+
+/**
+ * フォルダ内のVRChatファイル名リストから期待されるダイジェストを計算
+ * 実際の computeFolderDigest と同じロジック:
+ * - VRChat_*.png ファイルのみをフィルタ
+ * - ソートして改行で結合
+ * - xxhash128 でハッシュ化
+ */
+const computeExpectedDigestForFolder = (files: string[]): FolderDigest => {
+  const pngFiles = files
+    .filter((f) => f.startsWith('VRChat_') && f.endsWith('.png'))
+    .sort();
+  return computeTestDigest(pngFiles.join('\n'));
 };
 
 /**
@@ -122,12 +136,11 @@ describe('createVRChatPhotoPathIndex', () => {
       mockSettingStore as unknown as SettingStore,
     );
 
-    // folder-hash モック - フォルダパスに基づいて一意のハッシュを返す
-    vi.mocked(hashElement).mockImplementation(async (folderPath: string) => ({
-      hash: computeTestDigest(folderPath),
-      name: folderPath,
-      children: [],
-    }));
+    // hash-wasm モック - ファイル名リストに基づいて一意のハッシュを返す
+    // xxhash128 は IDataType (string | Buffer) を受け取るため、型アサーションを使用
+    vi.mocked(xxhash128).mockImplementation(async (input) =>
+      computeTestDigest(String(input)),
+    );
 
     // readdir モック - withFileTypesオプションの有無で振る舞いを変える
     // readdir は複雑なオーバーロードを持つため、any を使ってモック
@@ -247,9 +260,9 @@ describe('createVRChatPhotoPathIndex', () => {
       expect(savedStates[yearMonthFolder2024_02]).toBeDefined();
       expect(savedStates[extraYearMonthFolder]).toBeDefined();
 
-      // ダイジェストが正しく計算される（folder-hash はフォルダパスベースでハッシュ）
+      // ダイジェストが正しく計算される（hash-wasm はファイル名リストベースでハッシュ）
       expect(savedStates[yearMonthFolder2024_01].digest).toBe(
-        computeTestDigest(yearMonthFolder2024_01),
+        computeExpectedDigestForFolder([file1Name, 'not-a-vrchat-file.txt']),
       );
     });
   });
@@ -257,7 +270,10 @@ describe('createVRChatPhotoPathIndex', () => {
   describe('差分スキャン（isIncremental = true）', () => {
     it('ダイジェストが一致するフォルダはスキップする', async () => {
       // 事前にスキャン状態を設定（2024-01は変更なし、他は古いダイジェスト）
-      const digest2024_01 = computeTestDigest(yearMonthFolder2024_01);
+      const digest2024_01 = computeExpectedDigestForFolder([
+        file1Name,
+        'not-a-vrchat-file.txt',
+      ]);
       savedScanStates = {
         [yearMonthFolder2024_01]: {
           digest: digest2024_01,
@@ -327,18 +343,21 @@ describe('createVRChatPhotoPathIndex', () => {
     });
 
     it('更新されたファイルがない場合はDB保存処理を呼び出さない', async () => {
-      // 全フォルダが変更なし（folder-hash はフォルダパスベースでハッシュ）
+      // 全フォルダが変更なし（hash-wasm はファイル名リストベースでハッシュ）
       savedScanStates = {
         [yearMonthFolder2024_01]: {
-          digest: computeTestDigest(yearMonthFolder2024_01),
+          digest: computeExpectedDigestForFolder([
+            file1Name,
+            'not-a-vrchat-file.txt',
+          ]),
           lastScannedAt: now.toISOString(),
         },
         [yearMonthFolder2024_02]: {
-          digest: computeTestDigest(yearMonthFolder2024_02),
+          digest: computeExpectedDigestForFolder([file2Name]),
           lastScannedAt: now.toISOString(),
         },
         [extraYearMonthFolder]: {
-          digest: computeTestDigest(extraYearMonthFolder),
+          digest: computeExpectedDigestForFolder([extraFileName]),
           lastScannedAt: now.toISOString(),
         },
       };
@@ -355,15 +374,18 @@ describe('createVRChatPhotoPathIndex', () => {
       // 全フォルダを変更なしにしてスキップを確認
       savedScanStates = {
         [yearMonthFolder2024_01]: {
-          digest: computeTestDigest(yearMonthFolder2024_01),
+          digest: computeExpectedDigestForFolder([
+            file1Name,
+            'not-a-vrchat-file.txt',
+          ]),
           lastScannedAt: now.toISOString(),
         },
         [yearMonthFolder2024_02]: {
-          digest: computeTestDigest(yearMonthFolder2024_02),
+          digest: computeExpectedDigestForFolder([file2Name]),
           lastScannedAt: now.toISOString(),
         },
         [extraYearMonthFolder]: {
-          digest: computeTestDigest(extraYearMonthFolder),
+          digest: computeExpectedDigestForFolder([extraFileName]),
           lastScannedAt: now.toISOString(),
         },
       };
@@ -379,19 +401,26 @@ describe('createVRChatPhotoPathIndex', () => {
   describe('エラーハンドリング', () => {
     describe('computeFolderDigest エラー', () => {
       it('フォルダ削除エラー（ENOENT）が発生した場合はスキップしてdebugログを出力する', async () => {
-        // folder-hash がENOENTエラーを返すようにモック
-        vi.mocked(hashElement).mockImplementation(
-          async (folderPath: string) => {
-            if (folderPath === yearMonthFolder2024_01) {
+        // readdir がENOENTエラーを返すようにモック（computeFolderDigest内で呼ばれる）
+        const originalReaddirMock = vi.mocked(nodefsPromises.readdir);
+        const originalImplementation =
+          originalReaddirMock.getMockImplementation();
+        (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+          async (dirPath: PathLike, options?: unknown) => {
+            const pathStr = dirPath.toString();
+            // computeFolderDigest で呼ばれる readdir（withFileTypes なし）
+            if (
+              pathStr === yearMonthFolder2024_01 &&
+              (!options ||
+                !(options as { withFileTypes?: boolean }).withFileTypes)
+            ) {
               const error = new Error('ENOENT: no such file or directory');
               (error as NodeJS.ErrnoException).code = 'ENOENT';
               throw error;
             }
-            return {
-              hash: computeTestDigest(folderPath),
-              name: folderPath,
-              children: [],
-            };
+            // それ以外はオリジナルの実装を呼ぶ
+            // biome-ignore lint/suspicious/noExplicitAny: readdir mock type
+            return originalImplementation?.(dirPath, options as any);
           },
         );
 
@@ -418,18 +447,25 @@ describe('createVRChatPhotoPathIndex', () => {
       });
 
       it('権限エラー（EACCES）が発生した場合はスキップしてwarnログを出力する', async () => {
-        vi.mocked(hashElement).mockImplementation(
-          async (folderPath: string) => {
-            if (folderPath === yearMonthFolder2024_02) {
+        // readdir がEACCESエラーを返すようにモック
+        const originalReaddirMock = vi.mocked(nodefsPromises.readdir);
+        const originalImplementation =
+          originalReaddirMock.getMockImplementation();
+        (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+          async (dirPath: PathLike, options?: unknown) => {
+            const pathStr = dirPath.toString();
+            // computeFolderDigest で呼ばれる readdir（withFileTypes なし）
+            if (
+              pathStr === yearMonthFolder2024_02 &&
+              (!options ||
+                !(options as { withFileTypes?: boolean }).withFileTypes)
+            ) {
               const error = new Error('EACCES: permission denied');
               (error as NodeJS.ErrnoException).code = 'EACCES';
               throw error;
             }
-            return {
-              hash: computeTestDigest(folderPath),
-              name: folderPath,
-              children: [],
-            };
+            // biome-ignore lint/suspicious/noExplicitAny: readdir mock type
+            return originalImplementation?.(dirPath, options as any);
           },
         );
 
@@ -455,7 +491,25 @@ describe('createVRChatPhotoPathIndex', () => {
       it('想定外エラーは再スローする（Sentry送信対象）', async () => {
         const unexpectedError = new Error('EMFILE: too many open files');
         (unexpectedError as NodeJS.ErrnoException).code = 'EMFILE';
-        vi.mocked(hashElement).mockRejectedValue(unexpectedError);
+        // readdir が想定外エラーを返すようにモック
+        const originalReaddirMock = vi.mocked(nodefsPromises.readdir);
+        const originalImplementation =
+          originalReaddirMock.getMockImplementation();
+        (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+          async (dirPath: PathLike, options?: unknown) => {
+            const pathStr = dirPath.toString();
+            // computeFolderDigest で呼ばれる readdir（withFileTypes なし）
+            if (
+              pathStr === yearMonthFolder2024_01 &&
+              (!options ||
+                !(options as { withFileTypes?: boolean }).withFileTypes)
+            ) {
+              throw unexpectedError;
+            }
+            // biome-ignore lint/suspicious/noExplicitAny: readdir mock type
+            return originalImplementation?.(dirPath, options as any);
+          },
+        );
 
         await expect(service.createVRChatPhotoPathIndex(false)).rejects.toThrow(
           unexpectedError,

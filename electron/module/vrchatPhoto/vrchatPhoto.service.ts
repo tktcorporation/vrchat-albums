@@ -4,7 +4,7 @@ import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
 import * as dateFns from 'date-fns';
-import { hashElement } from 'folder-hash';
+import { xxhash128 } from 'hash-wasm';
 import * as neverthrow from 'neverthrow';
 import { ResultAsync } from 'neverthrow';
 import * as path from 'pathe';
@@ -608,11 +608,13 @@ type FolderDigestError =
 
 /**
  * フォルダ内のVRChatファイル一覧からダイジェスト（ハッシュ）を計算
- * folder-hashライブラリを使用して信頼性の高いハッシュを生成
+ * hash-wasmのxxhash128を使用してファイル名リストからハッシュを生成
+ *
+ * 注意: xxhash128は32文字のhexを出力し、既存のFolderDigestSchema（MD5形式）と互換
  *
  * @param folderPath VRChat写真を含むフォルダのパス
  * @returns ResultAsync<FolderDigest, FolderDigestError>
- *          - 成功時: FolderDigest（MD5ハッシュ値）
+ *          - 成功時: FolderDigest（xxhash128ハッシュ値、32文字hex）
  *          - FOLDER_NOT_FOUND: スキャン中にフォルダが削除された（想定内）
  *          - PERMISSION_DENIED: 権限エラー（ユーザーに通知すべき）
  * @throws 予期しないエラー（EMFILE等）はSentry送信対象として再スロー
@@ -620,14 +622,8 @@ type FolderDigestError =
 const computeFolderDigest = (
   folderPath: VRChatPhotoContainingFolderPath,
 ): neverthrow.ResultAsync<FolderDigest, FolderDigestError> => {
-  const options = {
-    algo: 'md5' as const,
-    encoding: 'hex' as const,
-    files: { include: ['VRChat_*.png'] },
-  };
-
   return neverthrow.ResultAsync.fromPromise(
-    hashElement(folderPath, options),
+    fsPromises.readdir(folderPath as string),
     (error): FolderDigestError => {
       const nodeError = error as NodeJS.ErrnoException;
       return match(nodeError.code)
@@ -640,7 +636,7 @@ const computeFolderDigest = (
         })
         .with(P.union('EACCES', 'EPERM'), () => {
           logger.warn({
-            message: `Permission denied hashing folder: ${folderPath}`,
+            message: `Permission denied reading folder: ${folderPath}`,
             stack: error instanceof Error ? error : new Error(String(error)),
           });
           return {
@@ -653,21 +649,35 @@ const computeFolderDigest = (
           throw error;
         });
     },
-  ).andThen((result) =>
-    neverthrow.fromThrowable(
-      () => FolderDigestSchema.parse(result.hash),
-      (error): FolderDigestError => {
-        // folder-hashライブラリが予期しないハッシュ形式を返した場合
-        // これはライブラリのバグまたは破壊的変更を示すため、Sentryに送信
-        logger.error({
-          message: 'Invalid hash format from folder-hash library',
-          stack: error instanceof Error ? error : new Error(String(error)),
-          details: { hash: result.hash, folderPath: folderPath as string },
-        });
+  ).andThen((files) => {
+    // VRChat写真ファイルのみをフィルタリングしてソート
+    const pngFiles = files
+      .filter((f) => f.startsWith('VRChat_') && f.endsWith('.png'))
+      .sort();
+
+    // ファイル名リストをハッシュ化（ファイル内容は読まない）
+    return neverthrow.ResultAsync.fromPromise(
+      xxhash128(pngFiles.join('\n')),
+      (error) => {
+        // hash-wasmの内部エラーは想定外 → Sentry送信のため再スロー
         throw error;
       },
-    )(),
-  );
+    ).andThen((hash) =>
+      neverthrow.fromThrowable(
+        () => FolderDigestSchema.parse(hash),
+        (error): FolderDigestError => {
+          // xxhash128が予期しないハッシュ形式を返した場合
+          // これはライブラリのバグまたは破壊的変更を示すため、Sentryに送信
+          logger.error({
+            message: 'Invalid hash format from hash-wasm library',
+            stack: error instanceof Error ? error : new Error(String(error)),
+            details: { hash, folderPath: folderPath as string },
+          });
+          throw error;
+        },
+      )(),
+    );
+  });
 };
 
 /**
@@ -784,7 +794,7 @@ const getChangedFoldersWithFiles = async (
   };
 
   for (const folderPath of folders) {
-    // folder-hash でダイジェスト計算（エラー時はスキップ）
+    // hash-wasm でダイジェスト計算（エラー時はスキップ）
     const digestResult = await computeFolderDigest(folderPath);
 
     if (digestResult.isErr()) {

@@ -4478,13 +4478,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/folder-hash@npm:^4.0.4":
-  version: 4.0.4
-  resolution: "@types/folder-hash@npm:4.0.4"
-  checksum: 10c0/dfef81bbd4bd807f6182cf97796c3c9e404298c9bc224d6a12d954b64b9b1f56de120fa8a12eae8e3b49504037dee4c33695762175fa200bd26768b4907707ce
-  languageName: node
-  linkType: hard
-
 "@types/fs-extra@npm:9.0.13, @types/fs-extra@npm:^9.0.11":
   version: 9.0.13
   resolution: "@types/fs-extra@npm:9.0.13"
@@ -6452,18 +6445,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"debug@npm:4.4.0":
-  version: 4.4.0
-  resolution: "debug@npm:4.4.0"
-  dependencies:
-    ms: "npm:^2.1.3"
-  peerDependenciesMeta:
-    supports-color:
-      optional: true
-  checksum: 10c0/db94f1a182bf886f57b4755f85b3a74c39b5114b9377b7ab375dc2cfa3454f09490cc6c30f829df3fc8042bc8b8995f6567ce5cd96f3bc3688bd24027197d9de
-  languageName: node
-  linkType: hard
-
 "debug@npm:^3.1.0":
   version: 3.2.7
   resolution: "debug@npm:3.2.7"
@@ -7582,18 +7563,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"folder-hash@npm:^4.1.1":
-  version: 4.1.1
-  resolution: "folder-hash@npm:4.1.1"
-  dependencies:
-    debug: "npm:4.4.0"
-    minimatch: "npm:7.4.6"
-  bin:
-    folder-hash: bin/folder-hash
-  checksum: 10c0/71597548cccda43c3d4bda940fd1277f63839a86322d66dec2aa883dce4f51c4c0a6e274d7cb30cfbf4df9897d7a5649a09257e5ffada2fa50cd3a2b09da5a32
-  languageName: node
-  linkType: hard
-
 "follow-redirects@npm:^1.15.6":
   version: 1.15.11
   resolution: "follow-redirects@npm:1.15.11"
@@ -8165,6 +8134,13 @@ __metadata:
   version: 2.0.1
   resolution: "has-unicode@npm:2.0.1"
   checksum: 10c0/ebdb2f4895c26bb08a8a100b62d362e49b2190bcfd84b76bc4be1a3bd4d254ec52d0dd9f2fbcc093fc5eb878b20c52146f9dfd33e2686ed28982187be593b47c
+  languageName: node
+  linkType: hard
+
+"hash-wasm@npm:^4.12.0":
+  version: 4.12.0
+  resolution: "hash-wasm@npm:4.12.0"
+  checksum: 10c0/6cb95055319810b6f673de755289960683a9831807690795f0e8918b2fd7e6ae5b82a9dc47cbace171cf2814b412ef68c315a0ead0b4d96bd3e56a05e4bde136
   languageName: node
   linkType: hard
 
@@ -10092,15 +10068,6 @@ __metadata:
   version: 3.1.0
   resolution: "mimic-response@npm:3.1.0"
   checksum: 10c0/0d6f07ce6e03e9e4445bee655202153bdb8a98d67ee8dc965ac140900d7a2688343e6b4c9a72cfc9ef2f7944dfd76eef4ab2482eb7b293a68b84916bac735362
-  languageName: node
-  linkType: hard
-
-"minimatch@npm:7.4.6":
-  version: 7.4.6
-  resolution: "minimatch@npm:7.4.6"
-  dependencies:
-    brace-expansion: "npm:^2.0.1"
-  checksum: 10c0/e587bf3d90542555a3d58aca94c549b72d58b0a66545dd00eef808d0d66e5d9a163d3084da7f874e83ca8cc47e91c670e6c6f6593a3e7bb27fcc0e6512e87c67
   languageName: node
   linkType: hard
 
@@ -13563,7 +13530,6 @@ __metadata:
     "@trpc/react-query": "npm:^11"
     "@trpc/server": "npm:^11"
     "@types/electron-is-dev": "npm:1.1.3"
-    "@types/folder-hash": "npm:^4.0.4"
     "@types/license-checker": "npm:25.0.6"
     "@types/node": "npm:~22.17.0"
     "@types/react": "npm:^19.2.7"
@@ -13588,9 +13554,9 @@ __metadata:
     electron-unhandled: "npm:4.0.1"
     electron-updater: "npm:6.6.2"
     exiftool-vendored: "npm:^34.1.0"
-    folder-hash: "npm:^4.1.1"
     git-cliff: "npm:~2.11.0"
     glob: "npm:^13.0.0"
+    hash-wasm: "npm:^4.12.0"
     jotai: "npm:~2.16.0"
     jsdom: "npm:~27.3.0"
     knip: "npm:5.76.3"
