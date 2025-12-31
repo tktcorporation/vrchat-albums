@@ -596,22 +596,59 @@ export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
 const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（sharp処理は重いため小さく）
 
 /**
+ * フォルダハッシュ計算エラー
+ */
+type FolderDigestError =
+  | { type: 'FOLDER_NOT_FOUND'; folderPath: string }
+  | { type: 'PERMISSION_DENIED'; folderPath: string };
+
+/**
  * フォルダ内のVRChatファイル一覧からダイジェスト（ハッシュ）を計算
  * folder-hashライブラリを使用して信頼性の高いハッシュを生成
  *
  * @param folderPath VRChat写真を含むフォルダのパス
- * @returns FolderDigest ブランド型でラップされたMD5ハッシュ
+ * @returns ResultAsync<FolderDigest, FolderDigestError>
+ *          - FOLDER_NOT_FOUND: スキャン中にフォルダが削除された（想定内）
+ *          - PERMISSION_DENIED: 権限エラー（ユーザーに通知すべき）
+ *          - その他のエラーは再スロー（Sentry送信）
  */
-const computeFolderDigest = async (
+const computeFolderDigest = (
   folderPath: VRChatPhotoContainingFolderPath,
-): Promise<FolderDigest> => {
+): neverthrow.ResultAsync<FolderDigest, FolderDigestError> => {
   const options = {
     algo: 'md5' as const,
     encoding: 'hex' as const,
     files: { include: ['VRChat_*.png'] },
   };
-  const result = await hashElement(folderPath, options);
-  return FolderDigestSchema.parse(result.hash);
+
+  return neverthrow.ResultAsync.fromPromise(
+    hashElement(folderPath, options),
+    (error): FolderDigestError => {
+      const nodeError = error as NodeJS.ErrnoException;
+      return match(nodeError.code)
+        .with('ENOENT', () => {
+          logger.debug(`Folder not found during hash: ${folderPath}`);
+          return {
+            type: 'FOLDER_NOT_FOUND' as const,
+            folderPath: folderPath as string,
+          };
+        })
+        .with(P.union('EACCES', 'EPERM'), () => {
+          logger.warn({
+            message: `Permission denied hashing folder: ${folderPath}`,
+            stack: error instanceof Error ? error : new Error(String(error)),
+          });
+          return {
+            type: 'PERMISSION_DENIED' as const,
+            folderPath: folderPath as string,
+          };
+        })
+        .otherwise(() => {
+          // 想定外エラー → Sentry送信のため再スロー
+          throw error;
+        });
+    },
+  ).map((result) => FolderDigestSchema.parse(result.hash));
 };
 
 /**
@@ -630,9 +667,25 @@ const getPhotoFolders = async (
     let entries: Dirent[];
     try {
       entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
-    } catch (_error) {
-      // ディレクトリが読めない場合はスキップ（権限エラーなど）
-      logger.debug(`Cannot read directory: ${dirPath}`);
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      // エラーを分類して適切に処理
+      match(nodeError.code)
+        .with('ENOENT', () => {
+          // ディレクトリが存在しない（スキャン中に削除された等）→ 想定内
+          logger.debug(`Directory not found: ${dirPath}`);
+        })
+        .with(P.union('EACCES', 'EPERM'), () => {
+          // 権限エラー → ユーザーに通知すべき警告
+          logger.warn({
+            message: `Permission denied reading directory: ${dirPath}. Check folder permissions.`,
+            stack: error instanceof Error ? error : new Error(String(error)),
+          });
+        })
+        .otherwise(() => {
+          // 想定外エラー → Sentry送信のため再スロー
+          throw error;
+        });
       return;
     }
 
@@ -642,11 +695,12 @@ const getPhotoFolders = async (
         e.isFile() && e.name.startsWith('VRChat_') && e.name.endsWith('.png'),
     );
 
+    // Simple boolean check → if文が適切（CLAUDE.md例外）
     if (hasVRChatPhotos) {
       photoFolders.push(dirPath);
     }
 
-    // サブディレクトリを再帰探索
+    // サブディレクトリを再帰探索（async/await制御のためif文を使用）
     for (const entry of entries) {
       if (entry.isDirectory()) {
         await scanDir(path.join(dirPath, entry.name));
@@ -680,8 +734,15 @@ const getChangedFoldersWithFiles = async (
   const changedFolders: ChangedFolder[] = [];
 
   for (const folderPath of folders) {
-    // folder-hash でダイジェスト計算
-    const currentDigest = await computeFolderDigest(folderPath);
+    // folder-hash でダイジェスト計算（エラー時はスキップ）
+    const digestResult = await computeFolderDigest(folderPath);
+
+    if (digestResult.isErr()) {
+      // FOLDER_NOT_FOUND/PERMISSION_DENIED はログ済みなのでスキップ
+      continue;
+    }
+
+    const currentDigest = digestResult.value;
 
     // ブランド型から生のstring値を取得して比較
     const savedState = savedStates[folderPath as string];
@@ -692,8 +753,35 @@ const getChangedFoldersWithFiles = async (
       continue;
     }
 
-    // 変更があったフォルダのファイル一覧を取得
-    const fileNames = await fsPromises.readdir(folderPath as string);
+    // 変更があったフォルダのファイル一覧を取得（エラー時はスキップ）
+    const fileNamesResult = await neverthrow.ResultAsync.fromPromise(
+      fsPromises.readdir(folderPath as string),
+      (error): { type: 'READDIR_ERROR'; code: string | undefined } => {
+        const nodeError = error as NodeJS.ErrnoException;
+        return match(nodeError.code)
+          .with('ENOENT', () => {
+            logger.debug(`Folder deleted during scan: ${folderPath}`);
+            return { type: 'READDIR_ERROR' as const, code: nodeError.code };
+          })
+          .with(P.union('EACCES', 'EPERM'), () => {
+            logger.warn({
+              message: `Permission denied reading folder: ${folderPath}`,
+              stack: error instanceof Error ? error : new Error(String(error)),
+            });
+            return { type: 'READDIR_ERROR' as const, code: nodeError.code };
+          })
+          .otherwise(() => {
+            // 想定外エラー → Sentry送信のため再スロー
+            throw error;
+          });
+      },
+    );
+
+    if (fileNamesResult.isErr()) {
+      continue;
+    }
+
+    const fileNames = fileNamesResult.value;
 
     logger.debug(
       `Folder changed: ${folderPath} (saved: ${savedState?.digest ?? 'none'}, current: ${currentDigest})`,
@@ -736,14 +824,27 @@ const filterNewFilesByMtime = async (
       fsPromises.stat(filePath),
       (error): { type: 'STAT_ERROR'; message: string } => {
         const nodeError = error as NodeJS.ErrnoException;
-        if (nodeError.code === 'ENOENT') {
-          return { type: 'STAT_ERROR', message: 'File not found' };
-        }
-        logger.error({
-          message: `Failed to get stats for ${filePath}`,
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
-        return { type: 'STAT_ERROR', message: nodeError.message };
+        return match(nodeError.code)
+          .with('ENOENT', () => {
+            // スキャン中にファイルが削除された → 想定内
+            logger.debug(`File not found (deleted during scan): ${filePath}`);
+            return { type: 'STAT_ERROR' as const, message: 'File not found' };
+          })
+          .with(P.union('EACCES', 'EPERM'), () => {
+            // 権限エラー → ユーザーに通知すべき
+            logger.warn({
+              message: `Permission denied accessing file: ${filePath}`,
+              stack: error instanceof Error ? error : new Error(String(error)),
+            });
+            return {
+              type: 'STAT_ERROR' as const,
+              message: nodeError.message ?? 'Permission denied',
+            };
+          })
+          .otherwise(() => {
+            // 想定外エラー → Sentry送信のため再スロー
+            throw error;
+          });
       },
     );
 

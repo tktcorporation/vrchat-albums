@@ -3,6 +3,7 @@ import Store from 'electron-store';
 import type * as neverthrow from 'neverthrow';
 import { fromThrowable } from 'neverthrow';
 import { match, P } from 'ts-pattern';
+import { z } from 'zod';
 
 type TestPlaywrightStoreName = `test-playwright-settings-${string}`;
 type StoreName = 'v0-settings' | 'test-settings' | TestPlaywrightStoreName;
@@ -24,15 +25,24 @@ type SettingStoreKey = (typeof settingStoreKey)[number];
  * フォルダスキャン状態（永続化用）
  * 各フォルダのダイジェストと最終スキャン日時を保持
  */
-export interface FolderScanState {
-  /** ファイル一覧のダイジェスト（ハッシュ値） */
-  digest: string;
+export const FolderScanStateSchema = z.object({
+  /** ファイル一覧のダイジェスト（MD5ハッシュ値） */
+  digest: z.string().regex(/^[a-f0-9]{32}$/, 'Invalid MD5 hash format'),
   /** 最終スキャン日時（ISO文字列） */
-  lastScannedAt: string;
-}
+  lastScannedAt: z
+    .string()
+    .datetime({ message: 'Invalid ISO datetime format' }),
+});
+
+export type FolderScanState = z.infer<typeof FolderScanStateSchema>;
 
 /** フォルダパス → スキャン状態のマップ */
-export type PhotoFolderScanStates = Record<string, FolderScanState>;
+export const PhotoFolderScanStatesSchema = z.record(
+  z.string().min(1),
+  FolderScanStateSchema,
+);
+
+export type PhotoFolderScanStates = z.infer<typeof PhotoFolderScanStatesSchema>;
 
 /**
  * 設定ストアの操作エラー
@@ -290,13 +300,21 @@ const setSettingStore = (name: StoreName) => {
     setMigrationNoticeShown: setMigrationNoticeShown(set),
     getPhotoFolderScanStates: (): PhotoFolderScanStates => {
       const value = get('photoFolderScanStates');
-      return match(value)
-        .when(
-          (v): v is PhotoFolderScanStates =>
-            v !== null && typeof v === 'object' && !Array.isArray(v),
-          (v) => v,
-        )
-        .otherwise(() => ({}));
+      const result = PhotoFolderScanStatesSchema.safeParse(value);
+      return match(result)
+        .with({ success: true }, (r) => r.data)
+        .with({ success: false }, (r) => {
+          // バリデーションエラー時はログ出力して空オブジェクトを返す
+          // 破損データをクリアして次回から正常に動作させる
+          if (value !== null && value !== undefined) {
+            logger.warn({
+              message: 'Invalid photoFolderScanStates data, resetting to empty',
+              stack: new Error(r.error.message),
+            });
+          }
+          return {};
+        })
+        .exhaustive();
     },
     setPhotoFolderScanStates: (states: PhotoFolderScanStates) => {
       set('photoFolderScanStates', states);
