@@ -66,7 +66,7 @@ const launchElectronApp = async () => {
       `--js-flags=--max-old-space-size=${MEMORY_LIMIT_MB}`, // V8エンジンのメモリ制限を増やす
       '--disable-dev-shm-usage', // /dev/shmの使用を無効化（コンテナ環境向け）
       '--disable-gpu', // GPU無効化でメモリ節約
-      '--disable-software-rasterizer',
+      // '--disable-software-rasterizer', // devcontainerではソフトウェアレンダリングが必要なため削除
       '--disable-features=VizDisplayCompositor', // Disable problematic display features
       '--disable-gpu-compositing',
       '--in-process-gpu', // Run GPU in process to avoid IPC issues
@@ -83,7 +83,10 @@ const launchElectronApp = async () => {
       NODE_OPTIONS: `--max-old-space-size=${MEMORY_LIMIT_MB}`, // Node.js環境変数でもメモリ制限を設定
       ELECTRON_ENABLE_LOGGING: '1', // Enable Electron logging
       G_SLICE: 'always-malloc', // Fix GLib memory issues
+      G_DEBUG: '', // Suppress GLib debug output
+      GDK_BACKEND: 'x11', // Force X11 backend
       GTK_THEME: 'Adwaita', // Set a default GTK theme
+      LIBGL_ALWAYS_SOFTWARE: '1', // Force software rendering
       DISPLAY: ':99', // Virtual display
     },
   });
