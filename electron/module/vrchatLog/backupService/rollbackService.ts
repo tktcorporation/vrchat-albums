@@ -1,7 +1,6 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as neverthrow from 'neverthrow';
-import { ResultAsync } from 'neverthrow';
 import { match } from 'ts-pattern';
 import { getDBQueue } from '../../../lib/dbQueue';
 import { logger } from '../../../lib/logger';
@@ -16,7 +15,6 @@ export type RollbackError =
   | { type: 'METADATA_NOT_FOUND'; path: string }
   | { type: 'NO_VALID_MONTH_DATA'; path: string }
   | { type: 'VALIDATION_FAILED'; message: string }
-  | { type: 'CLEAR_LOGSTORE_FAILED'; message: string }
   | { type: 'RESTORE_FAILED'; message: string }
   | { type: 'NO_DIRS_RESTORED' }
   | { type: 'DB_REBUILD_FAILED'; message: string }
@@ -43,10 +41,6 @@ export const getRollbackErrorMessage = (error: RollbackError): string =>
       { type: 'VALIDATION_FAILED' },
       (e) => `検証に失敗しました: ${e.message}`,
     )
-    .with(
-      { type: 'CLEAR_LOGSTORE_FAILED' },
-      (e) => `logStoreのクリアに失敗しました: ${e.message}`,
-    )
     .with({ type: 'RESTORE_FAILED' }, (e) => `復帰に失敗しました: ${e.message}`)
     .with(
       { type: 'NO_DIRS_RESTORED' },
@@ -63,42 +57,17 @@ export const getRollbackErrorMessage = (error: RollbackError): string =>
     .exhaustive();
 
 /**
- * ファイル/ディレクトリの存在確認をResultAsyncでラップ
+ * ファイル/ディレクトリの存在確認
+ * @returns true if exists, false if not
  */
-const accessAsync = (
-  targetPath: string,
-): ResultAsync<void, { code: string; path: string }> =>
-  ResultAsync.fromPromise(fs.access(targetPath), (error) => ({
-    code:
-      error instanceof Error && 'code' in error
-        ? String(error.code)
-        : 'UNKNOWN',
-    path: targetPath,
-  }));
-
-/**
- * ディレクトリを再帰的に削除（存在しない場合は成功扱い）
- */
-const rmDirAsync = (dirPath: string): ResultAsync<void, Error> =>
-  ResultAsync.fromPromise(
-    fs.rm(dirPath, { recursive: true, force: true }),
-    (e): Error => (e instanceof Error ? e : new Error(String(e))),
-  );
-
-/**
- * ディレクトリをコピー
- */
-const copyDirAsync = (
-  source: string,
-  target: string,
-): ResultAsync<void, Error> =>
-  ResultAsync.fromPromise(
-    (async () => {
-      await fs.mkdir(target, { recursive: true });
-      await fs.cp(source, target, { recursive: true, force: true });
-    })(),
-    (e): Error => (e instanceof Error ? e : new Error(String(e))),
-  );
+const existsAsync = async (targetPath: string): Promise<boolean> => {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
 import {
@@ -146,10 +115,8 @@ export class RollbackService {
       }
 
       // 2. 現在のlogStoreをクリア
-      const clearResult = await this.clearCurrentLogStore();
-      if (clearResult.isErr()) {
-        return neverthrow.err(clearResult.error);
-      }
+      // ファイルシステムエラーは予期しないエラーとしてthrow
+      await this.clearCurrentLogStore();
 
       // 3. バックアップからlogStore復帰
       const restoreResult = await this.restoreLogStoreFromBackup(backupPath);
@@ -203,15 +170,13 @@ export class RollbackService {
     backupPath: string,
   ): Promise<neverthrow.Result<void, RollbackError>> {
     // バックアップディレクトリの存在確認
-    const backupDirResult = await accessAsync(backupPath);
-    if (backupDirResult.isErr()) {
+    if (!(await existsAsync(backupPath))) {
       return neverthrow.err({ type: 'BACKUP_DIR_NOT_FOUND', path: backupPath });
     }
 
     // メタデータファイルの存在確認
     const metadataPath = path.join(backupPath, 'backup-metadata.json');
-    const metadataResult = await accessAsync(metadataPath);
-    if (metadataResult.isErr()) {
+    if (!(await existsAsync(metadataPath))) {
       return neverthrow.err({ type: 'METADATA_NOT_FOUND', path: metadataPath });
     }
 
@@ -234,8 +199,7 @@ export class RollbackService {
         `logStore-${monthDir.name}.txt`,
       );
 
-      const logStoreResult = await accessAsync(logStoreFile);
-      if (logStoreResult.isErr()) {
+      if (!(await existsAsync(logStoreFile))) {
         logger.warn(`logStore file not found: ${logStoreFile}`);
         // 一部のファイルが見つからなくても継続（警告のみ）
       }
@@ -249,35 +213,24 @@ export class RollbackService {
 
   /**
    * 現在のlogStoreディレクトリをクリア
+   * ファイルシステムエラーは予期しないエラーとしてthrow（Sentryに送信）
    */
-  private async clearCurrentLogStore(): Promise<
-    neverthrow.Result<void, RollbackError>
-  > {
+  private async clearCurrentLogStore(): Promise<void> {
     const logStoreDir = getLogStoreDir();
 
     // logStoreディレクトリが存在する場合は削除
-    const accessResult = await accessAsync(logStoreDir);
-    if (accessResult.isOk()) {
-      const rmResult = await rmDirAsync(logStoreDir);
-      if (rmResult.isErr()) {
-        return neverthrow.err({
-          type: 'CLEAR_LOGSTORE_FAILED',
-          message: rmResult.error.message,
-        });
-      }
-      logger.info(`Cleared current logStore directory: ${logStoreDir}`);
-    } else {
-      // ディレクトリが存在しない場合は何もしない
-      logger.info(`logStore directory does not exist: ${logStoreDir}`);
-    }
+    // force: true なのでディレクトリが存在しなくてもエラーにならない
+    // その他のエラー（権限など）は予期しないエラーとしてthrow
+    await fs.rm(logStoreDir, { recursive: true, force: true });
+    logger.info(`Cleared current logStore directory: ${logStoreDir}`);
 
     // 新しいlogStoreディレクトリを初期化
     initLogStoreDir();
-    return neverthrow.ok(undefined);
   }
 
   /**
    * バックアップからlogStoreを復帰
+   * ファイルシステムエラーは予期しないエラーとしてthrow（Sentryに送信）
    */
   private async restoreLogStoreFromBackup(
     backupPath: string,
@@ -291,30 +244,23 @@ export class RollbackService {
       (entry) => entry.isDirectory() && /^\d{4}-\d{2}$/.test(entry.name),
     );
 
-    let restoredDirCount = 0;
-
+    // 各月別ディレクトリをコピー
+    // ファイルシステムエラーは予期しないエラーとしてthrow
     for (const monthDir of monthDirs) {
       const sourceDir = path.join(backupPath, monthDir.name);
       const targetDir = path.join(currentLogStoreDir, monthDir.name);
 
-      const copyResult = await copyDirAsync(sourceDir, targetDir);
-      if (copyResult.isErr()) {
-        logger.error({
-          message: `Failed to restore month directory ${monthDir.name}: ${copyResult.error.message}`,
-        });
-        // 一部のディレクトリの復帰に失敗しても継続
-      } else {
-        restoredDirCount++;
-        logger.info(`Restored month directory: ${monthDir.name}`);
-      }
+      await fs.mkdir(targetDir, { recursive: true });
+      await fs.cp(sourceDir, targetDir, { recursive: true, force: true });
+      logger.info(`Restored month directory: ${monthDir.name}`);
     }
 
-    if (restoredDirCount === 0) {
+    if (monthDirs.length === 0) {
       return neverthrow.err({ type: 'NO_DIRS_RESTORED' });
     }
 
     logger.info(
-      `Successfully restored ${restoredDirCount} month directories from backup`,
+      `Successfully restored ${monthDirs.length} month directories from backup`,
     );
     return neverthrow.ok(undefined);
   }

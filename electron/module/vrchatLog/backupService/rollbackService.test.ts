@@ -207,7 +207,7 @@ describe('rollbackService', () => {
       }
     });
 
-    it('logStore復帰に失敗した場合はエラーを返す', async () => {
+    it('logStore復帰に失敗した場合は予期しないエラーとしてthrowされる', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
@@ -227,14 +227,10 @@ describe('rollbackService', () => {
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
       vi.mocked(fs.cp).mockRejectedValue(new Error('Copy failed'));
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
-
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(getRollbackErrorMessage(result.error)).toContain(
-          'バックアップからディレクトリを復帰できませんでした',
-        );
-      }
+      // ファイルシステムエラーは予期しないエラーとしてthrowされる（Sentryに送信）
+      await expect(
+        rollbackService.rollbackToBackup(mockBackup),
+      ).rejects.toThrow('Copy failed');
     });
 
     it('DB再構築に失敗した場合はエラーを返す', async () => {
@@ -344,13 +340,9 @@ describe('rollbackService', () => {
 
   describe('clearCurrentLogStore (private)', () => {
     // logStoreディレクトリのクリア処理のテスト
-    it('logStoreディレクトリが存在しない場合もエラーにならない', async () => {
-      vi.mocked(fs.access).mockImplementation(async (p) => {
-        if (p === path.join('/mocked', 'logStore')) {
-          throw new Error('ENOENT');
-        }
-        return undefined;
-      });
+    // fs.rm は force: true で呼ばれるので、ディレクトリが存在しなくてもエラーにならない
+    it('logStoreディレクトリをクリアする', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: '2023-11',
@@ -365,6 +357,7 @@ describe('rollbackService', () => {
           parentPath: '',
         } as unknown as Dirent<Buffer>,
       ]);
+      vi.mocked(fs.rm).mockResolvedValue(undefined);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
       vi.mocked(fs.cp).mockResolvedValue(undefined);
       vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
@@ -382,76 +375,19 @@ describe('rollbackService', () => {
       const result = await rollbackService.rollbackToBackup(mockBackup);
 
       expect(result.isOk()).toBe(true);
-      // fs.rmが呼ばれていないことを確認
-      expect(fs.rm).not.toHaveBeenCalled();
+      // fs.rmがforce: trueで呼ばれることを確認
+      expect(fs.rm).toHaveBeenCalledWith(expect.stringContaining('logStore'), {
+        recursive: true,
+        force: true,
+      });
       // initLogStoreDirが呼ばれたことを確認
       expect(logStorageManagerModule.initLogStoreDir).toHaveBeenCalled();
     });
   });
 
   describe('restoreLogStoreFromBackup (private)', () => {
-    // 部分的な復帰でも処理を継続する
-    it('一部のディレクトリ復帰に失敗しても他のディレクトリは復帰する', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
-      vi.mocked(fs.readdir).mockResolvedValue([
-        {
-          name: '2023-11',
-          isDirectory: () => true,
-          isFile: () => false,
-          isBlockDevice: () => false,
-          isCharacterDevice: () => false,
-          isFIFO: () => false,
-          isSocket: () => false,
-          isSymbolicLink: () => false,
-          path: '',
-          parentPath: '',
-        } as unknown as Dirent<Buffer>,
-        {
-          name: '2023-12',
-          isDirectory: () => true,
-          isFile: () => false,
-          isBlockDevice: () => false,
-          isCharacterDevice: () => false,
-          isFIFO: () => false,
-          isSocket: () => false,
-          isSymbolicLink: () => false,
-          path: '',
-          parentPath: '',
-        } as unknown as Dirent<Buffer>,
-      ]);
-      vi.mocked(fs.rm).mockResolvedValue(undefined);
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-
-      // 最初のディレクトリはコピー失敗、2番目は成功
-      let cpCallCount = 0;
-      vi.mocked(fs.cp).mockImplementation(async () => {
-        cpCallCount++;
-        if (cpCallCount === 1) {
-          throw new Error('Copy failed for first directory');
-        }
-        return undefined;
-      });
-
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.ok({
-          createdWorldJoinLogModelList: [],
-          createdPlayerJoinLogModelList: [],
-          createdPlayerLeaveLogModelList: [],
-          createdVRChatPhotoPathModelList: [],
-        }),
-      );
-      vi.mocked(
-        backupServiceModule.backupService.updateBackupMetadata,
-      ).mockResolvedValue(neverthrow.ok(undefined));
-
-      const result = await rollbackService.rollbackToBackup(mockBackup);
-
-      // 一部失敗しても処理は成功する
-      expect(result.isOk()).toBe(true);
-      expect(fs.cp).toHaveBeenCalledTimes(2);
-    });
-
-    it('すべてのディレクトリ復帰に失敗した場合はエラー', async () => {
+    // ファイルシステムエラーは予期しないエラーとしてthrow（Sentryに送信）
+    it('ディレクトリ復帰に失敗した場合は予期しないエラーとしてthrowされる', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.readdir).mockResolvedValue([
         {
@@ -471,14 +407,10 @@ describe('rollbackService', () => {
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
       vi.mocked(fs.cp).mockRejectedValue(new Error('Copy failed'));
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
-
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(getRollbackErrorMessage(result.error)).toContain(
-          'バックアップからディレクトリを復帰できませんでした',
-        );
-      }
+      // ファイルシステムエラーは予期しないエラーとしてthrowされる
+      await expect(
+        rollbackService.rollbackToBackup(mockBackup),
+      ).rejects.toThrow('Copy failed');
     });
   });
 });
