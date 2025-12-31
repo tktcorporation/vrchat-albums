@@ -115,23 +115,43 @@ const GalleryContent = memo(
     effectiveWidthRef.current = effectiveWidth;
 
     // ResizeObserver で幅を監視（1箇所に集約）
+    // Electron起動直後はDOMレイアウトが確定していない場合があるため、
+    // clientWidth が 0 の場合はリトライする
     useEffect(() => {
       if (!containerRef.current) return;
 
+      let retryTimeoutId: number | undefined;
+      let retryCount = 0;
+      const MAX_RETRIES = 10;
+      const RETRY_DELAY = 50; // ms
+
       const updateWidth = () => {
         const rawWidth = containerRef.current?.clientWidth ?? 0;
-        setEffectiveWidth(
-          rawWidth > 0
-            ? rawWidth - LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING
-            : 0,
-        );
+
+        if (rawWidth > 0) {
+          setEffectiveWidth(
+            rawWidth - LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING,
+          );
+          retryCount = MAX_RETRIES; // 成功したらリトライを停止
+        } else if (retryCount < MAX_RETRIES) {
+          // 幅が0の場合、次のフレームで再測定をスケジュール
+          retryCount++;
+          retryTimeoutId = window.setTimeout(() => {
+            requestAnimationFrame(updateWidth);
+          }, RETRY_DELAY);
+        }
       };
 
       const observer = new ResizeObserver(updateWidth);
       observer.observe(containerRef.current);
       updateWidth(); // 初期値を設定
 
-      return () => observer.disconnect();
+      return () => {
+        observer.disconnect();
+        if (retryTimeoutId !== undefined) {
+          window.clearTimeout(retryTimeoutId);
+        }
+      };
     }, []);
 
     // サムネイルキャッシュ（Google Photos風の高速ローディング）
