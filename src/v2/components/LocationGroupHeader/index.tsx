@@ -225,7 +225,7 @@ export const LocationGroupHeader = ({
       className="w-full glass-panel rounded-t-lg overflow-hidden group/card"
     >
       <div className="relative h-24 overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted/80 dark:from-muted dark:to-muted/60">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200/80 dark:from-gray-800 dark:to-gray-900/80">
           {details?.thumbnailImageUrl && isVisible && (
             <>
               <div
@@ -237,10 +237,10 @@ export const LocationGroupHeader = ({
                   filter: 'blur(26px) saturate(120%) brightness(0.9)',
                 }}
               />
-              <div className="absolute inset-0 bg-background/70 dark:bg-background/50 backdrop-blur-[1px] group-hover/card:backdrop-blur-[2px] transition-all duration-500" />
+              <div className="absolute inset-0 bg-white/70 dark:bg-black/50 backdrop-blur-[1px] group-hover/card:backdrop-blur-[2px] transition-all duration-500" />
               <div className="absolute inset-0">
-                <div className="absolute inset-0 bg-gradient-to-r from-background/60 to-background/40 dark:from-background/30 dark:to-background/10 mix-blend-overlay" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,hsl(var(--background)/0.6),hsl(var(--background)/0.3)_70%)]" />
+                <div className="absolute inset-0 bg-gradient-to-r from-white/60 to-white/40 dark:from-black/30 dark:to-black/10 mix-blend-overlay" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.6),rgba(255,255,255,0.3)_70%)] dark:bg-[radial-gradient(circle_at_50%_120%,rgba(0,0,0,0.4),rgba(0,0,0,0.2)_70%)]" />
               </div>
             </>
           )}
@@ -265,11 +265,11 @@ export const LocationGroupHeader = ({
                 </div>
               ) : (
                 <div
-                  className="h-20 rounded-lg bg-muted flex items-center justify-center border border-border/20"
+                  className="h-20 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center border border-white/20 dark:border-gray-700/30"
                   style={{ aspectRatio: '4/3' }}
                 >
                   <ImageIcon
-                    className={`${ICON_SIZE.lg.class} text-muted-foreground`}
+                    className={`${ICON_SIZE.lg.class} text-gray-400 dark:text-gray-600`}
                   />
                 </div>
               )}
@@ -279,7 +279,7 @@ export const LocationGroupHeader = ({
             <div className="flex-1 min-w-0 flex flex-col gap-2">
               {/* 1行目: ワールド名とアクション */}
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold flex items-center group/title text-foreground">
+                <h3 className="text-lg font-bold flex items-center group/title text-gray-800 dark:text-white">
                   <button
                     type="button"
                     className="hover:underline flex items-center transition-all duration-300 hover:text-primary-600 dark:hover:text-primary-300"
@@ -328,7 +328,7 @@ export const LocationGroupHeader = ({
                   <button
                     type="button"
                     onClick={openShareModal}
-                    className="flex items-center text-sm font-medium text-foreground backdrop-blur-sm bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full transition-all duration-300 border border-border/20 hover:border-border/30"
+                    className="flex items-center text-sm font-medium text-gray-800 dark:text-white backdrop-blur-sm bg-primary-500/10 hover:bg-primary-500/20 dark:bg-primary-500/30 dark:hover:bg-primary-500/40 px-3 py-1 rounded-full transition-all duration-300 border border-white/20 dark:border-white/10 hover:border-white/30 dark:hover:border-white/20"
                   >
                     <Share2 className={`${ICON_SIZE.sm.class} mr-1.5`} />
                   </button>
@@ -339,30 +339,30 @@ export const LocationGroupHeader = ({
               <div className="flex items-center gap-2 w-full">
                 {isPlayersLoading || players === null ? (
                   // ローディング中 or 未取得: スケルトン表示
-                  <div className="flex gap-2 items-center text-xs text-foreground backdrop-blur-sm bg-background/30 px-3 py-1 rounded-full border border-border/20 flex-1 min-w-0">
+                  <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <Users
-                        className={`${ICON_SIZE.sm.class} text-primary flex-shrink-0`}
+                        className={`${ICON_SIZE.sm.class} text-primary-600 dark:text-primary-300 flex-shrink-0`}
                       />
-                      <div className="h-4 w-6 bg-muted-foreground/20 rounded animate-pulse" />
+                      <div className="h-4 w-6 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
                     </div>
-                    <div className="text-muted-foreground">|</div>
+                    <div className="text-gray-500 dark:text-gray-400">|</div>
                     <div className="flex-1 flex items-center gap-2">
-                      <div className="h-4 w-24 bg-muted-foreground/20 rounded animate-pulse" />
-                      <div className="h-4 w-20 bg-muted-foreground/20 rounded animate-pulse" />
-                      <div className="h-4 w-16 bg-muted-foreground/20 rounded animate-pulse" />
+                      <div className="h-4 w-24 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
+                      <div className="h-4 w-20 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-gray-300/50 dark:bg-gray-600/50 rounded animate-pulse" />
                     </div>
                   </div>
                 ) : players.length > 0 ? (
                   // プレイヤーあり（取得済み、データあり）: リスト表示
-                  <div className="flex gap-2 items-center text-xs text-foreground backdrop-blur-sm bg-background/30 hover:bg-background/40 px-3 py-1 rounded-full transition-all duration-300 border border-border/20 hover:border-border/30 group/players flex-1 min-w-0">
+                  <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 hover:bg-white/40 dark:bg-black/30 dark:hover:bg-black/40 px-3 py-1 rounded-full transition-all duration-300 border border-white/20 dark:border-gray-700/30 hover:border-white/30 dark:hover:border-gray-700/40 group/players flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <Users
-                        className={`${ICON_SIZE.sm.class} text-primary flex-shrink-0`}
+                        className={`${ICON_SIZE.sm.class} text-primary-600 dark:text-primary-300 flex-shrink-0`}
                       />
                       <span>{players.length}</span>
                     </div>
-                    <div className="text-muted-foreground">|</div>
+                    <div className="text-gray-500 dark:text-gray-400">|</div>
                     <div
                       ref={playerListContainerRef}
                       className="relative cursor-pointer flex-1 min-w-0"
@@ -387,7 +387,7 @@ export const LocationGroupHeader = ({
                             maxVisiblePlayers={maxVisiblePlayers}
                           />
                         ) : (
-                          <span className="text-success flex items-center gap-2">
+                          <span className="text-green-400 flex items-center gap-2">
                             <CheckIcon className={ICON_SIZE.sm.class} />
                             {t('locationHeader.copied')}
                           </span>
@@ -404,13 +404,13 @@ export const LocationGroupHeader = ({
                               top: tooltipPosition.top,
                               left: tooltipPosition.left,
                             }}
-                            className="z-50 p-4 bg-popover/95 backdrop-blur-md text-foreground text-sm rounded-lg shadow-xl border border-border/20"
+                            className="z-50 p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md text-gray-900 dark:text-gray-100 text-sm rounded-lg shadow-xl border border-gray-200/20 dark:border-gray-700/30"
                           >
                             <div className="flex flex-wrap gap-2">
                               {players.map((p: Player) => (
                                 <span
                                   key={p.id}
-                                  className="bg-muted text-muted-foreground px-3 py-1 rounded-full border border-border/50"
+                                  className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-full border border-gray-200/50 dark:border-gray-700/50"
                                 >
                                   {p.playerName}
                                 </span>
@@ -421,20 +421,20 @@ export const LocationGroupHeader = ({
                         ) as ReactPortal)}
                     </div>
                     <Copy
-                      className={`${ICON_SIZE.sm.class} ml-2 text-foreground group-hover/players:text-foreground/80 transition-colors flex-shrink-0`}
+                      className={`${ICON_SIZE.sm.class} ml-2 text-gray-800 dark:text-white group-hover/players:text-gray-200 transition-colors flex-shrink-0`}
                     />
                   </div>
                 ) : (
                   // プレイヤーなし（取得済み、データなし = 0人）: 「プレイヤー情報なし」表示
-                  <div className="flex gap-2 items-center text-xs text-foreground backdrop-blur-sm bg-background/30 px-3 py-1 rounded-full border border-border/20 flex-1 min-w-0">
+                  <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <Users
-                        className={`${ICON_SIZE.sm.class} text-primary flex-shrink-0`}
+                        className={`${ICON_SIZE.sm.class} text-primary-600 dark:text-primary-300 flex-shrink-0`}
                       />
                       <span>0</span>
                     </div>
-                    <div className="text-muted-foreground">|</div>
-                    <span className="text-muted-foreground">
+                    <div className="text-gray-500 dark:text-gray-400">|</div>
+                    <span className="text-gray-500 dark:text-gray-400">
                       {t('locationHeader.noPlayerInfo')}
                     </span>
                   </div>
