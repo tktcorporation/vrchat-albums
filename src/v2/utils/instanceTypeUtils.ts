@@ -146,17 +146,23 @@ export const getInstanceTypeColor = (instanceId: string | null): string => {
   const type = getInstanceType(instanceId);
   switch (type) {
     case 'public':
+      // パブリック: 緑（変更なし）
       return 'bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30';
     case 'friends':
-      return 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30';
+      // フレンド: 黄色（VRChatサービスに準拠）
+      return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30';
     case 'friends+':
-      return 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30';
+      // フレプラ: 黄色（フレンドと同系色）
+      return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/30';
     case 'invite':
-      return 'bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30';
+      // インバイト: 紫（VRChatサービスに準拠）
+      return 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30';
     case 'group':
-      return 'bg-pink-500/20 text-pink-700 dark:text-pink-300 border-pink-500/30';
+      // グループ: 薄めの灰色（VRChatサービスに準拠）
+      return 'bg-gray-400/20 text-gray-600 dark:text-gray-300 border-gray-400/30';
     case 'group-public':
-      return 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30';
+      // グループパブリック: 薄めの灰色（グループと同系色）
+      return 'bg-gray-400/20 text-gray-600 dark:text-gray-300 border-gray-400/30';
     case 'unknown':
       return 'bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30';
     default:
