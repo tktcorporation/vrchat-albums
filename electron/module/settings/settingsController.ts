@@ -1,4 +1,5 @@
 import type { UpdateCheckResult } from 'electron-updater';
+import { ResultAsync } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 import { reloadMainWindow } from '../../electronUtil';
 import {
@@ -369,57 +370,67 @@ export const settingsRouter = () =>
      * ユーザーの承認を得て旧アプリからのデータ移行を実行する
      */
     performMigration: procedure.mutation(async () => {
-      try {
-        // 動的インポートで移行サービスを読み込む
-        const { performMigration } = await import('../migration/service');
-        const result = await performMigration();
+      // ResultAsync.fromPromise でエラーハンドリングを統一
+      return ResultAsync.fromPromise(
+        (async () => {
+          // 動的インポートで移行サービスを読み込む
+          const { performMigration } = await import('../migration/service');
+          const result = await performMigration();
 
-        // performMigration は Result<MigrationResult, never> を返すため、
-        // エラーは発生しない。neverthrow標準の.match()を使用
-        return result.match(
-          (migrationResult) => {
-            // エラーは MigrationResult.errors 配列に格納される
-            if (migrationResult.errors.length > 0) {
-              logger.error({
-                message: `Migration failed with errors: ${migrationResult.errors.join(
-                  ', ',
-                )}`,
-              });
-              throw new UserFacingError(
-                `データ移行に失敗しました: ${migrationResult.errors.join(
-                  ', ',
-                )}`,
+          // performMigration は Result<MigrationResult, never> を返すため、
+          // エラーは発生しない。neverthrow標準の.match()を使用
+          return result.match(
+            (migrationResult) => {
+              // エラーは MigrationResult.errors 配列に格納される
+              if (migrationResult.errors.length > 0) {
+                logger.error({
+                  message: `Migration failed with errors: ${migrationResult.errors.join(
+                    ', ',
+                  )}`,
+                });
+                throw new UserFacingError(
+                  `データ移行に失敗しました: ${migrationResult.errors.join(
+                    ', ',
+                  )}`,
+                );
+              }
+              return migrationResult;
+            },
+            // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
+            () => {
+              throw new Error(
+                'Unreachable: performMigration should never return an error',
               );
-            }
-            return migrationResult;
-          },
-          // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
-          () => {
-            throw new Error(
-              'Unreachable: performMigration should never return an error',
-            );
-          },
-        );
-      } catch (error) {
-        logger.error({
-          message: `Failed to perform migration: ${match(error)
-            .with(P.instanceOf(Error), (err) => err.message)
-            .otherwise(() => 'Unknown error')}`,
-          stack: match(error)
-            .with(P.instanceOf(Error), (err) => err)
-            .otherwise(() => undefined),
-        });
+            },
+          );
+        })(),
+        (error): never => {
+          logger.error({
+            message: `Failed to perform migration: ${match(error)
+              .with(P.instanceOf(Error), (err) => err.message)
+              .otherwise(() => 'Unknown error')}`,
+            stack: match(error)
+              .with(P.instanceOf(Error), (err) => err)
+              .otherwise(() => undefined),
+          });
 
-        // UserFacingErrorの場合はそのまま再スロー
-        if (error instanceof UserFacingError) {
-          throw error;
-        }
+          // UserFacingErrorの場合はそのまま再スロー
+          if (error instanceof UserFacingError) {
+            throw error;
+          }
 
-        // その他のエラーの場合
-        throw new UserFacingError(
-          'データ移行中に予期しないエラーが発生しました',
-        );
-      }
+          // その他のエラーの場合
+          throw new UserFacingError(
+            'データ移行中に予期しないエラーが発生しました',
+          );
+        },
+      ).match(
+        (result) => result,
+        () => {
+          // error handler always throws, so this branch is unreachable
+          throw new Error('unreachable');
+        },
+      );
     }),
 
     /**

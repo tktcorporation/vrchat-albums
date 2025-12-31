@@ -5,6 +5,7 @@ import { performance } from 'node:perf_hooks';
 import * as dateFns from 'date-fns';
 import { glob } from 'glob';
 import * as neverthrow from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import * as path from 'pathe';
 import sharp from 'sharp';
 import { match, P } from 'ts-pattern';
@@ -932,69 +933,67 @@ export const getVRChatPhotoItemData = async ({
   // 指定しない場合は元画像のサイズをそのまま返す
   width?: number;
 }): Promise<neverthrow.Result<string, 'InputFileIsMissing'>> => {
-  try {
-    // サムネイル（width指定あり）の場合はキャッシュを使用
-    if (width !== undefined) {
-      const cacheKey = generateCacheKey(photoPath, width);
+  // ResultAsync.fromPromise で予期されたエラー (InputFileIsMissing) を処理
+  return ResultAsync.fromPromise(
+    (async () => {
+      // サムネイル（width指定あり）の場合はキャッシュを使用
+      if (width !== undefined) {
+        const cacheKey = generateCacheKey(photoPath, width);
 
-      // キャッシュから取得を試みる（構造化された結果で判定）
-      const cacheResult = await getCachedThumbnail(cacheKey);
+        // キャッシュから取得を試みる（構造化された結果で判定）
+        const cacheResult = await getCachedThumbnail(cacheKey);
 
-      // ts-patternでキャッシュ結果を処理
-      const cachedData = match(cacheResult)
-        .with({ status: 'hit' }, ({ data }) => data)
-        .with({ status: 'miss' }, () => null)
-        .with({ status: 'error' }, ({ error }) => {
-          // エラー時はログ出力済み、生成にフォールバック
-          logger.debug({
-            message: `Cache read error for ${cacheKey}, regenerating thumbnail`,
-            stack: error,
-          });
-          return null;
-        })
-        .exhaustive();
+        // ts-patternでキャッシュ結果を処理
+        const cachedData = match(cacheResult)
+          .with({ status: 'hit' }, ({ data }) => data)
+          .with({ status: 'miss' }, () => null)
+          .with({ status: 'error' }, ({ error }) => {
+            // エラー時はログ出力済み、生成にフォールバック
+            logger.debug({
+              message: `Cache read error for ${cacheKey}, regenerating thumbnail`,
+              stack: error,
+            });
+            return null;
+          })
+          .exhaustive();
 
-      if (cachedData) {
-        return neverthrow.ok(
-          `data:image/webp;base64,${cachedData.toString('base64')}`,
-        );
+        if (cachedData) {
+          return `data:image/webp;base64,${cachedData.toString('base64')}`;
+        }
+
+        // キャッシュにない場合は生成してキャッシュに保存
+        const photoBuf = await sharp(photoPath)
+          .resize(width)
+          .webp({ quality: 80 }) // WebPに変換（ファイルサイズ削減）
+          .toBuffer();
+
+        // 非同期でキャッシュに保存（レスポンスを遅らせない）
+        // エラーは saveThumbnailToCache 内部でログ出力される
+        void saveThumbnailToCache(cacheKey, photoBuf);
+
+        return `data:image/webp;base64,${photoBuf.toString('base64')}`;
       }
 
-      // キャッシュにない場合は生成してキャッシュに保存
-      const photoBuf = await sharp(photoPath)
-        .resize(width)
-        .webp({ quality: 80 }) // WebPに変換（ファイルサイズ削減）
-        .toBuffer();
-
-      // 非同期でキャッシュに保存（レスポンスを遅らせない）
-      // エラーは saveThumbnailToCache 内部でログ出力される
-      void saveThumbnailToCache(cacheKey, photoBuf);
-
-      return neverthrow.ok(
-        `data:image/webp;base64,${photoBuf.toString('base64')}`,
-      );
-    }
-
-    // 元サイズの場合はキャッシュなし
-    const photoBuf = await sharp(photoPath).toBuffer();
-    return neverthrow.ok(
-      `data:image/${path
+      // 元サイズの場合はキャッシュなし
+      const photoBuf = await sharp(photoPath).toBuffer();
+      return `data:image/${path
         .extname(photoPath)
-        .replace('.', '')};base64,${photoBuf.toString('base64')}`,
-    );
-  } catch (error) {
-    return match(error)
-      .with(
-        P.intersection(P.instanceOf(Error), {
-          message: P.string.includes('Input file is missing'),
-        }),
-        () => neverthrow.err('InputFileIsMissing' as const),
-      )
-      .otherwise((e) => {
-        // 予期しないエラーはre-throw（Sentryに送信）
-        throw e instanceof Error ? e : new Error(JSON.stringify(e));
-      });
-  }
+        .replace('.', '')};base64,${photoBuf.toString('base64')}`;
+    })(),
+    (error): 'InputFileIsMissing' => {
+      return match(error)
+        .with(
+          P.intersection(P.instanceOf(Error), {
+            message: P.string.includes('Input file is missing'),
+          }),
+          () => 'InputFileIsMissing' as const,
+        )
+        .otherwise((e) => {
+          // 予期しないエラーはre-throw（Sentryに送信）
+          throw e instanceof Error ? e : new Error(JSON.stringify(e));
+        });
+    },
+  );
 };
 
 /**

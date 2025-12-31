@@ -1,4 +1,5 @@
 import * as neverthrow from 'neverthrow';
+import { ResultAsync } from 'neverthrow';
 import { match } from 'ts-pattern';
 import z from 'zod';
 import { ERROR_CATEGORIES, UserFacingError } from '../../lib/errors';
@@ -87,56 +88,69 @@ export const appendLoglinesToFileFromLogFilePathList = async (
 
   logger.info(`Found ${logFilePathList.value.length} log files to process`);
 
-  let totalProcessedLines = 0;
-  let hasProcessedAnyLines = false;
+  // ResultAsync.fromPromise でストリーミング処理のエラーを処理
+  const streamResult = await ResultAsync.fromPromise(
+    (async () => {
+      let totalProcessedLines = 0;
+      let hasProcessedAnyLines = false;
 
-  try {
-    // ストリーミング処理で各バッチを処理
-    for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
-      {
-        logFilePathList: logFilePathList.value,
-        includesList: [...FILTER_PATTERNS],
-        batchSize: 1000, // バッチサイズを指定
-        maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
-      },
-    )) {
-      // ログ行をフィルタリング（processAll=trueの場合はスキップ）
-      const filteredLogLines = processAll
-        ? logLineBatch
-        : vrchatLogService.filterLogLinesByDate(logLineBatch, startDate);
+      // ストリーミング処理で各バッチを処理
+      for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
+        {
+          logFilePathList: logFilePathList.value,
+          includesList: [...FILTER_PATTERNS],
+          batchSize: 1000, // バッチサイズを指定
+          maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
+        },
+      )) {
+        // ログ行をフィルタリング（processAll=trueの場合はスキップ）
+        const filteredLogLines = processAll
+          ? logLineBatch
+          : vrchatLogService.filterLogLinesByDate(logLineBatch, startDate);
 
-      if (filteredLogLines.length > 0) {
-        hasProcessedAnyLines = true;
-        totalProcessedLines += filteredLogLines.length;
+        if (filteredLogLines.length > 0) {
+          hasProcessedAnyLines = true;
+          totalProcessedLines += filteredLogLines.length;
 
-        logger.debug(
-          `Processing batch of ${filteredLogLines.length} log lines`,
-        );
+          logger.debug(
+            `Processing batch of ${filteredLogLines.length} log lines`,
+          );
 
-        // 各バッチを保存
-        const result = await vrchatLogService.appendLoglinesToFile({
-          logLines: filteredLogLines,
-        });
-        if (result.isErr()) {
-          return neverthrow.err(result.error);
+          // 各バッチを保存
+          const result = await vrchatLogService.appendLoglinesToFile({
+            logLines: filteredLogLines,
+          });
+          if (result.isErr()) {
+            // エラーをthrowしてerror handlerで処理
+            throw result.error;
+          }
         }
       }
-    }
-  } catch (error) {
-    // VRChatLogFileError は予期されたエラーなのでそのまま返す
-    if (error instanceof VRChatLogFileError) {
-      return neverthrow.err(error);
-    }
-    // その他のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
-    throw error;
+
+      return { totalProcessedLines, hasProcessedAnyLines };
+    })(),
+    (error): VRChatLogFileError => {
+      // VRChatLogFileError は予期されたエラーなのでそのまま返す
+      if (error instanceof VRChatLogFileError) {
+        return error;
+      }
+      // その他のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
+      throw error;
+    },
+  );
+
+  if (streamResult.isErr()) {
+    return neverthrow.err(streamResult.error);
   }
 
-  if (!hasProcessedAnyLines) {
+  if (!streamResult.value.hasProcessedAnyLines) {
     logger.info('No new log lines to process after filtering');
     return neverthrow.ok(undefined);
   }
 
-  logger.info(`Processing completed: ${totalProcessedLines} log lines`);
+  logger.info(
+    `Processing completed: ${streamResult.value.totalProcessedLines} log lines`,
+  );
 
   return neverthrow.ok(undefined);
 };

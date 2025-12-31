@@ -32,7 +32,7 @@
     "exceptions": {
       "allowWithFinally": true,
       "allowInsideFromPromise": true,
-      "allowWithRethrow": true,
+      "allowWithRethrow": false,
       "allowElectronEnvDetection": true,
       "allowLogAndFallback": false,
       "allowReturnErrOnCatch": false,
