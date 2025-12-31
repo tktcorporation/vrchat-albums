@@ -187,3 +187,62 @@ export const VRChatLogFilePathSchema = z
   .brand<'VRChatLogFilePath'>();
 
 export type VRChatLogFilePath = z.infer<typeof VRChatLogFilePathSchema>;
+
+// ============================================================================
+// Folder Digest (ハッシュ値)
+// ============================================================================
+
+/**
+ * MD5ハッシュ形式の正規表現（32文字の小文字16進数）
+ * folder-hashライブラリとの互換性を保証
+ */
+export const MD5_HASH_REGEX = /^[a-f0-9]{32}$/;
+
+/**
+ * フォルダ内容のダイジェスト（MD5ハッシュ）
+ * folder-hash ライブラリが生成するハッシュ値
+ */
+export const FolderDigestSchema = z
+  .string()
+  .regex(MD5_HASH_REGEX, 'Invalid MD5 hash format')
+  .brand<'FolderDigest'>();
+
+export type FolderDigest = z.infer<typeof FolderDigestSchema>;
+
+/**
+ * 文字列がFolderDigestの形式（MD5ハッシュ）として有効かどうかを検証
+ */
+export const isValidFolderDigest = (value: string): boolean =>
+  MD5_HASH_REGEX.test(value);
+
+// ============================================================================
+// VRChat Photo Containing Folder Path
+// ============================================================================
+
+/**
+ * VRChat写真を含むフォルダのパス
+ *
+ * スキャンによって発見された、VRChat_*.png を含むフォルダを表す。
+ * この型は `getPhotoFolders` 関数の出力としてのみ生成されるべき。
+ *
+ * @remarks
+ * - VRChat写真が存在することの検証は型レベルではなく `getPhotoFolders` で実行
+ * - 任意のパス文字列からの生成は避け、スキャン結果としてのみ使用すること
+ * - VRChatPhotoDirPath（ユーザー設定のベースディレクトリ）とは区別される
+ */
+export const VRChatPhotoContainingFolderPathSchema = z
+  .string()
+  .min(1, 'Folder path cannot be empty')
+  .brand<'VRChatPhotoContainingFolderPath'>();
+
+export type VRChatPhotoContainingFolderPath = z.infer<
+  typeof VRChatPhotoContainingFolderPathSchema
+>;
+
+/**
+ * 文字列がVRChatPhotoContainingFolderPathの形式として有効かどうかを検証
+ * 注意: この関数は形式のみを検証し、実際にVRChat写真が含まれているかは検証しない
+ */
+export const isValidVRChatPhotoContainingFolderPath = (
+  value: string,
+): boolean => value.length > 0;
