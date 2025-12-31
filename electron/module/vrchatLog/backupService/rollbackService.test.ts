@@ -270,14 +270,13 @@ describe('rollbackService', () => {
       }
     });
 
-    it('トランザクション内でエラーが発生した場合は適切に処理される', async () => {
-      // トランザクションがエラーを返すようにモック
+    it('キューがタイムアウトした場合は適切に処理される', async () => {
+      // トランザクションがTASK_TIMEOUTエラーを返すようにモック
       vi.mocked(dbQueueModule.getDBQueue).mockReturnValueOnce({
         transaction: vi.fn(async () => {
-          // トランザクションがエラーを返す
           return neverthrow.err({
-            type: 'TRANSACTION_ERROR' as const,
-            message: 'Transaction failed',
+            type: 'TASK_TIMEOUT' as const,
+            message: 'Task timeout',
           });
         }),
       } as unknown as ReturnType<typeof dbQueueModule.getDBQueue>);
@@ -290,6 +289,21 @@ describe('rollbackService', () => {
           'トランザクションに失敗しました',
         );
       }
+    });
+
+    it('予期しないエラーが発生した場合はそのままthrowされる', async () => {
+      const unexpectedError = new Error('Unexpected database error');
+      // トランザクションが予期しないエラーをthrowするようにモック
+      vi.mocked(dbQueueModule.getDBQueue).mockReturnValueOnce({
+        transaction: vi.fn(async () => {
+          throw unexpectedError;
+        }),
+      } as unknown as ReturnType<typeof dbQueueModule.getDBQueue>);
+
+      // 予期しないエラーはそのままthrowされる（Sentryに送信される）
+      await expect(
+        rollbackService.rollbackToBackup(mockBackup),
+      ).rejects.toThrow('Unexpected database error');
     });
   });
 

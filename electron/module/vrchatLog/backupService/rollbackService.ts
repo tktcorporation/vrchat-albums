@@ -130,8 +130,9 @@ export class RollbackService {
 
     const dbQueue = getDBQueue();
 
-    // dbQueue.transactionは予期しないエラーを自動的にキャッチして
-    // Result<T, DBQueueError>として返すため、内部でtry-catchは不要
+    // dbQueue.transactionは予期しないエラーをそのまま throw する
+    // これによりSentryにエラーが送信される
+    // QUEUE_FULL, TASK_TIMEOUT のみがResult型で返される
     const transactionResult = await dbQueue.transaction(async () => {
       const backupPath = path.join(
         backupService.getBackupBasePath(),
@@ -177,10 +178,19 @@ export class RollbackService {
     });
 
     if (transactionResult.isErr()) {
-      return neverthrow.err<void, RollbackError>({
-        type: 'TRANSACTION_FAILED',
-        message: transactionResult.error.message,
-      });
+      // DBQueueError (QUEUE_FULL, TASK_TIMEOUT) を RollbackError にマッピング
+      return neverthrow.err<void, RollbackError>(
+        match(transactionResult.error)
+          .with({ type: 'QUEUE_FULL' }, (e) => ({
+            type: 'TRANSACTION_FAILED' as const,
+            message: e.message,
+          }))
+          .with({ type: 'TASK_TIMEOUT' }, (e) => ({
+            type: 'TRANSACTION_FAILED' as const,
+            message: e.message,
+          }))
+          .exhaustive(),
+      );
     }
 
     return transactionResult.value;

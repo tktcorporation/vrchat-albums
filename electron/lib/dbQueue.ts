@@ -7,12 +7,13 @@ import { getRDBClient } from './sequelize';
 
 /**
  * データベースキューのエラー型
+ *
+ * Note: QUERY_ERROR と TRANSACTION_ERROR は削除済み
+ * 予期しないエラーはそのまま throw され Sentry に送信される
  */
 export type DBQueueError =
   | { type: 'QUEUE_FULL'; message: string }
-  | { type: 'TASK_TIMEOUT'; message: string }
-  | { type: 'QUERY_ERROR'; message: string }
-  | { type: 'TRANSACTION_ERROR'; message: string };
+  | { type: 'TASK_TIMEOUT'; message: string };
 
 /**
  * データベースアクセスのためのキュー設定
@@ -147,21 +148,16 @@ class DBQueue {
    * 読み取り専用のクエリを実行する
    * @param query 実行するSQLクエリ
    * @returns クエリの実行結果
+   *
+   * Note: 予期しないエラーはそのまま throw され Sentry に送信される
    */
   async query(query: string): Promise<unknown[]> {
     return this.add(async () => {
       const client = getRDBClient().__client;
-      try {
-        const result = await client.query(query, {
-          type: 'SELECT',
-        });
-        return result;
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`SQLite query error: ${error.message}`);
-        }
-        throw new Error('Unknown SQLite query error');
-      }
+      const result = await client.query(query, {
+        type: 'SELECT',
+      });
+      return result;
     });
   }
 
@@ -169,31 +165,18 @@ class DBQueue {
    * 読み取り専用のクエリを実行する（Result型を返す）
    * @param query 実行するSQLクエリ
    * @returns クエリの実行結果をResult型でラップ
+   *
+   * Note: 予期しないエラーは addWithResult 内で throw され Sentry に送信される
    */
   async queryWithResult(
     query: string,
   ): Promise<Result<unknown[], DBQueueError>> {
     return this.addWithResult(async () => {
       const client = getRDBClient().__client;
-      try {
-        const result = await client.query(query, {
-          type: 'SELECT',
-        });
-        return result;
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new Error(`SQLite query error: ${error.message}`);
-        }
-        throw new Error('Unknown SQLite query error');
-      }
-    }).catch((error) => {
-      // addWithResultでスローされた予期せぬエラーを処理
-      return err({
-        type: 'QUERY_ERROR',
-        message: `SQLiteクエリエラー: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+      const result = await client.query(query, {
+        type: 'SELECT',
       });
+      return result;
     });
   }
 
@@ -201,6 +184,8 @@ class DBQueue {
    * トランザクションを使用してタスクを実行する
    * @param task トランザクションを使用するタスク関数
    * @returns タスクの実行結果をResult型でラップ
+   *
+   * Note: 予期しないエラーは addWithResult 内で throw され Sentry に送信される
    */
   async transaction<T>(
     task: (transaction: Transaction) => Promise<T>,
@@ -208,18 +193,6 @@ class DBQueue {
     return this.addWithResult(async () => {
       const client = getRDBClient().__client;
       return await client.transaction(task);
-    }).catch((error) => {
-      // addWithResultでスローされた予期せぬエラーを処理
-      logger.error({
-        message: 'DBQueue: トランザクション実行中にエラーが発生しました',
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
-      return err({
-        type: 'TRANSACTION_ERROR',
-        message: `トランザクションエラー: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      });
     });
   }
 
