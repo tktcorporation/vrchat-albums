@@ -805,11 +805,19 @@ const getChangedFoldersWithFiles = async (
     // ブランド型から生のstring値を取得して比較（オブジェクトキーアクセス用）
     const savedState = savedStates[folderPath as string];
 
+    // デバッグ: savedState lookup 結果
+    logger.debug(
+      `[DigestCheck] folder=${folderPath}, savedStateExists=${!!savedState}, savedDigest=${savedState?.digest ?? 'none'}, currentDigest=${currentDigest}`,
+    );
+
     // ダイジェストが一致すればスキップ（FolderDigest同士は直接比較可能）
     if (savedState && savedState.digest === currentDigest) {
-      logger.debug(`Folder unchanged (digest match): ${folderPath}`);
+      logger.debug(`[DigestCheck] MATCH - skipping folder: ${folderPath}`);
       continue;
     }
+    logger.debug(
+      `[DigestCheck] MISMATCH - folder will be processed: ${folderPath}`,
+    );
 
     // 変更があったフォルダのファイル一覧を取得（エラー時はスキップ）
     const fileNamesResult = await neverthrow.ResultAsync.fromPromise(
@@ -1174,6 +1182,11 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
         const { newFiles, statErrors } = await filterNewFilesByMtime(
           changedFolder,
           lastScannedAt,
+        );
+
+        // デバッグ: mtime フィルタ結果
+        logger.debug(
+          `[MtimeFilter] folder=${folderPathStr}, lastScannedAt=${lastScannedAt?.toISOString() ?? 'null'}, totalFiles=${changedFolder.fileNames.length}, newFiles=${newFiles.length}`,
         );
 
         // stat統計を集計
