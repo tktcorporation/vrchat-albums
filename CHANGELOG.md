@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- 起動時のフォトギャラリー幅初期化にリトライ機構を追加 (#663)
+- Improve Playwright test stability in devcontainer (#664)
+
+### ⚡ Performance
+
+- Folder-hash から hash-wasm xxhash128 に置き換えてダイジェスト計算を高速化 (#662)
+
+### Debug
+
+- 写真スキャン増分モード問題のデバッグログ追加 (#661)
+
+## [0.23.0] - 2025-12-31
+
 ### 🚀 Features
 
 - Redesign settings screen tab layout (#657)
@@ -21,7 +36,7 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Release v0.23.0
+- Release v0.23.0 (#660)
 
 ## [0.22.0] - 2025-12-30
 
