@@ -1,7 +1,8 @@
 import type { Transaction } from '@sequelize/core';
 import type { Result } from 'neverthrow';
-import { err, ok } from 'neverthrow';
+import { err, ResultAsync } from 'neverthrow';
 import PQueue from 'p-queue';
+import { match, P } from 'ts-pattern';
 import { logger } from './logger';
 import { getRDBClient } from './sequelize';
 
@@ -92,14 +93,25 @@ class DBQueue {
       await this.waitForSpace();
     }
 
-    try {
-      return (await this.queue.add(task)) as T;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'TimeoutError') {
-        logger.error({ message: 'DBQueue: タスクがタイムアウトしました' });
-      }
-      throw error;
-    }
+    // ResultAsync.fromPromiseを使い、エラーハンドラ内でre-throw
+    // すべてのエラーはre-throwされるので、unwrapは安全
+    return ResultAsync.fromPromise(
+      this.queue.add(task).then((r) => r as T),
+      (error): never => {
+        match(error)
+          .with(
+            P.intersection(P.instanceOf(Error), { name: 'TimeoutError' }),
+            () => {
+              logger.error({
+                message: 'DBQueue: タスクがタイムアウトしました',
+              });
+            },
+          )
+          .otherwise(() => {});
+        // すべてのエラーをre-throw
+        throw error;
+      },
+    ).then((r) => r._unsafeUnwrap());
   }
 
   /**
@@ -110,38 +122,44 @@ class DBQueue {
   async addWithResult<T>(
     task: () => Promise<T>,
   ): Promise<Result<T, DBQueueError>> {
-    try {
-      if (this.totalTasks >= this.options.maxSize) {
-        if (this.options.onFull === 'throw') {
-          return err({
-            type: 'QUEUE_FULL',
-            message: 'DBQueue: キューが一杯です',
-          });
-        }
-        // 'wait'の場合は空きができるまで待機する
-        await this.waitForSpace();
-      }
-
-      const result = await this.queue.add(task);
-      return ok(result as T);
-    } catch (error) {
-      if (error instanceof Error && error.name === 'TimeoutError') {
-        logger.error({
-          message: 'DBQueue: タスクがタイムアウトしました',
-          stack: error,
-        });
+    if (this.totalTasks >= this.options.maxSize) {
+      if (this.options.onFull === 'throw') {
         return err({
-          type: 'TASK_TIMEOUT',
-          message: `DBQueue: タスクがタイムアウトしました: ${error.message}`,
+          type: 'QUEUE_FULL',
+          message: 'DBQueue: キューが一杯です',
         });
       }
-      // 予期せぬエラーの場合はログを出力して例外をスロー
-      logger.error({
-        message: 'DBQueue: タスク実行中に予期せぬエラーが発生しました',
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
-      throw error; // 予期せぬエラーはそのままスロー
+      // 'wait'の場合は空きができるまで待機する
+      await this.waitForSpace();
     }
+
+    return ResultAsync.fromPromise(
+      this.queue.add(task).then((r) => r as T),
+      (error): DBQueueError => {
+        return match(error)
+          .with(
+            P.intersection(P.instanceOf(Error), { name: 'TimeoutError' }),
+            (e) => {
+              logger.error({
+                message: 'DBQueue: タスクがタイムアウトしました',
+                stack: e,
+              });
+              return {
+                type: 'TASK_TIMEOUT' as const,
+                message: `DBQueue: タスクがタイムアウトしました: ${e.message}`,
+              };
+            },
+          )
+          .otherwise((e) => {
+            // 予期せぬエラーの場合はログを出力して例外をスロー
+            logger.error({
+              message: 'DBQueue: タスク実行中に予期せぬエラーが発生しました',
+              stack: e instanceof Error ? e : new Error(String(e)),
+            });
+            throw e; // 予期せぬエラーはそのままスロー
+          });
+      },
+    );
   }
 
   /**
