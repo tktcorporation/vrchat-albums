@@ -34,6 +34,7 @@ export default ({ command }: ConfigEnv): UserConfig => {
       },
       server: {
         port: process.env.PORT === undefined ? 3000 : +process.env.PORT,
+        host: true,
       },
       optimizeDeps: {
         exclude: ['path', 'clip-filepaths'],

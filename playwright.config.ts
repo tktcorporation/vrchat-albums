@@ -55,7 +55,7 @@ export default defineConfig({
     // The electron main process files are already built by test:playwright
     command: 'yarn dev:vite',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 60000,
     env: {
       NODE_OPTIONS: `--max-old-space-size=${
