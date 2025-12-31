@@ -4,7 +4,7 @@ import type * as neverthrow from 'neverthrow';
 import { fromThrowable } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
-import { MD5_HASH_REGEX } from '../lib/brandedTypes';
+import { FolderDigestSchema } from '../lib/brandedTypes';
 
 type TestPlaywrightStoreName = `test-playwright-settings-${string}`;
 type StoreName = 'v0-settings' | 'test-settings' | TestPlaywrightStoreName;
@@ -27,9 +27,12 @@ type SettingStoreKey = (typeof settingStoreKey)[number];
  * 各フォルダのダイジェストと最終スキャン日時を保持
  */
 export const FolderScanStateSchema = z.object({
-  /** ファイル一覧のダイジェスト（MD5ハッシュ値） */
-  digest: z.string().regex(MD5_HASH_REGEX, 'Invalid MD5 hash format'),
-  /** 最終スキャン日時（ISO文字列） */
+  /** ファイル一覧のダイジェスト（MD5ハッシュ値、FolderDigest型） */
+  digest: FolderDigestSchema,
+  /**
+   * 最終スキャン完了日時（ISO 8601形式、UTC）
+   * このフォルダの処理が完了した時点で更新される
+   */
   lastScannedAt: z
     .string()
     .datetime({ message: 'Invalid ISO datetime format' }),
@@ -306,12 +309,13 @@ const setSettingStore = (name: StoreName) => {
         .with({ success: true }, (r) => r.data)
         .with({ success: false }, (r) => {
           // バリデーションエラー時はログ出力して空オブジェクトを返す
-          // 破損データをクリアして次回から正常に動作させる
           if (value !== null && value !== undefined) {
             logger.warn({
               message: 'Invalid photoFolderScanStates data, resetting to empty',
               stack: new Error(r.error.message),
             });
+            // 破損データをクリアして次回から正常に動作させる
+            set('photoFolderScanStates', {});
           }
           return {};
         })

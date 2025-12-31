@@ -3,6 +3,7 @@ import type { Dirent, PathLike } from 'node:fs';
 import * as nodefsPromises from 'node:fs/promises';
 import * as dateFns from 'date-fns';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type FolderDigest, FolderDigestSchema } from '../../lib/brandedTypes';
 import {
   getSettingStore,
   type PhotoFolderScanStates,
@@ -43,8 +44,18 @@ import { hashElement } from 'folder-hash';
  * folder-hash はフォルダのコンテンツに基づいてハッシュを計算するので、
  * テストではフォルダパスベースで一意のハッシュを返す
  */
-const computeTestDigest = (folderPath: string): string => {
-  return crypto.createHash('md5').update(folderPath).digest('hex');
+const computeTestDigest = (folderPath: string): FolderDigest => {
+  const hash = crypto.createHash('md5').update(folderPath).digest('hex');
+  return FolderDigestSchema.parse(hash);
+};
+
+/**
+ * 古い（変更を示す）ダイジェストを生成
+ * テストで「ダイジェスト不一致」状態を作るために使用
+ */
+const createOldDigest = (suffix: string): FolderDigest => {
+  const hash = crypto.createHash('md5').update(`old-${suffix}`).digest('hex');
+  return FolderDigestSchema.parse(hash);
 };
 
 /**
@@ -253,12 +264,12 @@ describe('createVRChatPhotoPathIndex', () => {
         },
         // 2024-02は古いダイジェスト（変更あり）+ 前回スキャン日時あり
         [yearMonthFolder2024_02]: {
-          digest: 'old-digest',
+          digest: createOldDigest('2024-02'),
           lastScannedAt: twoHoursAgo.toISOString(),
         },
         // extraも古いダイジェスト（変更あり）+ 前回スキャン日時あり
         [extraYearMonthFolder]: {
-          digest: 'old-digest',
+          digest: createOldDigest('extra'),
           lastScannedAt: twoHoursAgo.toISOString(),
         },
       };
@@ -280,7 +291,7 @@ describe('createVRChatPhotoPathIndex', () => {
       // 2024-02フォルダは変更あり（ダイジェスト不一致）だがmtimeは古い
       savedScanStates = {
         [yearMonthFolder2024_02]: {
-          digest: 'old-digest-different',
+          digest: createOldDigest('different'),
           lastScannedAt: twoHoursAgo.toISOString(), // file2は3時間前なのでスキップ
         },
       };

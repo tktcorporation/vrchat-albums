@@ -612,9 +612,10 @@ type FolderDigestError =
  *
  * @param folderPath VRChat写真を含むフォルダのパス
  * @returns ResultAsync<FolderDigest, FolderDigestError>
+ *          - 成功時: FolderDigest（MD5ハッシュ値）
  *          - FOLDER_NOT_FOUND: スキャン中にフォルダが削除された（想定内）
  *          - PERMISSION_DENIED: 権限エラー（ユーザーに通知すべき）
- *          - その他のエラーは再スロー（Sentry送信）
+ * @throws 予期しないエラー（EMFILE等）はSentry送信対象として再スロー
  */
 const computeFolderDigest = (
   folderPath: VRChatPhotoContainingFolderPath,
@@ -1019,9 +1020,10 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
 
       // 各変更フォルダを処理
       for (const changedFolder of changedFolders) {
-        // ブランド型をstringにキャストしてストレージアクセス
+        // ブランド型をstringにキャストしてストレージアクセス（パスのみ）
         const folderPathStr = changedFolder.folderPath as string;
-        const digestStr = changedFolder.currentDigest as string;
+        // digestはFolderDigest型のまま保持（FolderScanStateSchema.digestと型統一）
+        const { currentDigest } = changedFolder;
 
         const savedState = savedStates[folderPathStr];
         const lastScannedAt = savedState
@@ -1038,7 +1040,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
           // ファイル削除のみの場合など（ダイジェスト変更だがmtimeでフィルタ後0件）
           // ダイジェストは更新する
           updatedStates[folderPathStr] = {
-            digest: digestStr,
+            digest: currentDigest,
             lastScannedAt: new Date().toISOString(),
           };
           continue;
@@ -1078,9 +1080,9 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
           }
         }
 
-        // フォルダスキャン状態を更新（ブランド型→string）
+        // フォルダスキャン状態を更新
         updatedStates[folderPathStr] = {
-          digest: digestStr,
+          digest: currentDigest,
           lastScannedAt: new Date().toISOString(),
         };
       }
