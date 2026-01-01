@@ -1,4 +1,4 @@
-import { type RefObject, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toValidWidth, type ValidWidth } from '../types/validWidth';
 
 /**
@@ -11,90 +11,136 @@ export type WidthState =
   | { status: 'measuring' }
   | { status: 'ready'; width: ValidWidth };
 
+/** デバッグログを有効にするかどうか（本番調査用） */
+const DEBUG_WIDTH_MEASUREMENT = false;
+
 /**
- * コンテナ幅を測定するカスタムフック
+ * コンテナ幅を測定するカスタムフック（Callback Ref パターン）
  *
  * ## 設計原則
  *
- * 1. **useLayoutEffect を使用**: ペイント前に同期実行
+ * 1. **Callback Ref を使用**: ref が attach された瞬間に確実にコールバックが呼ばれる
  * 2. **明示的な状態管理**: "測定中" と "準備完了" を区別
  * 3. **型安全**: ValidWidth 型で 0 以下を型レベルで排除
  *
- * ## Electron 対応
+ * ## なぜ Callback Ref か
  *
- * - 起動直後は DOM が確定していない可能性がある
- * - ResizeObserver で継続的に監視
- * - 最大 10 回まで測定をリトライ
+ * `useLayoutEffect` + `RefObject` パターンでは、初回レンダリング時に
+ * `containerRef.current` が `null` の場合、effect が早期リターンし、
+ * その後 ref が有効になっても effect が再実行されない問題があった。
+ *
+ * Callback Ref は DOM に要素が attach された瞬間に呼ばれるため、
+ * このタイミング問題を根本的に解決できる。
  *
  * ## 使用例
  *
  * ```tsx
- * const widthState = useContainerWidth(containerRef, 32);
+ * const { containerRef, widthState } = useContainerWidth(32);
  *
- * {match(widthState)
- *   .with({ status: 'measuring' }, () => <Skeleton />)
- *   .with({ status: 'ready' }, ({ width }) => <Content width={width} />)
- *   .exhaustive()}
+ * return (
+ *   <div ref={containerRef}>
+ *     {match(widthState)
+ *       .with({ status: 'measuring' }, () => <Skeleton />)
+ *       .with({ status: 'ready' }, ({ width }) => <Content width={width} />)
+ *       .exhaustive()}
+ *   </div>
+ * );
  * ```
  *
- * @param containerRef - コンテナ要素への ref
  * @param padding - コンテナのパディング（幅から減算される）
- * @returns 幅の状態（measuring または ready）
+ * @returns containerRef（callback ref）と widthState
  */
-export function useContainerWidth(
-  containerRef: RefObject<HTMLElement | null>,
-  padding = 0,
-): WidthState {
+export function useContainerWidth(padding = 0): {
+  containerRef: (node: HTMLElement | null) => void;
+  widthState: WidthState;
+} {
   const [state, setState] = useState<WidthState>({ status: 'measuring' });
-  const retryCountRef = useRef(0);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const nodeRef = useRef<HTMLElement | null>(null);
 
-  useLayoutEffect(() => {
-    if (!containerRef.current) return;
+  // padding を ref で保持（callback ref の依存を減らすため）
+  const paddingRef = useRef(padding);
+  paddingRef.current = padding;
 
-    const MAX_RETRIES = 10;
-    const RETRY_DELAY = 50; // ms
-    let timeoutId: number | undefined;
-    let animationFrameId: number | undefined;
+  const containerRef = useCallback((node: HTMLElement | null) => {
+    if (DEBUG_WIDTH_MEASUREMENT) {
+      console.log('[useContainerWidth] Callback ref called:', {
+        nodeExists: !!node,
+        nodeTagName: node?.tagName,
+        timestamp: performance.now().toFixed(2),
+      });
+    }
+
+    // 古い observer をクリーンアップ
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    nodeRef.current = node;
+
+    if (!node) {
+      if (DEBUG_WIDTH_MEASUREMENT) {
+        console.log(
+          '[useContainerWidth] Node detached, resetting to measuring',
+        );
+      }
+      setState({ status: 'measuring' });
+      return;
+    }
 
     const measureWidth = () => {
-      const rawWidth = containerRef.current?.clientWidth ?? 0;
-      const adjustedWidth = rawWidth - padding;
+      const rawWidth = node.clientWidth;
+      const adjustedWidth = rawWidth - paddingRef.current;
       const validWidth = toValidWidth(adjustedWidth);
 
-      if (validWidth !== null) {
-        setState({ status: 'ready', width: validWidth });
-        retryCountRef.current = MAX_RETRIES; // リトライを停止
-      } else if (retryCountRef.current < MAX_RETRIES) {
-        // 幅が 0 の場合、次のフレームで再測定をスケジュール
-        retryCountRef.current++;
-        timeoutId = window.setTimeout(() => {
-          animationFrameId = requestAnimationFrame(measureWidth);
-        }, RETRY_DELAY);
+      if (DEBUG_WIDTH_MEASUREMENT) {
+        console.log('[useContainerWidth] Measuring:', {
+          rawWidth,
+          adjustedWidth,
+          isValid: validWidth !== null,
+          timestamp: performance.now().toFixed(2),
+        });
       }
-      // MAX_RETRIES 到達時は measuring のまま（ログ出力推奨）
+
+      if (validWidth !== null) {
+        if (DEBUG_WIDTH_MEASUREMENT) {
+          console.log(
+            '[useContainerWidth] ✅ Width measured successfully:',
+            adjustedWidth,
+          );
+        }
+        setState({ status: 'ready', width: validWidth });
+      } else {
+        // 幅が 0 以下の場合は measuring 状態を維持
+        // ResizeObserver がサイズ変更を検知したら再測定される
+        if (DEBUG_WIDTH_MEASUREMENT) {
+          console.log(
+            '[useContainerWidth] ⚠️ Invalid width, waiting for resize...',
+          );
+        }
+      }
     };
 
-    const observer = new ResizeObserver(() => {
-      // サイズ変更時は常に再測定
-      const rawWidth = containerRef.current?.clientWidth ?? 0;
-      const adjustedWidth = rawWidth - padding;
-      const validWidth = toValidWidth(adjustedWidth);
-
-      if (validWidth !== null) {
-        setState({ status: 'ready', width: validWidth });
-      }
+    // ResizeObserver で継続的に監視
+    observerRef.current = new ResizeObserver(() => {
+      measureWidth();
     });
+    observerRef.current.observe(node);
 
-    observer.observe(containerRef.current);
-    measureWidth(); // 初期測定
+    // 初期測定
+    measureWidth();
+  }, []);
 
+  // アンマウント時のクリーンアップ
+  useEffect(() => {
     return () => {
-      observer.disconnect();
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-      if (animationFrameId !== undefined)
-        cancelAnimationFrame(animationFrameId);
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
     };
-  }, [containerRef, padding]);
+  }, []);
 
-  return state;
+  return { containerRef, widthState: state };
 }

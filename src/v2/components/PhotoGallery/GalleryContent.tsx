@@ -397,12 +397,21 @@ const GalleryContent = memo(
       onGroupingEnd: finishLoadingGrouping,
     });
 
-    const containerRef = useRef<HTMLDivElement>(null);
+    // VirtualizedGallery の getScrollElement 用 RefObject
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // useContainerWidth で幅を測定（ValidWidth 型を保証）
-    const widthState = useContainerWidth(
-      containerRef,
+    // Callback Ref パターンで幅を測定
+    const { containerRef: widthCallbackRef, widthState } = useContainerWidth(
       LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING,
+    );
+
+    // Callback ref と RefObject を統合
+    const combinedRef = useCallback(
+      (node: HTMLDivElement | null) => {
+        scrollContainerRef.current = node;
+        widthCallbackRef(node);
+      },
+      [widthCallbackRef],
     );
 
     // 全てのグループを表示（写真があるグループもないグループも）
@@ -438,7 +447,7 @@ const GalleryContent = memo(
           />
         )}
         {/* コンテナは常にレンダリング（幅測定のため） */}
-        <div ref={containerRef} className="flex-1 flex flex-col">
+        <div ref={combinedRef} className="flex-1 flex flex-col">
           {match(widthState)
             .with({ status: 'measuring' }, () => <MeasuringSkeleton />)
             .with({ status: 'ready' }, ({ width }) => (
@@ -452,7 +461,7 @@ const GalleryContent = memo(
                 setIsMultiSelectMode={setIsMultiSelectMode}
                 isLoading={isLoading}
                 galleryData={galleryData}
-                containerRef={containerRef}
+                containerRef={scrollContainerRef}
               />
             ))
             .exhaustive()}
