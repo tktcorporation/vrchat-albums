@@ -378,13 +378,6 @@ VirtualizedGallery.displayName = 'VirtualizedGallery';
  * @see useContainerWidth - 幅測定フック
  * @see ValidWidth - 有効な幅の Branded Type
  */
-/**
- * 再現用フラグ: ref を遅延させて Electron 起動時のタイミング問題をシミュレート
- * 本番環境では false にすること
- */
-const SIMULATE_DELAYED_REF = true;
-const SIMULATE_DELAY_MS = 1000; // 1秒遅延
-
 const GalleryContent = memo(
   ({
     searchQuery,
@@ -421,24 +414,6 @@ const GalleryContent = memo(
       [widthCallbackRef],
     );
 
-    // 再現用: ref を遅延で有効化
-    const [containerReady, setContainerReady] = useState(!SIMULATE_DELAYED_REF);
-
-    useEffect(() => {
-      if (SIMULATE_DELAYED_REF) {
-        console.log(
-          '[GalleryContent] 🔧 SIMULATE_DELAYED_REF enabled. Delaying ref by',
-          SIMULATE_DELAY_MS,
-          'ms',
-        );
-        const timer = setTimeout(() => {
-          console.log('[GalleryContent] ✅ Container ref is now ready');
-          setContainerReady(true);
-        }, SIMULATE_DELAY_MS);
-        return () => clearTimeout(timer);
-      }
-    }, []);
-
     // 全てのグループを表示（写真があるグループもないグループも）
     const filteredGroups = useMemo(() => {
       return Object.entries(groupedPhotos);
@@ -472,11 +447,7 @@ const GalleryContent = memo(
           />
         )}
         {/* コンテナは常にレンダリング（幅測定のため） */}
-        {/* 再現用: containerReady が false の間は ref を設定しない */}
-        <div
-          ref={containerReady ? combinedRef : undefined}
-          className="flex-1 flex flex-col"
-        >
+        <div ref={combinedRef} className="flex-1 flex flex-col">
           {match(widthState)
             .with({ status: 'measuring' }, () => <MeasuringSkeleton />)
             .with({ status: 'ready' }, ({ width }) => (

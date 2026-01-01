@@ -12,7 +12,7 @@ export type WidthState =
   | { status: 'ready'; width: ValidWidth };
 
 /** デバッグログを有効にするかどうか（本番調査用） */
-const DEBUG_WIDTH_MEASUREMENT = true;
+const DEBUG_WIDTH_MEASUREMENT = false;
 
 /**
  * コンテナ幅を測定するカスタムフック（Callback Ref パターン）
