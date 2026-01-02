@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { match, P } from 'ts-pattern';
 import { invalidatePhotoGalleryQueries } from '@/queryClient';
 import { trpcReact } from '@/trpc';
@@ -118,12 +118,17 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
       },
     });
 
+  // ミューテーションをrefで保持し、retryProcess の安定した参照を維持する
+  const mutationRef = useRef(initializeAppDataMutation);
+  mutationRef.current = initializeAppDataMutation;
+
   // 初期化処理を開始
   const startInitialization = useCallback(() => {
+    const mutation = mutationRef.current;
     match({
       stage: stages.initialization,
-      isLoading: initializeAppDataMutation.isPending,
-      isSuccess: initializeAppDataMutation.isSuccess,
+      isLoading: mutation.isPending,
+      isSuccess: mutation.isSuccess,
       hasTriggered: hasTriggeredInitialization,
     })
       .with(
@@ -135,15 +140,11 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
         },
         () => {
           setHasTriggeredInitialization(true);
-          initializeAppDataMutation.mutate();
+          mutation.mutate();
         },
       )
       .otherwise(() => {});
-  }, [
-    stages.initialization,
-    initializeAppDataMutation,
-    hasTriggeredInitialization,
-  ]);
+  }, [stages.initialization, hasTriggeredInitialization]);
 
   // 自動的に初期化を開始
   useEffect(() => {
@@ -156,9 +157,9 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
     setError(null);
     setHasNotifiedCompletion(false);
     setHasTriggeredInitialization(false);
-    initializeAppDataMutation.reset();
+    mutationRef.current.reset();
     // startInitialization は useEffect で自動的に呼ばれる
-  }, [initializeAppDataMutation]);
+  }, []);
 
   // 完了判定
   const completed = useMemo(

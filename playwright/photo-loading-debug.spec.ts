@@ -43,13 +43,8 @@ const SERVER_MAX_ATTEMPTS = 10;
 const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY || '4096';
 
 interface PerformanceMetrics {
-  usePhotoGalleryCallCount: number;
-  useGroupPhotosCallCount: number;
-  groupPhotosBySessionTime: number | null;
-  convertGroupsToRecordTime: number | null;
-  photosLength: number | null;
-  joinLogsLength: number | null;
-  groupCount: number | null;
+  photosLoaded: boolean;
+  contentLoadTime: number | null;
 }
 
 const launchElectronApp = async () => {
@@ -137,27 +132,25 @@ const TIMEOUT = 120000; // 2 minutes for debugging
 test.setTimeout(TIMEOUT);
 
 /**
- * 写真一覧の無限ロード問題をデバッグするテスト
+ * 写真一覧のロードが正常に完了することを検証するテスト
  *
  * このテストは以下を検証します：
- * 1. usePhotoGallery が何回呼ばれるか（2回呼ばれている問題）
- * 2. groupPhotosBySession の処理時間
- * 3. 写真とログの件数
+ * 1. アプリが正常に起動すること
+ * 2. 写真一覧が妥当な時間内にロードされること
+ *
+ * 注意: React StrictModeと tRPC クエリの状態遷移により、
+ * コンポーネントは複数回レンダリングされますが、
+ * useMemoによるメモ化で重い処理は最小限に抑えられています。
  */
-test('写真一覧のロードパフォーマンスを計測', async () => {
+test('写真一覧が正常にロードされる', async () => {
   console.log('=== Photo Loading Performance Debug Test ===');
 
   // テスト用の写真ディレクトリをセットアップ
   setupTestPhotos();
 
   const metrics: PerformanceMetrics = {
-    usePhotoGalleryCallCount: 0,
-    useGroupPhotosCallCount: 0,
-    groupPhotosBySessionTime: null,
-    convertGroupsToRecordTime: null,
-    photosLength: null,
-    joinLogsLength: null,
-    groupCount: null,
+    photosLoaded: false,
+    contentLoadTime: null,
   };
 
   // Launch Electron app
@@ -166,77 +159,6 @@ test('写真一覧のロードパフォーマンスを計測', async () => {
   console.log('Electron app launched, waiting for first window...');
 
   const page = await electronApp.firstWindow({ timeout: 30000 });
-
-  // コンソールログを監視してメトリクスを収集
-  page.on('console', (msg) => {
-    const text = msg.text();
-
-    // usePhotoGallery の呼び出し回数をカウント
-    if (text.includes('[usePhotoGallery] Hook called')) {
-      metrics.usePhotoGalleryCallCount++;
-      console.log(
-        `[DEBUG] usePhotoGallery called (count: ${metrics.usePhotoGalleryCallCount})`,
-      );
-      console.log(`[DEBUG] ${text}`);
-    }
-
-    // useGroupPhotos の呼び出し回数をカウント
-    if (text.includes('[useGroupPhotos] useMemo triggered')) {
-      metrics.useGroupPhotosCallCount++;
-      console.log(
-        `[DEBUG] useGroupPhotos triggered (count: ${metrics.useGroupPhotosCallCount})`,
-      );
-
-      // photosLength と joinLogsLength を抽出
-      const photosMatch = text.match(/photosLength:\s*(\d+)/);
-      const logsMatch = text.match(/joinLogsLength:\s*(\d+)/);
-      if (photosMatch) {
-        metrics.photosLength = Number.parseInt(photosMatch[1], 10);
-      }
-      if (logsMatch) {
-        metrics.joinLogsLength = Number.parseInt(logsMatch[1], 10);
-      }
-      console.log(`[DEBUG] ${text}`);
-    }
-
-    // groupPhotosBySession の処理時間を抽出
-    if (text.includes('[useGroupPhotos] groupPhotosBySession:')) {
-      const timeMatch = text.match(/groupPhotosBySession:\s*([\d.]+)ms/);
-      if (timeMatch) {
-        metrics.groupPhotosBySessionTime = Number.parseFloat(timeMatch[1]);
-        console.log(
-          `[DEBUG] groupPhotosBySession took ${metrics.groupPhotosBySessionTime}ms`,
-        );
-      }
-    }
-
-    // convertGroupsToRecord の処理時間を抽出
-    if (text.includes('[useGroupPhotos] convertGroupsToRecord:')) {
-      const timeMatch = text.match(/convertGroupsToRecord:\s*([\d.]+)ms/);
-      if (timeMatch) {
-        metrics.convertGroupsToRecordTime = Number.parseFloat(timeMatch[1]);
-        console.log(
-          `[DEBUG] convertGroupsToRecord took ${metrics.convertGroupsToRecordTime}ms`,
-        );
-      }
-    }
-
-    // Grouping complete からグループ数を抽出
-    if (text.includes('[useGroupPhotos] Grouping complete')) {
-      const groupMatch = text.match(/groupCount:\s*(\d+)/);
-      if (groupMatch) {
-        metrics.groupCount = Number.parseInt(groupMatch[1], 10);
-        console.log(
-          `[DEBUG] Grouping complete with ${metrics.groupCount} groups`,
-        );
-      }
-    }
-
-    // GalleryContent のレンダリングログ
-    if (text.includes('[GalleryContent] Render')) {
-      console.log(`[DEBUG] ${text}`);
-    }
-  });
 
   // ページエラーを監視
   page.on('pageerror', (error) => {
@@ -313,13 +235,16 @@ test('写真一覧のロードパフォーマンスを計測', async () => {
       '[data-testid="location-group-header"], .photo-card',
       { timeout: 60000 },
     );
-    const loadTime = Date.now() - startTime;
-    console.log(`\n=== Main content loaded in ${loadTime}ms ===`);
+    metrics.contentLoadTime = Date.now() - startTime;
+    metrics.photosLoaded = true;
+    console.log(
+      `\n=== Main content loaded in ${metrics.contentLoadTime}ms ===`,
+    );
   } catch (_error) {
-    const loadTime = Date.now() - startTime;
-    console.log(`\n=== Timeout after ${loadTime}ms ===`);
+    metrics.contentLoadTime = Date.now() - startTime;
+    console.log(`\n=== Timeout after ${metrics.contentLoadTime}ms ===`);
 
-    // タイムアウト時もメトリクスを出力
+    // タイムアウト時もスクリーンショットを撮る
     if (!page.isClosed()) {
       await page.screenshot({
         path: path.join(__dirname, './previews/photo-loading-timeout.png'),
@@ -327,50 +252,10 @@ test('写真一覧のロードパフォーマンスを計測', async () => {
     }
   }
 
-  // さらに少し待ってメトリクスを収集
-  await page.waitForTimeout(5000);
-
   // メトリクスを出力
   console.log('\n=== Performance Metrics ===');
-  console.log(
-    `usePhotoGallery call count: ${metrics.usePhotoGalleryCallCount}`,
-  );
-  console.log(`useGroupPhotos call count: ${metrics.useGroupPhotosCallCount}`);
-  console.log(`Photos count: ${metrics.photosLength ?? 'N/A'}`);
-  console.log(`Join logs count: ${metrics.joinLogsLength ?? 'N/A'}`);
-  console.log(`Group count: ${metrics.groupCount ?? 'N/A'}`);
-  console.log(
-    `groupPhotosBySession time: ${metrics.groupPhotosBySessionTime ?? 'N/A'}ms`,
-  );
-  console.log(
-    `convertGroupsToRecord time: ${metrics.convertGroupsToRecordTime ?? 'N/A'}ms`,
-  );
-
-  // 問題の検証
-  console.log('\n=== Issues Detection ===');
-
-  // Issue 1: usePhotoGallery が2回以上呼ばれている
-  if (metrics.usePhotoGalleryCallCount > 1) {
-    console.log(
-      `⚠️ ISSUE: usePhotoGallery is called ${metrics.usePhotoGalleryCallCount} times (expected: 1)`,
-    );
-  } else if (metrics.usePhotoGalleryCallCount === 1) {
-    console.log('✅ usePhotoGallery is called only once');
-  }
-
-  // Issue 2: groupPhotosBySession が遅い（1秒以上）
-  if (
-    metrics.groupPhotosBySessionTime !== null &&
-    metrics.groupPhotosBySessionTime > 1000
-  ) {
-    console.log(
-      `⚠️ ISSUE: groupPhotosBySession is slow (${metrics.groupPhotosBySessionTime}ms > 1000ms)`,
-    );
-  } else if (metrics.groupPhotosBySessionTime !== null) {
-    console.log(
-      `✅ groupPhotosBySession is fast (${metrics.groupPhotosBySessionTime}ms)`,
-    );
-  }
+  console.log(`Photos loaded: ${metrics.photosLoaded}`);
+  console.log(`Content load time: ${metrics.contentLoadTime}ms`);
 
   // スクリーンショットを保存
   if (!page.isClosed()) {
@@ -387,8 +272,10 @@ test('写真一覧のロードパフォーマンスを計測', async () => {
   }
 
   // テスト結果を検証
-  // usePhotoGallery が2回以上呼ばれている場合は警告（テストは失敗させない）
-  expect(metrics.usePhotoGalleryCallCount).toBeGreaterThan(0);
+  // 写真がロードされていることを確認
+  expect(metrics.photosLoaded).toBe(true);
+  // ロード時間が妥当な範囲内であることを確認（60秒以内）
+  expect(metrics.contentLoadTime).toBeLessThan(60000);
 
   console.log('\n=== Test Complete ===');
 });
