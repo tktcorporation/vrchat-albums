@@ -484,15 +484,15 @@
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/instrumentation-amqplib/node_modules/@opentelemetry/core",
-    "licenseFile": "node_modules/@opentelemetry/instrumentation-amqplib/node_modules/@opentelemetry/core/LICENSE"
+    "path": "node_modules/@opentelemetry/core",
+    "licenseFile": "node_modules/@opentelemetry/core/LICENSE"
   },
   "@opentelemetry/core@2.2.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/core",
-    "licenseFile": "node_modules/@opentelemetry/core/LICENSE"
+    "path": "node_modules/@sentry/node/node_modules/@opentelemetry/core",
+    "licenseFile": "node_modules/@sentry/node/node_modules/@opentelemetry/core/LICENSE"
   },
   "@opentelemetry/instrumentation-amqplib@0.55.0": {
     "licenses": "Apache-2.0",
@@ -694,15 +694,15 @@
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions",
-    "licenseFile": "node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions/LICENSE"
+    "path": "node_modules/@sentry/node/node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions",
+    "licenseFile": "node_modules/@sentry/node/node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions/LICENSE"
   },
   "@opentelemetry/semantic-conventions@1.38.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/semantic-conventions",
-    "licenseFile": "node_modules/@opentelemetry/semantic-conventions/LICENSE"
+    "path": "node_modules/@opentelemetry/instrumentation-koa/node_modules/@opentelemetry/semantic-conventions",
+    "licenseFile": "node_modules/@opentelemetry/instrumentation-koa/node_modules/@opentelemetry/semantic-conventions/LICENSE"
   },
   "@opentelemetry/sql-common@0.41.2": {
     "licenses": "Apache-2.0",
@@ -1071,8 +1071,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
-    "path": "node_modules/@sentry/node-core",
-    "licenseFile": "node_modules/@sentry/node-core/LICENSE"
+    "path": "node_modules/@sentry/node/node_modules/@sentry/node-core",
+    "licenseFile": "node_modules/@sentry/node/node_modules/@sentry/node-core/LICENSE"
   },
   "@sentry/node@10.29.0": {
     "licenses": "MIT",
@@ -1085,8 +1085,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
-    "path": "node_modules/@sentry/opentelemetry",
-    "licenseFile": "node_modules/@sentry/opentelemetry/LICENSE"
+    "path": "node_modules/@sentry/node/node_modules/@sentry/opentelemetry",
+    "licenseFile": "node_modules/@sentry/node/node_modules/@sentry/opentelemetry/LICENSE"
   },
   "@sentry/vite-plugin@4.6.1": {
     "licenses": "MIT",
