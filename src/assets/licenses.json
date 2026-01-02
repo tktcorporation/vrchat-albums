@@ -212,14 +212,6 @@
     "path": "node_modules/@babel/plugin-transform-react-jsx-source",
     "licenseFile": "node_modules/@babel/plugin-transform-react-jsx-source/LICENSE"
   },
-  "@babel/runtime@7.27.6": {
-    "licenses": "MIT",
-    "repository": "https://github.com/babel/babel",
-    "publisher": "The Babel Team",
-    "url": "https://babel.dev/team",
-    "path": "node_modules/@babel/runtime",
-    "licenseFile": "node_modules/@babel/runtime/LICENSE"
-  },
   "@babel/template@7.27.2": {
     "licenses": "MIT",
     "repository": "https://github.com/babel/babel",
@@ -1161,28 +1153,28 @@
     "path": "node_modules/@tailwindcss/vite",
     "licenseFile": "node_modules/@tailwindcss/vite/LICENSE"
   },
-  "@tanstack/query-core@5.90.12": {
+  "@tanstack/query-core@5.90.16": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
     "path": "node_modules/@tanstack/query-core",
     "licenseFile": "node_modules/@tanstack/query-core/LICENSE"
   },
-  "@tanstack/react-query@5.90.12": {
+  "@tanstack/react-query@5.90.16": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
     "path": "node_modules/@tanstack/react-query",
     "licenseFile": "node_modules/@tanstack/react-query/LICENSE"
   },
-  "@tanstack/react-virtual@3.13.13": {
+  "@tanstack/react-virtual@3.13.14": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/virtual",
     "publisher": "Tanner Linsley",
     "path": "node_modules/@tanstack/react-virtual",
     "licenseFile": "node_modules/@tanstack/react-virtual/LICENSE"
   },
-  "@tanstack/virtual-core@3.13.13": {
+  "@tanstack/virtual-core@3.13.14": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/virtual",
     "publisher": "Tanner Linsley",
@@ -1320,7 +1312,7 @@
     "path": "node_modules/@types/mysql",
     "licenseFile": "node_modules/@types/mysql/LICENSE"
   },
-  "@types/node@22.17.2": {
+  "@types/node@22.15.35": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/node",
@@ -2145,6 +2137,15 @@
     "publisher": "Sindre Sorhus",
     "email": "sindresorhus@gmail.com",
     "url": "https://sindresorhus.com",
+    "path": "node_modules/electron-unhandled/node_modules/electron-is-dev",
+    "licenseFile": "node_modules/electron-unhandled/node_modules/electron-is-dev/license"
+  },
+  "electron-is-dev@3.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/sindresorhus/electron-is-dev",
+    "publisher": "Sindre Sorhus",
+    "email": "sindresorhus@gmail.com",
+    "url": "https://sindresorhus.com",
     "path": "node_modules/electron-is-dev",
     "licenseFile": "node_modules/electron-is-dev/license"
   },
@@ -2331,7 +2332,7 @@
     "path": "node_modules/eventemitter3",
     "licenseFile": "node_modules/eventemitter3/LICENSE"
   },
-  "exiftool-vendored.pl@13.44.0": {
+  "exiftool-vendored.pl@13.45.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.pl",
     "publisher": "Matthew McEachen",
@@ -2339,7 +2340,7 @@
     "path": "node_modules/exiftool-vendored.pl",
     "licenseFile": "node_modules/exiftool-vendored.pl/LICENSE"
   },
-  "exiftool-vendored@34.1.0": {
+  "exiftool-vendored@34.2.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.js",
     "publisher": "Matthew McEachen",
@@ -2990,7 +2991,7 @@
     "path": "node_modules/jiti",
     "licenseFile": "node_modules/jiti/LICENSE"
   },
-  "jotai@2.16.0": {
+  "jotai@2.16.1": {
     "licenses": "MIT",
     "repository": "https://github.com/pmndrs/jotai",
     "publisher": "Daishi Kato",
@@ -4343,7 +4344,7 @@
     "path": "node_modules/react-dom",
     "licenseFile": "node_modules/react-dom/LICENSE"
   },
-  "react-error-boundary@6.0.0": {
+  "react-error-boundary@6.0.1": {
     "licenses": "MIT",
     "repository": "https://github.com/bvaughn/react-error-boundary",
     "publisher": "Brian Vaughn",
@@ -5270,8 +5271,8 @@
     "path": "node_modules/vite",
     "licenseFile": "node_modules/vite/LICENSE.md"
   },
-  "vrchat-albums@0.23.0": {
-    "licenses": "MIT*",
+  "vrchat-albums@0.24.0": {
+    "licenses": "Custom: https://github.com/tktcorporation/vrchat-albums/releases",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",
     "path": "",
@@ -5404,7 +5405,7 @@
     "path": "node_modules/yocto-queue",
     "licenseFile": "node_modules/yocto-queue/license"
   },
-  "zod@4.2.1": {
+  "zod@4.3.4": {
     "licenses": "MIT",
     "repository": "https://github.com/colinhacks/zod",
     "publisher": "Colin McDonnell",
