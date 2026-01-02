@@ -410,6 +410,8 @@ const GalleryContent = memo(
       LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING,
     );
 
+    console.log('[GalleryContent] widthState', widthState);
+
     // Callback ref と RefObject を統合
     const combinedRef = useCallback(
       (node: HTMLDivElement | null) => {
