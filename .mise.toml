@@ -2,7 +2,7 @@
 # https://mise.jdx.dev/configuration.html
 
 [tools]
-node = "20"
+node = "22"
 yarn = "latest"
 uv = "latest"
 python = "3.14"

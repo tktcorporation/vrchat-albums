@@ -16,7 +16,7 @@ function extractMajorVersion(version: string): string | null {
 }
 
 function main(): void {
-  consola.start('Checking @types/node version matches engines.node...');
+  consola.start('Checking Node.js version consistency...');
 
   const enginesNode = pkg.engines?.node;
   const typesNode = pkg.devDependencies?.['@types/node'];
@@ -33,6 +33,7 @@ function main(): void {
 
   const enginesMajor = extractMajorVersion(enginesNode);
   const typesMajor = extractMajorVersion(typesNode);
+  const runningMajor = extractMajorVersion(process.versions.node);
 
   if (!enginesMajor) {
     consola.error(`Cannot parse engines.node version: ${enginesNode}`);
@@ -44,14 +45,35 @@ function main(): void {
     process.exit(1);
   }
 
+  if (!runningMajor) {
+    consola.error(
+      `Cannot parse running Node.js version: ${process.versions.node}`,
+    );
+    process.exit(1);
+  }
+
+  // Check 1: Running Node.js version matches engines.node
+  if (runningMajor !== enginesMajor) {
+    consola.error(
+      `Running Node.js v${process.versions.node} (major: ${runningMajor}) does not match engines.node: "${enginesNode}" (major: ${enginesMajor})`,
+    );
+    consola.info(
+      `Fix: Use Node.js ${enginesMajor}.x (e.g., mise use node@${enginesMajor})`,
+    );
+    process.exit(1);
+  }
+  consola.success(
+    `Running Node.js v${process.versions.node} matches engines.node: "${enginesNode}"`,
+  );
+
+  // Check 2: @types/node matches engines.node
   if (enginesMajor !== typesMajor) {
     consola.error(
-      `Version mismatch: @types/node@${typesNode} (major: ${typesMajor}) does not match engines.node: "${enginesNode}" (major: ${enginesMajor})`,
+      `@types/node@${typesNode} (major: ${typesMajor}) does not match engines.node: "${enginesNode}" (major: ${enginesMajor})`,
     );
     consola.info(`Fix: yarn add -D @types/node@~${enginesMajor}.0.0`);
     process.exit(1);
   }
-
   consola.success(
     `@types/node@${typesNode} matches engines.node: "${enginesNode}"`,
   );
