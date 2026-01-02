@@ -62,16 +62,14 @@ const launchElectronApp = async () => {
   const electronApp = await _electron.launch({
     args: [
       '--no-sandbox',
-      `--max-old-space-size=${MEMORY_LIMIT_MB}`, // Node.jsのヒープメモリを増やす
-      `--js-flags=--max-old-space-size=${MEMORY_LIMIT_MB}`, // V8エンジンのメモリ制限を増やす
-      '--disable-dev-shm-usage', // /dev/shmの使用を無効化（コンテナ環境向け）
-      '--disable-gpu', // GPU無効化でメモリ節約
-      // '--disable-software-rasterizer', // devcontainerではソフトウェアレンダリングが必要なため削除
-      '--disable-features=VizDisplayCompositor', // Disable problematic display features
-      '--disable-gpu-compositing',
-      '--in-process-gpu', // Run GPU in process to avoid IPC issues
-      '--enable-logging', // Enable logging
-      '--log-level=0', // Verbose logging
+      `--max-old-space-size=${MEMORY_LIMIT_MB}`,
+      `--js-flags=--max-old-space-size=${MEMORY_LIMIT_MB}`,
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--enable-logging',
+      '--log-level=0',
+      // Disable crash reporter to prevent GLib-GObject errors from killing the process
+      '--disable-breakpad',
       path.join(__dirname, '../main/index.cjs'),
     ],
     env: {
@@ -88,6 +86,21 @@ const launchElectronApp = async () => {
       GTK_THEME: 'Adwaita', // Set a default GTK theme
       LIBGL_ALWAYS_SOFTWARE: '1', // Force software rendering
       DISPLAY: ':99', // Virtual display
+      // Prevent Electron from creating native dialogs that may cause GTK issues
+      ELECTRON_NO_ATTACH_CONSOLE: '1',
+      // Disable hardware acceleration to avoid GPU-related crashes
+      ELECTRON_DISABLE_GPU: '1',
+      // Force libvips to use single thread to avoid GObject conflicts with GTK
+      VIPS_CONCURRENCY: '1',
+      // Disable GTK accessibility to prevent D-Bus issues
+      GTK_A11Y: 'none',
+      NO_AT_BRIDGE: '1',
+      // Prevent Glib extra module loading
+      GIO_EXTRA_MODULES: '',
+      // Suppress GTK warning messages
+      GTK_DEBUG: 'no-css-validation',
+      // Skip Sharp metadata processing to avoid GLib-GObject conflicts
+      PLAYWRIGHT_SKIP_SHARP: 'true',
     },
   });
 

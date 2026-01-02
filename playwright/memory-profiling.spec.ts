@@ -232,11 +232,10 @@ const launchElectronApp = async () => {
       `--js-flags=--max-old-space-size=${MEMORY_LIMIT_MB}`,
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-features=VizDisplayCompositor',
-      '--disable-gpu-compositing',
-      '--in-process-gpu',
       '--enable-logging',
       '--log-level=0',
+      // Disable crash reporter to prevent GLib-GObject errors from killing the process
+      '--disable-breakpad',
       path.join(__dirname, '../main/index.cjs'),
     ],
     env: {
@@ -254,8 +253,22 @@ const launchElectronApp = async () => {
       LIBGL_ALWAYS_SOFTWARE: '1',
       DISPLAY: ':99',
       // libvipsのメモリ設定（環境変数で制御可能）
-      VIPS_CONCURRENCY: '2',
+      // Force libvips to use single thread to avoid GObject conflicts with GTK
+      VIPS_CONCURRENCY: '1',
       VIPS_DISC_THRESHOLD: '100m',
+      // Prevent Electron from creating native dialogs that may cause GTK issues
+      ELECTRON_NO_ATTACH_CONSOLE: '1',
+      // Disable hardware acceleration to avoid GPU-related crashes
+      ELECTRON_DISABLE_GPU: '1',
+      // Disable GTK accessibility to prevent D-Bus issues
+      GTK_A11Y: 'none',
+      NO_AT_BRIDGE: '1',
+      // Prevent Glib extra module loading
+      GIO_EXTRA_MODULES: '',
+      // Suppress GTK warning messages
+      GTK_DEBUG: 'no-css-validation',
+      // Skip Sharp metadata processing to avoid GLib-GObject conflicts
+      PLAYWRIGHT_SKIP_SHARP: 'true',
     },
   });
 
