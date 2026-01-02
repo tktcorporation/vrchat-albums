@@ -161,6 +161,12 @@ const VirtualizedGallery = memo(
 
     // 幅が変更されたら virtualizer に再計算させる
     useEffect(() => {
+      console.log('[VirtualizedGallery] Width changed, measuring', {
+        widthValue,
+        scrollElementExists: !!scrollElementRef.current,
+        scrollElementHeight: scrollElementRef.current?.clientHeight,
+        scrollElementScrollHeight: scrollElementRef.current?.scrollHeight,
+      });
       virtualizer.measure();
     }, [widthValue, virtualizer]);
 
@@ -276,11 +282,31 @@ const VirtualizedGallery = memo(
       [isMultiSelectMode, setSelectedPhotos, setIsMultiSelectMode],
     );
 
+    // スクロール要素のサイズをデバッグ
+    useEffect(() => {
+      if (scrollElementRef.current) {
+        const el = scrollElementRef.current;
+        const debugInfo = {
+          clientHeight: el.clientHeight,
+          scrollHeight: el.scrollHeight,
+          offsetHeight: el.offsetHeight,
+          computedHeight: getComputedStyle(el).height,
+          totalSize: virtualizer.getTotalSize(),
+          virtualItemsCount: virtualizer.getVirtualItems().length,
+          groupCount: filteredGroups.length,
+        };
+        console.log(
+          '[VirtualizedGallery] Scroll element mounted:',
+          JSON.stringify(debugInfo),
+        );
+      }
+    }, [filteredGroups.length, virtualizer]);
+
     return (
       <>
         <div
           ref={scrollElementRef}
-          className="flex-1 overflow-y-auto p-4 pr-4 scrollbar-none"
+          className="flex-1 min-h-0 overflow-y-auto p-4 pr-4 scrollbar-none"
           onClick={handleBackgroundClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -459,7 +485,7 @@ const GalleryContent = memo(
           />
         )}
         {/* コンテナは常にレンダリング（幅測定のため） */}
-        <div ref={widthCallbackRef} className="flex-1 flex flex-col">
+        <div ref={widthCallbackRef} className="flex-1 min-h-0 flex flex-col">
           {match(widthState)
             .with({ status: 'measuring' }, () => <MeasuringSkeleton />)
             .with({ status: 'ready' }, ({ width }) => (
