@@ -15,18 +15,6 @@ import { extractStructuredError } from './errorSchemas';
 export { ERROR_CATEGORIES, ERROR_CODES, type ErrorCategory, type ErrorCode };
 
 /**
- * 構造化されたエラー情報
- */
-export interface StructuredErrorInfo {
-  code: ErrorCode;
-  category: ErrorCategory;
-  message: string;
-  userMessage: string;
-  details?: Record<string, unknown>;
-  cause?: Error;
-}
-
-/**
  * tRPCエラーからエラー情報を抽出
  */
 export interface ParsedErrorInfo {

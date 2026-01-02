@@ -22,7 +22,6 @@ import {
   isValidVRChatPlayerId,
   isValidVRChatPlayerName,
   isValidVRChatWorldId,
-  isValidVRChatWorldInstanceId,
   isValidVRChatWorldName,
 } from './vrchatIdValidation.js';
 
@@ -74,25 +73,6 @@ export const OptionalVRChatPlayerIdSchema = z
   });
 
 // ============================================================================
-// VRChat World Instance ID
-// ============================================================================
-
-/**
- * VRChat World Instance ID スキーマ
- * 形式: 英数字のみ、または英数字~region(region_code)形式
- *
- * 注: このIDはメソッド（getInstanceType等）を持つため、
- * BaseValueObject を継承したクラスとして定義する必要があります。
- * ここでは基本的な検証スキーマのみを提供します。
- */
-export const VRChatWorldInstanceIdBaseSchema = z
-  .string()
-  .refine(isValidVRChatWorldInstanceId, {
-    message:
-      'Invalid VRChat World Instance ID format. Expected: alphanumeric string or alphanumeric~region(region_code)',
-  });
-
-// ============================================================================
 // VRChat Player Name
 // ============================================================================
 
@@ -139,56 +119,6 @@ export const VRChatLogLineSchema = z.string().brand<'VRChatLogLine'>();
 export type VRChatLogLine = z.infer<typeof VRChatLogLineSchema>;
 
 // ============================================================================
-// Path Types (メソッドなしのシンプルなパス)
-// ============================================================================
-
-/**
- * VRChat Photo Directory Path スキーマ
- */
-export const VRChatPhotoDirPathSchema = z
-  .string()
-  .min(1, 'Photo directory path cannot be empty')
-  .brand<'VRChatPhotoDirPath'>();
-
-export type VRChatPhotoDirPath = z.infer<typeof VRChatPhotoDirPathSchema>;
-
-/**
- * VRChat Log Files Directory Path スキーマ
- */
-export const VRChatLogFilesDirPathSchema = z
-  .string()
-  .min(1, 'Log files directory path cannot be empty')
-  .brand<'VRChatLogFilesDirPath'>();
-
-export type VRChatLogFilesDirPath = z.infer<typeof VRChatLogFilesDirPathSchema>;
-
-/**
- * 未検証の VRChat Log Files Directory Path スキーマ
- * ユーザー入力などで、まだ存在確認されていないパス
- */
-export const NotValidatedVRChatLogFilesDirPathSchema = z
-  .string()
-  .min(1, 'Log files directory path cannot be empty')
-  .brand<'NotValidatedVRChatLogFilesDirPath'>();
-
-export type NotValidatedVRChatLogFilesDirPath = z.infer<
-  typeof NotValidatedVRChatLogFilesDirPathSchema
->;
-
-/**
- * VRChat Log File Path スキーマ
- * output_log_*.txt 形式のログファイルパス
- */
-export const VRChatLogFilePathSchema = z
-  .string()
-  .refine((value) => value.includes('output_log') && value.endsWith('.txt'), {
-    message: 'Invalid VRChat log file path. Expected: output_log_*.txt',
-  })
-  .brand<'VRChatLogFilePath'>();
-
-export type VRChatLogFilePath = z.infer<typeof VRChatLogFilePathSchema>;
-
-// ============================================================================
 // Folder Digest (ハッシュ値)
 // ============================================================================
 
@@ -208,12 +138,6 @@ export const FolderDigestSchema = z
   .brand<'FolderDigest'>();
 
 export type FolderDigest = z.infer<typeof FolderDigestSchema>;
-
-/**
- * 文字列がFolderDigestの形式（MD5ハッシュ）として有効かどうかを検証
- */
-export const isValidFolderDigest = (value: string): boolean =>
-  MD5_HASH_REGEX.test(value);
 
 // ============================================================================
 // VRChat Photo Containing Folder Path
@@ -238,11 +162,3 @@ export const VRChatPhotoContainingFolderPathSchema = z
 export type VRChatPhotoContainingFolderPath = z.infer<
   typeof VRChatPhotoContainingFolderPathSchema
 >;
-
-/**
- * 文字列がVRChatPhotoContainingFolderPathの形式として有効かどうかを検証
- * 注意: この関数は形式のみを検証し、実際にVRChat写真が含まれているかは検証しない
- */
-export const isValidVRChatPhotoContainingFolderPath = (
-  value: string,
-): boolean => value.length > 0;

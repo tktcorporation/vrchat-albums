@@ -84,14 +84,6 @@ class VRChatPhotoPath extends BaseValueObject<'VRChatPhotoPath', string> {
 
 export type { VRChatPhotoPath };
 
-/**
- * VRChat写真パスかどうかを判定するバリデーション関数
- */
-export const isValidVRChatPhotoPath = (value: string): boolean => {
-  const basename = pathe.basename(value);
-  return VRCHAT_PHOTO_FILENAME_PATTERN.test(basename);
-};
-
 export const VRChatPhotoPathSchema = z
   .string()
   .refine(

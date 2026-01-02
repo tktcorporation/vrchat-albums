@@ -13,8 +13,8 @@ const config: KnipConfig = {
     'electron/module/**/*Controller.ts',
   ],
   project: ['src/**/*.ts', 'src/**/*.tsx', 'electron/**/*.ts'],
-  ignoreBinaries: [],
-  ignoreDependencies: ['@types/sharp', '@tktco/node-actionlint'],
+  ignoreBinaries: ['only-allow'],
+  ignoreDependencies: ['@types/sharp', '@antfu/ni'],
   ignore: ['src/components/ui/**'],
   // Don't report unused exports in entry files (tRPC routers)
   includeEntryExports: false,
