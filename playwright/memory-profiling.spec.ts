@@ -267,8 +267,11 @@ const launchElectronApp = async () => {
       GIO_EXTRA_MODULES: '',
       // Suppress GTK warning messages
       GTK_DEBUG: 'no-css-validation',
-      // Skip Sharp metadata processing to avoid GLib-GObject conflicts
-      PLAYWRIGHT_SKIP_SHARP: 'true',
+      // libvips settings to avoid GLib-GObject conflicts
+      VIPS_MAX_THREADS: '1',
+      VIPS_NOVECTOR: '1',
+      // Force Sharp to use bundled libvips (avoids system libvips/GTK conflicts)
+      SHARP_IGNORE_GLOBAL_LIBVIPS: '1',
     },
   });
 

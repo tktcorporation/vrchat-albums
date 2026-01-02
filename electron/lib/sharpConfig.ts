@@ -75,16 +75,33 @@ let isInitialized = false;
 let currentConfig: SharpConfigOptions = DEFAULT_CONFIG;
 
 /**
+ * Playwright/テスト環境かどうかを判定
+ * GLib-GObject競合を避けるため、テスト環境では常に低メモリモードを使用
+ */
+const isPlaywrightTestEnvironment = (): boolean => {
+  return process.env.PLAYWRIGHT_TEST === 'true';
+};
+
+/**
  * Sharpを初期化する
  * アプリケーション起動時に一度だけ呼び出す
  *
  * @param options 設定オプション（省略時はデフォルト設定）
+ *
+ * ## Playwright環境での動作
+ * Playwright環境では、GTKとlibvipsのGLib-GObject競合を防ぐため、
+ * 常にLOW_MEMORY_CONFIG（concurrency=1, cache=false）を使用する
  */
 export const initializeSharp = (
   options: Partial<SharpConfigOptions> = {},
 ): void => {
+  // Playwright環境では常に低メモリ設定を強制（GLib-GObject競合防止）
+  const baseConfig = isPlaywrightTestEnvironment()
+    ? LOW_MEMORY_CONFIG
+    : DEFAULT_CONFIG;
+
   const config: SharpConfigOptions = {
-    ...DEFAULT_CONFIG,
+    ...baseConfig,
     ...options,
   };
 
@@ -131,15 +148,24 @@ export const switchToLowMemoryMode = (): void => {
 
 /**
  * 通常モードに戻す
+ *
+ * ## Playwright環境での動作
+ * Playwright環境では「通常モード」でもLOW_MEMORY_CONFIGを使用する
+ * （GLib-GObject競合を常に回避するため）
  */
 export const switchToNormalMode = (): void => {
-  initializeSharp(DEFAULT_CONFIG);
+  // Playwright環境では「通常モード」でも低メモリ設定を維持
+  const config = isPlaywrightTestEnvironment()
+    ? LOW_MEMORY_CONFIG
+    : DEFAULT_CONFIG;
+  initializeSharp(config);
 
   logger.debug({
     message: 'Sharp switched to normal mode',
     details: {
       concurrency: sharp.concurrency(),
       cache: sharp.cache(),
+      isPlaywrightTest: isPlaywrightTestEnvironment(),
     },
   });
 };
