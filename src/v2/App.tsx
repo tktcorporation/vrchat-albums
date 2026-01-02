@@ -308,13 +308,16 @@ const Contents = () => {
   const { stage, error, originalError, retry } = useStartup();
   const loadingState = useLoadingState();
 
+  // 必要な関数を分割代入で取得し、依存配列を最適化
+  const { startLoadingStartupSync, finishLoadingStartupSync } = loadingState;
+
   useEffect(() => {
     if (stage === 'syncing') {
-      loadingState.startLoadingStartupSync();
+      startLoadingStartupSync();
     } else {
-      loadingState.finishLoadingStartupSync();
+      finishLoadingStartupSync();
     }
-  }, [stage, loadingState]);
+  }, [stage, startLoadingStartupSync, finishLoadingStartupSync]);
 
   if (stage === 'error') {
     // 型安全なエラー解析 - tRPCエラーオブジェクトがある場合は優先的に使用

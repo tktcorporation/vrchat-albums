@@ -183,14 +183,27 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
     [stages],
   );
 
-  return {
-    stages,
-    updateStage,
-    errorMessage: error?.message ?? '',
-    errorStage: error?.stage ?? '',
-    originalError: error?.originalError,
-    retryProcess,
-    completed,
-    finished,
-  };
+  // 返り値オブジェクトをメモ化して、不要な再レンダリングを防ぐ
+  return useMemo(
+    () => ({
+      stages,
+      updateStage,
+      errorMessage: error?.message ?? '',
+      errorStage: error?.stage ?? '',
+      originalError: error?.originalError,
+      retryProcess,
+      completed,
+      finished,
+    }),
+    [
+      stages,
+      updateStage,
+      error?.message,
+      error?.stage,
+      error?.originalError,
+      retryProcess,
+      completed,
+      finished,
+    ],
+  );
 };
