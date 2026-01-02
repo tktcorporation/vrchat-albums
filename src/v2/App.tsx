@@ -1,6 +1,6 @@
 import type { Event, EventHint } from '@sentry/electron/main';
 import { init as initSentry } from '@sentry/electron/renderer';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { match } from 'ts-pattern';
 import { Toaster } from '@/components/ui/toaster';
 import { scrubEventData } from '@/lib/utils/masking';
@@ -303,18 +303,20 @@ const ToasterWrapper = () => {
  * 起動処理の進行状況に応じて UI を切り替えるメインコンテンツ部分。
  * 初期同期やエラー状態を監視しながら各画面を表示する。
  */
-const Contents = () => {
-  // const { toast } = useToast(); // スタートアップエラーはbackendから送信されるため不要
+const Contents = memo(() => {
   const { stage, error, originalError, retry } = useStartup();
   const loadingState = useLoadingState();
 
+  // 必要な関数を分割代入で取得し、依存配列を最適化
+  const { startLoadingStartupSync, finishLoadingStartupSync } = loadingState;
+
   useEffect(() => {
     if (stage === 'syncing') {
-      loadingState.startLoadingStartupSync();
+      startLoadingStartupSync();
     } else {
-      loadingState.finishLoadingStartupSync();
+      finishLoadingStartupSync();
     }
-  }, [stage, loadingState]);
+  }, [stage, startLoadingStartupSync, finishLoadingStartupSync]);
 
   if (stage === 'error') {
     // 型安全なエラー解析 - tRPCエラーオブジェクトがある場合は優先的に使用
@@ -542,6 +544,8 @@ const Contents = () => {
   }
 
   return <PhotoGallery {...loadingState} />;
-};
+});
+
+Contents.displayName = 'Contents';
 
 export default App;

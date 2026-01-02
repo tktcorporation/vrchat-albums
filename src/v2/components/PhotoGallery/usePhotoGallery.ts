@@ -76,12 +76,6 @@ export function usePhotoGallery(
     isMultiSelectModeAtom,
   );
 
-  console.log('[usePhotoGallery] Hook called', {
-    searchQuery,
-    searchType,
-    hasOnGroupingEnd: !!options?.onGroupingEnd,
-  });
-
   const { data: photoListRaw, isLoading: isLoadingPhotos } =
     trpcReact.vrchatPhoto.getVrchatPhotoPathModelList.useQuery(
       {
@@ -92,11 +86,6 @@ export function usePhotoGallery(
         refetchOnWindowFocus: false,
       },
     );
-
-  console.log('[usePhotoGallery] Query state', {
-    isLoadingPhotos,
-    photoListRawLength: photoListRaw?.length,
-  });
 
   const photoList: Photo[] = useMemo(() => {
     if (!photoListRaw) return [];
@@ -254,15 +243,29 @@ export function usePhotoGallery(
     ],
   );
 
-  return {
-    groupedPhotos: filteredGroupedPhotos,
-    isLoading,
-    selectedPhoto,
-    setSelectedPhoto,
-    selectedPhotos,
-    setSelectedPhotos,
-    isMultiSelectMode,
-    setIsMultiSelectMode,
-    debug,
-  };
+  // 返り値オブジェクトをメモ化して、参照の安定性を確保
+  return useMemo(
+    () => ({
+      groupedPhotos: filteredGroupedPhotos,
+      isLoading,
+      selectedPhoto,
+      setSelectedPhoto,
+      selectedPhotos,
+      setSelectedPhotos,
+      isMultiSelectMode,
+      setIsMultiSelectMode,
+      debug,
+    }),
+    [
+      filteredGroupedPhotos,
+      isLoading,
+      selectedPhoto,
+      setSelectedPhoto,
+      selectedPhotos,
+      setSelectedPhotos,
+      isMultiSelectMode,
+      setIsMultiSelectMode,
+      debug,
+    ],
+  );
 }

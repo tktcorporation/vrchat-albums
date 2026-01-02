@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 interface LoadingState {
   /** アプリ起動時の同期処理（ログ読み込み、インデックス構築など）が進行中かどうかを示します。 */
@@ -60,15 +60,30 @@ export const useLoadingState = (): UseLoadingStateResult => {
   const startRefreshing = useCallback(() => setIsRefreshing(true), []);
   const finishRefreshing = useCallback(() => setIsRefreshing(false), []);
 
-  return {
-    isLoadingStartupSync,
-    isLoadingGrouping,
-    isRefreshing,
-    startLoadingStartupSync,
-    finishLoadingStartupSync,
-    startLoadingGrouping,
-    finishLoadingGrouping,
-    startRefreshing,
-    finishRefreshing,
-  };
+  // 返り値オブジェクトをメモ化して、参照の安定性を確保
+  // これにより、依存配列に含めた際の不要な再レンダリングを防ぐ
+  return useMemo(
+    () => ({
+      isLoadingStartupSync,
+      isLoadingGrouping,
+      isRefreshing,
+      startLoadingStartupSync,
+      finishLoadingStartupSync,
+      startLoadingGrouping,
+      finishLoadingGrouping,
+      startRefreshing,
+      finishRefreshing,
+    }),
+    [
+      isLoadingStartupSync,
+      isLoadingGrouping,
+      isRefreshing,
+      startLoadingStartupSync,
+      finishLoadingStartupSync,
+      startLoadingGrouping,
+      finishLoadingGrouping,
+      startRefreshing,
+      finishRefreshing,
+    ],
+  );
 };
