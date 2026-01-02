@@ -161,12 +161,6 @@ const VirtualizedGallery = memo(
 
     // 幅が変更されたら virtualizer に再計算させる
     useEffect(() => {
-      console.log('[VirtualizedGallery] Width changed, measuring', {
-        widthValue,
-        scrollElementExists: !!scrollElementRef.current,
-        scrollElementHeight: scrollElementRef.current?.clientHeight,
-        scrollElementScrollHeight: scrollElementRef.current?.scrollHeight,
-      });
       virtualizer.measure();
     }, [widthValue, virtualizer]);
 
@@ -177,15 +171,6 @@ const VirtualizedGallery = memo(
       [filteredGroups],
     );
     useEffect(() => {
-      console.log(
-        '[VirtualizedGallery] Photos count changed, recalculating sizes',
-        {
-          totalPhotosCount,
-          groupCount: filteredGroups.length,
-          totalSize: virtualizer.getTotalSize(),
-          virtualItemsCount: virtualizer.getVirtualItems().length,
-        },
-      );
       virtualizer.measure();
     }, [totalPhotosCount, virtualizer, filteredGroups.length]);
 
@@ -281,26 +266,6 @@ const VirtualizedGallery = memo(
       },
       [isMultiSelectMode, setSelectedPhotos, setIsMultiSelectMode],
     );
-
-    // スクロール要素のサイズをデバッグ
-    useEffect(() => {
-      if (scrollElementRef.current) {
-        const el = scrollElementRef.current;
-        const debugInfo = {
-          clientHeight: el.clientHeight,
-          scrollHeight: el.scrollHeight,
-          offsetHeight: el.offsetHeight,
-          computedHeight: getComputedStyle(el).height,
-          totalSize: virtualizer.getTotalSize(),
-          virtualItemsCount: virtualizer.getVirtualItems().length,
-          groupCount: filteredGroups.length,
-        };
-        console.log(
-          '[VirtualizedGallery] Scroll element mounted:',
-          JSON.stringify(debugInfo),
-        );
-      }
-    }, [filteredGroups.length, virtualizer]);
 
     return (
       <>
@@ -439,18 +404,10 @@ const GalleryContent = memo(
     setIsMultiSelectMode,
     galleryData,
   }: GalleryContentProps) => {
-    console.log('[GalleryContent] Render', {
-      isLoadingStartupSync,
-      isLoadingGrouping,
-      groupedPhotosCount: Object.keys(groupedPhotos).length,
-    });
-
     // Callback Ref パターンで幅を測定
     const { containerRef: widthCallbackRef, widthState } = useContainerWidth(
       LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING,
     );
-
-    console.log('[GalleryContent] widthState', widthState);
 
     // 全てのグループを表示（写真があるグループもないグループも）
     const filteredGroups = useMemo(() => {
