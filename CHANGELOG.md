@@ -4,9 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### 🐛 Bug Fixes
+
+- @getgrit/cli を削除し、制限環境でのビルド失敗を修正 (#679)
+- UsePhotoGallery の不要な再レンダリングを削減 (#676) (#682)
+- VRChat World Instance ID の UUID 形式をサポート (#686)
+
+### 🎨 Styling
+
+- Improve light mode design with cleaner, modern look (#678)
+
 ### ⚙️ Miscellaneous Tasks
 
-- Add knip workflow to detect unused code on PRs
+- Add knip workflow to detect unused code on PRs (#677)
+- Knip による未使用コードの整理 (#680)
 
 ## [0.25.0] - 2026-01-02
 

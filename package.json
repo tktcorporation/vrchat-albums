@@ -1,6 +1,6 @@
 {
   "name": "vrchat-albums",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "main": "main/index.cjs",
   "author": {
     "name": "tktcorporation"
