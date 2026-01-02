@@ -9,8 +9,10 @@ import { electronUtilRouter } from '../electronUtilController';
 const normalizePath = (p: string) => p.replace(/\\/g, '/');
 
 vi.mock('node:fs/promises');
-vi.mock('electron-is-dev', () => ({ default: false }));
 vi.mock('electron', () => ({
+  app: {
+    isPackaged: false,
+  },
   clipboard: {
     writeText: vi.fn(),
     writeImage: vi.fn(),

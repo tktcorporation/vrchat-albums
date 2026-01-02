@@ -5,8 +5,12 @@ import {
   init as initSentry,
 } from '@sentry/electron/main';
 import { app, type BrowserWindow, ipcMain } from 'electron';
-import isDev from 'electron-is-dev';
 import unhandled from 'electron-unhandled';
+
+// electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
+// Electron ネイティブの app.isPackaged を使用
+const isDev = !app.isPackaged;
+
 // Packages
 import { createIPCHandler } from 'trpc-electron/main';
 import { scrubEventData } from '../src/lib/utils/masking';
