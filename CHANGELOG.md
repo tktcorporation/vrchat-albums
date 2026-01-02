@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 - Upgrade dependencies and add Node.js version check (#669)
 - Upgrade Yarn from 4.1.0 to 4.12.0 (#673)
+- Bump version to 0.25.0
 
 ## [0.24.0] - 2025-12-31
 
