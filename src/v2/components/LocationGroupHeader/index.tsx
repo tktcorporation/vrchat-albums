@@ -225,7 +225,7 @@ export const LocationGroupHeader = ({
       className="w-full glass-panel rounded-t-lg overflow-hidden group/card"
     >
       <div className="relative h-24 overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200/80 dark:from-gray-800 dark:to-gray-900/80">
+        <div className="absolute inset-0 bg-gradient-to-br from-white to-gray-50/90 dark:from-gray-800 dark:to-gray-900/80">
           {details?.thumbnailImageUrl && isVisible && (
             <>
               <div
@@ -237,10 +237,10 @@ export const LocationGroupHeader = ({
                   filter: 'blur(26px) saturate(120%) brightness(0.9)',
                 }}
               />
-              <div className="absolute inset-0 bg-white/70 dark:bg-black/50 backdrop-blur-[1px] group-hover/card:backdrop-blur-[2px] transition-all duration-500" />
+              <div className="absolute inset-0 bg-white/85 dark:bg-black/50 backdrop-blur-[1px] group-hover/card:backdrop-blur-[2px] transition-all duration-500" />
               <div className="absolute inset-0">
-                <div className="absolute inset-0 bg-gradient-to-r from-white/60 to-white/40 dark:from-black/30 dark:to-black/10 mix-blend-overlay" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.6),rgba(255,255,255,0.3)_70%)] dark:bg-[radial-gradient(circle_at_50%_120%,rgba(0,0,0,0.4),rgba(0,0,0,0.2)_70%)]" />
+                <div className="absolute inset-0 bg-gradient-to-r from-white/70 to-white/50 dark:from-black/30 dark:to-black/10 mix-blend-overlay" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.7),rgba(255,255,255,0.4)_70%)] dark:bg-[radial-gradient(circle_at_50%_120%,rgba(0,0,0,0.4),rgba(0,0,0,0.2)_70%)]" />
               </div>
             </>
           )}
@@ -265,11 +265,11 @@ export const LocationGroupHeader = ({
                 </div>
               ) : (
                 <div
-                  className="h-20 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center border border-white/20 dark:border-gray-700/30"
+                  className="h-20 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-700/30"
                   style={{ aspectRatio: '4/3' }}
                 >
                   <ImageIcon
-                    className={`${ICON_SIZE.lg.class} text-gray-400 dark:text-gray-600`}
+                    className={`${ICON_SIZE.lg.class} text-gray-300 dark:text-gray-600`}
                   />
                 </div>
               )}

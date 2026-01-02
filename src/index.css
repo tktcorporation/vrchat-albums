@@ -18,36 +18,36 @@
 
 @layer base {
   :root {
-    /* Arc Browser inspired light theme with glassmorphism */
-    --background: 0 0% 100% / 0.05;
-    --foreground: 220 9% 15%;
+    /* Modern clean light theme - YouTube/Material inspired */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
 
-    --muted: 220 5% 98% / 0.4;
-    --muted-foreground: 220 5% 45%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    --popover: 0 0% 100% / 0.95;
-    --popover-foreground: 220 9% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
 
-    --border: 220 10% 90% / 0.3;
-    --input: 220 10% 85% / 0.5;
+    --border: 0 0% 90%;
+    --input: 0 0% 93%;
 
-    --card: 0 0% 100% / 0.7;
-    --card-foreground: 220 9% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
 
-    --primary: 32 95% 55%;
+    --primary: 32 95% 52%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary-muted: 220 5% 96% / 0.6;
-    --secondary: 220 5% 96% / 0.8;
-    --secondary-foreground: 220 9% 15%;
+    --secondary-muted: 0 0% 96%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
 
-    --accent: 32 30% 95% / 0.6;
-    --accent-foreground: 32 95% 55%;
+    --accent: 30 6% 96%;
+    --accent-foreground: 32 80% 42%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --ring: 32 95% 55% / 0.3;
+    --ring: 32 95% 52% / 0.3;
 
     --radius: 0.75rem;
 
@@ -60,18 +60,18 @@
     --info-foreground: 0 0% 100%;
 
     /* Surface hierarchy */
-    --surface-elevated: 0 0% 100% / 0.9;
-    --surface-sunken: 220 5% 96% / 0.6;
+    --surface-elevated: 0 0% 100%;
+    --surface-sunken: 0 0% 97%;
 
-    /* Arc Browser style subtle gradient background - reduced brightness for better contrast */
-    --gradient-start: 220 15% 92%;
-    --gradient-middle: 225 12% 90%;
-    --gradient-end: 230 10% 88%;
+    /* Clean neutral gradient - no blue tint */
+    --gradient-start: 0 0% 98%;
+    --gradient-middle: 0 0% 97%;
+    --gradient-end: 0 0% 96%;
 
-    /* Glass effect backdrop */
-    --glass-bg: 0 0% 100% / 0.1;
-    --glass-border: 0 0% 100% / 0.2;
-    --glass-shadow: 0 4px 16px rgba(247, 148, 29, 0.1);
+    /* Glass effect - more opaque for light mode */
+    --glass-bg: 0 0% 100% / 0.9;
+    --glass-border: 0 0% 88%;
+    --glass-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   }
 
   .dark {
@@ -185,6 +185,14 @@
     -webkit-backdrop-filter: blur(20px);
     z-index: -1;
   }
+
+  /* Light mode: cleaner, less glass effect */
+  :root:not(.dark) body::after {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   @font-face {
     font-family: "Noto Sans CJK JP";
     src: url("assets/NotoSansCJKjp-Regular.ttf") format("truetype");
@@ -319,5 +327,47 @@
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border-bottom: 1px solid hsl(var(--border) / 0.1);
+  }
+
+  /* Light mode: reduce glass effects for cleaner look */
+  :root:not(.dark) .glass {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  :root:not(.dark) .glass-panel {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  :root:not(.dark) .glass-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  :root:not(.dark) .glass-button {
+    background: hsl(var(--primary));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+  }
+
+  :root:not(.dark) .glass-button:hover {
+    background: hsl(var(--primary) / 0.9);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+
+  :root:not(.dark) .glass-input {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  :root:not(.dark) .minimal-header {
+    background: hsl(var(--background));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: 1px solid hsl(var(--border));
   }
 }

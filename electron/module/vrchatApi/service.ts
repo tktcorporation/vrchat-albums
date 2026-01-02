@@ -1,5 +1,4 @@
 import * as neverthrow from 'neverthrow';
-import { match } from 'ts-pattern';
 import { z } from 'zod';
 import { getData } from '../../lib/getData';
 import type { VRChatWorldId } from '../vrchatLog/model';
@@ -11,25 +10,6 @@ export type VRChatApiError =
   | { type: 'WORLD_NOT_FOUND'; worldId: string }
   | { type: 'API_REQUEST_FAILED'; message: string }
   | { type: 'PARSE_ERROR'; issues: string };
-
-/**
- * VRChatApiError からユーザー向けメッセージを取得
- */
-export const getVRChatApiErrorMessage = (error: VRChatApiError): string =>
-  match(error)
-    .with(
-      { type: 'WORLD_NOT_FOUND' },
-      (e) => `ワールドが見つかりません: ${e.worldId}`,
-    )
-    .with(
-      { type: 'API_REQUEST_FAILED' },
-      (e) => `VRChat API リクエストに失敗しました: ${e.message}`,
-    )
-    .with(
-      { type: 'PARSE_ERROR' },
-      (e) => `VRChat API レスポンスの解析に失敗しました: ${e.issues}`,
-    )
-    .exhaustive();
 
 /**
  * id: 'wrld_6fecf18a-ab96-43f2-82dc-ccf79f17c34f',

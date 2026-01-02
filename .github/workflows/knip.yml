@@ -1,0 +1,86 @@
+name: Knip - Unused Code Detection
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  knip:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node and Install Dependencies
+        uses: ./.github/actions/setup-node-and-install
+
+      - name: Run knip
+        id: knip
+        continue-on-error: true
+        env:
+          NO_COLOR: 1
+        run: |
+          set +e
+          OUTPUT=$(yarn knip --no-config-hints 2>&1)
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+          # Save output to file for multiline handling (strip any remaining ANSI codes)
+          echo "$OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' > knip-output.txt
+
+          # Check if there are any issues
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "has_issues=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create comment body
+        id: comment
+        env:
+          HAS_ISSUES: ${{ steps.knip.outputs.has_issues }}
+        run: |
+          if [ "$HAS_ISSUES" = "true" ]; then
+            {
+              echo 'body<<EOF'
+              echo '## 🔍 Knip - Unused Code Detection'
+              echo ''
+              echo '以下の未使用コードが検出されました：'
+              echo ''
+              echo '```'
+              cat knip-output.txt
+              echo '```'
+              echo ''
+              echo '<details>'
+              echo '<summary>対応方法</summary>'
+              echo ''
+              echo '- **未使用の依存関係**: `yarn remove <package>` で削除'
+              echo '- **未使用のエクスポート**: エクスポートを削除するか、`knip.config.ts` の `ignore` に追加'
+              echo '- **未使用の型**: 型定義を削除するか、将来使用予定なら `knip.config.ts` で除外'
+              echo ''
+              echo '</details>'
+              echo ''
+              echo '---'
+              echo '*このチェックは警告のみで、マージをブロックしません。*'
+              echo 'EOF'
+            } >> $GITHUB_OUTPUT
+          else
+            {
+              echo 'body<<EOF'
+              echo '## 🔍 Knip - Unused Code Detection'
+              echo ''
+              echo '✅ 未使用コードは検出されませんでした。'
+              echo 'EOF'
+            } >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: knip-report
+          message: ${{ steps.comment.outputs.body }}
