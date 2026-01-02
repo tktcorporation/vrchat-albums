@@ -36,12 +36,6 @@ export interface PlayerLeaveLogRecord {
   updatedAt: Date;
 }
 
-export interface ExportOptions {
-  startDate?: Date;
-  endDate?: Date;
-  outputPath?: string;
-}
-
 // TODO: アプリイベントの型は今後実装
 // export interface AppEventLogRecord {
 //   id: string;

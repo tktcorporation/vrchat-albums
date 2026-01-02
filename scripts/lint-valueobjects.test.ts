@@ -8,60 +8,83 @@ describe('ValueObject Linter', () => {
     'scripts/test-fixtures/valueobjects',
   );
 
-  it('should pass for valid ValueObject', async () => {
-    // Run linter on specific fixture file
-    const result = await lintValueObjects(false, [
-      path.join(fixturesDir, 'valid.ts'),
-    ]);
+  // TypeScript compiler initialization can be slow in CI environments
+  const TEST_TIMEOUT = 30000;
 
-    expect(result.success).toBe(true);
-    expect(result.issues).toHaveLength(0);
-    expect(result.message).toContain(
-      'All ValueObject implementations follow the correct pattern!',
-    );
-  });
+  it(
+    'should pass for valid ValueObject',
+    { timeout: TEST_TIMEOUT },
+    async () => {
+      // Run linter on specific fixture file
+      const result = await lintValueObjects(false, [
+        path.join(fixturesDir, 'valid.ts'),
+      ]);
 
-  it('should detect indirect inheritance from BaseValueObject', async () => {
-    // Run linter on pathObject and specialPathObject (both properly type-only exported)
-    const result = await lintValueObjects(false, [
-      path.join(fixturesDir, 'pathObject.ts'),
-      path.join(fixturesDir, 'specialPathObject.ts'),
-    ]);
+      expect(result.success).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.message).toContain(
+        'All ValueObject implementations follow the correct pattern!',
+      );
+    },
+  );
 
-    expect(result.success).toBe(true);
-    expect(result.issues).toHaveLength(0);
-    expect(result.message).toContain(
-      'All ValueObject implementations follow the correct pattern!',
-    );
-  });
+  it(
+    'should detect indirect inheritance from BaseValueObject',
+    { timeout: TEST_TIMEOUT },
+    async () => {
+      // Run linter on pathObject and specialPathObject (both properly type-only exported)
+      const result = await lintValueObjects(false, [
+        path.join(fixturesDir, 'pathObject.ts'),
+        path.join(fixturesDir, 'specialPathObject.ts'),
+      ]);
 
-  it('should fail when indirect ValueObject is exported as class', async () => {
-    // Run linter on invalidPathObject
-    const result = await lintValueObjects(false, [
-      path.join(fixturesDir, 'invalidPathObject.ts'),
-    ]);
+      expect(result.success).toBe(true);
+      expect(result.issues).toHaveLength(0);
+      expect(result.message).toContain(
+        'All ValueObject implementations follow the correct pattern!',
+      );
+    },
+  );
 
-    expect(result.success).toBe(false);
-    expect(result.issues.length).toBeGreaterThan(0);
-  });
+  it(
+    'should fail when indirect ValueObject is exported as class',
+    { timeout: TEST_TIMEOUT },
+    async () => {
+      // Run linter on invalidPathObject
+      const result = await lintValueObjects(false, [
+        path.join(fixturesDir, 'invalidPathObject.ts'),
+      ]);
 
-  it('should fail for ValueObject exported as class', async () => {
-    // Run linter on invalid-export
-    const result = await lintValueObjects(false, [
-      path.join(fixturesDir, 'invalid-export.ts'),
-    ]);
+      expect(result.success).toBe(false);
+      expect(result.issues.length).toBeGreaterThan(0);
+    },
+  );
 
-    expect(result.success).toBe(false);
-    expect(result.issues.some((i) => i.severity === 'error')).toBe(true);
-  });
+  it(
+    'should fail for ValueObject exported as class',
+    { timeout: TEST_TIMEOUT },
+    async () => {
+      // Run linter on invalid-export
+      const result = await lintValueObjects(false, [
+        path.join(fixturesDir, 'invalid-export.ts'),
+      ]);
 
-  it('should fail for ValueObject with export class syntax', async () => {
-    // Run linter on invalid-export-class
-    const result = await lintValueObjects(false, [
-      path.join(fixturesDir, 'invalid-export-class.ts'),
-    ]);
+      expect(result.success).toBe(false);
+      expect(result.issues.some((i) => i.severity === 'error')).toBe(true);
+    },
+  );
 
-    expect(result.success).toBe(false);
-    expect(result.issues.some((i) => i.severity === 'error')).toBe(true);
-  });
+  it(
+    'should fail for ValueObject with export class syntax',
+    { timeout: TEST_TIMEOUT },
+    async () => {
+      // Run linter on invalid-export-class
+      const result = await lintValueObjects(false, [
+        path.join(fixturesDir, 'invalid-export-class.ts'),
+      ]);
+
+      expect(result.success).toBe(false);
+      expect(result.issues.some((i) => i.severity === 'error')).toBe(true);
+    },
+  );
 });

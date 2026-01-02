@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [unreleased]
 
+### ⚙️ Miscellaneous Tasks
+
+- Add knip workflow to detect unused code on PRs
+
+## [0.25.0] - 2026-01-02
+
 ### 🐛 Bug Fixes
 
 - ValidWidth 型で起動時のギャラリー幅 0 問題を根本修正 (#667)
@@ -16,7 +22,7 @@ All notable changes to this project will be documented in this file.
 
 - Upgrade dependencies and add Node.js version check (#669)
 - Upgrade Yarn from 4.1.0 to 4.12.0 (#673)
-- Bump version to 0.25.0
+- Release v0.25.0 (#675)
 
 ## [0.24.0] - 2025-12-31
 

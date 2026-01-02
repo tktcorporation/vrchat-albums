@@ -163,50 +163,6 @@ class SentryNotifiedError extends Error {
 // 型のみエクスポート（直接インスタンス化を防ぐ）
 export type { SentryNotifiedError };
 
-/**
- * SentryNotifiedErrorを作成し、自動的にSentryに通知する
- *
- * @example
- * ```typescript
- * import { createSentryNotifiedError } from '../../lib/errors';
- *
- * export async function getData(): Promise<Result<Data, SentryNotifiedError>> {
- *   try {
- *     const data = await database.query(...);
- *     return ok(data);
- *   } catch (error) {
- *     // 自動的にSentryに通知される
- *     return err(createSentryNotifiedError(
- *       'Unexpected error in getData',
- *       error
- *     ));
- *   }
- * }
- * ```
- */
-export function createSentryNotifiedError(
-  message: string,
-  error: unknown,
-): SentryNotifiedError {
-  // logger を動的インポートして循環依存を回避
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { logger } = require('./logger');
-
-  const originalError =
-    error instanceof Error ? error : new Error(String(error));
-
-  // Sentryに通知
-  logger.error({
-    message,
-    stack: originalError,
-  });
-
-  return new SentryNotifiedError(
-    error instanceof Error ? error.message : String(error),
-    originalError,
-  );
-}
-
 // 特定の操作に失敗したことを示すエラーなど、より具体的なエラーも定義可能
 // export class OperationFailedError extends UserFacingError {
 //   constructor(operationName: string, details?: string, options?: ErrorOptions) {
