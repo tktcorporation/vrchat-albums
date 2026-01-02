@@ -188,7 +188,7 @@ export const VRChatWorldInstanceIdSchema = z
     if (!isValidVRChatWorldInstanceId(value)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `Invalid VRChat World Instance ID format. Expected: alphanumeric string or alphanumeric~region(region_code). Received: "${value}"`,
+        message: `Invalid VRChat World Instance ID format. Expected: alphanumeric string, UUID, or with ~region(region_code) suffix. Received: "${value}"`,
       });
     }
   })
