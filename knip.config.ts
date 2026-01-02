@@ -19,7 +19,11 @@ const config: KnipConfig = {
     'electron/module/**/*Controller.ts',
   ],
   project: ['src/**/*.{ts,tsx}', 'electron/**/*.ts'],
-  ignoreBinaries: ['only-allow'],
+  ignoreBinaries: [
+    'only-allow',
+    // grit binary comes from @getgrit/cli package
+    'grit',
+  ],
   ignoreDependencies: [
     '@types/sharp',
     '@antfu/ni',
