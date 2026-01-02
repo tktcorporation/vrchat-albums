@@ -387,6 +387,12 @@ const GalleryContent = memo(
     finishLoadingGrouping,
     galleryData,
   }: GalleryContentProps) => {
+    console.log('[GalleryContent] Render', {
+      searchQuery,
+      isLoadingStartupSync,
+      isLoadingGrouping,
+    });
+
     const {
       groupedPhotos,
       selectedPhotos,

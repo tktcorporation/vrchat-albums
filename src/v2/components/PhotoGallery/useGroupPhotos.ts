@@ -250,11 +250,33 @@ export function useGroupPhotos(
     );
 
   const groupedPhotos = useMemo(() => {
-    if (isLoadingLogs || !joinLogs) return {};
-    if (joinLogs.length === 0) return {};
+    console.log('[useGroupPhotos] useMemo triggered', {
+      isLoadingLogs,
+      joinLogsLength: joinLogs?.length,
+      photosLength: photos.length,
+    });
 
+    if (isLoadingLogs || !joinLogs) {
+      console.log('[useGroupPhotos] Early return: loading or no logs');
+      return {};
+    }
+    if (joinLogs.length === 0) {
+      console.log('[useGroupPhotos] Early return: empty logs');
+      return {};
+    }
+
+    console.time('[useGroupPhotos] groupPhotosBySession');
     const groups = groupPhotosBySession(photos, joinLogs);
+    console.timeEnd('[useGroupPhotos] groupPhotosBySession');
+
+    console.time('[useGroupPhotos] convertGroupsToRecord');
     const result = convertGroupsToRecord(groups);
+    console.timeEnd('[useGroupPhotos] convertGroupsToRecord');
+
+    console.log('[useGroupPhotos] Grouping complete', {
+      groupCount: Object.keys(result).length,
+    });
+
     onGroupingEnd?.();
     return result;
   }, [photos, joinLogs, isLoadingLogs, onGroupingEnd]);
