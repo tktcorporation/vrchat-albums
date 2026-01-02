@@ -35,7 +35,6 @@ export default defineConfig({
         '@sentry/vite-plugin',
         // Electron 関連のモジュール
         'electron',
-        'electron-is-dev',
         'electron-log',
         'electron-store',
         'electron-unhandled',
