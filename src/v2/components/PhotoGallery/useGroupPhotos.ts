@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { trpcReact } from '@/trpc';
 import type { Photo } from '../../types/photo';
 
@@ -249,6 +249,13 @@ export function useGroupPhotos(
       },
     );
 
+  // onGroupingEnd のコールバックを ref で保持（依存配列から除外するため）
+  const onGroupingEndRef = useRef(onGroupingEnd);
+  onGroupingEndRef.current = onGroupingEnd;
+
+  // onGroupingEnd を一度だけ呼び出すためのフラグ
+  const hasCalledOnGroupingEndRef = useRef(false);
+
   const groupedPhotos = useMemo(() => {
     console.log('[useGroupPhotos] useMemo triggered', {
       isLoadingLogs,
@@ -277,9 +284,21 @@ export function useGroupPhotos(
       groupCount: Object.keys(result).length,
     });
 
-    onGroupingEnd?.();
     return result;
-  }, [photos, joinLogs, isLoadingLogs, onGroupingEnd]);
+  }, [photos, joinLogs, isLoadingLogs]);
+
+  // グルーピング完了時のコールバックを useEffect で実行（useMemo 内の副作用を排除）
+  // 一度だけ呼び出す（再レンダリングによる無限ループを防止）
+  useEffect(() => {
+    const groupCount = Object.keys(groupedPhotos).length;
+    if (groupCount > 0 && !hasCalledOnGroupingEndRef.current) {
+      hasCalledOnGroupingEndRef.current = true;
+      console.log('[useGroupPhotos] Calling onGroupingEnd via useEffect', {
+        groupCount,
+      });
+      onGroupingEndRef.current?.();
+    }
+  }, [groupedPhotos]);
 
   const debug: DebugInfo = {
     totalPhotos: photos.length,

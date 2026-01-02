@@ -18,8 +18,7 @@ import type { PhotoGalleryData } from '../PhotoGallery';
 import PhotoGrid from '../PhotoGrid';
 import { DateJumpSidebar } from './DateJumpSidebar';
 import { GalleryErrorBoundary } from './GalleryErrorBoundary';
-import type { GroupedPhoto } from './useGroupPhotos';
-import { usePhotoGallery } from './usePhotoGallery';
+import type { GroupedPhoto, GroupedPhotos } from './useGroupPhotos';
 
 /**
  * ギャラリーコンテンツコンポーネントのプロパティ定義
@@ -27,12 +26,20 @@ import { usePhotoGallery } from './usePhotoGallery';
 interface GalleryContentProps
   extends Pick<
     UseLoadingStateResult,
-    'isLoadingStartupSync' | 'isLoadingGrouping' | 'finishLoadingGrouping'
+    'isLoadingStartupSync' | 'isLoadingGrouping'
   > {
-  /** ヘッダーから渡される検索クエリ */
-  searchQuery: string;
-  /** 検索タイプ（world | player | undefined） */
-  searchType?: 'world' | 'player';
+  /** グループ化された写真データ（親から渡される） */
+  groupedPhotos: GroupedPhotos;
+  /** 選択された写真のID配列 */
+  selectedPhotos: string[];
+  /** 選択された写真を更新するハンドラ */
+  setSelectedPhotos: (
+    update: string[] | ((prev: string[]) => string[]),
+  ) => void;
+  /** 複数選択モードかどうか */
+  isMultiSelectMode: boolean;
+  /** 複数選択モードを切り替えるハンドラ */
+  setIsMultiSelectMode: (value: boolean) => void;
   /** ギャラリーデータ（統合AppHeaderに渡す） */
   galleryData?: PhotoGalleryData;
 }
@@ -380,27 +387,19 @@ VirtualizedGallery.displayName = 'VirtualizedGallery';
  */
 const GalleryContent = memo(
   ({
-    searchQuery,
-    searchType,
     isLoadingStartupSync,
     isLoadingGrouping,
-    finishLoadingGrouping,
+    groupedPhotos,
+    selectedPhotos,
+    setSelectedPhotos,
+    isMultiSelectMode,
+    setIsMultiSelectMode,
     galleryData,
   }: GalleryContentProps) => {
     console.log('[GalleryContent] Render', {
-      searchQuery,
       isLoadingStartupSync,
       isLoadingGrouping,
-    });
-
-    const {
-      groupedPhotos,
-      selectedPhotos,
-      setSelectedPhotos,
-      isMultiSelectMode,
-      setIsMultiSelectMode,
-    } = usePhotoGallery(searchQuery, searchType, {
-      onGroupingEnd: finishLoadingGrouping,
+      groupedPhotosCount: Object.keys(groupedPhotos).length,
     });
 
     // VirtualizedGallery の getScrollElement 用 RefObject
