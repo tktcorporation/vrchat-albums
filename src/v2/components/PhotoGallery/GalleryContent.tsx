@@ -162,6 +162,23 @@ const VirtualizedGallery = memo(
       virtualizer.measure();
     }, [widthValue, virtualizer]);
 
+    // filteredGroups の内容が変更されたらサイズを再計算
+    // （写真がロードされた時など）
+    const totalPhotosCount = useMemo(
+      () => filteredGroups.reduce((sum, [, g]) => sum + g.photos.length, 0),
+      [filteredGroups],
+    );
+    useEffect(() => {
+      console.log(
+        '[VirtualizedGallery] Photos count changed, recalculating sizes',
+        {
+          totalPhotosCount,
+          groupCount: filteredGroups.length,
+        },
+      );
+      virtualizer.measure();
+    }, [totalPhotosCount, virtualizer]);
+
     // 日付ジャンプハンドラー
     const handleJumpToDate = useCallback(
       (groupIndex: number) => {
