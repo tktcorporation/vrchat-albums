@@ -35,9 +35,13 @@ import {
  */
 export const VRChatWorldIdSchema = z
   .string()
-  .refine(isValidVRChatWorldId, {
-    message:
-      'Invalid VRChat World ID format. Expected: wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+  .superRefine((value, ctx) => {
+    if (!isValidVRChatWorldId(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid VRChat World ID format. Expected: wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Received: "${value}"`,
+      });
+    }
   })
   .brand<'VRChatWorldId'>();
 
@@ -53,9 +57,13 @@ export type VRChatWorldId = z.infer<typeof VRChatWorldIdSchema>;
  */
 export const VRChatPlayerIdSchema = z
   .string()
-  .refine(isValidVRChatPlayerId, {
-    message:
-      'Invalid VRChat Player ID format. Expected: usr_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+  .superRefine((value, ctx) => {
+    if (!isValidVRChatPlayerId(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid VRChat Player ID format. Expected: usr_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Received: "${value}"`,
+      });
+    }
   })
   .brand<'VRChatPlayerId'>();
 
@@ -82,8 +90,13 @@ export const OptionalVRChatPlayerIdSchema = z
  */
 export const VRChatPlayerNameSchema = z
   .string()
-  .refine(isValidVRChatPlayerName, {
-    message: 'Invalid VRChat Player Name. Cannot be empty',
+  .superRefine((value, ctx) => {
+    if (!isValidVRChatPlayerName(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid VRChat Player Name. Cannot be empty. Received: "${value}"`,
+      });
+    }
   })
   .brand<'VRChatPlayerName'>();
 
@@ -99,8 +112,13 @@ export type VRChatPlayerName = z.infer<typeof VRChatPlayerNameSchema>;
  */
 export const VRChatWorldNameSchema = z
   .string()
-  .refine(isValidVRChatWorldName, {
-    message: 'Invalid VRChat World Name. Cannot be empty',
+  .superRefine((value, ctx) => {
+    if (!isValidVRChatWorldName(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid VRChat World Name. Cannot be empty. Received: "${value}"`,
+      });
+    }
   })
   .brand<'VRChatWorldName'>();
 
