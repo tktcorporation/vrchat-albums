@@ -79,6 +79,18 @@ describe('VRChatログ関連のvalueObjects', () => {
       expect(instanceId.value).toBe(validId);
     });
 
+    it('UUID形式のインスタンスIDでvalueObjectを作成できる', () => {
+      const validId = '0abb3e08-82db-43f1-b6fe-ee59c2ffc335';
+      const instanceId = VRChatWorldInstanceIdSchema.parse(validId);
+      expect(instanceId.value).toBe(validId);
+    });
+
+    it('UUID形式 + region情報のインスタンスIDでvalueObjectを作成できる', () => {
+      const validId = '0abb3e08-82db-43f1-b6fe-ee59c2ffc335~region(jp)';
+      const instanceId = VRChatWorldInstanceIdSchema.parse(validId);
+      expect(instanceId.value).toBe(validId);
+    });
+
     it('無効なインスタンスIDでエラーが発生する', () => {
       expect(() => VRChatWorldInstanceIdSchema.parse('invalid-id')).toThrow();
       expect(() => VRChatWorldInstanceIdSchema.parse('123@45')).toThrow();
@@ -100,12 +112,27 @@ describe('VRChatログ関連のvalueObjects', () => {
       expect(isValidVRChatWorldInstanceId('86676~region(jp)')).toBe(true);
       expect(isValidVRChatWorldInstanceId('83c39dd3c3~region(us)')).toBe(true);
       expect(isValidVRChatWorldInstanceId('abc123')).toBe(true);
+      expect(
+        isValidVRChatWorldInstanceId('0abb3e08-82db-43f1-b6fe-ee59c2ffc335'),
+      ).toBe(true);
+      expect(
+        isValidVRChatWorldInstanceId(
+          '0abb3e08-82db-43f1-b6fe-ee59c2ffc335~region(jp)',
+        ),
+      ).toBe(true);
       expect(isValidVRChatWorldInstanceId('invalid-id')).toBe(false);
     });
 
     describe('getInstanceType', () => {
       it('通常のインスタンスIDはpublicを返す', () => {
         const instanceId = VRChatWorldInstanceIdSchema.parse('12345');
+        expect(instanceId.getInstanceType()).toBe('public');
+      });
+
+      it('UUID形式のインスタンスIDはpublicを返す', () => {
+        const instanceId = VRChatWorldInstanceIdSchema.parse(
+          '0abb3e08-82db-43f1-b6fe-ee59c2ffc335',
+        );
         expect(instanceId.getInstanceType()).toBe('public');
       });
 

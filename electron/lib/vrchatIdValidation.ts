@@ -21,9 +21,13 @@ export const VRCHAT_PLAYER_ID_PATTERN =
 
 /**
  * VRChat World Instance ID のパターン
- * 形式: 英数字のみ、または英数字~region(region_code)形式
+ * 形式:
+ * - 英数字のみ (例: 12345, 83c39dd3c3)
+ * - UUID形式 (例: 0abb3e08-82db-43f1-b6fe-ee59c2ffc335)
+ * - 上記 + ~region(region_code) などの接尾辞
  */
-export const VRCHAT_WORLD_INSTANCE_ID_PATTERN = /^[a-zA-Z0-9]+(~.+)?$/;
+export const VRCHAT_WORLD_INSTANCE_ID_PATTERN =
+  /^([a-zA-Z0-9]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(~.+)?$/i;
 
 /**
  * VRChat World ID の検証関数
