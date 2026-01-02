@@ -356,12 +356,6 @@ export type PhotoOperationError =
   | 'MODEL_NOT_FOUND'
   | 'FILE_NOT_FOUND_MODEL_DELETED';
 
-// ログ操作関連のエラー型定義（将来の拡張用）
-export type LogOperationError =
-  | 'LOG_FILE_NOT_FOUND'
-  | 'LOG_PARSE_ERROR'
-  | 'LOG_ACCESS_DENIED';
-
 // VRChatログファイル操作のエラー型定義
 export type VRChatLogFileErrorCode =
   | 'LOG_FILE_NOT_FOUND'
@@ -370,12 +364,6 @@ export type VRChatLogFileErrorCode =
   | 'LOG_STORE_DIR_CREATE_FAILED'
   | 'LOG_MONTH_DIR_CREATE_FAILED'
   | 'LOG_FILE_WRITE_FAILED';
-
-// データベース操作関連のエラー型定義
-export type DatabaseOperationError =
-  | 'CONNECTION_FAILED'
-  | 'QUERY_FAILED'
-  | 'TRANSACTION_FAILED';
 
 // EXIF操作関連のエラー型定義
 export type ExifOperationErrorCode =
@@ -507,30 +495,6 @@ export function handlePhotoOperationError<T>(
   return handleTypedResultError(result, {
     operationName: 'Photo operation',
     defaultUserMessage: '写真操作中にエラーが発生しました。',
-  });
-}
-
-/**
- * ログ操作専用の型安全なエラーハンドラー
- */
-export function handleLogOperationError<T>(
-  result: Result<T, LogOperationError>,
-): T {
-  return handleTypedResultError(result, {
-    operationName: 'Log operation',
-    defaultUserMessage: 'ログ操作中にエラーが発生しました。',
-  });
-}
-
-/**
- * データベース操作専用の型安全なエラーハンドラー
- */
-export function handleDatabaseOperationError<T>(
-  result: Result<T, DatabaseOperationError>,
-): T {
-  return handleTypedResultError(result, {
-    operationName: 'Database operation',
-    defaultUserMessage: 'データベース操作中にエラーが発生しました。',
   });
 }
 

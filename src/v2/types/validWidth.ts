@@ -24,16 +24,6 @@ export const ValidWidthSchema = z
 export type ValidWidth = z.infer<typeof ValidWidthSchema>;
 
 /**
- * 幅が有効かどうかを判定する型ガード
- *
- * @param width - 検証する幅
- * @returns width > 0 の場合 true
- */
-export function isValidWidth(width: number): width is number & ValidWidth {
-  return width > 0;
-}
-
-/**
  * 数値から ValidWidth を生成
  *
  * @param width - 変換する幅

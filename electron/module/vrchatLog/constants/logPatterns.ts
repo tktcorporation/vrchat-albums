@@ -28,12 +28,3 @@ export const FILTER_PATTERNS = [
   LOG_PATTERNS.PLAYER_LEAVE,
   LOG_PATTERNS.APP_EXIT,
 ] as const;
-
-// パーサーの処理状況を型で管理
-export type LogPatternHandling = {
-  [LOG_PATTERNS.APP_START]: 'todo';
-  [LOG_PATTERNS.WORLD_JOIN]: 'implemented';
-  [LOG_PATTERNS.PLAYER_JOIN]: 'implemented';
-  [LOG_PATTERNS.PLAYER_LEAVE]: 'implemented';
-  [LOG_PATTERNS.APP_EXIT]: 'implemented';
-};

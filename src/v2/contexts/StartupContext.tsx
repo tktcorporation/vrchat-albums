@@ -1,5 +1,5 @@
 import type React from 'react';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { useStartupStage } from '../hooks/useStartUpStage';
 
 type Stage = 'idle' | 'syncing' | 'ready' | 'error';
@@ -37,13 +37,17 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
     return 'idle';
   })();
 
-  const value: StartupContextValue = {
-    stage,
-    error: errorMessage || null,
-    originalError,
-    isReady: completed,
-    retry: retryProcess,
-  };
+  // Context の value をメモ化して、不要な再レンダリングを防ぐ
+  const value = useMemo<StartupContextValue>(
+    () => ({
+      stage,
+      error: errorMessage || null,
+      originalError,
+      isReady: completed,
+      retry: retryProcess,
+    }),
+    [stage, errorMessage, originalError, completed, retryProcess],
+  );
 
   return (
     <StartupContext.Provider value={value}>{children}</StartupContext.Provider>

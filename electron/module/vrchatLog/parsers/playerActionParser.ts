@@ -17,8 +17,6 @@ export interface VRChatPlayerLeaveLog {
   playerId: VRChatPlayerId | null;
 }
 
-export type VRChatPlayerActionLog = VRChatPlayerJoinLog | VRChatPlayerLeaveLog;
-
 /**
  * プレイヤーアクションパースのエラー種別
  */

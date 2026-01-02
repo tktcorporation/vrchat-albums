@@ -484,15 +484,15 @@
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/instrumentation-amqplib/node_modules/@opentelemetry/core",
-    "licenseFile": "node_modules/@opentelemetry/instrumentation-amqplib/node_modules/@opentelemetry/core/LICENSE"
+    "path": "node_modules/@opentelemetry/core",
+    "licenseFile": "node_modules/@opentelemetry/core/LICENSE"
   },
   "@opentelemetry/core@2.2.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/core",
-    "licenseFile": "node_modules/@opentelemetry/core/LICENSE"
+    "path": "node_modules/@sentry/node/node_modules/@opentelemetry/core",
+    "licenseFile": "node_modules/@sentry/node/node_modules/@opentelemetry/core/LICENSE"
   },
   "@opentelemetry/instrumentation-amqplib@0.55.0": {
     "licenses": "Apache-2.0",
@@ -694,15 +694,15 @@
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions",
-    "licenseFile": "node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions/LICENSE"
+    "path": "node_modules/@sentry/node/node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions",
+    "licenseFile": "node_modules/@sentry/node/node_modules/@opentelemetry/core/node_modules/@opentelemetry/semantic-conventions/LICENSE"
   },
   "@opentelemetry/semantic-conventions@1.38.0": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/open-telemetry/opentelemetry-js",
     "publisher": "OpenTelemetry Authors",
-    "path": "node_modules/@opentelemetry/semantic-conventions",
-    "licenseFile": "node_modules/@opentelemetry/semantic-conventions/LICENSE"
+    "path": "node_modules/@opentelemetry/instrumentation-koa/node_modules/@opentelemetry/semantic-conventions",
+    "licenseFile": "node_modules/@opentelemetry/instrumentation-koa/node_modules/@opentelemetry/semantic-conventions/LICENSE"
   },
   "@opentelemetry/sql-common@0.41.2": {
     "licenses": "Apache-2.0",
@@ -1071,8 +1071,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
-    "path": "node_modules/@sentry/node-core",
-    "licenseFile": "node_modules/@sentry/node-core/LICENSE"
+    "path": "node_modules/@sentry/node/node_modules/@sentry/node-core",
+    "licenseFile": "node_modules/@sentry/node/node_modules/@sentry/node-core/LICENSE"
   },
   "@sentry/node@10.29.0": {
     "licenses": "MIT",
@@ -1085,8 +1085,8 @@
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript",
     "publisher": "Sentry",
-    "path": "node_modules/@sentry/opentelemetry",
-    "licenseFile": "node_modules/@sentry/opentelemetry/LICENSE"
+    "path": "node_modules/@sentry/node/node_modules/@sentry/opentelemetry",
+    "licenseFile": "node_modules/@sentry/node/node_modules/@sentry/opentelemetry/LICENSE"
   },
   "@sentry/vite-plugin@4.6.1": {
     "licenses": "MIT",
@@ -1938,21 +1938,13 @@
     "path": "node_modules/cross-spawn",
     "licenseFile": "node_modules/cross-spawn/LICENSE"
   },
-  "csstype@3.1.3": {
+  "csstype@3.2.3": {
     "licenses": "MIT",
     "repository": "https://github.com/frenic/csstype",
     "publisher": "Fredrik Nicol",
     "email": "fredrik.nicol@gmail.com",
     "path": "node_modules/csstype",
     "licenseFile": "node_modules/csstype/LICENSE"
-  },
-  "csstype@3.2.3": {
-    "licenses": "MIT",
-    "repository": "https://github.com/frenic/csstype",
-    "publisher": "Fredrik Nicol",
-    "email": "fredrik.nicol@gmail.com",
-    "path": "node_modules/@types/react/node_modules/csstype",
-    "licenseFile": "node_modules/@types/react/node_modules/csstype/LICENSE"
   },
   "date-fns@4.1.0": {
     "licenses": "MIT",
@@ -2132,15 +2124,6 @@
     "licenseFile": "node_modules/eastasianwidth/README.md"
   },
   "electron-is-dev@2.0.0": {
-    "licenses": "MIT",
-    "repository": "https://github.com/sindresorhus/electron-is-dev",
-    "publisher": "Sindre Sorhus",
-    "email": "sindresorhus@gmail.com",
-    "url": "https://sindresorhus.com",
-    "path": "node_modules/electron-unhandled/node_modules/electron-is-dev",
-    "licenseFile": "node_modules/electron-unhandled/node_modules/electron-is-dev/license"
-  },
-  "electron-is-dev@3.0.1": {
     "licenses": "MIT",
     "repository": "https://github.com/sindresorhus/electron-is-dev",
     "publisher": "Sindre Sorhus",
@@ -2623,14 +2606,6 @@
     "email": "ljharb@gmail.com",
     "path": "node_modules/globalthis",
     "licenseFile": "node_modules/globalthis/LICENSE"
-  },
-  "goober@2.1.16": {
-    "licenses": "MIT",
-    "repository": "https://github.com/cristianbote/goober",
-    "publisher": "Cristian",
-    "email": "botecristian@yahoo.com",
-    "path": "node_modules/goober",
-    "licenseFile": "node_modules/goober/LICENSE"
   },
   "gopd@1.2.0": {
     "licenses": "MIT",
@@ -4352,13 +4327,6 @@
     "path": "node_modules/react-error-boundary",
     "licenseFile": "node_modules/react-error-boundary/LICENSE"
   },
-  "react-hot-toast@2.6.0": {
-    "licenses": "MIT",
-    "repository": "https://github.com/timolins/react-hot-toast",
-    "publisher": "Timo Lins",
-    "path": "node_modules/react-hot-toast",
-    "licenseFile": "node_modules/react-hot-toast/LICENSE"
-  },
   "react-markdown@10.1.0": {
     "licenses": "MIT",
     "repository": "https://github.com/remarkjs/react-markdown",
@@ -4931,21 +4899,6 @@
     "path": "node_modules/tinyglobby",
     "licenseFile": "node_modules/tinyglobby/LICENSE"
   },
-  "tmp-promise@3.0.3": {
-    "licenses": "MIT",
-    "repository": "https://github.com/benjamingr/tmp-promise",
-    "publisher": "Benjamin Gruenbaum and Collaborators.",
-    "path": "node_modules/tmp-promise",
-    "licenseFile": "node_modules/tmp-promise/README.md"
-  },
-  "tmp@0.2.5": {
-    "licenses": "MIT",
-    "repository": "https://github.com/raszi/node-tmp",
-    "publisher": "KARASZI István",
-    "email": "github@spam.raszi.hu",
-    "path": "node_modules/tmp",
-    "licenseFile": "node_modules/tmp/LICENSE"
-  },
   "to-regex-range@5.0.1": {
     "licenses": "MIT",
     "repository": "https://github.com/micromatch/to-regex-range",
@@ -5271,7 +5224,7 @@
     "path": "node_modules/vite",
     "licenseFile": "node_modules/vite/LICENSE.md"
   },
-  "vrchat-albums@0.24.0": {
+  "vrchat-albums@0.25.0": {
     "licenses": "Custom: https://github.com/tktcorporation/vrchat-albums/releases",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",

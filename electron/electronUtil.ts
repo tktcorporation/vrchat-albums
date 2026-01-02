@@ -14,8 +14,11 @@ import {
   shell,
   Tray,
 } from 'electron';
-import isDev from 'electron-is-dev';
 import { err, fromThrowable, Result, ResultAsync } from 'neverthrow';
+
+// electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
+// Electron ネイティブの app.isPackaged を使用
+const isDev = !app.isPackaged;
 
 import { logger } from './lib/logger';
 // Local

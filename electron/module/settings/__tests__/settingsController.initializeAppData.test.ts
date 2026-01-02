@@ -18,11 +18,8 @@ vi.mock('electron', () => ({
   app: {
     getVersion: vi.fn().mockReturnValue('1.0.0'),
     getPath: vi.fn().mockReturnValue('/tmp/logs'),
+    isPackaged: true, // 本番環境として扱う
   },
-}));
-
-vi.mock('electron-is-dev', () => ({
-  default: false,
 }));
 
 // 型定義

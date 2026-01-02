@@ -257,32 +257,15 @@ export function useGroupPhotos(
   const hasCalledOnGroupingEndRef = useRef(false);
 
   const groupedPhotos = useMemo(() => {
-    console.log('[useGroupPhotos] useMemo triggered', {
-      isLoadingLogs,
-      joinLogsLength: joinLogs?.length,
-      photosLength: photos.length,
-    });
-
     if (isLoadingLogs || !joinLogs) {
-      console.log('[useGroupPhotos] Early return: loading or no logs');
       return {};
     }
     if (joinLogs.length === 0) {
-      console.log('[useGroupPhotos] Early return: empty logs');
       return {};
     }
 
-    console.time('[useGroupPhotos] groupPhotosBySession');
     const groups = groupPhotosBySession(photos, joinLogs);
-    console.timeEnd('[useGroupPhotos] groupPhotosBySession');
-
-    console.time('[useGroupPhotos] convertGroupsToRecord');
     const result = convertGroupsToRecord(groups);
-    console.timeEnd('[useGroupPhotos] convertGroupsToRecord');
-
-    console.log('[useGroupPhotos] Grouping complete', {
-      groupCount: Object.keys(result).length,
-    });
 
     return result;
   }, [photos, joinLogs, isLoadingLogs]);
@@ -293,31 +276,37 @@ export function useGroupPhotos(
     const groupCount = Object.keys(groupedPhotos).length;
     if (groupCount > 0 && !hasCalledOnGroupingEndRef.current) {
       hasCalledOnGroupingEndRef.current = true;
-      console.log('[useGroupPhotos] Calling onGroupingEnd via useEffect', {
-        groupCount,
-      });
       onGroupingEndRef.current?.();
     }
   }, [groupedPhotos]);
 
-  const debug: DebugInfo = {
-    totalPhotos: photos.length,
-    totalGroups: Object.keys(groupedPhotos).length,
-  };
-
-  // セッション情報を追加
-  if (joinLogs) {
-    const sessions = buildSessions(joinLogs);
-    debug.sessionInfo = {
-      totalSessions: sessions.length,
-      openSessions: sessions.filter((s) => !s.leaveTime).length,
-      closedSessions: sessions.filter((s) => s.leaveTime).length,
+  // デバッグ情報をメモ化
+  const debug = useMemo<DebugInfo>(() => {
+    const baseDebug: DebugInfo = {
+      totalPhotos: photos.length,
+      totalGroups: Object.keys(groupedPhotos).length,
     };
-  }
 
-  return {
-    groupedPhotos,
-    isLoading: isLoadingLogs,
-    debug,
-  };
+    // セッション情報を追加
+    if (joinLogs) {
+      const sessions = buildSessions(joinLogs);
+      baseDebug.sessionInfo = {
+        totalSessions: sessions.length,
+        openSessions: sessions.filter((s) => !s.leaveTime).length,
+        closedSessions: sessions.filter((s) => s.leaveTime).length,
+      };
+    }
+
+    return baseDebug;
+  }, [photos.length, groupedPhotos, joinLogs]);
+
+  // 返り値オブジェクトをメモ化して、参照の安定性を確保
+  return useMemo(
+    () => ({
+      groupedPhotos,
+      isLoading: isLoadingLogs,
+      debug,
+    }),
+    [groupedPhotos, isLoadingLogs, debug],
+  );
 }
