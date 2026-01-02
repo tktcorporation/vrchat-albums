@@ -118,27 +118,6 @@ export const writeFileSyncSafe = (
 };
 
 /**
- * ディレクトリを作成し、既に存在する場合はエラー情報を返す非同期関数。
- * VRChat 写真保存処理などで使用される。
- */
-export const mkdirSyncSafe = (
-  dirPath: string,
-): ResultAsync<void, { code: 'EEXIST'; error: NodeJS.ErrnoException }> =>
-  ResultAsync.fromPromise(
-    promisify(fs.mkdir)(dirPath),
-    (e): { code: 'EEXIST'; error: NodeJS.ErrnoException } => {
-      if (!isNodeError(e)) {
-        throw e; // 予期しないエラーをre-throw
-      }
-      return match(e)
-        .with({ code: 'EEXIST' }, (ee) => ({ code: ee.code, error: ee }))
-        .otherwise((ee) => {
-          throw ee; // 分類できないエラーをre-throw
-        });
-    },
-  );
-
-/**
  * fs.existsSync の薄いラッパー
  * ログ保存処理などでファイルの存在確認に利用される
  */
@@ -174,42 +153,6 @@ export const appendFileAsync = (
         });
     },
   );
-
-/**
- * ファイル削除エラー型
- */
-export type UnlinkError =
-  | { type: 'ENOENT'; message: string }
-  | { type: 'EACCES'; message: string }
-  | { type: 'EPERM'; message: string }
-  | { type: 'IO_ERROR'; message: string; code?: string };
-
-/**
- * 指定したファイルを削除する非同期関数。
- * 一時ファイルのクリーンアップ処理などで使用される。
- */
-export const unlinkAsync = (filePath: string): ResultAsync<void, UnlinkError> =>
-  ResultAsync.fromPromise(fs.promises.unlink(filePath), (e): UnlinkError => {
-    const nodeError = e as NodeJS.ErrnoException;
-    return match(nodeError)
-      .with({ code: 'ENOENT' }, (ee) => ({
-        type: 'ENOENT' as const,
-        message: ee.message,
-      }))
-      .with({ code: 'EACCES' }, (ee) => ({
-        type: 'EACCES' as const,
-        message: ee.message,
-      }))
-      .with({ code: 'EPERM' }, (ee) => ({
-        type: 'EPERM' as const,
-        message: ee.message,
-      }))
-      .otherwise((ee) => ({
-        type: 'IO_ERROR' as const,
-        message: ee.message ?? String(e),
-        code: ee.code,
-      }));
-  });
 
 /**
  * fs.createReadStream をラップしたユーティリティ。
