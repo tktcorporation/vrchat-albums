@@ -14,8 +14,19 @@ const config: KnipConfig = {
   ],
   project: ['src/**/*.ts', 'src/**/*.tsx', 'electron/**/*.ts'],
   ignoreBinaries: ['only-allow'],
-  ignoreDependencies: ['@types/sharp', '@antfu/ni'],
-  ignore: ['src/components/ui/**'],
+  ignoreDependencies: [
+    '@types/sharp',
+    '@antfu/ni',
+    // shadcn/ui indirect dependencies
+    '@radix-ui/react-select',
+    '@radix-ui/react-separator',
+    'tw-animate-css',
+  ],
+  ignore: [
+    'src/components/ui/**',
+    // Design token types - kept for future type safety
+    'src/v2/constants/ui.ts',
+  ],
   // Don't report unused exports in entry files (tRPC routers)
   includeEntryExports: false,
   // Ignore exports that are used within the same file
