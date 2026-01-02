@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron, expect, test } from '@playwright/test';
@@ -5,6 +6,35 @@ import { _electron, expect, test } from '@playwright/test';
 // ESモジュール環境で__dirnameの代わりに使用
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * テスト用の写真ディレクトリをセットアップする
+ * debug/VRChat_2023-10-01_03-01-18.551_2560x1440_sample.png を
+ * debug/photos/VRChat/2023-10/ にコピーする
+ */
+const setupTestPhotos = () => {
+  const samplePhotoPath = path.join(
+    __dirname,
+    '../debug/VRChat_2023-10-01_03-01-18.551_2560x1440_sample.png',
+  );
+  const targetDir = path.join(__dirname, '../debug/photos/VRChat/2023-10');
+  const targetPhotoPath = path.join(
+    targetDir,
+    'VRChat_2023-10-08_00-05-00.000_2560x1440.png',
+  );
+
+  // ディレクトリを作成（存在しない場合）
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+    console.log(`Created test photos directory: ${targetDir}`);
+  }
+
+  // サンプル画像をコピー（存在しない場合）
+  if (!fs.existsSync(targetPhotoPath)) {
+    fs.copyFileSync(samplePhotoPath, targetPhotoPath);
+    console.log(`Copied sample photo to: ${targetPhotoPath}`);
+  }
+};
 
 // Constants
 const XVFB_STARTUP_DELAY_MS = 1000;
@@ -116,6 +146,9 @@ test.setTimeout(TIMEOUT);
  */
 test('写真一覧のロードパフォーマンスを計測', async () => {
   console.log('=== Photo Loading Performance Debug Test ===');
+
+  // テスト用の写真ディレクトリをセットアップ
+  setupTestPhotos();
 
   const metrics: PerformanceMetrics = {
     usePhotoGalleryCallCount: 0,
