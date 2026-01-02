@@ -52,15 +52,6 @@ export const ShapeJsonDataErrorSchema = z.object({
 });
 
 /**
- * すべての可能なtRPCエラー構造の統合スキーマ
- */
-export const TRPCErrorSchema = z.union([
-  DirectDataErrorSchema,
-  ShapeDataErrorSchema,
-  ShapeJsonDataErrorSchema,
-]);
-
-/**
  * tRPC v11のエラー構造（cause.data）
  * v11ではエラーがcauseプロパティにラップされている場合がある
  */

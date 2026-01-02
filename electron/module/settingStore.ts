@@ -38,8 +38,6 @@ export const FolderScanStateSchema = z.object({
     .datetime({ message: 'Invalid ISO datetime format' }),
 });
 
-export type FolderScanState = z.infer<typeof FolderScanStateSchema>;
-
 /** フォルダパス → スキャン状態のマップ */
 export const PhotoFolderScanStatesSchema = z.record(
   z.string().min(1),

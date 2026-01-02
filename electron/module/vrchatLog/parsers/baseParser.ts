@@ -20,12 +20,6 @@ export const parseLogDateTime = (dateStr: string, timeStr: string): Date => {
   );
 };
 
-/**
- * ログ行の基本的な正規表現パターン
- */
-export const LOG_DATE_TIME_PATTERN =
-  /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2})/;
-
 // 注意: ワールドID検証機能はvalueObjectsパターンに移行されました
 // VRChatWorldId.isValid() を使用してください
 

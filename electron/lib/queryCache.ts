@@ -171,16 +171,3 @@ export const clearAllCaches = (): void => {
   worldInfoCache.clear();
   logger.debug('All caches cleared');
 };
-
-/**
- * 特定のパターンにマッチするキャッシュエントリを無効化
- */
-export const invalidateCachePattern = (pattern: RegExp): number => {
-  const playerListCount = playerListCache.invalidatePattern(pattern);
-  const worldInfoCount = worldInfoCache.invalidatePattern(pattern);
-  const totalCount = playerListCount + worldInfoCount;
-  logger.debug(
-    `Invalidated ${totalCount} cache entries matching pattern: ${pattern}`,
-  );
-  return totalCount;
-};
