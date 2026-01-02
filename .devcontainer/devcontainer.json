@@ -59,7 +59,8 @@
     "trust-mise": ["mise", "trust"]
   },
   "postCreateCommand": {
-    "mise-install": "mise install"
+    "mise-install": "mise install",
+    "install-grit": "curl -fsSL https://docs.grit.io/install | bash"
   },
   "postStartCommand": {
     "setup-chrome-devtools-mcp": [
