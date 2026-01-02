@@ -85,6 +85,16 @@ describe('VRChatログ関連のvalueObjects', () => {
       expect(() => VRChatWorldInstanceIdSchema.parse('')).toThrow();
     });
 
+    it('エラーメッセージに受け取った値が含まれる', () => {
+      const invalidId = 'invalid-id-123';
+      try {
+        VRChatWorldInstanceIdSchema.parse(invalidId);
+        expect.fail('Should have thrown');
+      } catch (e) {
+        expect((e as Error).message).toContain(invalidId);
+      }
+    });
+
     it('isValid静的メソッドが正しく動作する', () => {
       expect(isValidVRChatWorldInstanceId('12345')).toBe(true);
       expect(isValidVRChatWorldInstanceId('86676~region(jp)')).toBe(true);

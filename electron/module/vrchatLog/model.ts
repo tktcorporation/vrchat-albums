@@ -170,18 +170,26 @@ export const VRChatLogStoreFilePathRegex =
   /(logStore-\d{4}-\d{2}(?:-\d{14})?\.txt$|logStore\.txt$)/;
 export const VRChatLogStoreFilePathSchema = z
   .string()
-  .regex(
-    VRChatLogStoreFilePathRegex,
-    "Invalid log store file path. Expected format: 'logStore-YYYY-MM.txt', 'logStore-YYYY-MM-YYYYMMDDHHMMSS.txt', or 'logStore.txt'",
-  )
+  .superRefine((value, ctx) => {
+    if (!VRChatLogStoreFilePathRegex.test(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid log store file path. Expected format: 'logStore-YYYY-MM.txt', 'logStore-YYYY-MM-YYYYMMDDHHMMSS.txt', or 'logStore.txt'. Received: "${value}"`,
+      });
+    }
+  })
   .transform((value) => {
     return new VRChatLogStoreFilePath(value);
   });
 
 export const VRChatWorldInstanceIdSchema = z
   .string()
-  .refine(isValidVRChatWorldInstanceId, {
-    message:
-      'Invalid VRChat World Instance ID format. Expected: alphanumeric string or alphanumeric~region(region_code)',
+  .superRefine((value, ctx) => {
+    if (!isValidVRChatWorldInstanceId(value)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid VRChat World Instance ID format. Expected: alphanumeric string or alphanumeric~region(region_code). Received: "${value}"`,
+      });
+    }
   })
   .transform((value) => new VRChatWorldInstanceId(value));
