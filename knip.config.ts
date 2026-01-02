@@ -16,7 +16,6 @@ const config: KnipConfig = {
     'electron/api.ts',
     'electron/vite.config.ts',
     // tRPC controllers are used dynamically
-    'electron/module/**/controller/*.ts',
     'electron/module/**/*Controller.ts',
   ],
   project: ['src/**/*.{ts,tsx}', 'electron/**/*.ts'],
