@@ -6,6 +6,15 @@ import {
 } from '@sentry/electron/main';
 import { app, type BrowserWindow, ipcMain } from 'electron';
 import unhandled from 'electron-unhandled';
+// Early Sharp import - must come before any other module that uses Sharp
+// to ensure libvips initializes with our settings before GTK starts
+import sharp from 'sharp';
+
+// Initialize Sharp with minimal settings immediately on module load
+// This prevents GLib-GObject conflicts between libvips and GTK on Linux
+// by ensuring libvips uses single-threaded mode and no cache
+sharp.concurrency(1);
+sharp.cache(false);
 
 // electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
 // Electron ネイティブの app.isPackaged を使用

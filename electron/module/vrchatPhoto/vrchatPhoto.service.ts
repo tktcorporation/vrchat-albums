@@ -608,9 +608,18 @@ export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
 // バッチサイズ定数
 const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（sharp処理は重いため小さく）
 
+/**
+ * Playwright環境かどうかを判定
+ * GLib-GObject競合を避けるため、テスト環境ではSharp操作を完全に直列化する
+ */
+const isPlaywrightEnvironment = (): boolean => {
+  return process.env.PLAYWRIGHT_TEST === 'true';
+};
+
 // 並列処理の制限（メモリ効率のため控えめに設定）
-const SHARP_PARALLEL_LIMIT = 5; // sharp処理の並列数（以前は10）
-const THUMBNAIL_PARALLEL_LIMIT = 8; // サムネイル取得の並列数
+// Playwright環境ではGLib-GObject競合を避けるため、完全に直列化（並列数=1）
+const SHARP_PARALLEL_LIMIT = isPlaywrightEnvironment() ? 1 : 5;
+const THUMBNAIL_PARALLEL_LIMIT = isPlaywrightEnvironment() ? 1 : 8;
 
 // メモリ監視の閾値
 const MEMORY_WARNING_THRESHOLD_MB = 1024; // 1GB
@@ -1050,77 +1059,65 @@ async function processPhotoBatch(
         new Date(),
       );
 
-      // Playwrightテスト環境ではSharpによるメタデータ取得をスキップ
-      // GLib-GObjectとの競合によるクラッシュを回避
-      let height = 720;
-      let width = 1280;
-
-      if (process.env.PLAYWRIGHT_SKIP_SHARP === 'true') {
-        logger.debug(
-          `Skipping Sharp metadata for Playwright test: ${photoPath}`,
-        );
-        // デフォルトのサイズを使用
-      } else {
-        // sharpインスタンスを使い捨てにしてメモリリークを防ぐ
-        const metadataResult = await neverthrow.ResultAsync.fromPromise(
-          sharp(photoPath).metadata(),
-          (error): { type: 'SHARP_ERROR'; message: string } => {
-            const nodeError = error as NodeJS.ErrnoException;
-            return match(nodeError.code)
-              .with('ENOENT', () => {
-                // ファイル削除はレースコンディションで想定される
-                logger.debug(
-                  `Photo file not found during metadata extraction: ${photoPath}`,
-                );
-                return {
-                  type: 'SHARP_ERROR' as const,
-                  message: 'File not found',
-                };
-              })
-              .with(P.union('EACCES', 'EPERM'), () => {
-                // 権限エラー → ユーザーに通知すべき
-                logger.warn({
-                  message: `Permission denied reading photo: ${photoPath}`,
-                  stack:
-                    error instanceof Error ? error : new Error(String(error)),
-                });
-                return {
-                  type: 'SHARP_ERROR' as const,
-                  message: nodeError.message ?? 'Permission denied',
-                };
-              })
-              .otherwise(() => {
-                // sharpの内部エラー、破損ファイル等 → Sentry送信のため再スロー
-                // デバッグのためファイルパス情報を付加
-                const contextualError = new Error(
-                  `Sharp processing failed for: ${photoPath}`,
-                  { cause: error },
-                );
-                throw contextualError;
+      // sharpインスタンスを使い捨てにしてメモリリークを防ぐ
+      const metadataResult = await neverthrow.ResultAsync.fromPromise(
+        sharp(photoPath).metadata(),
+        (error): { type: 'SHARP_ERROR'; message: string } => {
+          const nodeError = error as NodeJS.ErrnoException;
+          return match(nodeError.code)
+            .with('ENOENT', () => {
+              // ファイル削除はレースコンディションで想定される
+              logger.debug(
+                `Photo file not found during metadata extraction: ${photoPath}`,
+              );
+              return {
+                type: 'SHARP_ERROR' as const,
+                message: 'File not found',
+              };
+            })
+            .with(P.union('EACCES', 'EPERM'), () => {
+              // 権限エラー → ユーザーに通知すべき
+              logger.warn({
+                message: `Permission denied reading photo: ${photoPath}`,
+                stack:
+                  error instanceof Error ? error : new Error(String(error)),
               });
+              return {
+                type: 'SHARP_ERROR' as const,
+                message: nodeError.message ?? 'Permission denied',
+              };
+            })
+            .otherwise(() => {
+              // sharpの内部エラー、破損ファイル等 → Sentry送信のため再スロー
+              // デバッグのためファイルパス情報を付加
+              const contextualError = new Error(
+                `Sharp processing failed for: ${photoPath}`,
+                { cause: error },
+              );
+              throw contextualError;
+            });
+        },
+      );
+
+      if (metadataResult.isErr()) {
+        return null;
+      }
+
+      const metadata = metadataResult.value;
+      const height = metadata.height ?? 720;
+      const width = metadata.width ?? 1280;
+
+      // メタデータが不完全な場合は警告ログを出力（デバッグ用）
+      if (!metadata.height || !metadata.width) {
+        logger.warn({
+          message: `Missing dimension metadata for photo, using defaults`,
+          details: {
+            photoPath,
+            hasHeight: !!metadata.height,
+            hasWidth: !!metadata.width,
+            defaultsUsed: { height, width },
           },
-        );
-
-        if (metadataResult.isErr()) {
-          return null;
-        }
-
-        const metadata = metadataResult.value;
-        height = metadata.height ?? 720;
-        width = metadata.width ?? 1280;
-
-        // メタデータが不完全な場合は警告ログを出力（デバッグ用）
-        if (!metadata.height || !metadata.width) {
-          logger.warn({
-            message: `Missing dimension metadata for photo, using defaults`,
-            details: {
-              photoPath,
-              hasHeight: !!metadata.height,
-              hasWidth: !!metadata.width,
-              defaultsUsed: { height, width },
-            },
-          });
-        }
+        });
       }
 
       return {
