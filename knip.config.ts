@@ -1,18 +1,27 @@
 import type { KnipConfig } from 'knip';
 
+/**
+ * Knip configuration for unused code detection
+ *
+ * Note: Using flat structure instead of workspaces because this is not a monorepo.
+ * The workspace hints are informational and can be ignored.
+ * Use `yarn knip --no-config-hints` to suppress them.
+ */
 const config: KnipConfig = {
   entry: [
+    // Renderer process
     'src/main.tsx',
+    // Main process
     'electron/index.ts',
     'electron/preload.ts',
     'electron/api.ts',
     'electron/vite.config.ts',
-    'vitest.config.ts',
-    // Add tRPC controllers as entry points since they're used dynamically
+    // tRPC controllers are used dynamically
     'electron/module/**/controller/*.ts',
     'electron/module/**/*Controller.ts',
   ],
-  project: ['src/**/*.ts', 'src/**/*.tsx', 'electron/**/*.ts'],
+  // Note: vitest.config.ts is auto-detected by knip's vitest plugin
+  project: ['src/**/*.{ts,tsx}', 'electron/**/*.ts'],
   ignoreBinaries: ['only-allow'],
   ignoreDependencies: [
     '@types/sharp',
