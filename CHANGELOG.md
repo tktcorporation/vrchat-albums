@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
+- ValidWidth 型で起動時のギャラリー幅 0 問題を根本修正 (#667)
+- UseContainerWidth を Callback Ref パターンに変更 (#668)
+- 写真一覧の無限ロード問題を修正 (#670) (#671)
+- Ensure GritQL CLI works in restricted network environments (#672)
+- Electron-is-dev を削除して app.isPackaged に置き換え (#674)
+
+### ⚙️ Miscellaneous Tasks
+
+- Upgrade dependencies and add Node.js version check (#669)
+- Upgrade Yarn from 4.1.0 to 4.12.0 (#673)
+
+## [0.24.0] - 2025-12-31
+
+### 🐛 Bug Fixes
+
 - 起動時のフォトギャラリー幅初期化にリトライ機構を追加 (#663)
 - Improve Playwright test stability in devcontainer (#664)
 
@@ -19,7 +34,7 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Bump version to 0.24.0
+- Bump version to 0.24.0 (#666)
 
 ### Debug
 
