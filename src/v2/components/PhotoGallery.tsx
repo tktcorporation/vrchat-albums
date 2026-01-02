@@ -156,11 +156,13 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
     <div className="flex flex-col h-full">
       <MigrationDialog />
       <GalleryContent
-        searchQuery={searchQuery}
-        searchType={searchType}
         isLoadingStartupSync={props.isLoadingStartupSync}
         isLoadingGrouping={props.isLoadingGrouping}
-        finishLoadingGrouping={props.finishLoadingGrouping}
+        groupedPhotos={groupedPhotos}
+        selectedPhotos={selectedPhotos}
+        setSelectedPhotos={setSelectedPhotos}
+        isMultiSelectMode={isMultiSelectMode}
+        setIsMultiSelectMode={setIsMultiSelectMode}
         galleryData={galleryData}
       />
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}

@@ -18,8 +18,7 @@ import type { PhotoGalleryData } from '../PhotoGallery';
 import PhotoGrid from '../PhotoGrid';
 import { DateJumpSidebar } from './DateJumpSidebar';
 import { GalleryErrorBoundary } from './GalleryErrorBoundary';
-import type { GroupedPhoto } from './useGroupPhotos';
-import { usePhotoGallery } from './usePhotoGallery';
+import type { GroupedPhoto, GroupedPhotos } from './useGroupPhotos';
 
 /**
  * ギャラリーコンテンツコンポーネントのプロパティ定義
@@ -27,12 +26,20 @@ import { usePhotoGallery } from './usePhotoGallery';
 interface GalleryContentProps
   extends Pick<
     UseLoadingStateResult,
-    'isLoadingStartupSync' | 'isLoadingGrouping' | 'finishLoadingGrouping'
+    'isLoadingStartupSync' | 'isLoadingGrouping'
   > {
-  /** ヘッダーから渡される検索クエリ */
-  searchQuery: string;
-  /** 検索タイプ（world | player | undefined） */
-  searchType?: 'world' | 'player';
+  /** グループ化された写真データ（親から渡される） */
+  groupedPhotos: GroupedPhotos;
+  /** 選択された写真のID配列 */
+  selectedPhotos: string[];
+  /** 選択された写真を更新するハンドラ */
+  setSelectedPhotos: (
+    update: string[] | ((prev: string[]) => string[]),
+  ) => void;
+  /** 複数選択モードかどうか */
+  isMultiSelectMode: boolean;
+  /** 複数選択モードを切り替えるハンドラ */
+  setIsMultiSelectMode: (value: boolean) => void;
   /** ギャラリーデータ（統合AppHeaderに渡す） */
   galleryData?: PhotoGalleryData;
 }
@@ -93,7 +100,6 @@ interface VirtualizedGalleryProps {
   setIsMultiSelectMode: (value: boolean) => void;
   isLoading: boolean;
   galleryData?: PhotoGalleryData;
-  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -112,12 +118,14 @@ const VirtualizedGallery = memo(
     setIsMultiSelectMode,
     isLoading,
     galleryData,
-    containerRef,
   }: VirtualizedGalleryProps) => {
     const [currentGroupIndex, setCurrentGroupIndex] = useState<
       number | undefined
     >(undefined);
     const observerRef = useRef<IntersectionObserver | null>(null);
+
+    // スクロールコンテナへの参照（virtualizer用）
+    const scrollElementRef = useRef<HTMLDivElement>(null);
 
     // ValidWidth を number として使用（型は保証済み）
     const widthValue = width as number;
@@ -131,9 +139,10 @@ const VirtualizedGallery = memo(
     const layoutCalculator = useMemo(() => new JustifiedLayoutCalculator(), []);
 
     // 仮想スクローラーの設定
+    // Note: scrollElementRef を使用して実際のスクロール要素を監視
     const virtualizer = useVirtualizer({
       count: filteredGroups.length,
-      getScrollElement: () => containerRef.current,
+      getScrollElement: () => scrollElementRef.current,
       estimateSize: useCallback(
         (index) => {
           const [, group] = filteredGroups[index];
@@ -154,6 +163,16 @@ const VirtualizedGallery = memo(
     useEffect(() => {
       virtualizer.measure();
     }, [widthValue, virtualizer]);
+
+    // filteredGroups の内容が変更されたらサイズを再計算
+    // （写真がロードされた時など）
+    const totalPhotosCount = useMemo(
+      () => filteredGroups.reduce((sum, [, g]) => sum + g.photos.length, 0),
+      [filteredGroups],
+    );
+    useEffect(() => {
+      virtualizer.measure();
+    }, [totalPhotosCount, virtualizer, filteredGroups.length]);
 
     // 日付ジャンプハンドラー
     const handleJumpToDate = useCallback(
@@ -200,7 +219,7 @@ const VirtualizedGallery = memo(
 
     // IntersectionObserverでビューポート内のグループを検知
     useEffect(() => {
-      if (!containerRef.current) return;
+      if (!scrollElementRef.current) return;
 
       const observer = new IntersectionObserver(
         (entries) => {
@@ -221,7 +240,7 @@ const VirtualizedGallery = memo(
           }
         },
         {
-          root: containerRef.current,
+          root: scrollElementRef.current,
           rootMargin: '-10% 0px -80% 0px',
           threshold: 0,
         },
@@ -232,7 +251,7 @@ const VirtualizedGallery = memo(
       return () => {
         observer.disconnect();
       };
-    }, [containerRef]);
+    }, []);
 
     const handleBackgroundClick = useCallback(
       (
@@ -240,23 +259,19 @@ const VirtualizedGallery = memo(
           | React.MouseEvent<HTMLDivElement>
           | React.KeyboardEvent<HTMLDivElement>,
       ) => {
-        if (event.target === containerRef.current && isMultiSelectMode) {
+        if (event.target === scrollElementRef.current && isMultiSelectMode) {
           setSelectedPhotos([]);
           setIsMultiSelectMode(false);
         }
       },
-      [
-        containerRef,
-        isMultiSelectMode,
-        setSelectedPhotos,
-        setIsMultiSelectMode,
-      ],
+      [isMultiSelectMode, setSelectedPhotos, setIsMultiSelectMode],
     );
 
     return (
       <>
         <div
-          className="flex-1 overflow-y-auto p-4 pr-4 scrollbar-none"
+          ref={scrollElementRef}
+          className="flex-1 min-h-0 overflow-y-auto p-4 pr-4 scrollbar-none"
           onClick={handleBackgroundClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -346,7 +361,7 @@ const VirtualizedGallery = memo(
           groups={groupsArray}
           onJumpToDate={handleJumpToDate}
           currentGroupIndex={currentGroupIndex}
-          scrollContainer={containerRef.current}
+          scrollContainer={scrollElementRef.current}
         />
       </>
     );
@@ -380,38 +395,18 @@ VirtualizedGallery.displayName = 'VirtualizedGallery';
  */
 const GalleryContent = memo(
   ({
-    searchQuery,
-    searchType,
     isLoadingStartupSync,
     isLoadingGrouping,
-    finishLoadingGrouping,
+    groupedPhotos,
+    selectedPhotos,
+    setSelectedPhotos,
+    isMultiSelectMode,
+    setIsMultiSelectMode,
     galleryData,
   }: GalleryContentProps) => {
-    const {
-      groupedPhotos,
-      selectedPhotos,
-      setSelectedPhotos,
-      isMultiSelectMode,
-      setIsMultiSelectMode,
-    } = usePhotoGallery(searchQuery, searchType, {
-      onGroupingEnd: finishLoadingGrouping,
-    });
-
-    // VirtualizedGallery の getScrollElement 用 RefObject
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-
     // Callback Ref パターンで幅を測定
     const { containerRef: widthCallbackRef, widthState } = useContainerWidth(
       LAYOUT_CONSTANTS.GALLERY_CONTAINER_PADDING,
-    );
-
-    // Callback ref と RefObject を統合
-    const combinedRef = useCallback(
-      (node: HTMLDivElement | null) => {
-        scrollContainerRef.current = node;
-        widthCallbackRef(node);
-      },
-      [widthCallbackRef],
     );
 
     // 全てのグループを表示（写真があるグループもないグループも）
@@ -447,7 +442,7 @@ const GalleryContent = memo(
           />
         )}
         {/* コンテナは常にレンダリング（幅測定のため） */}
-        <div ref={combinedRef} className="flex-1 flex flex-col">
+        <div ref={widthCallbackRef} className="flex-1 min-h-0 flex flex-col">
           {match(widthState)
             .with({ status: 'measuring' }, () => <MeasuringSkeleton />)
             .with({ status: 'ready' }, ({ width }) => (
@@ -461,7 +456,6 @@ const GalleryContent = memo(
                 setIsMultiSelectMode={setIsMultiSelectMode}
                 isLoading={isLoading}
                 galleryData={galleryData}
-                containerRef={scrollContainerRef}
               />
             ))
             .exhaustive()}

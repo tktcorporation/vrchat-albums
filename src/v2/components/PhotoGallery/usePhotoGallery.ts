@@ -76,6 +76,12 @@ export function usePhotoGallery(
     isMultiSelectModeAtom,
   );
 
+  console.log('[usePhotoGallery] Hook called', {
+    searchQuery,
+    searchType,
+    hasOnGroupingEnd: !!options?.onGroupingEnd,
+  });
+
   const { data: photoListRaw, isLoading: isLoadingPhotos } =
     trpcReact.vrchatPhoto.getVrchatPhotoPathModelList.useQuery(
       {
@@ -86,6 +92,11 @@ export function usePhotoGallery(
         refetchOnWindowFocus: false,
       },
     );
+
+  console.log('[usePhotoGallery] Query state', {
+    isLoadingPhotos,
+    photoListRawLength: photoListRaw?.length,
+  });
 
   const photoList: Photo[] = useMemo(() => {
     if (!photoListRaw) return [];
