@@ -89,6 +89,9 @@
   "simple-git-hooks": {
     "pre-commit": "yarn lint:biome && yarn lint:type-check"
   },
+  "resolutions": {
+    "cacache/glob": "10.5.0"
+  },
   "packageManager": "yarn@4.12.0",
   "engines": {
     "node": "22",
