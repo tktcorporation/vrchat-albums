@@ -57,6 +57,9 @@ export default ({ command }: ConfigEnv): UserConfig => {
         authToken: process.env.SENTRY_AUTH_TOKEN,
         org: process.env.SENTRY_ORG,
         project: process.env.SENTRY_PROJECT,
+        release: {
+          name: process.env.SENTRY_RELEASE,
+        },
       }),
     ],
     resolve: {
