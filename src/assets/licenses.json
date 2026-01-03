@@ -275,11 +275,11 @@
     "path": "node_modules/@electron/get",
     "licenseFile": "node_modules/@electron/get/LICENSE"
   },
-  "@esbuild/linux-arm64@0.27.2": {
+  "@esbuild/linux-x64@0.27.2": {
     "licenses": "MIT",
     "repository": "https://github.com/evanw/esbuild",
-    "path": "node_modules/@esbuild/linux-arm64",
-    "licenseFile": "node_modules/@esbuild/linux-arm64/README.md"
+    "path": "node_modules/@esbuild/linux-x64",
+    "licenseFile": "node_modules/@esbuild/linux-x64/README.md"
   },
   "@floating-ui/core@1.7.1": {
     "licenses": "MIT",
@@ -323,21 +323,21 @@
     "path": "node_modules/@img/colour",
     "licenseFile": "node_modules/@img/colour/LICENSE.md"
   },
-  "@img/sharp-libvips-linux-arm64@1.2.4": {
+  "@img/sharp-libvips-linux-x64@1.2.4": {
     "licenses": "LGPL-3.0-or-later",
     "repository": "https://github.com/lovell/sharp-libvips",
     "publisher": "Lovell Fuller",
     "email": "npm@lovell.info",
-    "path": "node_modules/sharp/node_modules/@img/sharp-libvips-linux-arm64",
-    "licenseFile": "node_modules/sharp/node_modules/@img/sharp-libvips-linux-arm64/README.md"
+    "path": "node_modules/@img/sharp-libvips-linux-x64",
+    "licenseFile": "node_modules/@img/sharp-libvips-linux-x64/README.md"
   },
-  "@img/sharp-linux-arm64@0.34.5": {
+  "@img/sharp-linux-x64@0.34.5": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/lovell/sharp",
     "publisher": "Lovell Fuller",
     "email": "npm@lovell.info",
-    "path": "node_modules/sharp/node_modules/@img/sharp-linux-arm64",
-    "licenseFile": "node_modules/sharp/node_modules/@img/sharp-linux-arm64/LICENSE"
+    "path": "node_modules/@img/sharp-linux-x64",
+    "licenseFile": "node_modules/@img/sharp-linux-x64/LICENSE"
   },
   "@isaacs/balanced-match@4.0.1": {
     "licenses": "MIT",
@@ -971,12 +971,19 @@
     "path": "node_modules/@rolldown/pluginutils",
     "licenseFile": "node_modules/@rolldown/pluginutils/LICENSE"
   },
-  "@rollup/rollup-linux-arm64-gnu@4.46.2": {
+  "@rollup/rollup-linux-x64-gnu@4.46.2": {
     "licenses": "MIT",
     "repository": "https://github.com/rollup/rollup",
     "publisher": "Lukas Taegert-Atkinson",
-    "path": "node_modules/@rollup/rollup-linux-arm64-gnu",
-    "licenseFile": "node_modules/@rollup/rollup-linux-arm64-gnu/README.md"
+    "path": "node_modules/rollup/node_modules/@rollup/rollup-linux-x64-gnu",
+    "licenseFile": "node_modules/rollup/node_modules/@rollup/rollup-linux-x64-gnu/README.md"
+  },
+  "@rollup/rollup-linux-x64-gnu@4.54.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rollup/rollup",
+    "publisher": "Lukas Taegert-Atkinson",
+    "path": "node_modules/@rollup/rollup-linux-x64-gnu",
+    "licenseFile": "node_modules/@rollup/rollup-linux-x64-gnu/README.md"
   },
   "@sentry-internal/browser-utils@10.29.0": {
     "licenses": "MIT",
@@ -1027,17 +1034,17 @@
     "path": "node_modules/@sentry/bundler-plugin-core",
     "licenseFile": "node_modules/@sentry/bundler-plugin-core/LICENSE"
   },
-  "@sentry/cli-linux-arm64@2.58.4": {
+  "@sentry/cli-linux-x64@2.58.4": {
     "licenses": "MIT*",
     "repository": "https://github.com/getsentry/sentry-cli",
-    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64",
-    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64/README.md"
+    "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-x64",
+    "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-x64/README.md"
   },
-  "@sentry/cli-linux-arm64@3.0.1": {
+  "@sentry/cli-linux-x64@3.0.1": {
     "licenses": "MIT*",
     "repository": "https://github.com/getsentry/sentry-cli",
-    "path": "node_modules/@sentry/cli-linux-arm64",
-    "licenseFile": "node_modules/@sentry/cli-linux-arm64/README.md"
+    "path": "node_modules/@sentry/cli-linux-x64",
+    "licenseFile": "node_modules/@sentry/cli-linux-x64/README.md"
   },
   "@sentry/cli@2.58.4": {
     "licenses": "MIT*",
@@ -1135,11 +1142,11 @@
     "path": "node_modules/@tailwindcss/node",
     "licenseFile": "node_modules/@tailwindcss/node/LICENSE"
   },
-  "@tailwindcss/oxide-linux-arm64-gnu@4.1.18": {
+  "@tailwindcss/oxide-linux-x64-gnu@4.1.18": {
     "licenses": "MIT",
     "repository": "https://github.com/tailwindlabs/tailwindcss",
-    "path": "node_modules/@tailwindcss/oxide-linux-arm64-gnu",
-    "licenseFile": "node_modules/@tailwindcss/oxide-linux-arm64-gnu/LICENSE"
+    "path": "node_modules/@tailwindcss/oxide-linux-x64-gnu",
+    "licenseFile": "node_modules/@tailwindcss/oxide-linux-x64-gnu/LICENSE"
   },
   "@tailwindcss/oxide@4.1.18": {
     "licenses": "MIT",
@@ -1816,11 +1823,11 @@
     "path": "node_modules/clean-stack",
     "licenseFile": "node_modules/clean-stack/license"
   },
-  "clip-filepaths-linux-arm64-gnu@0.3.0": {
+  "clip-filepaths-linux-x64-gnu@0.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/tktcorporation/clip-filepaths",
-    "path": "node_modules/clip-filepaths-linux-arm64-gnu",
-    "licenseFile": "node_modules/clip-filepaths-linux-arm64-gnu/README.md"
+    "path": "node_modules/clip-filepaths-linux-x64-gnu",
+    "licenseFile": "node_modules/clip-filepaths-linux-x64-gnu/README.md"
   },
   "clip-filepaths@0.3.0": {
     "licenses": "MIT",
@@ -3074,11 +3081,11 @@
     "path": "node_modules/lazy-val",
     "licenseFile": "node_modules/lazy-val/readme.md"
   },
-  "lightningcss-linux-arm64-gnu@1.30.2": {
+  "lightningcss-linux-x64-gnu@1.30.2": {
     "licenses": "MPL-2.0",
     "repository": "https://github.com/parcel-bundler/lightningcss",
-    "path": "node_modules/lightningcss-linux-arm64-gnu",
-    "licenseFile": "node_modules/lightningcss-linux-arm64-gnu/LICENSE"
+    "path": "node_modules/lightningcss-linux-x64-gnu",
+    "licenseFile": "node_modules/lightningcss-linux-x64-gnu/LICENSE"
   },
   "lightningcss@1.30.2": {
     "licenses": "MPL-2.0",
@@ -5224,7 +5231,7 @@
     "path": "node_modules/vite",
     "licenseFile": "node_modules/vite/LICENSE.md"
   },
-  "vrchat-albums@0.26.0": {
+  "vrchat-albums@0.25.1": {
     "licenses": "Custom: https://github.com/tktcorporation/vrchat-albums/releases",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",

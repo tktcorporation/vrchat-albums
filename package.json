@@ -167,7 +167,6 @@
     "@types/node": "~22.15.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "@types/sharp": "0.32.0",
     "@typescript/native-preview": "~7.0.0-dev.20251231.1",
     "@vitest/coverage-v8": "^4.0.16",
     "@welldone-software/why-did-you-render": "^10.0.1",
