@@ -17,13 +17,16 @@ import {
   VRChatPhotoContainingFolderPathSchema,
 } from './../../lib/brandedTypes';
 import { logger } from './../../lib/logger';
-import { MemoryMonitor } from './../../lib/memoryMonitor';
+import {
+  getGlobalMemoryMonitor,
+  MemoryMonitor,
+} from './../../lib/memoryMonitor';
 import {
   clearSharpCache,
   initializeSharp,
   isSharpInitialized,
+  restoreDefaultMode,
   switchToLowMemoryMode,
-  switchToNormalMode,
 } from './../../lib/sharpConfig';
 import * as fs from './../../lib/wrappedFs';
 import { emitProgress } from '../initProgress/emitter';
@@ -608,18 +611,10 @@ export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
 // バッチサイズ定数
 const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（sharp処理は重いため小さく）
 
-/**
- * Playwright環境かどうかを判定
- * GLib-GObject競合を避けるため、テスト環境ではSharp操作を完全に直列化する
- */
-const isPlaywrightEnvironment = (): boolean => {
-  return process.env.PLAYWRIGHT_TEST === 'true';
-};
-
-// 並列処理の制限（メモリ効率のため控えめに設定）
-// Playwright環境ではGLib-GObject競合を避けるため、完全に直列化（並列数=1）
-const SHARP_PARALLEL_LIMIT = isPlaywrightEnvironment() ? 1 : 5;
-const THUMBNAIL_PARALLEL_LIMIT = isPlaywrightEnvironment() ? 1 : 8;
+// 並列処理のデフォルト値
+// 実際の並列数はメモリ監視に基づいて動的に調整される
+const DEFAULT_SHARP_PARALLEL_LIMIT = 5;
+const DEFAULT_THUMBNAIL_PARALLEL_LIMIT = 8;
 
 // メモリ監視の閾値
 const MEMORY_WARNING_THRESHOLD_MB = 1024; // 1GB
@@ -1028,16 +1023,20 @@ async function processPhotoBatch(
     height: number;
   }> = [];
 
-  // 並列処理数を制限しながらバッチ処理
-  for (let i = 0; i < photoPaths.length; i += SHARP_PARALLEL_LIMIT) {
-    const subBatch = photoPaths.slice(i, i + SHARP_PARALLEL_LIMIT);
+  // 並列処理数をメモリ使用量に基づいて動的に調整
+  // memoryMonitorが渡されていればそれを使用、なければグローバルモニターを使用
+  const monitor = memoryMonitor ?? getGlobalMemoryMonitor();
+  const parallelLimit = monitor.getRecommendedParallelLimit(
+    DEFAULT_SHARP_PARALLEL_LIMIT,
+  );
 
-    // メモリ監視（オプション）
-    if (memoryMonitor) {
-      await memoryMonitor.checkMemory(
-        `processPhotoBatch subBatch ${Math.floor(i / SHARP_PARALLEL_LIMIT) + 1}`,
-      );
-    }
+  for (let i = 0; i < photoPaths.length; i += parallelLimit) {
+    const subBatch = photoPaths.slice(i, i + parallelLimit);
+
+    // メモリ監視
+    await monitor.checkMemory(
+      `processPhotoBatch subBatch ${Math.floor(i / parallelLimit) + 1}`,
+    );
 
     const photoInfoPromises = subBatch.map(async (photoPath) => {
       const matchResult = photoPath.match(
@@ -1410,9 +1409,9 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
 
   if (totalProcessed === 0) {
     logger.debug('No new photos found to index.');
-    // フルスキャン後は通常モードに戻す
+    // フルスキャン後はデフォルト設定に戻す
     if (!isIncremental) {
-      switchToNormalMode();
+      restoreDefaultMode();
     }
     return [];
   }
@@ -1420,9 +1419,9 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   // メモリ使用状況のサマリーをログ出力
   memoryMonitor.logSummary('createVRChatPhotoPathIndex');
 
-  // フルスキャン後は通常モードに戻す
+  // フルスキャン後はデフォルト設定に戻す
   if (!isIncremental) {
-    switchToNormalMode();
+    restoreDefaultMode();
   }
 
   logger.info(
@@ -1631,9 +1630,14 @@ export const getBatchThumbnails = async (
   const success = new Map<string, string>();
   const failed: BatchThumbnailResult['failed'] = [];
 
-  // 並列処理数を制限しながらバッチ処理
-  for (let i = 0; i < photoPaths.length; i += THUMBNAIL_PARALLEL_LIMIT) {
-    const batch = photoPaths.slice(i, i + THUMBNAIL_PARALLEL_LIMIT);
+  // 並列処理数をメモリ使用量に基づいて動的に調整
+  const monitor = getGlobalMemoryMonitor();
+  const thumbnailParallelLimit = monitor.getRecommendedParallelLimit(
+    DEFAULT_THUMBNAIL_PARALLEL_LIMIT,
+  );
+
+  for (let i = 0; i < photoPaths.length; i += thumbnailParallelLimit) {
+    const batch = photoPaths.slice(i, i + thumbnailParallelLimit);
 
     const thumbnailPromises = batch.map(async (photoPath) => {
       // getVRChatPhotoItemData は予期しないエラーを throw するため

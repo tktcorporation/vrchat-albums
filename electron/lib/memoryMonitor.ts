@@ -176,6 +176,49 @@ export class MemoryMonitor {
       },
     });
   }
+
+  /**
+   * 現在のメモリ使用量に基づいて推奨並列数を取得
+   *
+   * メモリ圧迫時は自動的に並列数を下げることで、
+   * テスト環境と本番環境で同じロジックでメモリ制御を行う。
+   *
+   * @param defaultLimit デフォルトの並列数（メモリに余裕がある場合に使用）
+   * @returns 現在のメモリ状況に応じた推奨並列数
+   *
+   * ## 動作
+   * - クリティカル閾値超過: 1（直列化してメモリ解放を促す）
+   * - 警告閾値超過: defaultLimit の半分（メモリ圧迫を緩和）
+   * - 正常: defaultLimit をそのまま返す
+   */
+  getRecommendedParallelLimit(defaultLimit: number): number {
+    const snapshot = getMemorySnapshot();
+
+    // ピークRSSを更新
+    if (snapshot.rssMB > this.peakRssMB) {
+      this.peakRssMB = snapshot.rssMB;
+    }
+
+    // クリティカル閾値超過: 直列化
+    if (snapshot.rssMB > this.config.rssCriticalThresholdMB) {
+      return 1;
+    }
+
+    // 警告閾値超過: 並列数を半減
+    if (snapshot.rssMB > this.config.rssWarningThresholdMB) {
+      return Math.max(1, Math.floor(defaultLimit / 2));
+    }
+
+    // 正常: デフォルト値
+    return defaultLimit;
+  }
+
+  /**
+   * 設定を取得（テスト用）
+   */
+  getConfig(): MemoryMonitorConfig {
+    return { ...this.config };
+  }
 }
 
 /**
