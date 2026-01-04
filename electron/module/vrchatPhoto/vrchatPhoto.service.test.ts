@@ -24,8 +24,23 @@ vi.mock('sharp', () => {
     resize: vi.fn().mockReturnThis(),
     toBuffer: vi.fn().mockResolvedValue(Buffer.from('mockImageData')),
   };
+  const mockSharp = vi.fn(() => mockSharpInstance);
+  // 静的メソッドを追加（sharpConfig.tsで使用）
+  (mockSharp as unknown as Record<string, unknown>).concurrency = vi.fn(
+    () => 2,
+  );
+  (mockSharp as unknown as Record<string, unknown>).cache = vi.fn(() => ({
+    memory: { current: 0, high: 0, max: 50 },
+    files: { current: 0, max: 10 },
+    items: { current: 0, max: 50 },
+  }));
+  (mockSharp as unknown as Record<string, unknown>).simd = vi.fn(() => true);
+  (mockSharp as unknown as Record<string, unknown>).versions = {
+    vips: '8.17.0',
+    sharp: '0.34.0',
+  };
   return {
-    default: vi.fn(() => mockSharpInstance),
+    default: mockSharp,
   };
 });
 vi.mock('./../../lib/logger', () => ({
