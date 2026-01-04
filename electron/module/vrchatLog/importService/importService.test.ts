@@ -3,12 +3,8 @@ import { promises as fs } from 'node:fs';
 import * as neverthrow from 'neverthrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as logSyncModule from '../../logSync/service';
-import type {
-  BackupError,
-  DBLogProvider,
-} from '../backupService/backupService';
+import type { BackupError } from '../backupService/backupService';
 import * as backupServiceModule from '../backupService/backupService';
-import type { LogRecord } from '../converters/dbToLogStore';
 import * as logStorageManagerModule from '../fileHandlers/logStorageManager';
 import { getImportErrorMessage, importService } from './importService';
 
@@ -55,10 +51,6 @@ describe('importService', () => {
     vi.restoreAllMocks();
   });
 
-  const mockGetDBLogs: DBLogProvider = async () => {
-    return [] as LogRecord[];
-  };
-
   describe('importLogStoreFiles', () => {
     it('ファイルをインポートできる', async () => {
       const filePaths = ['/path/to/logStore-2023-11.txt'];
@@ -101,10 +93,7 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        filePaths,
-        mockGetDBLogs,
-      );
+      const result = await importService.importLogStoreFiles(filePaths);
 
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
@@ -117,7 +106,7 @@ describe('importService', () => {
       // バックアップが作成されたことを確認
       expect(
         backupServiceModule.backupService.createPreImportBackup,
-      ).toHaveBeenCalledWith(mockGetDBLogs);
+      ).toHaveBeenCalled();
 
       // DB同期が実行されたことを確認
       expect(logSyncModule.syncLogs).toHaveBeenCalledWith('incremental');
@@ -192,10 +181,7 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        [dirPath],
-        mockGetDBLogs,
-      );
+      const result = await importService.importLogStoreFiles([dirPath]);
 
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
@@ -213,10 +199,7 @@ describe('importService', () => {
 
       vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
-      const result = await importService.importLogStoreFiles(
-        filePaths,
-        mockGetDBLogs,
-      );
+      const result = await importService.importLogStoreFiles(filePaths);
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
@@ -243,10 +226,7 @@ describe('importService', () => {
         backupServiceModule.backupService.createPreImportBackup,
       ).mockResolvedValue(neverthrow.err(backupError));
 
-      const result = await importService.importLogStoreFiles(
-        filePaths,
-        mockGetDBLogs,
-      );
+      const result = await importService.importLogStoreFiles(filePaths);
 
       expect(result.isErr()).toBe(true);
       if (result.isErr()) {
@@ -325,10 +305,7 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        paths,
-        mockGetDBLogs,
-      );
+      const result = await importService.importLogStoreFiles(paths);
 
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
@@ -383,10 +360,7 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        filePaths,
-        mockGetDBLogs,
-      );
+      const result = await importService.importLogStoreFiles(filePaths);
 
       // 処理自体は成功する（無効な行も含めて処理される）
       expect(result.isOk()).toBe(true);
@@ -490,10 +464,7 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        paths,
-        mockGetDBLogs,
-      );
+      const result = await importService.importLogStoreFiles(paths);
 
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {

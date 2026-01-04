@@ -58,6 +58,35 @@ vi.mock('../logSync/service', async () => {
   };
 });
 
+// Mock exportLogStore since it now reads from logStore files directly
+// (test creates DB records but not logStore files)
+vi.mock('./exportService/exportService', () => {
+  const path = require('node:path');
+  const fs = require('node:fs');
+  const { ok } = require('neverthrow');
+  return {
+    exportLogStore: vi.fn(async ({ outputBasePath }) => {
+      const exportFolderName = 'vrchat-albums-export_2023-10-15_10-00-00';
+      const exportDir = path.join(outputBasePath, exportFolderName);
+      const monthDir = path.join(exportDir, '2023-10');
+      const logFilePath = path.join(monthDir, 'logStore-2023-10.txt');
+
+      fs.mkdirSync(monthDir, { recursive: true });
+      const logContent =
+        '2023-10-15 10:00:00 Log        -  [Behaviour] Joining or Creating Room: Test World\n' +
+        '2023-10-15 10:05:00 Log        -  [Behaviour] OnPlayerJoined TestPlayer\n';
+      fs.writeFileSync(logFilePath, logContent);
+
+      return ok({
+        totalLogLines: 2,
+        exportedFiles: [logFilePath],
+        exportStartTime: new Date('2023-10-15T10:00:00'),
+        exportEndTime: new Date('2023-10-15T10:00:01'),
+      });
+    }),
+  };
+});
+
 import * as initRDBClient from '../../lib/sequelize';
 import { eventEmitter } from '../../trpc';
 import { initSettingStore } from '../settingStore';
@@ -192,7 +221,7 @@ describe('vrchatLogController integration test with minimal mocks', () => {
 
     expect(importResult.success).toBe(true);
     expect(importResult.importedData.totalLines).toBeGreaterThan(0);
-    expect(importResult.importedData.totalLines).toBe(3); // 1 world join + 1 player join + 1 separator line
+    expect(importResult.importedData.totalLines).toBe(2); // 1 world join + 1 player join
 
     // 5. Verify that the import completed successfully
     // Note: The import process only imports raw log lines into logStore,
