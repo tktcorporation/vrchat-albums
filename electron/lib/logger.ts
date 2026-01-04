@@ -116,35 +116,63 @@ const error = ({ message, stack, details }: ErrorLogParams): void => {
     },
   );
 
-  // UserFacingErrorの場合はSentryに送信しない（意図的に処理されたエラーのため）
-  const shouldSendToSentry = !(normalizedError instanceof UserFacingError);
+  // UserFacingErrorの場合でもcauseがあればSentryに送信（予期しないエラーの詳細を取得するため）
+  // causeがない純粋なUserFacingErrorは意図的に処理されたエラーなので送信しない
+  const userFacingError = match(normalizedError)
+    .with(P.instanceOf(UserFacingError), (e) => e)
+    .otherwise(() => null);
+
+  const causeError = match(userFacingError?.errorInfo?.cause)
+    .with(P.instanceOf(Error), (e) => e)
+    .otherwise(() => null);
+
+  const shouldSendToSentry = match({ userFacingError, causeError })
+    .with({ userFacingError: P.nullish }, () => true) // 通常のエラー → 送信
+    .with({ causeError: P.not(P.nullish) }, () => true) // UserFacingError with cause → 送信
+    .otherwise(() => false); // UserFacingError without cause → スキップ
 
   // 規約同意済みかつハンドルされていないエラーの場合のみSentryへ送信
   match({ termsAccepted, shouldSendToSentry })
     .with({ termsAccepted: true, shouldSendToSentry: true }, () => {
       log.debug('Attempting to send error to Sentry...');
+      // UserFacingErrorの場合はcauseを送信、それ以外は元のエラーを送信
+      const errorToSend = causeError ?? errorInfo;
       const sendResult = Result.fromThrowable(
         () => {
-          captureException(errorInfo, {
+          captureException(errorToSend, {
             extra: {
               ...(stack ? { stack: stackWithCauses(stack) } : {}),
               ...(details ? { details } : {}),
+              // UserFacingErrorの場合は追加情報を付与
+              ...(userFacingError
+                ? {
+                    userFacingMessage: userFacingError.message,
+                    errorCode: userFacingError.errorInfo?.code,
+                    errorCategory: userFacingError.errorInfo?.category,
+                  }
+                : {}),
             },
             tags: {
               source: 'electron-main',
+              ...(userFacingError ? { hasUserFacingWrapper: 'true' } : {}),
             },
           });
         },
         (error) => error,
       )();
       sendResult.match(
-        () => log.debug('Error sent to Sentry successfully'),
+        () =>
+          log.debug(
+            `Error sent to Sentry successfully${causeError ? ' (cause from UserFacingError)' : ''}`,
+          ),
         (sentryError) =>
           log.debug('Failed to send error to Sentry:', sentryError),
       );
     })
     .with({ termsAccepted: true, shouldSendToSentry: false }, () => {
-      log.debug('UserFacingError detected, skipping Sentry (handled error)');
+      log.debug(
+        'UserFacingError without cause detected, skipping Sentry (handled error)',
+      );
     })
     .with({ termsAccepted: false }, () => {
       log.debug('Terms not accepted, skipping Sentry error');
