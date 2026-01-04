@@ -16,6 +16,7 @@ import {
   type VRChatPhotoContainingFolderPath,
   VRChatPhotoContainingFolderPathSchema,
 } from './../../lib/brandedTypes';
+import { isLinuxPlatform } from './../../lib/environment';
 import { logger } from './../../lib/logger';
 import {
   getGlobalMemoryMonitor,
@@ -616,6 +617,20 @@ const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（sharp処理
 const DEFAULT_SHARP_PARALLEL_LIMIT = 5;
 const DEFAULT_THUMBNAIL_PARALLEL_LIMIT = 8;
 
+/**
+ * Sharp並列処理のベース値を取得
+ *
+ * Linux環境ではGLib-GObject競合を避けるため常に1を返す（シングルスレッド処理）。
+ * Windows/Mac環境ではデフォルト値を返し、メモリ監視で動的に調整される。
+ *
+ * @param defaultLimit デフォルトの並列数
+ * @returns Linux環境では1、それ以外はdefaultLimit
+ */
+const getSharpParallelBaseLimit = (defaultLimit: number): number => {
+  // Linux環境では常にシングルスレッド（GLib-GObject競合防止）
+  return isLinuxPlatform() ? 1 : defaultLimit;
+};
+
 // メモリ監視の閾値
 const MEMORY_WARNING_THRESHOLD_MB = 1024; // 1GB
 const MEMORY_CRITICAL_THRESHOLD_MB = 1536; // 1.5GB
@@ -1023,12 +1038,12 @@ async function processPhotoBatch(
     height: number;
   }> = [];
 
-  // 並列処理数をメモリ使用量に基づいて動的に調整
-  // memoryMonitorが渡されていればそれを使用、なければグローバルモニターを使用
+  // 並列処理数をプラットフォームとメモリ使用量に基づいて決定
+  // 1. Linux環境ではGLib-GObject競合防止のため1を使用
+  // 2. Windows/Mac環境ではメモリ監視で動的に調整
   const monitor = memoryMonitor ?? getGlobalMemoryMonitor();
-  const parallelLimit = monitor.getRecommendedParallelLimit(
-    DEFAULT_SHARP_PARALLEL_LIMIT,
-  );
+  const baseLimit = getSharpParallelBaseLimit(DEFAULT_SHARP_PARALLEL_LIMIT);
+  const parallelLimit = monitor.getRecommendedParallelLimit(baseLimit);
 
   for (let i = 0; i < photoPaths.length; i += parallelLimit) {
     const subBatch = photoPaths.slice(i, i + parallelLimit);
@@ -1630,11 +1645,11 @@ export const getBatchThumbnails = async (
   const success = new Map<string, string>();
   const failed: BatchThumbnailResult['failed'] = [];
 
-  // 並列処理数をメモリ使用量に基づいて動的に調整
+  // 並列処理数をプラットフォームとメモリ使用量に基づいて決定
+  // Linux環境ではGLib-GObject競合防止のため1を使用
   const monitor = getGlobalMemoryMonitor();
-  const thumbnailParallelLimit = monitor.getRecommendedParallelLimit(
-    DEFAULT_THUMBNAIL_PARALLEL_LIMIT,
-  );
+  const baseLimit = getSharpParallelBaseLimit(DEFAULT_THUMBNAIL_PARALLEL_LIMIT);
+  const thumbnailParallelLimit = monitor.getRecommendedParallelLimit(baseLimit);
 
   for (let i = 0; i < photoPaths.length; i += thumbnailParallelLimit) {
     const batch = photoPaths.slice(i, i + thumbnailParallelLimit);

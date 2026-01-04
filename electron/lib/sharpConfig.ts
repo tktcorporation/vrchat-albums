@@ -21,7 +21,29 @@
 
 import sharp from 'sharp';
 import { isLinuxPlatform } from './environment';
-import { logger } from './logger';
+
+/**
+ * loggerを遅延インポート
+ *
+ * sharpConfig.tsがloggerをトップレベルでインポートすると、
+ * loggerが@sentry/electron/mainやelectron-logをインポートし、
+ * それがGTKを読み込んでGLib-GObject競合を引き起こす。
+ *
+ * 遅延インポートにより、Sharp初期化後にのみloggerが読み込まれる。
+ */
+const logDebug = async (message: string | object) => {
+  const { logger } = await import('./logger');
+  if (typeof message === 'string') {
+    logger.debug(message);
+  } else {
+    logger.debug(message);
+  }
+};
+
+const logInfo = async (message: object) => {
+  const { logger } = await import('./logger');
+  logger.info(message);
+};
 
 /**
  * Sharp設定オプション
@@ -136,7 +158,8 @@ export const initializeSharp = (
 
   isInitialized = true;
 
-  logger.info({
+  // 非同期でログ出力（fire-and-forget）
+  void logInfo({
     message: 'Sharp initialized',
     details: {
       concurrency: sharp.concurrency(),
@@ -157,7 +180,7 @@ export const initializeSharp = (
 export const switchToLowMemoryMode = (): void => {
   applyConfig(LOW_MEMORY_CONFIG);
 
-  logger.debug({
+  void logDebug({
     message: 'Sharp: low memory mode',
     details: {
       concurrency: sharp.concurrency(),
@@ -178,7 +201,7 @@ export const restoreDefaultMode = (): void => {
   const config = getEnvironmentAppropriateConfig(DEFAULT_CONFIG);
   applyConfig(config);
 
-  logger.debug({
+  void logDebug({
     message: 'Sharp: default mode restored',
     details: {
       concurrency: sharp.concurrency(),
@@ -203,7 +226,7 @@ export const clearSharpCache = (): void => {
     sharp.cache(previousCache);
   }
 
-  logger.debug('Sharp cache cleared');
+  void logDebug('Sharp cache cleared');
 };
 
 /**

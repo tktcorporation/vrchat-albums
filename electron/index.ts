@@ -1,3 +1,30 @@
+/**
+ * Sharp 早期初期化（GLib-GObject 競合回避）
+ *
+ * ## 重要: このインポートは必ずファイルの最初に配置すること！
+ *
+ * ## なぜここで初期化が必要か
+ * Linux環境では、GTK（Electronが使用）とlibvips（Sharpが使用）が
+ * 両方ともGLib-GObjectを使用する。Electronをインポートする前に
+ * Sharpを初期化しないと競合が発生し、アプリがクラッシュする。
+ *
+ * ## 解決策
+ * - GTKより先にSharp（libvips）をインポート・初期化
+ * - 最小設定（concurrency=1, cache=false）でメモリ競合を回避
+ *
+ * ## アプリ内での設定変更
+ * 後から electron/lib/sharpConfig.ts の関数で設定を調整可能。
+ * Linux環境では常に低メモリ設定を維持。
+ *
+ * @see electron/lib/sharpConfig.ts - アプリ内Sharp設定管理
+ */
+import sharp from 'sharp';
+
+sharp.concurrency(1);
+sharp.cache(false);
+
+// --- ここより下でElectron関連のインポートが可能 ---
+
 import path from 'node:path';
 import {
   type Event,
@@ -6,29 +33,6 @@ import {
 } from '@sentry/electron/main';
 import { app, type BrowserWindow, ipcMain } from 'electron';
 import unhandled from 'electron-unhandled';
-
-/**
- * Sharp 早期初期化（GLib-GObject 競合回避）
- *
- * ## なぜここで初期化が必要か
- * Linux環境では、GTK（Electronが使用）とlibvips（Sharpが使用）が
- * 両方ともGLib-GObjectを使用する。初期化順序が不適切だと競合が発生し、
- * アプリがクラッシュする。
- *
- * ## 解決策
- * - GTKより先にSharp（libvips）をインポート・初期化
- * - 最小設定（concurrency=1, cache=false）でメモリ競合を回避
- *
- * ## アプリ内での設定変更
- * 後から electron/lib/sharpConfig.ts の関数で設定を調整可能。
- * ただしPlaywright環境では常に低メモリ設定を維持。
- *
- * @see electron/lib/sharpConfig.ts - アプリ内Sharp設定管理
- */
-import sharp from 'sharp';
-
-sharp.concurrency(1);
-sharp.cache(false);
 
 // electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
 // Electron ネイティブの app.isPackaged を使用
