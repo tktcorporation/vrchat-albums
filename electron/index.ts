@@ -21,7 +21,6 @@ import { logger } from './lib/logger';
 import * as sequelizeClient from './lib/sequelize';
 import { getAppUserDataPath } from './lib/wrappedApp';
 import { getBackgroundUsecase } from './module/backGroundUsecase';
-import { clearMainWindow, setMainWindow } from './module/initProgress/emitter';
 import { initSettingStore } from './module/settingStore';
 
 const settingStore = initSettingStore();
@@ -174,12 +173,6 @@ const initializeApp = async () => {
 
   registerIpcMainListeners();
   const mainWindow = await createOrGetMainWindow();
-
-  // 進捗エミッターにメインウィンドウを設定
-  setMainWindow(mainWindow);
-  mainWindow.on('closed', () => {
-    clearMainWindow();
-  });
 
   createIPCHandler({
     router,

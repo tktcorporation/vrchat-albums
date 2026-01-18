@@ -15,6 +15,27 @@ vi.mock('../../hooks/useStartUpStage', () => ({
   useStartupStage: vi.fn(() => mockUseStartupStage),
 }));
 
+// useInitProgressのモック（tRPC subscriptionを使うためモックが必要）
+vi.mock('../../hooks/useInitProgress', () => ({
+  useInitProgress: vi.fn(() => ({
+    progress: null,
+    currentStage: null,
+    currentProgress: 0,
+    message: '',
+    details: undefined,
+    stageLabel: '',
+    reset: vi.fn(),
+  })),
+  STAGE_LABELS: {
+    database_sync: 'データベース初期化',
+    directory_check: 'ディレクトリ確認',
+    log_append: 'ログファイル読み込み',
+    log_load: 'ログデータ保存',
+    photo_index: '写真インデックス',
+    completed: '完了',
+  },
+}));
+
 import { useStartupStage } from '../../hooks/useStartUpStage';
 
 const mockUseStartupStageHook = useStartupStage as ReturnType<typeof vi.fn>;
