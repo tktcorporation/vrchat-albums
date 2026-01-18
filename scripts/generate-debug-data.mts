@@ -71,6 +71,17 @@ const DEBUG_DIR = path.join(path.resolve(__dirname, '..'), 'debug');
 const LOGS_DIR = path.join(DEBUG_DIR, 'logs');
 const PHOTOS_DIR = path.join(DEBUG_DIR, 'photos', 'VRChat');
 
+// Electron Store の設定ファイルパス（テスト環境用）
+const getElectronConfigDir = (): string => {
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || '', 'Electron');
+  }
+  // Linux/macOS: ~/.config/Electron
+  return path.join(process.env.HOME || '', '.config', 'Electron');
+};
+const ELECTRON_CONFIG_DIR = getElectronConfigDir();
+const ELECTRON_CONFIG_FILE = path.join(ELECTRON_CONFIG_DIR, 'config.json');
+
 // 現在の日時
 const _NOW = new Date();
 const _DATE_FORMAT = 'yyyy-MM-dd';
@@ -312,6 +323,32 @@ function generatePhotoFile(
   }
 }
 
+/**
+ * Electron Store の設定ファイルを生成する
+ * テスト環境でセットアップ画面をスキップするために必要
+ */
+function generateElectronConfig(): void {
+  console.log('Generating Electron config file...');
+
+  // 設定内容
+  const config = {
+    logFilesDir: LOGS_DIR,
+    vRChatPhotoDir: path.join(DEBUG_DIR, 'photos', 'VRChat'),
+    isTermsAccepted: true,
+  };
+
+  // ディレクトリが存在しない場合は作成
+  if (!fs.existsSync(ELECTRON_CONFIG_DIR)) {
+    fs.mkdirSync(ELECTRON_CONFIG_DIR, { recursive: true });
+  }
+
+  // 設定ファイルを書き込み
+  fs.writeFileSync(ELECTRON_CONFIG_FILE, JSON.stringify(config, null, 2));
+  console.log(`Generated config file: ${ELECTRON_CONFIG_FILE}`);
+  console.log(`  logFilesDir: ${config.logFilesDir}`);
+  console.log(`  vRChatPhotoDir: ${config.vRChatPhotoDir}`);
+}
+
 // メイン関数
 function main(): void {
   try {
@@ -325,6 +362,9 @@ function main(): void {
     // 写真ファイルを生成
     const photoPath = generatePhotoFile(eventTimes, logInfo.worldInfo);
     console.log(`Generated photo file: ${photoPath}`);
+
+    // Electron Store の設定ファイルを生成（テスト環境でセットアップをスキップ）
+    generateElectronConfig();
 
     console.log('Debug data generation completed successfully!');
 
