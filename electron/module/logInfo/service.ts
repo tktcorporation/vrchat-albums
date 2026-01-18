@@ -511,6 +511,11 @@ export async function loadLogInfoIndexFromVRChatLog({
   const photoResults =
     await vrchatPhotoService.createVRChatPhotoPathIndex(excludeOldLogLoad);
   results.createdVRChatPhotoPathModelList = photoResults ?? [];
+  emitProgress({
+    stage: 'photo_index',
+    progress: 100,
+    message: '写真インデックスが完了しました',
+  });
   const photoIndexEndTime = performance.now();
   logger.debug(
     `Create photo path index took ${
