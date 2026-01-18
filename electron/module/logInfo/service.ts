@@ -502,7 +502,7 @@ export async function loadLogInfoIndexFromVRChatLog({
   // 6. 写真のインデックス処理
   // excludeOldLogLoad=true → 差分スキャン（ダイジェスト・mtime使用）
   // excludeOldLogLoad=false → フルスキャン
-  emitStageStart('photo_index', '写真をインデックス中...');
+  await emitStageStart('photo_index', '写真をインデックス中...');
   const photoIndexStartTime = performance.now();
   const photoResults =
     await vrchatPhotoService.createVRChatPhotoPathIndex(excludeOldLogLoad);

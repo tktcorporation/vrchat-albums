@@ -201,7 +201,10 @@ export const settingsRouter = () =>
 
         // Step 1: データベース同期
         logger.info('Step 1: Syncing database schema...');
-        emitStageStart('database_sync', 'データベースを初期化しています...');
+        await emitStageStart(
+          'database_sync',
+          'データベースを初期化しています...',
+        );
         await sequelizeClient.syncRDBClient();
         emitStageComplete(
           'database_sync',
@@ -210,7 +213,7 @@ export const settingsRouter = () =>
 
         // Step 2: ディレクトリチェック
         logger.info('Step 2: Checking VRChat directories...');
-        emitStageStart(
+        await emitStageStart(
           'directory_check',
           'VRChatディレクトリを確認しています...',
         );
@@ -290,8 +293,8 @@ export const settingsRouter = () =>
         }
 
         // Step 4: ログ同期実行
+        // emitStageStart は syncLogs 内で行われる
         logger.info('Step 4: Starting log sync...');
-        emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
         const logSyncResult = await syncLogs(syncMode);
 
         if (logSyncResult.isErr()) {

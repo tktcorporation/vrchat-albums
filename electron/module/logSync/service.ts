@@ -57,7 +57,7 @@ export async function syncLogs(
   logger.info(`Starting log sync with mode: ${mode}`);
 
   // Step 1: VRChatログファイルから新しいログ行を抽出・保存
-  emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
+  await emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
   const appendResult =
     await appendLoglinesToFileFromLogFilePathList(isFullSync);
 
@@ -76,7 +76,10 @@ export async function syncLogs(
   emitStageComplete('log_append', 'VRChatログファイルの読み込みが完了しました');
 
   // Step 2: 保存されたログをデータベースに読み込む
-  emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
+  await emitStageStart(
+    'log_load',
+    'ログデータをデータベースに保存しています...',
+  );
   const loadResult = await loadLogInfoIndexFromVRChatLog({
     excludeOldLogLoad: !isFullSync,
   });
