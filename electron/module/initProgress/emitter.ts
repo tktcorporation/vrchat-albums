@@ -2,12 +2,24 @@
  * 初期化進捗をレンダラに送信するエミッター
  */
 import type { BrowserWindow } from 'electron';
+import { err, fromThrowable, type Result } from 'neverthrow';
+import { match } from 'ts-pattern';
 import { logger } from '../../lib/logger';
 import {
   INIT_PROGRESS_CHANNEL,
   type InitProgressPayload,
+  InitProgressPayloadSchema,
   type InitStage,
 } from './types';
+
+/**
+ * 進捗送信のエラー型
+ */
+export type EmitProgressError =
+  | { type: 'WINDOW_NOT_AVAILABLE'; message: string }
+  | { type: 'WINDOW_DESTROYED'; message: string }
+  | { type: 'VALIDATION_ERROR'; message: string }
+  | { type: 'IPC_SEND_ERROR'; message: string };
 
 // メインウィンドウの参照を保持
 let mainWindow: BrowserWindow | null = null;
@@ -28,18 +40,78 @@ export const clearMainWindow = (): void => {
 };
 
 /**
- * 進捗イベントをレンダラに送信する
+ * 進捗イベントをレンダラに送信する（Result型を返す）
  */
-export const emitProgress = (payload: InitProgressPayload): void => {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    logger.debug('Cannot emit progress: mainWindow not available');
-    return;
+export const emitProgressWithResult = (
+  payload: InitProgressPayload,
+): Result<void, EmitProgressError> => {
+  // ウィンドウの状態チェック
+  if (!mainWindow) {
+    return err({
+      type: 'WINDOW_NOT_AVAILABLE',
+      message: 'mainWindow is not set',
+    });
   }
 
-  try {
-    mainWindow.webContents.send(INIT_PROGRESS_CHANNEL, payload);
-  } catch (error) {
-    logger.warn('Failed to emit progress:', error);
+  if (mainWindow.isDestroyed()) {
+    return err({
+      type: 'WINDOW_DESTROYED',
+      message: 'mainWindow has been destroyed',
+    });
+  }
+
+  // ペイロードの検証
+  const validationResult = InitProgressPayloadSchema.safeParse(payload);
+  if (!validationResult.success) {
+    return err({
+      type: 'VALIDATION_ERROR',
+      message: validationResult.error.message,
+    });
+  }
+
+  // IPC送信（fromThrowableを使用）
+  const sendMessage = fromThrowable(
+    () => {
+      mainWindow?.webContents.send(
+        INIT_PROGRESS_CHANNEL,
+        validationResult.data,
+      );
+    },
+    (error): EmitProgressError => ({
+      type: 'IPC_SEND_ERROR',
+      message: error instanceof Error ? error.message : String(error),
+    }),
+  );
+
+  return sendMessage();
+};
+
+/**
+ * 進捗イベントをレンダラに送信する
+ * エラーは内部でログ出力して握りつぶす（進捗報告の失敗でアプリを止めない）
+ */
+export const emitProgress = (payload: InitProgressPayload): void => {
+  const result = emitProgressWithResult(payload);
+
+  if (result.isErr()) {
+    match(result.error)
+      .with(
+        { type: 'WINDOW_NOT_AVAILABLE' },
+        { type: 'WINDOW_DESTROYED' },
+        () => {
+          // ウィンドウ未設定/破棄済みは正常な状態（デバッグログのみ）
+          logger.debug(`Cannot emit progress: ${result.error.message}`);
+        },
+      )
+      .with({ type: 'VALIDATION_ERROR' }, (e) => {
+        // バリデーションエラーは警告（開発時のバグ検出）
+        logger.warn(`Invalid progress payload: ${e.message}`);
+      })
+      .with({ type: 'IPC_SEND_ERROR' }, (e) => {
+        // IPC送信エラーは警告
+        logger.warn(`Failed to emit progress: ${e.message}`);
+      })
+      .exhaustive();
   }
 };
 
