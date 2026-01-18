@@ -1,29 +1,13 @@
 /**
- * 初期化進捗イベントのペイロード型
+ * Electron IPC型定義
  *
- * Note: この型定義は以下のzodスキーマと同期する必要があります：
- * - electron/module/initProgress/schema.ts (backend)
- * - src/v2/lib/initProgress/schema.ts (frontend)
+ * Note: InitProgressPayloadなどの複雑な型は `unknown` として受け取り、
+ * 使用箇所でzodスキーマによる検証を行う設計。
+ * これにより、zodスキーマとd.tsの手動同期が不要になる。
  *
- * d.tsファイルではimportができないため、手動での同期が必要です。
- * 型の変更時は上記3箇所を更新してください。
+ * @see src/v2/lib/initProgress/schema.ts - zod検証用スキーマ
+ * @see src/v2/hooks/useInitProgress.ts - 検証実装
  */
-interface InitProgressPayload {
-  stage:
-    | 'database_sync'
-    | 'directory_check'
-    | 'log_append'
-    | 'log_load'
-    | 'photo_index'
-    | 'completed';
-  progress: number;
-  message: string;
-  details?: {
-    current?: number;
-    total?: number;
-    currentItem?: string;
-  };
-}
 
 declare global {
   const __SENTRY_RELEASE__: string;
@@ -46,9 +30,11 @@ declare global {
           error: null | 'photoYearMonthDirsNotFound' | 'photoDirReadError';
         }) => void,
       ) => () => void;
-      receiveInitProgress: (
-        callback: (data: InitProgressPayload) => void,
-      ) => () => void;
+      /**
+       * 初期化進捗を受信する
+       * @param callback データはunknownとして受け取り、useInitProgress内でzod検証する
+       */
+      receiveInitProgress: (callback: (data: unknown) => void) => () => void;
     };
   }
 }

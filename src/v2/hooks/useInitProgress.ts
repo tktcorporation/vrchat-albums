@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { match } from 'ts-pattern';
 import {
   type InitProgressPayload,
   type InitStage,
@@ -27,19 +28,19 @@ export const useInitProgress = () => {
 
     setIsListening(true);
     const cleanup = window.MyOn.receiveInitProgress((data: unknown) => {
-      // zodで検証
+      // zodで検証し、ts-patternで結果を処理
       const result = parseInitProgressPayload(data);
-      if (result.success) {
-        setProgress(result.data);
-        setValidationError(null);
-      } else {
-        // 検証失敗時はエラーをログに記録（開発時のデバッグ用）
-        console.warn(
-          'Invalid progress payload received:',
-          result.error.message,
-        );
-        setValidationError(result.error.message);
-      }
+      match(result)
+        .with({ success: true }, (r) => {
+          setProgress(r.data);
+          setValidationError(null);
+        })
+        .with({ success: false }, (r) => {
+          // 検証失敗時はエラーをログに記録（開発時のデバッグ用）
+          console.warn('Invalid progress payload received:', r.error.message);
+          setValidationError(r.error.message);
+        })
+        .exhaustive();
     });
 
     return () => {
