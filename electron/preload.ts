@@ -43,7 +43,7 @@ process.once('loaded', () => {
 declare global {
   interface Window {
     Main: typeof api;
-    MyOn: typeof myOn;
+    // MyOn は src/v2/types/electron.d.ts で型定義されているため、ここでは省略
     ipcRenderer: typeof ipcRenderer;
   }
 }
@@ -107,6 +107,27 @@ contextBridge.exposeInMainWorld('Main', api);
 /**
  * 型安全な ipcRenderer.on
  */
+/**
+ * 初期化進捗イベントのペイロード型
+ * electron/module/initProgress/types.ts と同期
+ */
+interface InitProgressPayload {
+  stage:
+    | 'database_sync'
+    | 'directory_check'
+    | 'log_append'
+    | 'log_load'
+    | 'photo_index'
+    | 'completed';
+  progress: number;
+  message: string;
+  details?: {
+    current?: number;
+    total?: number;
+    currentItem?: string;
+  };
+}
+
 const myOn = {
   receiveStatusToUseVRChatLogFilesDir: (
     callback: (
@@ -131,6 +152,16 @@ const myOn = {
     }) => void,
   ) => {
     const key = 'vrchat-photo-dir-with-error';
+    ipcRenderer.on(key, (_, data) => callback(data));
+    return () => {
+      ipcRenderer.removeAllListeners(key);
+    };
+  },
+  /**
+   * 初期化進捗イベントを受信する
+   */
+  receiveInitProgress: (callback: (data: InitProgressPayload) => void) => {
+    const key = 'init-progress';
     ipcRenderer.on(key, (_, data) => callback(data));
     return () => {
       ipcRenderer.removeAllListeners(key);

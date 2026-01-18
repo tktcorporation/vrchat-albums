@@ -1,5 +1,9 @@
 import type React from 'react';
 import { createContext, useContext, useMemo } from 'react';
+import {
+  type InitProgressPayload,
+  useInitProgress,
+} from '../hooks/useInitProgress';
 import { useStartupStage } from '../hooks/useStartUpStage';
 
 type Stage = 'idle' | 'syncing' | 'ready' | 'error';
@@ -10,6 +14,12 @@ interface StartupContextValue {
   originalError?: unknown; // tRPCエラーオブジェクト全体
   isReady: boolean;
   retry: () => void;
+  /** 初期化進捗情報 */
+  progress: InitProgressPayload | null;
+  /** 進捗メッセージ */
+  progressMessage: string;
+  /** 進捗パーセント (0-100) */
+  progressPercent: number;
 }
 
 const StartupContext = createContext<StartupContextValue | null>(null);
@@ -27,6 +37,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
 }) => {
   const { stages, errorMessage, originalError, retryProcess, completed } =
     useStartupStage();
+  const { progress, message, currentProgress } = useInitProgress();
 
   // ステージマッピング
   const stage: Stage = (() => {
@@ -45,8 +56,20 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       originalError,
       isReady: completed,
       retry: retryProcess,
+      progress,
+      progressMessage: message,
+      progressPercent: currentProgress,
     }),
-    [stage, errorMessage, originalError, completed, retryProcess],
+    [
+      stage,
+      errorMessage,
+      originalError,
+      completed,
+      retryProcess,
+      progress,
+      message,
+      currentProgress,
+    ],
   );
 
   return (

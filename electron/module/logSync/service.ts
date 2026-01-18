@@ -1,5 +1,6 @@
 import * as neverthrow from 'neverthrow';
 import { logger } from '../../lib/logger';
+import { emitStageComplete, emitStageStart } from '../initProgress/emitter';
 import type { LogInfoError } from '../logInfo/error';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
 import type { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
@@ -56,6 +57,7 @@ export async function syncLogs(
   logger.info(`Starting log sync with mode: ${mode}`);
 
   // Step 1: VRChatログファイルから新しいログ行を抽出・保存
+  emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
   const appendResult =
     await appendLoglinesToFileFromLogFilePathList(isFullSync);
 
@@ -71,8 +73,10 @@ export async function syncLogs(
     // VRChatLogFileError を直接返す
     return neverthrow.err(appendResult.error);
   }
+  emitStageComplete('log_append', 'VRChatログファイルの読み込みが完了しました');
 
   // Step 2: 保存されたログをデータベースに読み込む
+  emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
   const loadResult = await loadLogInfoIndexFromVRChatLog({
     excludeOldLogLoad: !isFullSync,
   });
@@ -81,6 +85,7 @@ export async function syncLogs(
     logger.error({ message: 'Failed to load log info' });
     return neverthrow.err(loadResult.error);
   }
+  emitStageComplete('log_load', 'ログデータの保存が完了しました');
 
   logger.info(`Log sync completed successfully with mode: ${mode}`);
   return neverthrow.ok(loadResult.value);
