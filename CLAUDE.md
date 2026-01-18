@@ -58,6 +58,7 @@
     </pattern>
 
     <pattern name="Error Handling" jp="型安全・構造化システム">
+      <reference>.claude/rules/error-handling.md (統合ルールファイル)</reference>
       <layer name="Service">neverthrow Result pattern (Result&lt;T, E&gt;)</layer>
       <layer name="tRPC">UserFacingError with structured info (code/category/userMessage)</layer>
       <layer name="Frontend">parseErrorFromTRPC + Toast variant selection</layer>
@@ -127,7 +128,7 @@
           ]]>
         </implementation-pattern>
 
-        <anti-pattern>
+        <anti-pattern name="catch-err-without-classification">
           <![CDATA[
           // ❌ Bad: 全てのエラーをラップ（Sentryに送信されない）
           try {
@@ -136,6 +137,41 @@
           } catch (error) {
             // 予期しないエラーもラップしてしまう
             return err(error);
+          }
+          ]]>
+        </anti-pattern>
+
+        <anti-pattern name="stack-trace-loss" priority="critical" jp="スタックトレース消失">
+          <description>new Error()でエラーを包み直すとスタックトレースが消失する</description>
+          <![CDATA[
+          // ❌ Bad: スタックトレースが消失
+          catch (error) {
+            throw new Error(`Failed: ${error.message}`);
+          }
+
+          // ✅ Good: causeで元エラーを保持
+          catch (error) {
+            throw new Error('Failed to process', { cause: error });
+          }
+          ]]>
+        </anti-pattern>
+
+        <anti-pattern name="silent-error-swallowing" priority="critical" jp="エラー握りつぶし">
+          <description>エラーをキャッチして何もしないとSentryに送信されない</description>
+          <![CDATA[
+          // ❌ Bad: エラーを握りつぶし（Sentryに送信されない）
+          try {
+            await riskyOperation();
+          } catch (error) {
+            console.log('Something went wrong');
+          }
+
+          // ✅ Good: Sentryに送信
+          try {
+            await riskyOperation();
+          } catch (error) {
+            logger.error('Operation failed', error);
+            throw error; // 予期しないエラーは再スロー
           }
           ]]>
         </anti-pattern>
