@@ -23,7 +23,7 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 
 ## タスク完了プロセス
 
-```
+```text
 1. Code Implementation
 2. yarn lint:fix
 3. yarn lint

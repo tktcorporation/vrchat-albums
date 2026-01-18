@@ -6,7 +6,7 @@ Playwright テストとの互換性を確保するための Electron インポ�
 
 ## 禁止事項
 
-**トップレベルで Electron の app, BrowserWindow 等をインポートしてはならない**
+### トップレベルで Electron の app, BrowserWindow 等をインポートしてはならない
 
 ```typescript
 // ❌ NEVER: Playwright テストでクラッシュ

@@ -3,19 +3,23 @@
 /**
  * Floating Promises Linter
  *
- * Detects async function calls that are not awaited.
- * This prevents bugs where Promise-returning functions are called
- * without await, causing the caller to not wait for completion.
+ * await されていない非同期関数呼び出しを検出するリンター。
+ * Promise を返す関数が await なしで呼び出されると、
+ * 呼び出し元が完了を待たずに処理が続行されるバグを防止する。
  *
- * Example:
- *   emitStageStart('stage', 'message'); // ❌ Missing await
- *   await emitStageStart('stage', 'message'); // ✅ Properly awaited
+ * 例:
+ *   emitStageStart('stage', 'message'); // ❌ await がない
+ *   await emitStageStart('stage', 'message'); // ✅ 正しく await されている
  */
 
 import consola from 'consola';
 import { glob } from 'glob';
 import * as ts from 'typescript';
-import { type NormalizedPath, NormalizedPathArraySchema } from './lib/paths';
+import {
+  type NormalizedPath,
+  NormalizedPathArraySchema,
+  NormalizedPathSchema,
+} from './lib/paths';
 
 export interface FloatingPromiseIssue {
   file: string;
@@ -36,16 +40,19 @@ export class FloatingPromiseLinter {
   private program: ts.Program;
   private checker: ts.TypeChecker;
   private files: NormalizedPath[];
+  private projectRoot: string;
 
   constructor(
     files: string[],
     private sourceMap?: Map<string, string>,
+    projectRoot?: string,
   ) {
     this.files = NormalizedPathArraySchema.parse(files);
+    this.projectRoot = projectRoot ?? process.cwd();
 
     // Read tsconfig.json to get proper compiler options
     const configPath = ts.findConfigFile(
-      process.cwd(),
+      this.projectRoot,
       ts.sys.fileExists,
       'tsconfig.json',
     );
@@ -65,7 +72,7 @@ export class FloatingPromiseLinter {
       const parsedConfig = ts.parseJsonConfigFileContent(
         configFile.config,
         ts.sys,
-        process.cwd(),
+        this.projectRoot,
       );
       compilerOptions = {
         ...parsedConfig.options,
@@ -121,10 +128,15 @@ export class FloatingPromiseLinter {
 
   lint(): FloatingPromiseLintResult {
     for (const sourceFile of this.program.getSourceFiles()) {
-      if (
-        !sourceFile.isDeclarationFile &&
-        this.files.includes(sourceFile.fileName as NormalizedPath)
-      ) {
+      if (sourceFile.isDeclarationFile) continue;
+
+      // Windows互換性のためパスを正規化
+      const normalizedResult = NormalizedPathSchema.safeParse(
+        sourceFile.fileName,
+      );
+      if (!normalizedResult.success) continue;
+
+      if (this.files.includes(normalizedResult.data)) {
         this.lintFile(sourceFile);
       }
     }
@@ -287,11 +299,13 @@ export async function lintFloatingPromises(
         '**/*.d.ts',
         '**/*.test.ts',
         '**/*.spec.ts',
+        '**/*.test.tsx',
+        '**/*.spec.tsx',
       ],
     },
   );
 
-  const linter = new FloatingPromiseLinter(files);
+  const linter = new FloatingPromiseLinter(files, undefined, root);
   return linter.lint();
 }
 

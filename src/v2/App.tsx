@@ -542,7 +542,9 @@ const Contents = memo(() => {
               <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
-                  style={{ width: `${Math.max(progressPercent, 5)}%` }}
+                  style={{
+                    width: `${Math.min(Math.max(progressPercent, 5), 100)}%`,
+                  }}
                   data-testid="progress-bar"
                   data-progress={progressPercent}
                 />

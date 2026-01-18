@@ -109,14 +109,15 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
           await new Promise((resolve) => setTimeout(resolve, remaining));
         }
 
-        updateStage('initialization', 'success');
-
         // ログ同期完了後、ログ関連のクエリキャッシュを無効化
+        // キャッシュ無効化完了を待ってからステージ遷移する
         try {
-          invalidatePhotoGalleryQueries(utils);
+          await invalidatePhotoGalleryQueries(utils);
         } catch (error) {
           console.warn('Failed to invalidate query cache:', error);
         }
+
+        updateStage('initialization', 'success');
 
         // 初期化完了を通知
         callbacks?.onComplete?.();
