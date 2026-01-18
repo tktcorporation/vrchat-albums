@@ -60,30 +60,30 @@ export const emitProgressWithResult = (
     });
   }
 
-  // ペイロードの検証
+  // ペイロードの検証とIPC送信
   const validationResult = InitProgressPayloadSchema.safeParse(payload);
-  if (!validationResult.success) {
-    return err({
-      type: 'VALIDATION_ERROR',
-      message: validationResult.error.message,
-    });
-  }
 
-  // IPC送信（fromThrowableを使用）
-  const sendMessage = fromThrowable(
-    () => {
-      mainWindow?.webContents.send(
-        INIT_PROGRESS_CHANNEL,
-        validationResult.data,
+  return match(validationResult)
+    .with({ success: false }, (r) =>
+      err({
+        type: 'VALIDATION_ERROR' as const,
+        message: r.error.message,
+      }),
+    )
+    .with({ success: true }, (r) => {
+      // IPC送信（fromThrowableを使用）
+      const sendMessage = fromThrowable(
+        () => {
+          mainWindow?.webContents.send(INIT_PROGRESS_CHANNEL, r.data);
+        },
+        (error): EmitProgressError => ({
+          type: 'IPC_SEND_ERROR',
+          message: error instanceof Error ? error.message : String(error),
+        }),
       );
-    },
-    (error): EmitProgressError => ({
-      type: 'IPC_SEND_ERROR',
-      message: error instanceof Error ? error.message : String(error),
-    }),
-  );
-
-  return sendMessage();
+      return sendMessage();
+    })
+    .exhaustive();
 };
 
 /**

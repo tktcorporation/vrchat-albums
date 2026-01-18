@@ -18,17 +18,6 @@ export const InitStageSchema = z.enum([
 export type InitStage = z.infer<typeof InitStageSchema>;
 
 /**
- * 進捗値（0-100の範囲）
- */
-export const ProgressValueSchema = z
-  .number()
-  .int()
-  .min(0)
-  .max(100)
-  .brand<'ProgressValue'>();
-export type ProgressValue = z.infer<typeof ProgressValueSchema>;
-
-/**
  * 進捗の詳細情報
  */
 export const InitProgressDetailsSchema = z
@@ -45,12 +34,16 @@ export type InitProgressDetails = z.infer<typeof InitProgressDetailsSchema>;
 
 /**
  * 初期化進捗イベントのペイロード
+ *
+ * Note: progressフィールドはブランド型を外した数値として定義。
+ * IPCでの送受信時にブランド型は保持されないため、
+ * 境界では通常の数値として検証し、内部でProgressValueとして扱う。
  */
 export const InitProgressPayloadSchema = z
   .object({
     /** 現在のステージ */
     stage: InitStageSchema,
-    /** ステージ内での進捗（0-100） */
+    /** ステージ内での進捗（0-100） - ProgressValueと同じ制約 */
     progress: z.number().int().min(0).max(100),
     /** ユーザー向けメッセージ */
     message: z.string().min(1),
@@ -84,17 +77,6 @@ export const STAGE_LABELS: Record<InitStage, string> = {
 export type SafeParseResult<T> =
   | { success: true; data: T }
   | { success: false; error: z.ZodError };
-
-/**
- * 進捗値を安全に作成する
- * @param value 0-100の数値
- * @returns パース結果
- */
-export const createProgressValue = (
-  value: number,
-): SafeParseResult<ProgressValue> => {
-  return ProgressValueSchema.safeParse(value) as SafeParseResult<ProgressValue>;
-};
 
 /**
  * 進捗ペイロードを検証する

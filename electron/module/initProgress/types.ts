@@ -10,7 +10,6 @@ export {
   InitProgressPayloadSchema,
   type InitStage,
   InitStageSchema,
-  type ProgressValue,
   parseInitProgressPayload,
   STAGE_LABELS,
 } from './schema';
