@@ -26,8 +26,8 @@ export const useInitProgress = () => {
     },
     onError: (err) => {
       console.error('Init progress subscription error:', err);
-      // TRPCClientErrorLike を Error に変換
-      setError(new Error(err.message));
+      // 元のエラー情報を cause で保持（スタックトレース消失を防ぐ）
+      setError(new Error(err.message, { cause: err }));
     },
   });
 
