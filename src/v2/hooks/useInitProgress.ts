@@ -11,32 +11,22 @@ export type { InitProgressPayload, InitStage };
 export { STAGE_LABELS };
 
 /**
- * ステージに基づく全体進捗のベース値
- * 各ステージの開始時点での全体進捗パーセント
+ * ステージごとの進捗設定
+ * - base: ステージ開始時点での全体進捗パーセント
+ * - range: 次のステージまでの進捗幅
  */
-const STAGE_BASE_PROGRESS: Record<InitStage, number> = {
-  ready: 0,
-  database_sync: 0,
-  directory_check: 20,
-  log_append: 35,
-  log_load: 50,
-  photo_index: 75,
-  completed: 100,
-  error: 0, // エラー時は進捗を維持しない
-};
-
-/**
- * 次のステージまでの進捗幅
- */
-const STAGE_PROGRESS_RANGE: Record<InitStage, number> = {
-  ready: 0,
-  database_sync: 20, // 0% → 20%
-  directory_check: 15, // 20% → 35%
-  log_append: 15, // 35% → 50%
-  log_load: 25, // 50% → 75%
-  photo_index: 25, // 75% → 100%
-  completed: 0,
-  error: 0,
+const STAGE_PROGRESS_CONFIG: Record<
+  InitStage,
+  { base: number; range: number }
+> = {
+  ready: { base: 0, range: 0 },
+  database_sync: { base: 0, range: 20 }, // 0% → 20%
+  directory_check: { base: 20, range: 15 }, // 20% → 35%
+  log_append: { base: 35, range: 15 }, // 35% → 50%
+  log_load: { base: 50, range: 25 }, // 50% → 75%
+  photo_index: { base: 75, range: 25 }, // 75% → 100%
+  completed: { base: 100, range: 0 },
+  error: { base: 0, range: 0 }, // エラー時は進捗を維持しない
 };
 
 /**
@@ -79,14 +69,12 @@ export const useInitProgress = () => {
   const overallProgress = useMemo(() => {
     if (!progress?.stage) return 0;
 
-    const stage = progress.stage;
-    const baseProgress = STAGE_BASE_PROGRESS[stage];
-    const progressRange = STAGE_PROGRESS_RANGE[stage];
+    const config = STAGE_PROGRESS_CONFIG[progress.stage];
     const stageProgress = progress.progress ?? 0;
 
     // ステージ内の進捗を全体進捗に変換
-    // baseProgress + (stageProgress / 100) * progressRange
-    return Math.round(baseProgress + (stageProgress / 100) * progressRange);
+    // base + (stageProgress / 100) * range
+    return Math.round(config.base + (stageProgress / 100) * config.range);
   }, [progress?.stage, progress?.progress]);
 
   return {

@@ -467,7 +467,10 @@ const Contents = memo(() => {
     const displayMessage = progressMessage || '読み込み中...';
 
     return (
-      <div className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]">
+      <div
+        className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]"
+        data-testid="loading-screen"
+      >
         <AppHeader showGalleryControls={false} />
         <div className="flex items-center justify-center flex-1">
           <div className="text-center p-8 w-full max-w-md">
@@ -511,7 +514,10 @@ const Contents = memo(() => {
 
                 {/* 中央のパーセント表示 */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  <span
+                    className="text-sm font-medium text-gray-600 dark:text-gray-400"
+                    data-testid="progress-percent"
+                  >
                     {progressPercent > 0 ? `${progressPercent}%` : ''}
                   </span>
                 </div>
@@ -523,7 +529,10 @@ const Contents = memo(() => {
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 tracking-tight">
                 初期化中...
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-500 min-h-[1.5em]">
+              <p
+                className="text-sm text-gray-500 dark:text-gray-500 min-h-[1.5em]"
+                data-testid="progress-message"
+              >
                 {displayMessage}
               </p>
             </div>
@@ -534,6 +543,8 @@ const Contents = memo(() => {
                 <div
                   className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
                   style={{ width: `${Math.max(progressPercent, 5)}%` }}
+                  data-testid="progress-bar"
+                  data-progress={progressPercent}
                 />
               </div>
             </div>
