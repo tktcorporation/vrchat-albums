@@ -292,6 +292,16 @@
         <exception>Test assertions</exception>
       </exceptions>
       <benefits>Type inference, exhaustiveness checking, better readability</benefits>
+      <anti-patterns priority="critical" jp="絶対禁止">
+        <anti-pattern name="simplification-to-if">
+          <description>ts-pattern の match() を if文に書き換えること</description>
+          <reason>シンプル化ではなく堅牢性の低下。exhaustive checking が失われる。</reason>
+        </anti-pattern>
+        <anti-pattern name="removal-for-readability">
+          <description>「可読性向上」を理由に ts-pattern を削除すること</description>
+          <reason>ts-pattern 自体が可読性と型安全性を両立させるツール</reason>
+        </anti-pattern>
+      </anti-patterns>
     </pattern>
 
     <pattern name="Database Access">

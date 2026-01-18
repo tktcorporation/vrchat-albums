@@ -5,8 +5,11 @@
  * zodスキーマによる検証はsubscription側で行われる。
  */
 import { eventEmitter } from '../../trpc';
-import { INIT_PROGRESS_CHANNEL } from './schema';
-import type { InitProgressPayload, InitStage } from './types';
+import {
+  INIT_PROGRESS_CHANNEL,
+  type InitProgressPayload,
+  type InitStage,
+} from './schema';
 
 /**
  * デバッグ用遅延を取得する（実行時に評価）
@@ -34,8 +37,9 @@ export const emitProgress = (payload: InitProgressPayload): void => {
 /**
  * 進捗イベントを送信する（デバッグ遅延付き）
  * ステージ開始時に使用し、処理を一時停止させる
+ * emitStageStart からのみ呼ばれる内部関数
  */
-export const emitProgressWithDelay = async (
+const emitProgressWithDelay = async (
   payload: InitProgressPayload,
 ): Promise<void> => {
   emitProgress(payload);

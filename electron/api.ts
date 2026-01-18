@@ -16,7 +16,7 @@ import { openGetFileDialog } from './module/electronUtil/service';
 import {
   type InitProgressPayload,
   InitProgressPayloadSchema,
-} from './module/initProgress/types';
+} from './module/initProgress/schema';
 import { logInfoRouter } from './module/logInfo/logInfoCointroller';
 import { logSyncRouter } from './module/logSync/logSyncController';
 import * as service from './module/service';

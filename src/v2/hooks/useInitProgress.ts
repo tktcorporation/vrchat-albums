@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
-import type {
-  InitProgressPayload,
-  InitStage,
-} from '../../../electron/module/initProgress/types';
-import { STAGE_LABELS } from '../../../electron/module/initProgress/types';
+import {
+  type InitProgressPayload,
+  type InitStage,
+  STAGE_LABELS,
+} from '../../../electron/module/initProgress/schema';
 import { trpcReact } from '../../trpc';
 
 // electronモジュールから型とラベルを再エクスポート
@@ -12,21 +12,21 @@ export { STAGE_LABELS };
 
 /**
  * ステージごとの進捗設定
- * - base: ステージ開始時点での全体進捗パーセント
- * - range: 次のステージまでの進捗幅
+ * - startPercent: ステージ開始時点での全体進捗パーセント
+ * - rangePercent: 次のステージまでの進捗幅
  */
 const STAGE_PROGRESS_CONFIG: Record<
   InitStage,
-  { base: number; range: number }
+  { startPercent: number; rangePercent: number }
 > = {
-  ready: { base: 0, range: 0 },
-  database_sync: { base: 0, range: 20 }, // 0% → 20%
-  directory_check: { base: 20, range: 15 }, // 20% → 35%
-  log_append: { base: 35, range: 15 }, // 35% → 50%
-  log_load: { base: 50, range: 25 }, // 50% → 75%
-  photo_index: { base: 75, range: 25 }, // 75% → 100%
-  completed: { base: 100, range: 0 },
-  error: { base: 0, range: 0 }, // エラー時は進捗を維持しない
+  ready: { startPercent: 0, rangePercent: 0 },
+  database_sync: { startPercent: 0, rangePercent: 20 }, // 0% → 20%
+  directory_check: { startPercent: 20, rangePercent: 15 }, // 20% → 35%
+  log_append: { startPercent: 35, rangePercent: 15 }, // 35% → 50%
+  log_load: { startPercent: 50, rangePercent: 25 }, // 50% → 75%
+  photo_index: { startPercent: 75, rangePercent: 25 }, // 75% → 100%
+  completed: { startPercent: 100, rangePercent: 0 },
+  error: { startPercent: 0, rangePercent: 0 }, // エラー時は進捗を維持しない
 };
 
 /**
@@ -73,8 +73,10 @@ export const useInitProgress = () => {
     const stageProgress = progress.progress ?? 0;
 
     // ステージ内の進捗を全体進捗に変換
-    // base + (stageProgress / 100) * range
-    return Math.round(config.base + (stageProgress / 100) * config.range);
+    // startPercent + (stageProgress / 100) * rangePercent
+    return Math.round(
+      config.startPercent + (stageProgress / 100) * config.rangePercent,
+    );
   }, [progress?.stage, progress?.progress]);
 
   return {

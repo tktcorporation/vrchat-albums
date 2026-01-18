@@ -50,6 +50,7 @@ describe('useStartupStage - simplified implementation', () => {
     isPending: boolean;
     isSuccess: boolean;
     isError: boolean;
+    isIdle: boolean;
   };
 
   beforeEach(() => {
@@ -64,6 +65,7 @@ describe('useStartupStage - simplified implementation', () => {
       isPending: false,
       isSuccess: false,
       isError: false,
+      isIdle: true, // 初期状態では isIdle = true
     };
 
     // デフォルトのモック設定
@@ -295,6 +297,7 @@ describe('useStartupStage - simplified implementation', () => {
     const loadingMutation = {
       ...mockMutation,
       isPending: true,
+      isIdle: false, // 実行中は isIdle = false
     };
 
     mockTrpcReact.settings.initializeAppData.useMutation.mockReturnValue(
@@ -316,6 +319,7 @@ describe('useStartupStage - simplified implementation', () => {
     const successMutation = {
       ...mockMutation,
       isSuccess: true,
+      isIdle: false, // 成功後は isIdle = false
     };
 
     mockTrpcReact.settings.initializeAppData.useMutation.mockReturnValue(
