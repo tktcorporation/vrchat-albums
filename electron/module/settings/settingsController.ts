@@ -11,12 +11,7 @@ import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
 import { procedure, router as trpcRouter } from './../../trpc';
 import * as electronUtilService from '../electronUtil/service';
-import {
-  emitError,
-  emitInitComplete,
-  emitStageComplete,
-  emitStageStart,
-} from '../initProgress/emitter';
+import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
@@ -201,29 +196,28 @@ export const settingsRouter = () =>
 
         // Step 1: データベース同期
         logger.info('Step 1: Syncing database schema...');
-        await emitStageStart(
-          'database_sync',
-          'データベースを初期化しています...',
-        );
+        emitStageStart('database_sync', 'データベースを初期化しています...');
         await sequelizeClient.syncRDBClient();
-        emitStageComplete(
-          'database_sync',
-          'データベースの初期化が完了しました',
-        );
+        emitProgress({
+          stage: 'database_sync',
+          progress: 100,
+          message: 'データベースの初期化が完了しました',
+        });
 
         // Step 2: ディレクトリチェック
         logger.info('Step 2: Checking VRChat directories...');
-        await emitStageStart(
+        emitStageStart(
           'directory_check',
           'VRChatディレクトリを確認しています...',
         );
 
         // VRChatログディレクトリの存在確認は、ログ同期時のエラーで判定する
         // 事前チェックは省略し、ログ同期エラーで詳細なエラーを提供
-        emitStageComplete(
-          'directory_check',
-          'VRChatディレクトリの確認が完了しました',
-        );
+        emitProgress({
+          stage: 'directory_check',
+          progress: 100,
+          message: 'VRChatディレクトリの確認が完了しました',
+        });
 
         // Step 3: 初回起動判定とPhotoPath変更確認
         logger.info('Step 3: Checking if this is first launch...');
@@ -337,7 +331,11 @@ export const settingsRouter = () =>
         }
 
         // 初期化完了を通知
-        emitInitComplete();
+        emitProgress({
+          stage: 'completed',
+          progress: 100,
+          message: '初期化が完了しました',
+        });
 
         logger.info('=== Application data initialization completed ===');
         return { success: true };
@@ -355,7 +353,12 @@ export const settingsRouter = () =>
           .otherwise(() => 'Unknown initialization error');
 
         // エラーステージをemit
-        emitError('初期化に失敗しました', errorMessage);
+        emitProgress({
+          stage: 'error',
+          progress: 0,
+          message: '初期化に失敗しました',
+          details: { currentItem: errorMessage },
+        });
 
         // UserFacingErrorの場合は構造化情報を保持して再スロー
         if (error instanceof UserFacingError) {

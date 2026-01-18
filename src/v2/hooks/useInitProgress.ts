@@ -11,22 +11,51 @@ export type { InitProgressPayload, InitStage };
 export { STAGE_LABELS };
 
 /**
- * ステージごとの進捗設定
- * - startPercent: ステージ開始時点での全体進捗パーセント
- * - rangePercent: 次のステージまでの進捗幅
+ * ステージごとの重み付け（合計100）
  */
-const STAGE_PROGRESS_CONFIG: Record<
-  InitStage,
-  { startPercent: number; rangePercent: number }
-> = {
-  ready: { startPercent: 0, rangePercent: 0 },
-  database_sync: { startPercent: 0, rangePercent: 20 }, // 0% → 20%
-  directory_check: { startPercent: 20, rangePercent: 15 }, // 20% → 35%
-  log_append: { startPercent: 35, rangePercent: 15 }, // 35% → 50%
-  log_load: { startPercent: 50, rangePercent: 25 }, // 50% → 75%
-  photo_index: { startPercent: 75, rangePercent: 25 }, // 75% → 100%
-  completed: { startPercent: 100, rangePercent: 0 },
-  error: { startPercent: 0, rangePercent: 0 }, // エラー時は進捗を維持しない
+const STAGE_WEIGHTS: Partial<Record<InitStage, number>> = {
+  database_sync: 20,
+  directory_check: 15,
+  log_append: 15,
+  log_load: 25,
+  photo_index: 25,
+};
+
+/**
+ * 処理順序で並べたステージ一覧
+ */
+const ORDERED_STAGES: InitStage[] = [
+  'database_sync',
+  'directory_check',
+  'log_append',
+  'log_load',
+  'photo_index',
+];
+
+/**
+ * 全体進捗を計算する
+ * @param stage 現在のステージ
+ * @param stageProgress ステージ内進捗 (0-100)
+ */
+const calculateOverallProgress = (
+  stage: InitStage,
+  stageProgress: number,
+): number => {
+  if (stage === 'completed') return 100;
+  if (stage === 'error' || stage === 'ready') return 0;
+
+  const idx = ORDERED_STAGES.indexOf(stage);
+  if (idx === -1) return 0;
+
+  // 前ステージまでの累積
+  const prevTotal = ORDERED_STAGES.slice(0, idx).reduce(
+    (sum, s) => sum + (STAGE_WEIGHTS[s] ?? 0),
+    0,
+  );
+
+  // 現在ステージの進捗を加算
+  const currentWeight = STAGE_WEIGHTS[stage] ?? 0;
+  return Math.round(prevTotal + (stageProgress / 100) * currentWeight);
 };
 
 /**
@@ -68,15 +97,7 @@ export const useInitProgress = () => {
    */
   const overallProgress = useMemo(() => {
     if (!progress?.stage) return 0;
-
-    const config = STAGE_PROGRESS_CONFIG[progress.stage];
-    const stageProgress = progress.progress ?? 0;
-
-    // ステージ内の進捗を全体進捗に変換
-    // startPercent + (stageProgress / 100) * rangePercent
-    return Math.round(
-      config.startPercent + (stageProgress / 100) * config.rangePercent,
-    );
+    return calculateOverallProgress(progress.stage, progress.progress ?? 0);
   }, [progress?.stage, progress?.progress]);
 
   return {

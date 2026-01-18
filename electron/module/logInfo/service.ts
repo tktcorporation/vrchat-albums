@@ -5,7 +5,7 @@ import * as neverthrow from 'neverthrow';
 import { err, ResultAsync } from 'neverthrow';
 import { match } from 'ts-pattern';
 import { logger } from '../../lib/logger';
-import { emitStageProgress, emitStageStart } from '../initProgress/emitter';
+import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
@@ -390,12 +390,14 @@ export async function loadLogInfoIndexFromVRChatLog({
       batchNumber === totalBatches ||
       batchNumber % PROGRESS_REPORT_INTERVAL === 0
     ) {
-      emitStageProgress(
-        'log_load',
-        i + batch.length,
-        newLogs.length,
-        `ログデータを処理中... (${batchNumber}/${totalBatches})`,
-      );
+      const current = i + batch.length;
+      const total = newLogs.length;
+      emitProgress({
+        stage: 'log_load',
+        progress: total > 0 ? Math.round((current / total) * 100) : 0,
+        message: `ログデータを処理中... (${batchNumber}/${totalBatches})`,
+        details: { current, total },
+      });
     }
 
     const worldJoinLogBatch = batch.filter(
@@ -504,7 +506,7 @@ export async function loadLogInfoIndexFromVRChatLog({
   // 6. 写真のインデックス処理
   // excludeOldLogLoad=true → 差分スキャン（ダイジェスト・mtime使用）
   // excludeOldLogLoad=false → フルスキャン
-  await emitStageStart('photo_index', '写真をインデックス中...');
+  emitStageStart('photo_index', '写真をインデックス中...');
   const photoIndexStartTime = performance.now();
   const photoResults =
     await vrchatPhotoService.createVRChatPhotoPathIndex(excludeOldLogLoad);
