@@ -69,15 +69,21 @@ export class FloatingPromiseLinter {
 
     if (configPath) {
       const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-      const parsedConfig = ts.parseJsonConfigFileContent(
-        configFile.config,
-        ts.sys,
-        this.projectRoot,
-      );
-      compilerOptions = {
-        ...parsedConfig.options,
-        skipLibCheck: true,
-      };
+      if (configFile.error) {
+        consola.warn(
+          `Failed to read tsconfig.json: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, '\n')}`,
+        );
+      } else {
+        const parsedConfig = ts.parseJsonConfigFileContent(
+          configFile.config,
+          ts.sys,
+          this.projectRoot,
+        );
+        compilerOptions = {
+          ...parsedConfig.options,
+          skipLibCheck: true,
+        };
+      }
     }
 
     if (this.sourceMap) {
