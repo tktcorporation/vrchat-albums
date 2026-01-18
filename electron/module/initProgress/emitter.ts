@@ -77,3 +77,15 @@ export const emitInitComplete = (): void => {
     message: '初期化が完了しました',
   });
 };
+
+/**
+ * エラー発生を通知する
+ */
+export const emitError = (message: string, errorDetails?: string): void => {
+  emitProgress({
+    stage: 'error',
+    progress: 0,
+    message,
+    details: errorDetails ? { currentItem: errorDetails } : undefined,
+  });
+};

@@ -77,7 +77,14 @@ export const router = trpcRouter({
         if (result.success) {
           emit.next(result.data);
         } else {
-          logger.warn('Invalid init progress payload:', result.error.message);
+          logger.error({
+            message: 'Invalid init progress payload received',
+            stack: new Error('Zod validation failed'),
+            details: {
+              zodError: result.error.format(),
+              receivedData: data,
+            },
+          });
         }
       }
 

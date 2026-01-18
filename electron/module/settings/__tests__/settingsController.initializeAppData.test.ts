@@ -12,6 +12,7 @@ vi.mock('../../../lib/sequelize');
 vi.mock('../../logSync/service');
 vi.mock('../../vrchatWorldJoinLog/service');
 vi.mock('../../settingStore');
+vi.mock('../../initProgress/emitter');
 
 // Electron環境のモック
 vi.mock('electron', () => ({

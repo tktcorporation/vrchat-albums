@@ -12,6 +12,7 @@ import * as sequelizeClient from '../../lib/sequelize';
 import { procedure, router as trpcRouter } from './../../trpc';
 import * as electronUtilService from '../electronUtil/service';
 import {
+  emitError,
   emitInitComplete,
   emitStageComplete,
   emitStageStart,
@@ -345,15 +346,20 @@ export const settingsRouter = () =>
             .otherwise(() => undefined),
         });
 
+        // エラーメッセージを抽出
+        const errorMessage = match(error)
+          .with(P.instanceOf(Error), (err) => err.message)
+          .otherwise(() => 'Unknown initialization error');
+
+        // エラーステージをemit
+        emitError('初期化に失敗しました', errorMessage);
+
         // UserFacingErrorの場合は構造化情報を保持して再スロー
         if (error instanceof UserFacingError) {
           throw error;
         }
 
         // その他のエラーの場合は新しいUserFacingErrorでラップ
-        const errorMessage = match(error)
-          .with(P.instanceOf(Error), (err) => err.message)
-          .otherwise(() => 'Unknown initialization error');
         throw new UserFacingError(`初期化に失敗しました: ${errorMessage}`);
       } finally {
         // 処理完了後にフラグをリセット

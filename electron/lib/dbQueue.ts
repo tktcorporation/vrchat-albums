@@ -46,15 +46,6 @@ interface DBQueueOptions {
 }
 
 /**
- * 初期化処理用の長時間タイムアウト設定
- * 大量データ処理でもタイムアウトしないように設定
- */
-export const INIT_QUEUE_CONFIG: DBQueueOptions = {
-  concurrency: 1,
-  timeout: undefined, // タイムアウトなし
-} as const;
-
-/**
  * データベースアクセスのためのキュー
  * - 同時実行数を制限してデータベースアクセスをキューイングする
  * - トランザクション処理をサポート

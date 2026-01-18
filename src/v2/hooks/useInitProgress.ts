@@ -3,22 +3,12 @@ import type {
   InitProgressPayload,
   InitStage,
 } from '../../../electron/module/initProgress/types';
+import { STAGE_LABELS } from '../../../electron/module/initProgress/types';
 import { trpcReact } from '../../trpc';
 
-// electronモジュールから型を再エクスポート
+// electronモジュールから型とラベルを再エクスポート
 export type { InitProgressPayload, InitStage };
-
-/**
- * ステージの日本語ラベル
- */
-export const STAGE_LABELS: Record<InitStage, string> = {
-  database_sync: 'データベース初期化',
-  directory_check: 'ディレクトリ確認',
-  log_append: 'ログファイル読み込み',
-  log_load: 'ログデータ保存',
-  photo_index: '写真インデックス',
-  completed: '完了',
-} as const;
+export { STAGE_LABELS };
 
 /**
  * 初期化進捗を監視するフック
@@ -26,16 +16,24 @@ export const STAGE_LABELS: Record<InitStage, string> = {
  */
 export const useInitProgress = () => {
   const [progress, setProgress] = useState<InitProgressPayload | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   // tRPC subscriptionで進捗を購読
   trpcReact.subscribeInitProgress.useSubscription(undefined, {
     onData: (data) => {
       setProgress(data);
+      setError(null);
+    },
+    onError: (err) => {
+      console.error('Init progress subscription error:', err);
+      // TRPCClientErrorLike を Error に変換
+      setError(new Error(err.message));
     },
   });
 
   const reset = useCallback(() => {
     setProgress(null);
+    setError(null);
   }, []);
 
   return {
@@ -51,6 +49,8 @@ export const useInitProgress = () => {
     details: progress?.details,
     /** ステージの日本語ラベル */
     stageLabel: progress?.stage ? STAGE_LABELS[progress.stage] : '',
+    /** subscription エラー */
+    error,
     /** 進捗情報をリセット */
     reset,
   };
