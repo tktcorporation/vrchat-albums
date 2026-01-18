@@ -32,10 +32,9 @@ interface DBQueueOptions {
   maxSize?: number;
   /**
    * タスクのタイムアウト時間（ミリ秒）
-   * undefined を指定するとタイムアウトなし
    * @default 60000 (60秒)
    */
-  timeout?: number | undefined;
+  timeout?: number;
   /**
    * キューが一杯の場合の動作
    * - throw: エラーをスローする
@@ -53,32 +52,15 @@ interface DBQueueOptions {
  * @see docs/log-sync-architecture.md - ログ同期設計ドキュメント
  * @see electron/module/logSync/service.ts - 主要サービスクラス
  */
-/**
- * DBQueueの内部オプション型
- * timeout は undefined を許可（タイムアウトなし）
- */
-interface DBQueueInternalOptions {
-  concurrency: number;
-  maxSize: number;
-  timeout: number | undefined;
-  onFull: 'throw' | 'wait';
-}
-
 class DBQueue {
   private queue: PQueue;
-  private options: DBQueueInternalOptions;
+  private options: Required<DBQueueOptions>;
 
   constructor(options: DBQueueOptions = {}) {
-    // timeout が明示的に undefined で渡された場合はタイムアウトなし
-    const timeout =
-      options.timeout === undefined && 'timeout' in options
-        ? undefined
-        : (options.timeout ?? 60000);
-
     this.options = {
       concurrency: options.concurrency ?? 1,
       maxSize: options.maxSize ?? Number.POSITIVE_INFINITY,
-      timeout,
+      timeout: options.timeout ?? 60000,
       onFull: options.onFull ?? 'wait',
     };
 
@@ -320,16 +302,10 @@ const instances = new Map<string, DBQueue>();
  * 設定からハッシュを生成する
  */
 function getConfigHash(options: DBQueueOptions = {}): string {
-  // timeout が明示的に undefined で渡された場合はタイムアウトなし
-  const timeout =
-    options.timeout === undefined && 'timeout' in options
-      ? 'no-timeout'
-      : (options.timeout ?? 60000);
-
   const normalizedOptions = {
     concurrency: options.concurrency ?? 1,
     maxSize: options.maxSize ?? Number.POSITIVE_INFINITY,
-    timeout,
+    timeout: options.timeout ?? 60000,
     onFull: options.onFull ?? 'wait',
   };
   return JSON.stringify(normalizedOptions);

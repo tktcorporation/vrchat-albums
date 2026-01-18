@@ -1,5 +1,5 @@
 import type React from 'react';
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo } from 'react';
 import {
   type InitProgressPayload,
   useInitProgress,
@@ -37,7 +37,18 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
 }) => {
   const { stages, errorMessage, originalError, retryProcess, completed } =
     useStartupStage();
-  const { progress, message, currentProgress } = useInitProgress();
+  const {
+    progress,
+    message,
+    currentProgress,
+    reset: resetProgress,
+  } = useInitProgress();
+
+  // リトライ時に進捗状態もリセットする
+  const handleRetry = useCallback(() => {
+    resetProgress();
+    retryProcess();
+  }, [resetProgress, retryProcess]);
 
   // ステージマッピング
   const stage: Stage = (() => {
@@ -55,7 +66,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       error: errorMessage || null,
       originalError,
       isReady: completed,
-      retry: retryProcess,
+      retry: handleRetry,
       progress,
       progressMessage: message,
       progressPercent: currentProgress,
@@ -65,7 +76,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       errorMessage,
       originalError,
       completed,
-      retryProcess,
+      handleRetry,
       progress,
       message,
       currentProgress,
