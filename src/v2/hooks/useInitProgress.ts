@@ -17,10 +17,16 @@ export { STAGE_LABELS };
 export const useInitProgress = () => {
   const [progress, setProgress] = useState<InitProgressPayload | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const [isSubscriptionReady, setIsSubscriptionReady] = useState(false);
 
   // tRPC subscriptionで進捗を購読
   trpcReact.subscribeInitProgress.useSubscription(undefined, {
     onData: (data) => {
+      // readyイベントはsubscription接続完了の通知として扱う
+      if (data.stage === 'ready') {
+        setIsSubscriptionReady(true);
+        return; // readyイベントはprogressとして設定しない
+      }
       setProgress(data);
       setError(null);
     },
@@ -34,9 +40,12 @@ export const useInitProgress = () => {
   const reset = useCallback(() => {
     setProgress(null);
     setError(null);
+    setIsSubscriptionReady(false);
   }, []);
 
   return {
+    /** subscription接続完了フラグ */
+    isSubscriptionReady,
     /** 進捗情報 */
     progress,
     /** 現在のステージ */

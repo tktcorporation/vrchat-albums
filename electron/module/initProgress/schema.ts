@@ -8,6 +8,7 @@ import { z } from 'zod';
  * 初期化処理のステージ
  */
 export const InitStageSchema = z.enum([
+  'ready', // subscription接続完了
   'database_sync',
   'directory_check',
   'log_append',
@@ -60,6 +61,7 @@ export type InitProgressChannel = typeof INIT_PROGRESS_CHANNEL;
  * ステージの日本語ラベル
  */
 export const STAGE_LABELS: Record<InitStage, string> = {
+  ready: '接続完了',
   database_sync: 'データベース初期化',
   directory_check: 'ディレクトリ確認',
   log_append: 'ログファイル読み込み',

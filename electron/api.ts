@@ -71,6 +71,13 @@ export const router = trpcRouter({
    */
   subscribeInitProgress: procedure.subscription(() => {
     return observable<InitProgressPayload>((emit) => {
+      // subscription接続完了を即座に通知
+      emit.next({
+        stage: 'ready',
+        progress: 0,
+        message: '接続完了',
+      });
+
       function onInitProgress(data: unknown) {
         // zodで検証してから送信
         const result = InitProgressPayloadSchema.safeParse(data);

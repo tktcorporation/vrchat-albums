@@ -34,6 +34,11 @@ interface ProcessStageCallbacks {
   onComplete?: () => void;
 }
 
+interface UseStartupStageOptions extends ProcessStageCallbacks {
+  /** subscription接続完了フラグ（trueになるまで初期化を開始しない） */
+  isSubscriptionReady?: boolean;
+}
+
 const initialStages: ProcessStages = {
   initialization: 'pending',
 };
@@ -44,7 +49,8 @@ const initialStages: ProcessStages = {
  * settingsController.initializeAppData を呼び出して、
  * データベース初期化、同期、ログ同期を順次実行します。
  */
-export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
+export const useStartupStage = (options?: UseStartupStageOptions) => {
+  const { isSubscriptionReady = false, ...callbacks } = options ?? {};
   const [stages, setStages] = useState<ProcessStages>(initialStages);
   const [error, setError] = useState<ProcessError | null>(null);
   const [hasNotifiedCompletion, setHasNotifiedCompletion] = useState(false);
@@ -164,10 +170,12 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
       .otherwise(() => {});
   }, [stages.initialization, hasTriggeredInitialization]);
 
-  // 自動的に初期化を開始
+  // 自動的に初期化を開始（subscription接続完了後）
   useEffect(() => {
-    startInitialization();
-  }, [startInitialization]);
+    if (isSubscriptionReady) {
+      startInitialization();
+    }
+  }, [isSubscriptionReady, startInitialization]);
 
   // リトライ処理
   const retryProcess = useCallback(() => {

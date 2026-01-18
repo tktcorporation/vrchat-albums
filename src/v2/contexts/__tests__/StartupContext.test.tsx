@@ -18,6 +18,7 @@ vi.mock('../../hooks/useStartUpStage', () => ({
 // useInitProgressのモック（tRPC subscriptionを使うためモックが必要）
 vi.mock('../../hooks/useInitProgress', () => ({
   useInitProgress: vi.fn(() => ({
+    isSubscriptionReady: true,
     progress: null,
     currentStage: null,
     currentProgress: 0,
@@ -27,6 +28,7 @@ vi.mock('../../hooks/useInitProgress', () => ({
     reset: vi.fn(),
   })),
   STAGE_LABELS: {
+    ready: '接続完了',
     database_sync: 'データベース初期化',
     directory_check: 'ディレクトリ確認',
     log_append: 'ログファイル読み込み',

@@ -85,8 +85,21 @@ describe('useStartupStage - simplified implementation', () => {
     expect(result.current.finished).toBe(false);
   });
 
-  it('自動的に初期化ミューテーションが実行される', async () => {
-    renderHook(() => useStartupStage(mockCallbacks));
+  it('isSubscriptionReady=false の場合、初期化は開始されない', async () => {
+    renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: false }),
+    );
+
+    // 少し待ってからmutateが呼ばれていないことを確認
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it('isSubscriptionReady=true の場合、自動的に初期化ミューテーションが実行される', async () => {
+    renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalledTimes(1);
@@ -94,7 +107,9 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   it('ミューテーション実行中は inProgress になる', async () => {
-    const { result } = renderHook(() => useStartupStage(mockCallbacks));
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     // onMutateコールバックを手動で実行
     const mutationOptions =
@@ -112,7 +127,9 @@ describe('useStartupStage - simplified implementation', () => {
   it('ミューテーション成功時は success になる（最小表示時間経過後）', async () => {
     vi.useFakeTimers();
 
-    const { result } = renderHook(() => useStartupStage(mockCallbacks));
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     const mutationOptions =
       mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
@@ -146,7 +163,9 @@ describe('useStartupStage - simplified implementation', () => {
   it('処理が最小表示時間より長い場合は追加の待機なし', async () => {
     vi.useFakeTimers();
 
-    const { result } = renderHook(() => useStartupStage(mockCallbacks));
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     const mutationOptions =
       mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
@@ -172,7 +191,9 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   it('ミューテーション失敗時は error になる', async () => {
-    const { result } = renderHook(() => useStartupStage(mockCallbacks));
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     const mutationOptions =
       mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
@@ -193,7 +214,9 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   it('重複実行エラーの場合は無視される', async () => {
-    const { result } = renderHook(() => useStartupStage(mockCallbacks));
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     const mutationOptions =
       mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
@@ -213,7 +236,9 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   it('LOG_DIRECTORY_ERROR エラーは適切にハンドリングされる', async () => {
-    const { result } = renderHook(() => useStartupStage(mockCallbacks));
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     const mutationOptions =
       mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
@@ -236,7 +261,9 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   it('retryProcess実行時にリセットされる', async () => {
-    const { result } = renderHook(() => useStartupStage(mockCallbacks));
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     // エラー状態にする
     const mutationOptions =
@@ -274,7 +301,9 @@ describe('useStartupStage - simplified implementation', () => {
       loadingMutation,
     );
 
-    renderHook(() => useStartupStage(mockCallbacks));
+    renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     // 少し待ってからmutateが呼ばれていないことを確認
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -293,7 +322,9 @@ describe('useStartupStage - simplified implementation', () => {
       successMutation,
     );
 
-    renderHook(() => useStartupStage(mockCallbacks));
+    renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     // 少し待ってからmutateが呼ばれていないことを確認
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -304,7 +335,9 @@ describe('useStartupStage - simplified implementation', () => {
   it('完了時にコールバックが実行される', async () => {
     vi.useFakeTimers();
 
-    renderHook(() => useStartupStage(mockCallbacks));
+    renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     const mutationOptions =
       mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
@@ -335,7 +368,9 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   it('エラー時にコールバックが実行される', async () => {
-    renderHook(() => useStartupStage(mockCallbacks));
+    renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
 
     const mutationOptions =
       mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];

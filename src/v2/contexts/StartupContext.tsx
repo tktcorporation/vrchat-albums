@@ -35,14 +35,16 @@ interface StartupProviderProps {
 export const StartupProvider: React.FC<StartupProviderProps> = ({
   children,
 }) => {
-  const { stages, errorMessage, originalError, retryProcess, completed } =
-    useStartupStage();
   const {
+    isSubscriptionReady,
     progress,
     message,
     currentProgress,
     reset: resetProgress,
   } = useInitProgress();
+
+  const { stages, errorMessage, originalError, retryProcess, completed } =
+    useStartupStage({ isSubscriptionReady });
 
   // リトライ時に進捗状態もリセットする
   const handleRetry = useCallback(() => {
