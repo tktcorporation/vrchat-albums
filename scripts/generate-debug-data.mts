@@ -80,7 +80,14 @@ const getElectronConfigDir = (): string => {
   return path.join(process.env.HOME || '', '.config', 'Electron');
 };
 const ELECTRON_CONFIG_DIR = getElectronConfigDir();
-const ELECTRON_CONFIG_FILE = path.join(ELECTRON_CONFIG_DIR, 'config.json');
+// electron-store のファイル名は store の name オプションに基づく
+// Playwright テスト用: test-playwright-settings-{HASH}.json
+// この固定ハッシュ値はテストファイルの PLAYWRIGHT_STORE_HASH と一致させる必要がある
+const PLAYWRIGHT_STORE_HASH = 'ci-test';
+const ELECTRON_CONFIG_FILE = path.join(
+  ELECTRON_CONFIG_DIR,
+  `test-playwright-settings-${PLAYWRIGHT_STORE_HASH}.json`,
+);
 
 // 現在の日時
 const _NOW = new Date();

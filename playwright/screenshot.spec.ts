@@ -77,7 +77,7 @@ const launchElectronApp = async () => {
     env: {
       ...process.env,
       PLAYWRIGHT_TEST: 'true',
-      PLAYWRIGHT_STORE_HASH: Date.now().toString(),
+      PLAYWRIGHT_STORE_HASH: 'ci-test',
       NODE_ENV: 'development', // 開発モードを強制
       PORT: '3000', // 開発サーバーのポート
       NODE_OPTIONS: `--max-old-space-size=${MEMORY_LIMIT_MB}`, // Node.js環境変数でもメモリ制限を設定
