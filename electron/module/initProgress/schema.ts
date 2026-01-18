@@ -70,23 +70,3 @@ export const STAGE_LABELS: Record<InitStage, string> = {
   completed: '完了',
   error: 'エラー',
 } as const;
-
-/**
- * safeParse の戻り値型
- */
-export type SafeParseResult<T> =
-  | { success: true; data: T }
-  | { success: false; error: z.ZodError };
-
-/**
- * 進捗ペイロードを検証する
- * @param data 検証するデータ
- * @returns パース結果
- */
-export const parseInitProgressPayload = (
-  data: unknown,
-): SafeParseResult<InitProgressPayload> => {
-  return InitProgressPayloadSchema.safeParse(
-    data,
-  ) as SafeParseResult<InitProgressPayload>;
-};

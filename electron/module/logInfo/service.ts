@@ -375,6 +375,8 @@ export async function loadLogInfoIndexFromVRChatLog({
   // 5. ログのバッチ処理
   const batchProcessStartTime = performance.now();
   const BATCH_SIZE = 1000;
+  /** 進捗報告を行うバッチ間隔 */
+  const PROGRESS_REPORT_INTERVAL = 5;
   const totalBatches = Math.ceil(newLogs.length / BATCH_SIZE);
 
   for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
@@ -382,11 +384,11 @@ export async function loadLogInfoIndexFromVRChatLog({
     const batchStartTime = performance.now();
     const batch = newLogs.slice(i, i + BATCH_SIZE);
 
-    // 進捗を報告（5バッチごとまたは最初と最後）
+    // 進捗を報告（PROGRESS_REPORT_INTERVALバッチごとまたは最初と最後）
     if (
       batchNumber === 1 ||
       batchNumber === totalBatches ||
-      batchNumber % 5 === 0
+      batchNumber % PROGRESS_REPORT_INTERVAL === 0
     ) {
       emitStageProgress(
         'log_load',

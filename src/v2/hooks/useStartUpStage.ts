@@ -105,6 +105,7 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
       },
       onSuccess: async () => {
         // 最小表示時間を保証してから success に遷移
+        // onMutate で設定済み、未設定時は経過時間0として扱う
         const elapsed = Date.now() - (initStartTimeRef.current ?? Date.now());
         const remaining = MIN_LOADING_DISPLAY_MS - elapsed;
         if (remaining > 0) {
