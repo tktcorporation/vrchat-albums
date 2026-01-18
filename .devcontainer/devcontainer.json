@@ -1,25 +1,55 @@
 {
   "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
+  "mounts": [
+    "source=${localWorkspaceFolderBasename}-pnpm-store,target=${containerWorkspaceFolder}/.pnpm-store,type=volume"
+  ],
+
   "features": {
+    // "ghcr.io/devcontainers/features/docker-in-docker:2": {
+    //   "version": "latest",
+    //   "enableNonRootDocker": "true",
+    //   "moby": "true"
+    // },
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers-extra/features/mise:1": {},
     "ghcr.io/devcontainers/features/desktop-lite:1": {
       "webPort": "6080",
       "vncPort": "5901"
-    },
-    "ghcr.io/devcontainers-extra/features/mise:1": {}
+    }
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "GitHub.copilot",
+        "mhutchie.git-graph",
         "steoates.autoimport",
         "editorconfig.editorconfig",
         "WakaTime.vscode-wakatime",
-        "nemesv.copy-file-name",
-        "YoavBls.pretty-ts-errors",
-        "mhutchie.git-graph",
-        "github.vscode-github-actions"
-      ]
+        "nemesv.copy-file-name"
+      ],
+      "settings": {
+        "files.watcherExclude": {
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/.git/modules/**": true,
+          "**/node_modules/**": true,
+          "**/.pnpm/**": true,
+          "**/.pnpm-store/**": true,
+          "**/.turbo/**": true
+        },
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/.pnpm": true,
+          "**/.pnpm-store": true,
+          "**/.git": true,
+          "**/.turbo": true
+        }
+      }
     }
   },
   "forwardPorts": [6080],
@@ -67,6 +97,7 @@
       "bash",
       "-lc",
       ".devcontainer/setup-chrome-devtools-mcp.sh"
-    ]
+    ],
+    "mise-upgrade": ["mise", "upgrade"]
   }
 }

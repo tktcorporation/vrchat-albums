@@ -1,15 +1,19 @@
-# mise configuration file
-# https://mise.jdx.dev/configuration.html
-
 [tools]
-node = "22"
+node = ["22"]
 yarn = "latest"
 uv = "latest"
 python = "3.14"
+pnpm = "10"
 
-# Node.js global packages
 "npm:@anthropic-ai/claude-code" = "latest"
+"npm:@openai/codex" = "latest"
+"npm:@google/gemini-cli" = "latest"
+
 "npm:@antfu/ni" = "latest"
+
+# Browser automation
+"npm:playwright" = "latest"
+
 "npm:fxp-cli" = "latest"
 
 # GritQL - code search and transformation tool
@@ -17,20 +21,23 @@ python = "3.14"
 
 
 [settings]
-# Enable automatic installation of tools
 experimental = true
+# .nvmrcファイルを自動的に読み込む設定
+legacy_version_file = true
+# ディレクトリ移動時に自動的にツールをインストール
+auto_install = true
+
+# pipx バックエンドで uvx を使う設定
+pipx.uvx = true
 
 [tasks]
 "lint:xml" = "cat CLAUDE.md | fxp val"
-
-[tasks.playwright-install]
-run = "npx playwright install chromium && npx playwright install-deps chromium"
 
 [tasks.chromium-path]
 run = "ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1"
 description = "Get Playwright Chromium executable path"
 
-[hooks]
-postinstall = [
-  "ni",
-]
+[tasks.create-devenv]
+run = "npx @tktco/create-devenv@latest"
+description = "Run create-devenv CLI"
+
