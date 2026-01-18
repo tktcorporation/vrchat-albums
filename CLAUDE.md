@@ -13,8 +13,9 @@
       <item>tRPC</item>
       <item>SQLite/Sequelize</item>
       <item>Tailwind/Radix UI</item>
-      <item>ts-pattern</item>
-      <item>neverthrow</item>
+      <item>ts-pattern (型安全なパターンマッチング)</item>
+      <item>neverthrow (Result型によるエラーハンドリング)</item>
+      <item>Zod (スキーマ検証・Branded Types)</item>
     </tech-stack>
     
     <structure>
@@ -50,6 +51,45 @@
       <step order="4">yarn test</step>
       <step order="5">Task Completion</step>
     </task-completion-process>
+
+    <robustness-design priority="critical" jp="堅牢性設計">
+      <reference>.claude/rules/robustness.md (詳細ガイドライン)</reference>
+      <philosophy>テストで正しさを検証するのではなく、設計によって正しさを保証する</philosophy>
+
+      <priority-order jp="問題発見の優先順位">
+        <priority order="1">型による保証（コンパイル時検出）</priority>
+        <priority order="2">静的解析（linter・TypeScript厳格設定）</priority>
+        <priority order="3">ランタイム検証（Zodによる境界バリデーション）</priority>
+        <priority order="4">テスト（上記で保証できない振る舞いの検証）</priority>
+      </priority-order>
+
+      <required-tools>
+        <tool name="ts-pattern" use-case="条件分岐・exhaustive checking">
+          Union型の網羅的処理、エラー分類、状態遷移
+        </tool>
+        <tool name="Zod" use-case="外部境界のバリデーション">
+          API入力、ファイル読み込み、ユーザー入力
+        </tool>
+        <tool name="Zod Branded Types" use-case="プリミティブ型の意味的区別">
+          ID型（UserId, PhotoId）、検証済み値（ValidatedEmail）
+        </tool>
+        <tool name="neverthrow" use-case="予期されたエラーの型安全な伝播">
+          Result型によるエラーハンドリング
+        </tool>
+      </required-tools>
+
+      <design-principles>
+        <principle name="不正な状態を表現不可能に">
+          Union型で状態を明示し、不正な組み合わせを型レベルで排除
+        </principle>
+        <principle name="Parse, Don't Validate">
+          検証と型変換を同時に行い、検証済みであることを型で保証
+        </principle>
+        <principle name="シンプルさと堅牢性の両立">
+          不要な抽象化を避け、型システムで暗黙の契約を明示
+        </principle>
+      </design-principles>
+    </robustness-design>
   </critical-guidelines>
 
   <architectural-patterns>
