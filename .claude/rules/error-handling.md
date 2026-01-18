@@ -6,6 +6,73 @@
 
 ## 基本原則
 
+### try-catch を避け、neverthrow + ts-pattern を使用する
+
+**このプロジェクトでは `try-catch` の使用を原則として避けます。**
+
+代わりに、以下の組み合わせでエラーハンドリングを行います:
+
+| 状況 | 使用するパターン |
+|------|-----------------|
+| 同期処理でエラーが発生しうる | `fromThrowable()` |
+| 非同期処理でエラーが発生しうる | `ResultAsync.fromPromise()` |
+| Result型のエラーを分岐処理 | `match(result).with(...).otherwise(...)` |
+| 複数のResult型を連結 | `result.andThen()`, `result.map()` |
+
+```typescript
+// ✅ 推奨: neverthrow + ts-pattern
+import { ResultAsync, fromThrowable } from 'neverthrow';
+import { match } from 'ts-pattern';
+
+// 同期処理
+const safeParse = fromThrowable(
+  JSON.parse,
+  (e): ParseError => ({ type: 'PARSE_ERROR', message: String(e) })
+);
+
+// 非同期処理
+const fetchData = (url: string) =>
+  ResultAsync.fromPromise(
+    fetch(url).then(r => r.json()),
+    (e): FetchError => ({ type: 'FETCH_ERROR', message: String(e) })
+  );
+
+// 結果のハンドリング
+const result = await fetchData('/api/data');
+match(result)
+  .with({ isOk: true }, ({ value }) => handleSuccess(value))
+  .with({ isErr: true }, ({ error }) =>
+    match(error)
+      .with({ type: 'FETCH_ERROR' }, (e) => showRetryDialog(e))
+      .exhaustive()
+  )
+  .exhaustive();
+```
+
+#### try-catch が許容されるケース
+
+以下の場合のみ `try-catch` の使用を許容します:
+
+1. **`finally` でリソースクリーンアップが必要な場合**
+2. **Electron環境検出パターン** (`require('electron')` のtry-catch)
+3. **ts-patternでエラーを分類し、予期しないエラーを再スローする場合**
+
+```typescript
+// 許容例: finally でクリーンアップ
+try {
+  resource = await acquireResource();
+  return ok(await processResource(resource));
+} catch (error) {
+  return match(error)
+    .with({ code: 'ETIMEDOUT' }, () => err({ type: 'TIMEOUT' }))
+    .otherwise((e) => { throw e; }); // 予期しないエラーは再スロー
+} finally {
+  await resource?.release();
+}
+```
+
+---
+
 ### neverthrow の使い分け
 
 | エラー種別 | 処理方法 | 理由 |

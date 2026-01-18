@@ -210,11 +210,22 @@
         </generic-error-types-warning>
       </lint-enforcement>
 
-      <fromThrowable-preference priority="warning" jp="推奨パターン">
-        <principle>try-catch よりも fromThrowable/ResultAsync.fromPromise を優先</principle>
-        <exceptions>finally句、ts-patternでの分類+再スロー、Electron環境検出</exceptions>
-        <reference>docs/lint-neverthrow.md#fromthrowable-vs-try-catch (詳細・コード例)</reference>
-      </fromThrowable-preference>
+      <try-catch-avoidance priority="critical" jp="try-catch回避必須">
+        <principle>try-catchは原則使用禁止。neverthrow + ts-pattern の組み合わせを使用</principle>
+        <preferred-patterns>
+          <pattern use-case="同期処理">fromThrowable()</pattern>
+          <pattern use-case="非同期処理">ResultAsync.fromPromise()</pattern>
+          <pattern use-case="Result分岐">match(result).with(...).otherwise(...)</pattern>
+          <pattern use-case="Result連結">result.andThen(), result.map()</pattern>
+        </preferred-patterns>
+        <exceptions jp="try-catch許容ケース">
+          <exception>finally句でリソースクリーンアップが必要</exception>
+          <exception>Electron環境検出 (require('electron'))</exception>
+          <exception>ts-patternでエラー分類し、予期しないエラーを再スロー</exception>
+        </exceptions>
+        <reference>.claude/rules/error-handling.md (詳細・コード例)</reference>
+        <reference>docs/lint-neverthrow.md#fromthrowable-vs-try-catch</reference>
+      </try-catch-avoidance>
     </pattern>
 
     <pattern name="ts-pattern Usage" priority="critical" jp="型安全・表現力向上必須">
