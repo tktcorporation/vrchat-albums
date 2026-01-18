@@ -32,7 +32,6 @@ export const InitProgressDetailsSchema = z
     currentItem: z.string().optional(),
   })
   .strict();
-export type InitProgressDetails = z.infer<typeof InitProgressDetailsSchema>;
 
 /**
  * 初期化進捗イベントのペイロード
@@ -55,7 +54,6 @@ export type InitProgressPayload = z.infer<typeof InitProgressPayloadSchema>;
  * IPCチャンネル名（定数として型安全に管理）
  */
 export const INIT_PROGRESS_CHANNEL = 'init-progress' as const;
-export type InitProgressChannel = typeof INIT_PROGRESS_CHANNEL;
 
 /**
  * ステージの日本語ラベル
