@@ -73,6 +73,7 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -108,7 +109,9 @@ describe('useStartupStage - simplified implementation', () => {
     expect(result.current.finished).toBe(false);
   });
 
-  it('ミューテーション成功時は success になる', async () => {
+  it('ミューテーション成功時は success になる（最小表示時間経過後）', async () => {
+    vi.useFakeTimers();
+
     const { result } = renderHook(() => useStartupStage(mockCallbacks));
 
     const mutationOptions =
@@ -118,13 +121,54 @@ describe('useStartupStage - simplified implementation', () => {
       mutationOptions.onMutate();
     });
 
+    // onSuccess を開始（非同期）
+    let successPromise: Promise<void>;
     act(() => {
-      mutationOptions.onSuccess();
+      successPromise = mutationOptions.onSuccess();
+    });
+
+    // 最小表示時間前は inProgress のまま
+    expect(result.current.stages.initialization).toBe('inProgress');
+
+    // 最小表示時間を経過させる
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800);
+      await successPromise;
     });
 
     expect(result.current.stages.initialization).toBe('success');
     expect(result.current.completed).toBe(true);
     expect(result.current.finished).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it('処理が最小表示時間より長い場合は追加の待機なし', async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => useStartupStage(mockCallbacks));
+
+    const mutationOptions =
+      mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
+
+    act(() => {
+      mutationOptions.onMutate();
+    });
+
+    // 最小表示時間より長く待つ（実際の処理時間をシミュレート）
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    // onSuccess を呼び出す（既に最小表示時間を超えているので即座に完了）
+    await act(async () => {
+      await mutationOptions.onSuccess();
+    });
+
+    expect(result.current.stages.initialization).toBe('success');
+    expect(result.current.completed).toBe(true);
+
+    vi.useRealTimers();
   });
 
   it('ミューテーション失敗時は error になる', async () => {
@@ -258,6 +302,8 @@ describe('useStartupStage - simplified implementation', () => {
   });
 
   it('完了時にコールバックが実行される', async () => {
+    vi.useFakeTimers();
+
     renderHook(() => useStartupStage(mockCallbacks));
 
     const mutationOptions =
@@ -267,13 +313,25 @@ describe('useStartupStage - simplified implementation', () => {
       mutationOptions.onMutate();
     });
 
+    // onSuccess を開始して最小表示時間を経過させる
+    let successPromise: Promise<void>;
     act(() => {
-      mutationOptions.onSuccess();
+      successPromise = mutationOptions.onSuccess();
     });
 
-    await waitFor(() => {
-      expect(mockCallbacks.onComplete).toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800);
+      await successPromise;
     });
+
+    // onComplete は useEffect で呼ばれるため、次のレンダリングサイクルを待つ
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(mockCallbacks.onComplete).toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 
   it('エラー時にコールバックが実行される', async () => {

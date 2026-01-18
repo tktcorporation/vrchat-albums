@@ -6,6 +6,12 @@ import type { TypedTRPCError } from '../types/trpcErrors';
 
 type ProcessStage = 'pending' | 'inProgress' | 'success' | 'error' | 'skipped';
 
+/**
+ * ローディング画面の最小表示時間（ミリ秒）
+ * 処理が高速に完了してもローディング画面がフラッシュしないようにする
+ */
+const MIN_LOADING_DISPLAY_MS = 800;
+
 export interface ProcessStages {
   /**
    * アプリケーション初期化処理の状態を追跡
@@ -44,6 +50,9 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
   const [hasNotifiedCompletion, setHasNotifiedCompletion] = useState(false);
   const [hasTriggeredInitialization, setHasTriggeredInitialization] =
     useState(false);
+
+  // 初期化開始時刻を記録（最小表示時間保証用）
+  const initStartTimeRef = useRef<number | null>(null);
 
   // tRPC utils for query invalidation
   const utils = trpcReact.useUtils();
@@ -84,9 +93,18 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
     trpcReact.settings.initializeAppData.useMutation({
       retry: false, // 重複実行を避けるため、リトライは無効
       onMutate: () => {
+        // 開始時刻を記録（最小表示時間保証用）
+        initStartTimeRef.current = Date.now();
         updateStage('initialization', 'inProgress');
       },
       onSuccess: async () => {
+        // 最小表示時間を保証してから success に遷移
+        const elapsed = Date.now() - (initStartTimeRef.current ?? Date.now());
+        const remaining = MIN_LOADING_DISPLAY_MS - elapsed;
+        if (remaining > 0) {
+          await new Promise((resolve) => setTimeout(resolve, remaining));
+        }
+
         updateStage('initialization', 'success');
 
         // ログ同期完了後、ログ関連のクエリキャッシュを無効化
