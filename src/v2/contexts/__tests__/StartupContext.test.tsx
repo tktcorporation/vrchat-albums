@@ -20,11 +20,9 @@ vi.mock('../../hooks/useInitProgress', () => ({
   useInitProgress: vi.fn(() => ({
     isSubscriptionReady: true,
     progress: null,
-    currentStage: null,
-    currentProgress: 0,
+    overallProgress: 0,
     message: '',
-    details: undefined,
-    stageLabel: '',
+    error: null,
     reset: vi.fn(),
   })),
   STAGE_LABELS: {
