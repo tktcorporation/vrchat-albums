@@ -470,7 +470,7 @@ const Contents = memo(() => {
       <div className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]">
         <AppHeader showGalleryControls={false} />
         <div className="flex items-center justify-center flex-1">
-          <div className="text-center p-8 max-w-md">
+          <div className="text-center p-8 w-full max-w-md">
             {/* ローディングアニメーション */}
             <div className="relative mb-8">
               <div className="mx-auto w-20 h-20 relative">

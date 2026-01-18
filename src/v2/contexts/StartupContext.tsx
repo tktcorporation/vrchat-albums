@@ -39,7 +39,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
     isSubscriptionReady,
     progress,
     message,
-    currentProgress,
+    overallProgress,
     reset: resetProgress,
   } = useInitProgress();
 
@@ -71,7 +71,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       retry: handleRetry,
       progress,
       progressMessage: message,
-      progressPercent: currentProgress,
+      progressPercent: overallProgress,
     }),
     [
       stage,
@@ -81,7 +81,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       handleRetry,
       progress,
       message,
-      currentProgress,
+      overallProgress,
     ],
   );
 
