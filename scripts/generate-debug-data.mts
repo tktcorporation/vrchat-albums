@@ -331,29 +331,18 @@ function generatePhotoFile(
 }
 
 /**
- * Electron Store の設定ファイルを生成する
- * テスト環境でセットアップ画面をスキップするために必要
+ * Electron Store の設定ファイルを削除する
+ * テスト環境で本来の初期化フロー（利用規約同意 → セットアップ画面）を検証するために必要
  */
-function generateElectronConfig(): void {
-  console.log('Generating Electron config file...');
+function cleanElectronConfig(): void {
+  console.log('Cleaning Electron config file for fresh test...');
 
-  // 設定内容
-  const config = {
-    logFilesDir: LOGS_DIR,
-    vRChatPhotoDir: path.join(DEBUG_DIR, 'photos', 'VRChat'),
-    isTermsAccepted: true,
-  };
-
-  // ディレクトリが存在しない場合は作成
-  if (!fs.existsSync(ELECTRON_CONFIG_DIR)) {
-    fs.mkdirSync(ELECTRON_CONFIG_DIR, { recursive: true });
+  if (fs.existsSync(ELECTRON_CONFIG_FILE)) {
+    fs.unlinkSync(ELECTRON_CONFIG_FILE);
+    console.log(`Deleted config file: ${ELECTRON_CONFIG_FILE}`);
+  } else {
+    console.log(`Config file does not exist: ${ELECTRON_CONFIG_FILE}`);
   }
-
-  // 設定ファイルを書き込み
-  fs.writeFileSync(ELECTRON_CONFIG_FILE, JSON.stringify(config, null, 2));
-  console.log(`Generated config file: ${ELECTRON_CONFIG_FILE}`);
-  console.log(`  logFilesDir: ${config.logFilesDir}`);
-  console.log(`  vRChatPhotoDir: ${config.vRChatPhotoDir}`);
 }
 
 // メイン関数
@@ -370,8 +359,8 @@ function main(): void {
     const photoPath = generatePhotoFile(eventTimes, logInfo.worldInfo);
     console.log(`Generated photo file: ${photoPath}`);
 
-    // Electron Store の設定ファイルを生成（テスト環境でセットアップをスキップ）
-    generateElectronConfig();
+    // Electron Store の設定ファイルを削除（本来の初期化フローを検証するため）
+    cleanElectronConfig();
 
     console.log('Debug data generation completed successfully!');
 

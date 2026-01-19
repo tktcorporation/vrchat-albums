@@ -179,44 +179,28 @@ test('各画面でスクショ', async () => {
 
   await screenshot(page, title, 'initial');
 
-  // 「同意する」が表示されればクリック、表示されなければ次へ進む
+  // 利用規約画面が表示されることを検証（本来の初期化フロー）
+  console.log('Waiting for terms screen...');
+  await page.waitForSelector('text=同意する', { timeout: 10000 });
+  console.log('Terms button found, taking screenshot...');
+  await screenshot(page, title, 'terms');
+  await page.click('text=同意する');
   await page.waitForTimeout(1000);
-  const isTermsButtonVisible = await page.isVisible('text=同意する');
-  if (isTermsButtonVisible) {
-    console.log('Terms button found, clicking...');
-    await screenshot(page, title, 'terms');
-    await page.click('text=同意する');
-    await page.waitForTimeout(1000);
-  } else {
-    consola.log('「同意する」ボタンが表示されていません');
-  }
 
-  // 初期セットアップ画面または既にセットアップ済みの画面を待つ
-  console.log('Waiting for setup or main screen...');
-
-  // Wait for content to load
+  // セットアップ画面が表示されることを検証
+  console.log('Waiting for setup screen...');
   await page.waitForTimeout(2000);
   await screenshot(page, title, 'debug-current-state');
 
-  // 入力フィールドがあるか確認
+  // 入力フィールドが必ず存在することを検証
   const hasInput = (await page.locator('input[type="text"]').count()) > 0;
-  if (hasInput) {
-    console.log('Found input fields, assuming setup screen');
-    await screenshot(page, title, 'setup');
-  } else {
-    // メイン画面の可能性
-    const hasMainContent =
-      (await page
-        .locator('[data-testid="location-group-header"], .photo-card')
-        .count()) > 0;
-    if (hasMainContent) {
-      console.log('Main screen already loaded, skipping setup');
-      await screenshot(page, title, 'main-already-loaded');
-      // Exit app.
-      await electronApp.close();
-      return;
-    }
+  if (!hasInput) {
+    throw new Error(
+      'Setup screen not displayed: expected input fields for directory configuration',
+    );
   }
+  console.log('Found input fields, setup screen confirmed');
+  await screenshot(page, title, 'setup');
 
   // VRChatログファイルディレクトリの入力フィールドを選択
   try {
