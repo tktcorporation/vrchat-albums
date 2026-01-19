@@ -102,7 +102,7 @@ const launchElectronApp = async () => {
     env: {
       ...process.env,
       PLAYWRIGHT_TEST: 'true',
-      PLAYWRIGHT_STORE_HASH: 'ci-test',
+      PLAYWRIGHT_STORE_HASH: Date.now().toString(),
       NODE_ENV: 'development',
       PORT: '3000',
       NODE_OPTIONS: `--max-old-space-size=${MEMORY_LIMIT_MB}`,

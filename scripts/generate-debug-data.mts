@@ -71,24 +71,6 @@ const DEBUG_DIR = path.join(path.resolve(__dirname, '..'), 'debug');
 const LOGS_DIR = path.join(DEBUG_DIR, 'logs');
 const PHOTOS_DIR = path.join(DEBUG_DIR, 'photos', 'VRChat');
 
-// Electron Store の設定ファイルパス（テスト環境用）
-const getElectronConfigDir = (): string => {
-  if (process.platform === 'win32') {
-    return path.join(process.env.APPDATA || '', 'Electron');
-  }
-  // Linux/macOS: ~/.config/Electron
-  return path.join(process.env.HOME || '', '.config', 'Electron');
-};
-const ELECTRON_CONFIG_DIR = getElectronConfigDir();
-// electron-store のファイル名は store の name オプションに基づく
-// Playwright テスト用: test-playwright-settings-{HASH}.json
-// この固定ハッシュ値はテストファイルの PLAYWRIGHT_STORE_HASH と一致させる必要がある
-const PLAYWRIGHT_STORE_HASH = 'ci-test';
-const ELECTRON_CONFIG_FILE = path.join(
-  ELECTRON_CONFIG_DIR,
-  `test-playwright-settings-${PLAYWRIGHT_STORE_HASH}.json`,
-);
-
 // 現在の日時
 const _NOW = new Date();
 const _DATE_FORMAT = 'yyyy-MM-dd';
@@ -330,21 +312,6 @@ function generatePhotoFile(
   }
 }
 
-/**
- * Electron Store の設定ファイルを削除する
- * テスト環境で本来の初期化フロー（利用規約同意 → セットアップ画面）を検証するために必要
- */
-function cleanElectronConfig(): void {
-  console.log('Cleaning Electron config file for fresh test...');
-
-  if (fs.existsSync(ELECTRON_CONFIG_FILE)) {
-    fs.unlinkSync(ELECTRON_CONFIG_FILE);
-    console.log(`Deleted config file: ${ELECTRON_CONFIG_FILE}`);
-  } else {
-    console.log(`Config file does not exist: ${ELECTRON_CONFIG_FILE}`);
-  }
-}
-
 // メイン関数
 function main(): void {
   try {
@@ -358,9 +325,6 @@ function main(): void {
     // 写真ファイルを生成
     const photoPath = generatePhotoFile(eventTimes, logInfo.worldInfo);
     console.log(`Generated photo file: ${photoPath}`);
-
-    // Electron Store の設定ファイルを削除（本来の初期化フローを検証するため）
-    cleanElectronConfig();
 
     console.log('Debug data generation completed successfully!');
 
