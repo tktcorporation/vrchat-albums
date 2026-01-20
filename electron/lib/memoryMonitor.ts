@@ -93,6 +93,15 @@ export class MemoryMonitor {
   private lastWarningTime = 0;
   private readonly WARNING_COOLDOWN_MS = 10000; // 10秒間は同じ警告を出さない
 
+  /**
+   * ピークRSSを更新
+   */
+  private updatePeakRss(snapshot: MemorySnapshot): void {
+    if (snapshot.rssMB > this.peakRssMB) {
+      this.peakRssMB = snapshot.rssMB;
+    }
+  }
+
   constructor(config: Partial<MemoryMonitorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -103,11 +112,7 @@ export class MemoryMonitor {
    */
   async checkMemory(context?: string): Promise<MemorySnapshot> {
     const snapshot = getMemorySnapshot();
-
-    // ピークRSSを更新
-    if (snapshot.rssMB > this.peakRssMB) {
-      this.peakRssMB = snapshot.rssMB;
-    }
+    this.updatePeakRss(snapshot);
 
     const now = Date.now();
 
@@ -215,11 +220,7 @@ export class MemoryMonitor {
    */
   getRecommendedParallelLimit(defaultLimit: number): number {
     const snapshot = getMemorySnapshot();
-
-    // ピークRSSを更新
-    if (snapshot.rssMB > this.peakRssMB) {
-      this.peakRssMB = snapshot.rssMB;
-    }
+    this.updatePeakRss(snapshot);
 
     // クリティカル閾値超過: 直列化
     if (snapshot.rssMB > this.config.rssCriticalThresholdMB) {

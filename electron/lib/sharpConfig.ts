@@ -20,7 +20,7 @@
 import sharp from 'sharp';
 
 /**
- * loggerを遅延インポート
+ * loggerを遅延インポート（キャッシュ付き）
  *
  * sharpConfig.tsがloggerをトップレベルでインポートすると、
  * loggerが@sentry/electron/mainやelectron-logをインポートし、
@@ -28,14 +28,14 @@ import sharp from 'sharp';
  *
  * 遅延インポートにより、Sharp初期化後にのみloggerが読み込まれる。
  */
-const logDebug = async (message: string) => {
-  const { logger } = await import('./logger');
-  logger.debug(message);
-};
+let lazyLogger: typeof import('./logger').logger | null = null;
 
-const logInfo = async (message: object) => {
-  const { logger } = await import('./logger');
-  logger.info(message);
+const getLazyLogger = async () => {
+  if (!lazyLogger) {
+    const { logger } = await import('./logger');
+    lazyLogger = logger;
+  }
+  return lazyLogger;
 };
 
 /**
@@ -113,15 +113,17 @@ export const initializeSharp = (
   isInitialized = true;
 
   // 非同期でログ出力（fire-and-forget）
-  void logInfo({
-    message: 'Sharp initialized',
-    details: {
-      concurrency: sharp.concurrency(),
-      cache: sharp.cache(),
-      simd: sharp.simd(),
-      platform: process.platform,
-    },
-  });
+  void getLazyLogger().then((l) =>
+    l.info({
+      message: 'Sharp initialized',
+      details: {
+        concurrency: sharp.concurrency(),
+        cache: sharp.cache(),
+        simd: sharp.simd(),
+        platform: process.platform,
+      },
+    }),
+  );
 };
 
 /**
@@ -144,5 +146,5 @@ export const clearSharpCache = (): void => {
     sharp.cache(currentCacheConfig);
   }
 
-  void logDebug('Sharp cache cleared');
+  void getLazyLogger().then((l) => l.debug('Sharp cache cleared'));
 };
