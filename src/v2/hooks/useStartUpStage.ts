@@ -6,6 +6,12 @@ import type { TypedTRPCError } from '../types/trpcErrors';
 
 type ProcessStage = 'pending' | 'inProgress' | 'success' | 'error' | 'skipped';
 
+/**
+ * ローディング画面の最小表示時間（ミリ秒）
+ * 処理が高速に完了してもローディング画面がフラッシュしないようにする
+ */
+const MIN_LOADING_DISPLAY_MS = 800;
+
 export interface ProcessStages {
   /**
    * アプリケーション初期化処理の状態を追跡
@@ -28,6 +34,11 @@ interface ProcessStageCallbacks {
   onComplete?: () => void;
 }
 
+interface UseStartupStageOptions extends ProcessStageCallbacks {
+  /** subscription接続完了フラグ（trueになるまで初期化を開始しない） */
+  isSubscriptionReady?: boolean;
+}
+
 const initialStages: ProcessStages = {
   initialization: 'pending',
 };
@@ -38,12 +49,13 @@ const initialStages: ProcessStages = {
  * settingsController.initializeAppData を呼び出して、
  * データベース初期化、同期、ログ同期を順次実行します。
  */
-export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
+export const useStartupStage = (options?: UseStartupStageOptions) => {
+  const { isSubscriptionReady = false, ...callbacks } = options ?? {};
   const [stages, setStages] = useState<ProcessStages>(initialStages);
   const [error, setError] = useState<ProcessError | null>(null);
-  const [hasNotifiedCompletion, setHasNotifiedCompletion] = useState(false);
-  const [hasTriggeredInitialization, setHasTriggeredInitialization] =
-    useState(false);
+
+  // 初期化開始時刻を記録（最小表示時間保証用）
+  const initStartTimeRef = useRef<number | null>(null);
 
   // tRPC utils for query invalidation
   const utils = trpcReact.useUtils();
@@ -84,17 +96,31 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
     trpcReact.settings.initializeAppData.useMutation({
       retry: false, // 重複実行を避けるため、リトライは無効
       onMutate: () => {
+        // 開始時刻を記録（最小表示時間保証用）
+        initStartTimeRef.current = Date.now();
         updateStage('initialization', 'inProgress');
       },
       onSuccess: async () => {
-        updateStage('initialization', 'success');
+        // 最小表示時間を保証してから success に遷移
+        // onMutate で設定済み、未設定時は経過時間0として扱う
+        const elapsed = Date.now() - (initStartTimeRef.current ?? Date.now());
+        const remaining = MIN_LOADING_DISPLAY_MS - elapsed;
+        if (remaining > 0) {
+          await new Promise((resolve) => setTimeout(resolve, remaining));
+        }
 
         // ログ同期完了後、ログ関連のクエリキャッシュを無効化
+        // キャッシュ無効化完了を待ってからステージ遷移する
         try {
-          invalidatePhotoGalleryQueries(utils);
+          await invalidatePhotoGalleryQueries(utils);
         } catch (error) {
           console.warn('Failed to invalidate query cache:', error);
         }
+
+        updateStage('initialization', 'success');
+
+        // 初期化完了を通知
+        callbacks?.onComplete?.();
       },
       onError: (error: TypedTRPCError | Error | unknown) => {
         // 重複実行エラーの場合は無視
@@ -123,40 +149,30 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
   mutationRef.current = initializeAppDataMutation;
 
   // 初期化処理を開始
+  // mutation.isIdle = 未実行または reset() 済み
   const startInitialization = useCallback(() => {
     const mutation = mutationRef.current;
     match({
       stage: stages.initialization,
-      isLoading: mutation.isPending,
-      isSuccess: mutation.isSuccess,
-      hasTriggered: hasTriggeredInitialization,
+      isIdle: mutation.isIdle,
     })
-      .with(
-        {
-          stage: 'pending',
-          isLoading: false,
-          isSuccess: false,
-          hasTriggered: false,
-        },
-        () => {
-          setHasTriggeredInitialization(true);
-          mutation.mutate();
-        },
-      )
+      .with({ stage: 'pending', isIdle: true }, () => {
+        mutation.mutate();
+      })
       .otherwise(() => {});
-  }, [stages.initialization, hasTriggeredInitialization]);
+  }, [stages.initialization]);
 
-  // 自動的に初期化を開始
+  // 自動的に初期化を開始（subscription接続完了後）
   useEffect(() => {
-    startInitialization();
-  }, [startInitialization]);
+    if (isSubscriptionReady) {
+      startInitialization();
+    }
+  }, [isSubscriptionReady, startInitialization]);
 
   // リトライ処理
   const retryProcess = useCallback(() => {
     setStages(initialStages);
     setError(null);
-    setHasNotifiedCompletion(false);
-    setHasTriggeredInitialization(false);
     mutationRef.current.reset();
     // startInitialization は useEffect で自動的に呼ばれる
   }, []);
@@ -166,14 +182,6 @@ export const useStartupStage = (callbacks?: ProcessStageCallbacks) => {
     () => stages.initialization === 'success',
     [stages],
   );
-
-  // 完了通知
-  useEffect(() => {
-    if (completed && !hasNotifiedCompletion) {
-      setHasNotifiedCompletion(true);
-      callbacks?.onComplete?.();
-    }
-  }, [completed, hasNotifiedCompletion, callbacks]);
 
   // 終了判定（成功またはエラー）
   const finished = useMemo(

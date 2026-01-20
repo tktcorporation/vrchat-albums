@@ -43,7 +43,7 @@ process.once('loaded', () => {
 declare global {
   interface Window {
     Main: typeof api;
-    MyOn: typeof myOn;
+    // MyOn は src/v2/types/electron.d.ts で型定義されているため、ここでは省略
     ipcRenderer: typeof ipcRenderer;
   }
 }
@@ -104,9 +104,6 @@ const api = {
 };
 contextBridge.exposeInMainWorld('Main', api);
 
-/**
- * 型安全な ipcRenderer.on
- */
 const myOn = {
   receiveStatusToUseVRChatLogFilesDir: (
     callback: (

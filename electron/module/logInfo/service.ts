@@ -5,6 +5,7 @@ import * as neverthrow from 'neverthrow';
 import { err, ResultAsync } from 'neverthrow';
 import { match } from 'ts-pattern';
 import { logger } from '../../lib/logger';
+import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
@@ -374,9 +375,30 @@ export async function loadLogInfoIndexFromVRChatLog({
   // 5. ログのバッチ処理
   const batchProcessStartTime = performance.now();
   const BATCH_SIZE = 1000;
+  /** 進捗報告を行うバッチ間隔 */
+  const PROGRESS_REPORT_INTERVAL = 5;
+  const totalBatches = Math.ceil(newLogs.length / BATCH_SIZE);
+
   for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
+    const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
     const batchStartTime = performance.now();
     const batch = newLogs.slice(i, i + BATCH_SIZE);
+
+    // 進捗を報告（PROGRESS_REPORT_INTERVALバッチごとまたは最初と最後）
+    if (
+      batchNumber === 1 ||
+      batchNumber === totalBatches ||
+      batchNumber % PROGRESS_REPORT_INTERVAL === 0
+    ) {
+      const current = i + batch.length;
+      const total = newLogs.length;
+      emitProgress({
+        stage: 'log_load',
+        progress: total > 0 ? Math.round((current / total) * 100) : 0,
+        message: `ログデータを処理中... (${batchNumber}/${totalBatches})`,
+        details: { current, total },
+      });
+    }
 
     const worldJoinLogBatch = batch.filter(
       (log): log is VRChatWorldJoinLog => log.logType === 'worldJoin',
@@ -484,10 +506,16 @@ export async function loadLogInfoIndexFromVRChatLog({
   // 6. 写真のインデックス処理
   // excludeOldLogLoad=true → 差分スキャン（ダイジェスト・mtime使用）
   // excludeOldLogLoad=false → フルスキャン
+  emitStageStart('photo_index', '写真をインデックス中...');
   const photoIndexStartTime = performance.now();
   const photoResults =
     await vrchatPhotoService.createVRChatPhotoPathIndex(excludeOldLogLoad);
   results.createdVRChatPhotoPathModelList = photoResults ?? [];
+  emitProgress({
+    stage: 'photo_index',
+    progress: 100,
+    message: '写真インデックスが完了しました',
+  });
   const photoIndexEndTime = performance.now();
   logger.debug(
     `Create photo path index took ${

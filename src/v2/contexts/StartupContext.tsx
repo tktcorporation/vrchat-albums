@@ -1,5 +1,9 @@
 import type React from 'react';
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo } from 'react';
+import {
+  type InitProgressPayload,
+  useInitProgress,
+} from '../hooks/useInitProgress';
 import { useStartupStage } from '../hooks/useStartUpStage';
 
 type Stage = 'idle' | 'syncing' | 'ready' | 'error';
@@ -10,6 +14,12 @@ interface StartupContextValue {
   originalError?: unknown; // tRPCエラーオブジェクト全体
   isReady: boolean;
   retry: () => void;
+  /** 初期化進捗情報 */
+  progress: InitProgressPayload | null;
+  /** 進捗メッセージ */
+  progressMessage: string;
+  /** 進捗パーセント (0-100) */
+  progressPercent: number;
 }
 
 const StartupContext = createContext<StartupContextValue | null>(null);
@@ -25,8 +35,22 @@ interface StartupProviderProps {
 export const StartupProvider: React.FC<StartupProviderProps> = ({
   children,
 }) => {
+  const {
+    isSubscriptionReady,
+    progress,
+    message,
+    overallProgress,
+    reset: resetProgress,
+  } = useInitProgress();
+
   const { stages, errorMessage, originalError, retryProcess, completed } =
-    useStartupStage();
+    useStartupStage({ isSubscriptionReady });
+
+  // リトライ時に進捗状態もリセットする
+  const handleRetry = useCallback(() => {
+    resetProgress();
+    retryProcess();
+  }, [resetProgress, retryProcess]);
 
   // ステージマッピング
   const stage: Stage = (() => {
@@ -44,9 +68,21 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       error: errorMessage || null,
       originalError,
       isReady: completed,
-      retry: retryProcess,
+      retry: handleRetry,
+      progress,
+      progressMessage: message,
+      progressPercent: overallProgress,
     }),
-    [stage, errorMessage, originalError, completed, retryProcess],
+    [
+      stage,
+      errorMessage,
+      originalError,
+      completed,
+      handleRetry,
+      progress,
+      message,
+      overallProgress,
+    ],
   );
 
   return (

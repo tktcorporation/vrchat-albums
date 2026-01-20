@@ -13,6 +13,10 @@ import { backgroundSettingsRouter } from './module/backgroundSettings/controller
 import { debugRouter } from './module/debug/debugController';
 import { electronUtilRouter } from './module/electronUtil/controller/electronUtilController';
 import { openGetFileDialog } from './module/electronUtil/service';
+import {
+  type InitProgressPayload,
+  InitProgressPayloadSchema,
+} from './module/initProgress/schema';
 import { logInfoRouter } from './module/logInfo/logInfoCointroller';
 import { logSyncRouter } from './module/logSync/logSyncController';
 import * as service from './module/service';
@@ -58,6 +62,43 @@ export const router = trpcRouter({
 
       return () => {
         ee.off('toast', onToast);
+      };
+    });
+  }),
+  /**
+   * 初期化進捗を購読する
+   * zodスキーマで検証済みのデータのみを送信
+   */
+  subscribeInitProgress: procedure.subscription(() => {
+    return observable<InitProgressPayload>((emit) => {
+      // subscription接続完了を即座に通知
+      emit.next({
+        stage: 'ready',
+        progress: 0,
+        message: '接続完了',
+      });
+
+      function onInitProgress(data: unknown) {
+        // zodで検証してから送信
+        const result = InitProgressPayloadSchema.safeParse(data);
+        if (result.success) {
+          emit.next(result.data);
+        } else {
+          logger.error({
+            message: 'Invalid init progress payload received',
+            stack: new Error('Zod validation failed'),
+            details: {
+              zodError: result.error.format(),
+              receivedData: data,
+            },
+          });
+        }
+      }
+
+      ee.on('init-progress', onInitProgress);
+
+      return () => {
+        ee.off('init-progress', onInitProgress);
       };
     });
   }),

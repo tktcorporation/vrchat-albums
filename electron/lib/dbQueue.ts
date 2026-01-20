@@ -60,7 +60,7 @@ class DBQueue {
     this.options = {
       concurrency: options.concurrency ?? 1,
       maxSize: options.maxSize ?? Number.POSITIVE_INFINITY,
-      timeout: options.timeout ?? 60000, // 60秒に延長
+      timeout: options.timeout ?? 60000,
       onFull: options.onFull ?? 'wait',
     };
 
@@ -305,7 +305,7 @@ function getConfigHash(options: DBQueueOptions = {}): string {
   const normalizedOptions = {
     concurrency: options.concurrency ?? 1,
     maxSize: options.maxSize ?? Number.POSITIVE_INFINITY,
-    timeout: options.timeout ?? 30000,
+    timeout: options.timeout ?? 60000,
     onFull: options.onFull ?? 'wait',
   };
   return JSON.stringify(normalizedOptions);

@@ -18,6 +18,7 @@ import {
 } from './../../lib/brandedTypes';
 import { logger } from './../../lib/logger';
 import * as fs from './../../lib/wrappedFs';
+import { emitProgress } from '../initProgress/emitter';
 import { getSettingStore, type PhotoFolderScanStates } from '../settingStore';
 import * as model from './model/vrchatPhotoPath.model';
 import {
@@ -1260,6 +1261,13 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
 
             allCreatedModels.push(...createdModels);
             totalProcessed += processedBatch.length;
+
+            // 途中経過を報告（総数不明のため中間値を使用）
+            emitProgress({
+              stage: 'photo_index',
+              progress: 50,
+              message: `写真をインデックス中... (${totalProcessed} 件処理済み)`,
+            });
 
             const batchEndTime = performance.now();
             logger.debug(

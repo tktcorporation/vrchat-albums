@@ -11,6 +11,7 @@ import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
 import { procedure, router as trpcRouter } from './../../trpc';
 import * as electronUtilService from '../electronUtil/service';
+import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
@@ -195,13 +196,28 @@ export const settingsRouter = () =>
 
         // Step 1: データベース同期
         logger.info('Step 1: Syncing database schema...');
+        emitStageStart('database_sync', 'データベースを初期化しています...');
         await sequelizeClient.syncRDBClient();
+        emitProgress({
+          stage: 'database_sync',
+          progress: 100,
+          message: 'データベースの初期化が完了しました',
+        });
 
         // Step 2: ディレクトリチェック
         logger.info('Step 2: Checking VRChat directories...');
+        emitStageStart(
+          'directory_check',
+          'VRChatディレクトリを確認しています...',
+        );
 
         // VRChatログディレクトリの存在確認は、ログ同期時のエラーで判定する
         // 事前チェックは省略し、ログ同期エラーで詳細なエラーを提供
+        emitProgress({
+          stage: 'directory_check',
+          progress: 100,
+          message: 'VRChatディレクトリの確認が完了しました',
+        });
 
         // Step 3: 初回起動判定とPhotoPath変更確認
         logger.info('Step 3: Checking if this is first launch...');
@@ -271,6 +287,7 @@ export const settingsRouter = () =>
         }
 
         // Step 4: ログ同期実行
+        // emitStageStart は syncLogs 内で行われる
         logger.info('Step 4: Starting log sync...');
         const logSyncResult = await syncLogs(syncMode);
 
@@ -313,6 +330,13 @@ export const settingsRouter = () =>
           logger.info('Log sync completed successfully');
         }
 
+        // 初期化完了を通知
+        emitProgress({
+          stage: 'completed',
+          progress: 100,
+          message: '初期化が完了しました',
+        });
+
         logger.info('=== Application data initialization completed ===');
         return { success: true };
       } catch (error) {
@@ -323,15 +347,25 @@ export const settingsRouter = () =>
             .otherwise(() => undefined),
         });
 
+        // エラーメッセージを抽出
+        const errorMessage = match(error)
+          .with(P.instanceOf(Error), (err) => err.message)
+          .otherwise(() => 'Unknown initialization error');
+
+        // エラーステージをemit
+        emitProgress({
+          stage: 'error',
+          progress: 0,
+          message: '初期化に失敗しました',
+          details: { currentItem: errorMessage },
+        });
+
         // UserFacingErrorの場合は構造化情報を保持して再スロー
         if (error instanceof UserFacingError) {
           throw error;
         }
 
         // その他のエラーの場合は新しいUserFacingErrorでラップ
-        const errorMessage = match(error)
-          .with(P.instanceOf(Error), (err) => err.message)
-          .otherwise(() => 'Unknown initialization error');
         throw new UserFacingError(`初期化に失敗しました: ${errorMessage}`);
       } finally {
         // 処理完了後にフラグをリセット

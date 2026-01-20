@@ -173,6 +173,7 @@ const initializeApp = async () => {
 
   registerIpcMainListeners();
   const mainWindow = await createOrGetMainWindow();
+
   createIPCHandler({
     router,
     windows: [mainWindow],

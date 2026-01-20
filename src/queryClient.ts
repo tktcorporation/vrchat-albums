@@ -5,14 +5,15 @@ import type { trpcReact } from '@/trpc';
  * ログが更新されると、写真のグルーピング、ワールド参加情報、プレイヤー情報などが
  * 変更される可能性があるため、関連するすべてのクエリを無効化する。
  */
-export const invalidatePhotoGalleryQueries = (
+export const invalidatePhotoGalleryQueries = async (
   trpsUtils: ReturnType<typeof trpcReact.useUtils>,
-) => {
-  // 写真関連のクエリ
-  trpsUtils.vrchatPhoto.getVrchatPhotoPathModelList.invalidate();
-
-  // ワールド参加ログ関連のクエリ
-  trpsUtils.vrchatWorldJoinLog.getVRChatWorldJoinLogList.invalidate();
+): Promise<void> => {
+  await Promise.all([
+    // 写真関連のクエリ
+    trpsUtils.vrchatPhoto.getVrchatPhotoPathModelList.invalidate(),
+    // ワールド参加ログ関連のクエリ
+    trpsUtils.vrchatWorldJoinLog.getVRChatWorldJoinLogList.invalidate(),
+  ]);
 
   // ログ情報関連のクエリ（パフォーマンスを考慮して必要に応じて）
   // trpsUtils.logInfo.invalidate();

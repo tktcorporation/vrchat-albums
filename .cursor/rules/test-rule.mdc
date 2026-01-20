@@ -1,8 +1,0 @@
----
-description: 
-globs: *.spec.ts
-alwaysApply: false
----
-## テスト
-テストを記述する際はなるべく mock を使わずに書いてください。
-mock を使用せずに記述することが難しい場合は、確認をとってからmock を使用するようにしてください。

@@ -304,7 +304,14 @@ const ToasterWrapper = () => {
  * 初期同期やエラー状態を監視しながら各画面を表示する。
  */
 const Contents = memo(() => {
-  const { stage, error, originalError, retry } = useStartup();
+  const {
+    stage,
+    error,
+    originalError,
+    retry,
+    progressMessage,
+    progressPercent,
+  } = useStartup();
   const loadingState = useLoadingState();
 
   // 必要な関数を分割代入で取得し、依存配列を最適化
@@ -456,26 +463,31 @@ const Contents = memo(() => {
   }
 
   if (stage === 'syncing') {
-    const currentStage = '読み込み中...';
+    // 進捗メッセージがあれば表示、なければデフォルト
+    const displayMessage = progressMessage || '読み込み中...';
 
     return (
-      <div className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]">
+      <div
+        className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]"
+        data-testid="loading-screen"
+      >
         <AppHeader showGalleryControls={false} />
         <div className="flex items-center justify-center flex-1">
-          <div className="text-center p-8 max-w-md">
+          <div className="text-center p-8 w-full max-w-md">
             {/* ローディングアニメーション */}
             <div className="relative mb-8">
               <div className="mx-auto w-20 h-20 relative">
                 {/* ベースの円 */}
                 <div className="absolute inset-0 rounded-full bg-gray-100 dark:bg-gray-800" />
 
-                {/* プログレス */}
+                {/* プログレス - 実際の進捗を反映 */}
                 <svg
                   className="absolute inset-0 w-full h-full -rotate-90"
                   viewBox="0 0 80 80"
                   aria-label="ローディングインジケーター"
                 >
                   <title>ローディングインジケーター</title>
+                  {/* 背景の円 */}
                   <circle
                     cx="40"
                     cy="40"
@@ -483,31 +495,31 @@ const Contents = memo(() => {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3"
-                    className="text-primary animate-arc-loading"
+                    className="text-gray-200 dark:text-gray-700"
+                  />
+                  {/* 進捗の円 */}
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="36"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    className="text-primary transition-all duration-300"
                     strokeDasharray="226"
-                    strokeDashoffset="226"
+                    strokeDashoffset={226 - (226 * progressPercent) / 100}
                     strokeLinecap="round"
                   />
                 </svg>
 
-                {/* 中央のアイコン */}
+                {/* 中央のパーセント表示 */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-8 h-8 text-gray-600 dark:text-gray-400 animate-fade-in-out">
-                    <svg
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-label="写真アイコン"
-                    >
-                      <title>写真アイコン</title>
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
+                  <span
+                    className="text-sm font-medium text-gray-600 dark:text-gray-400"
+                    data-testid="progress-percent"
+                  >
+                    {progressPercent > 0 ? `${progressPercent}%` : ''}
+                  </span>
                 </div>
               </div>
             </div>
@@ -515,15 +527,32 @@ const Contents = memo(() => {
             {/* テキストエリア - タイポグラフィ */}
             <div className="space-y-3">
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 tracking-tight">
-                {currentStage}
+                初期化中...
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-500">
-                写真とログファイルを準備しています
+              <p
+                className="text-sm text-gray-500 dark:text-gray-500 min-h-[1.5em]"
+                data-testid="progress-message"
+              >
+                {displayMessage}
               </p>
             </div>
 
+            {/* プログレスバー */}
+            <div className="mt-6 w-full max-w-xs mx-auto">
+              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                  style={{
+                    width: `${Math.min(Math.max(progressPercent, 5), 100)}%`,
+                  }}
+                  data-testid="progress-bar"
+                  data-progress={progressPercent}
+                />
+              </div>
+            </div>
+
             {/* シンプルなドットインジケーター */}
-            <div className="mt-8 flex justify-center items-center space-x-1.5">
+            <div className="mt-6 flex justify-center items-center space-x-1.5">
               <div
                 className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
                 style={{ animationDelay: '0ms' }}
