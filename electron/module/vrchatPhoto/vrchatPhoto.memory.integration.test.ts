@@ -338,8 +338,15 @@ describe('写真インデックス作成のメモリプロファイリング', (
       },
     ];
 
+    // サービス関数を事前にインポート
+    // Sharp の cache()/concurrency() はグローバル設定のため、
+    // モジュールを再インポートしなくても設定変更は即座に反映される
+    const { createVRChatPhotoPathIndex } = await import(
+      './vrchatPhoto.service'
+    );
+
     for (const config of configurations) {
-      // 設定を適用
+      // 設定を適用（Sharpのグローバル設定を直接変更）
       config.setup();
 
       // スキャン状態をリセット
@@ -350,9 +357,6 @@ describe('写真インデックス作成のメモリプロファイリング', (
 
       const snapshot1 = takeMemorySnapshot('before');
 
-      const { createVRChatPhotoPathIndex } = await import(
-        './vrchatPhoto.service'
-      );
       await createVRChatPhotoPathIndex(false);
 
       const snapshot2 = takeMemorySnapshot('after');
