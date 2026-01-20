@@ -106,14 +106,12 @@ let currentConfig: SharpConfigOptions = LOW_MEMORY_CONFIG;
 /**
  * 現在の環境に適した設定を取得
  *
- * Linux環境では常に LOW_MEMORY_CONFIG を返す（GLib競合回避）
  * Windows/Mac環境では requestedConfig をそのまま返す
  */
 const getEnvironmentAppropriateConfig = (
   requestedConfig: SharpConfigOptions,
 ): SharpConfigOptions => {
-  // Linux環境では常に低メモリ設定を強制（GLib-GObject競合防止）
-  return isLinuxPlatform() ? LOW_MEMORY_CONFIG : requestedConfig;
+  return requestedConfig;
 };
 
 /**

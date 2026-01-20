@@ -5,7 +5,6 @@
  * Sharpなどのネイティブライブラリ（libvips）のメモリ使用量も含めて監視する
  */
 
-import { isLinuxPlatform } from './environment';
 import { logger } from './logger';
 
 /**
@@ -66,8 +65,8 @@ const DEFAULT_CONFIG: MemoryMonitorConfig = {
  * 実際の並列数は getParallelBaseLimit() とメモリ監視で動的に調整される。
  */
 export const PARALLEL_LIMITS = {
-  sharpMetadata: 5,
-  thumbnail: 8,
+  sharpMetadata: 3,
+  thumbnail: 5,
 } as const;
 
 /**
@@ -80,7 +79,7 @@ export const PARALLEL_LIMITS = {
  * @returns Linux環境では1、それ以外はdefaultLimit
  */
 export const getParallelBaseLimit = (defaultLimit: number): number => {
-  return isLinuxPlatform() ? 1 : defaultLimit;
+  return defaultLimit;
 };
 
 /**
