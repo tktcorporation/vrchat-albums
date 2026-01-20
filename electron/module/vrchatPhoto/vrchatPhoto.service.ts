@@ -19,7 +19,6 @@ import {
 import { logger } from './../../lib/logger';
 import {
   getGlobalMemoryMonitor,
-  getParallelBaseLimit,
   MEMORY_THRESHOLDS,
   MemoryMonitor,
   PARALLEL_LIMITS,
@@ -1023,12 +1022,11 @@ async function processPhotoBatch(
     height: number;
   }> = [];
 
-  // 並列処理数をプラットフォームとメモリ使用量に基づいて決定
-  // 1. Linux環境ではGLib-GObject競合防止のため1を使用
-  // 2. Windows/Mac環境ではメモリ監視で動的に調整
+  // 並列処理数をメモリ使用量に基づいて動的に決定
   const monitor = memoryMonitor ?? getGlobalMemoryMonitor();
-  const baseLimit = getParallelBaseLimit(PARALLEL_LIMITS.sharpMetadata);
-  const parallelLimit = monitor.getRecommendedParallelLimit(baseLimit);
+  const parallelLimit = monitor.getRecommendedParallelLimit(
+    PARALLEL_LIMITS.sharpMetadata,
+  );
 
   for (let i = 0; i < photoPaths.length; i += parallelLimit) {
     const subBatch = photoPaths.slice(i, i + parallelLimit);
@@ -1613,11 +1611,11 @@ export const getBatchThumbnails = async (
   const success = new Map<string, string>();
   const failed: BatchThumbnailResult['failed'] = [];
 
-  // 並列処理数をプラットフォームとメモリ使用量に基づいて決定
-  // Linux環境ではGLib-GObject競合防止のため1を使用
+  // 並列処理数をメモリ使用量に基づいて動的に決定
   const monitor = getGlobalMemoryMonitor();
-  const baseLimit = getParallelBaseLimit(PARALLEL_LIMITS.thumbnail);
-  const thumbnailParallelLimit = monitor.getRecommendedParallelLimit(baseLimit);
+  const thumbnailParallelLimit = monitor.getRecommendedParallelLimit(
+    PARALLEL_LIMITS.thumbnail,
+  );
 
   for (let i = 0; i < photoPaths.length; i += thumbnailParallelLimit) {
     const batch = photoPaths.slice(i, i + thumbnailParallelLimit);

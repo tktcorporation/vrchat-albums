@@ -20,7 +20,6 @@
  */
 
 import sharp from 'sharp';
-import { isLinuxPlatform } from './environment';
 
 /**
  * loggerを遅延インポート
@@ -104,17 +103,6 @@ let isInitialized = false;
 let currentConfig: SharpConfigOptions = LOW_MEMORY_CONFIG;
 
 /**
- * 現在の環境に適した設定を取得
- *
- * Windows/Mac環境では requestedConfig をそのまま返す
- */
-const getEnvironmentAppropriateConfig = (
-  requestedConfig: SharpConfigOptions,
-): SharpConfigOptions => {
-  return requestedConfig;
-};
-
-/**
  * Sharpの設定を適用
  */
 const applyConfig = (config: SharpConfigOptions): void => {
@@ -133,9 +121,6 @@ const applyConfig = (config: SharpConfigOptions): void => {
  * Sharpを初期化する
  *
  * @param options 設定オプション（省略時はデフォルト設定）
- *
- * ## 注意
- * Linux環境では、指定した設定に関わらず LOW_MEMORY_CONFIG が適用される
  */
 export const initializeSharp = (
   options: Partial<SharpConfigOptions> = {},
@@ -146,9 +131,7 @@ export const initializeSharp = (
     ...options,
   };
 
-  // Linux環境では強制的に低メモリ設定（1回のみ呼び出し）
-  const finalConfig = getEnvironmentAppropriateConfig(config);
-  applyConfig(finalConfig);
+  applyConfig(config);
 
   isInitialized = true;
 
@@ -160,7 +143,6 @@ export const initializeSharp = (
       cache: sharp.cache(),
       simd: sharp.simd(),
       platform: process.platform,
-      isLinux: isLinuxPlatform(),
     },
   });
 };
@@ -187,13 +169,9 @@ export const switchToLowMemoryMode = (): void => {
  * デフォルト設定に戻す
  *
  * 大量処理完了後に呼び出す。
- *
- * ## 注意
- * Linux環境では LOW_MEMORY_CONFIG のままとなる（GLib競合回避のため）
  */
 export const restoreDefaultMode = (): void => {
-  const config = getEnvironmentAppropriateConfig(DEFAULT_CONFIG);
-  applyConfig(config);
+  applyConfig(DEFAULT_CONFIG);
 
   void logDebug({
     message: 'Sharp: default mode restored',
@@ -201,7 +179,6 @@ export const restoreDefaultMode = (): void => {
       concurrency: sharp.concurrency(),
       cache: sharp.cache(),
       platform: process.platform,
-      isLinux: isLinuxPlatform(),
     },
   });
 };
