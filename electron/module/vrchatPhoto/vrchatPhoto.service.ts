@@ -1174,16 +1174,13 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   const settingStore = getSettingStore();
   const extraDirs = settingStore.getVRChatPhotoExtraDirList();
 
-  // Sharp初期化（未初期化の場合のみ）
+  // Sharp 初期化（未初期化の場合のみ）
   if (!isSharpInitialized()) {
-    // フルスキャン（初回起動）時は低メモリモードで開始
-    if (!isIncremental) {
-      switchToLowMemoryMode();
-    } else {
-      initializeSharp();
-    }
-  } else if (!isIncremental) {
-    // 既に初期化済みでもフルスキャン時は低メモリモードに切り替え
+    initializeSharp();
+  }
+
+  // フルスキャン時は低メモリモードに切り替え
+  if (!isIncremental) {
     switchToLowMemoryMode();
   }
 

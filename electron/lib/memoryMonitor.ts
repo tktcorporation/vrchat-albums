@@ -37,27 +37,27 @@ export interface MemoryMonitorConfig {
 }
 
 /**
- * デフォルト設定
- * - 警告: 1GB超過
- * - クリティカル: 1.5GB超過
- */
-const DEFAULT_CONFIG: MemoryMonitorConfig = {
-  rssWarningThresholdMB: 1024,
-  rssCriticalThresholdMB: 1536,
-  throttleDelayMs: 100,
-  enableLogging: true,
-};
-
-/**
  * メモリ監視の閾値定数（一元管理）
  *
  * プロジェクト全体で使用するメモリ閾値。
- * MemoryMonitor のデフォルト設定と同期している。
+ * MemoryMonitor のデフォルト設定もこの定数を参照する。
  */
 export const MEMORY_THRESHOLDS = {
+  /** RSS警告閾値 (MB) - 1GB超過で警告 */
   warningMB: 1024,
+  /** RSSクリティカル閾値 (MB) - 1.5GB超過で処理遅延 */
   criticalMB: 1536,
 } as const;
+
+/**
+ * デフォルト設定（MEMORY_THRESHOLDS から値を参照）
+ */
+const DEFAULT_CONFIG: MemoryMonitorConfig = {
+  rssWarningThresholdMB: MEMORY_THRESHOLDS.warningMB,
+  rssCriticalThresholdMB: MEMORY_THRESHOLDS.criticalMB,
+  throttleDelayMs: 100,
+  enableLogging: true,
+};
 
 /**
  * 並列処理数の設定定数（一元管理）

@@ -33,11 +33,7 @@ import { isLinuxPlatform } from './environment';
  */
 const logDebug = async (message: string | object) => {
   const { logger } = await import('./logger');
-  if (typeof message === 'string') {
-    logger.debug(message);
-  } else {
-    logger.debug(message);
-  }
+  logger.debug(message);
 };
 
 const logInfo = async (message: object) => {
