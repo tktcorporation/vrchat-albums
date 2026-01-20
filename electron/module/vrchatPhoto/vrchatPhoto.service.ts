@@ -28,8 +28,6 @@ import {
   clearSharpCache,
   initializeSharp,
   isSharpInitialized,
-  restoreDefaultMode,
-  switchToLowMemoryMode,
 } from './../../lib/sharpConfig';
 import * as fs from './../../lib/wrappedFs';
 import { emitProgress } from '../initProgress/emitter';
@@ -1179,11 +1177,6 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
     initializeSharp();
   }
 
-  // フルスキャン時は低メモリモードに切り替え
-  if (!isIncremental) {
-    switchToLowMemoryMode();
-  }
-
   // メモリ監視を初期化
   const memoryMonitor = new MemoryMonitor({
     rssWarningThresholdMB: MEMORY_THRESHOLDS.warningMB,
@@ -1408,20 +1401,11 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
 
   if (totalProcessed === 0) {
     logger.debug('No new photos found to index.');
-    // フルスキャン後はデフォルト設定に戻す
-    if (!isIncremental) {
-      restoreDefaultMode();
-    }
     return [];
   }
 
   // メモリ使用状況のサマリーをログ出力
   memoryMonitor.logSummary('createVRChatPhotoPathIndex');
-
-  // フルスキャン後はデフォルト設定に戻す
-  if (!isIncremental) {
-    restoreDefaultMode();
-  }
 
   logger.info(
     `Photo index creation completed: ${totalProcessed} photos processed in ${(totalEndTime - startTime).toFixed(2)} ms (${batchNumber} batches, peak RSS: ${memoryMonitor.getPeakRssMB().toFixed(0)}MB)`,
