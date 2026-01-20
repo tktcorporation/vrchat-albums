@@ -92,11 +92,10 @@ const launchElectronApp = async () => {
       `--js-flags=--max-old-space-size=${MEMORY_LIMIT_MB}`,
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-features=VizDisplayCompositor',
-      '--disable-gpu-compositing',
-      '--in-process-gpu',
       '--enable-logging',
       '--log-level=0',
+      // Disable crash reporter to prevent GLib-GObject errors from killing the process
+      '--disable-breakpad',
       path.join(__dirname, '../main/index.cjs'),
     ],
     env: {
@@ -113,6 +112,24 @@ const launchElectronApp = async () => {
       GTK_THEME: 'Adwaita',
       LIBGL_ALWAYS_SOFTWARE: '1',
       DISPLAY: ':99',
+      // Prevent Electron from creating native dialogs that may cause GTK issues
+      ELECTRON_NO_ATTACH_CONSOLE: '1',
+      // Disable hardware acceleration to avoid GPU-related crashes
+      ELECTRON_DISABLE_GPU: '1',
+      // Force libvips to use single thread to avoid GObject conflicts with GTK
+      VIPS_CONCURRENCY: '1',
+      // Disable GTK accessibility to prevent D-Bus issues
+      GTK_A11Y: 'none',
+      NO_AT_BRIDGE: '1',
+      // Prevent Glib extra module loading
+      GIO_EXTRA_MODULES: '',
+      // Suppress GTK warning messages
+      GTK_DEBUG: 'no-css-validation',
+      // libvips settings to avoid GLib-GObject conflicts
+      VIPS_MAX_THREADS: '1',
+      VIPS_NOVECTOR: '1',
+      // Force Sharp to use bundled libvips (avoids system libvips/GTK conflicts)
+      SHARP_IGNORE_GLOBAL_LIBVIPS: '1',
     },
   });
 
@@ -156,9 +173,17 @@ test('写真一覧が正常にロードされる', async () => {
   // Launch Electron app
   console.log('Launching Electron app...');
   const electronApp = await launchElectronApp();
-  console.log('Electron app launched, waiting for first window...');
+  console.log('Electron app launched, PID:', electronApp.process().pid);
+  console.log('Waiting for first window...');
 
-  const page = await electronApp.firstWindow({ timeout: 30000 });
+  try {
+    const page = await electronApp.firstWindow({ timeout: 30000 });
+    console.log('First window obtained, URL:', await page.url());
+  } catch (e) {
+    console.error('Failed to get first window:', e);
+    throw e;
+  }
+  const page = await electronApp.firstWindow({ timeout: 1000 }); // Already got it, quick retry
 
   // ページエラーを監視
   page.on('pageerror', (error) => {

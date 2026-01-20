@@ -1,0 +1,272 @@
+/**
+ * メモリ監視ユーティリティ
+ *
+ * Node.jsのheapUsedだけでなく、RSS（Resident Set Size）を監視することで
+ * Sharpなどのネイティブライブラリ（libvips）のメモリ使用量も含めて監視する
+ */
+
+// 遅延インポート用の変数
+// テスト環境でのElectron/GLib競合を避けるため、必要時にのみロード
+let lazyLogger: typeof import('./logger').logger | null = null;
+
+/**
+ * ロガーを遅延取得する
+ * Playwrightテスト時のGLib競合を防ぐため、トップレベルインポートを避ける
+ */
+const getLazyLogger = async (): Promise<typeof import('./logger').logger> => {
+  if (!lazyLogger) {
+    const { logger } = await import('./logger');
+    lazyLogger = logger;
+  }
+  return lazyLogger;
+};
+
+/**
+ * メモリ使用量のスナップショット
+ */
+export interface MemorySnapshot {
+  /** ヒープ使用量 (MB) - V8のJavaScriptオブジェクト */
+  heapUsedMB: number;
+  /** RSS (MB) - プロセス全体のメモリ（ネイティブメモリ含む） */
+  rssMB: number;
+  /** 外部メモリ (MB) - ArrayBuffer等 */
+  externalMB: number;
+  /** タイムスタンプ */
+  timestamp: number;
+}
+
+/**
+ * メモリ監視の設定
+ */
+export interface MemoryMonitorConfig {
+  /** RSS警告閾値 (MB) - この値を超えると警告ログ */
+  rssWarningThresholdMB: number;
+  /** RSSクリティカル閾値 (MB) - この値を超えると処理を遅延 */
+  rssCriticalThresholdMB: number;
+  /** メモリ圧迫時の遅延時間 (ms) */
+  throttleDelayMs: number;
+  /** ログ出力を有効にするか */
+  enableLogging: boolean;
+  /** 警告クールダウン時間 (ms) - この時間内は同じ警告を出さない */
+  warningCooldownMs: number;
+}
+
+/**
+ * メモリ監視の閾値定数（一元管理）
+ *
+ * プロジェクト全体で使用するメモリ閾値。
+ * MemoryMonitor のデフォルト設定もこの定数を参照する。
+ */
+export const MEMORY_THRESHOLDS = {
+  /** RSS警告閾値 (MB) - 1GB超過で警告 */
+  warningMB: 1024,
+  /** RSSクリティカル閾値 (MB) - 1.5GB超過で処理遅延 */
+  criticalMB: 1536,
+} as const;
+
+/**
+ * デフォルト設定（MEMORY_THRESHOLDS から値を参照）
+ */
+const DEFAULT_CONFIG: MemoryMonitorConfig = {
+  rssWarningThresholdMB: MEMORY_THRESHOLDS.warningMB,
+  rssCriticalThresholdMB: MEMORY_THRESHOLDS.criticalMB,
+  throttleDelayMs: 100,
+  enableLogging: true,
+  warningCooldownMs: 10000,
+};
+
+/**
+ * 並列処理数の設定定数（一元管理）
+ *
+ * Sharp 処理やサムネイル生成で使用するデフォルトの並列数。
+ * 実際の並列数は MemoryMonitor.getRecommendedParallelLimit() で動的に調整される。
+ */
+export const PARALLEL_LIMITS = {
+  sharpMetadata: 3,
+  thumbnail: 5,
+} as const;
+
+/**
+ * 現在のメモリ使用量を取得
+ */
+export const getMemorySnapshot = (): MemorySnapshot => {
+  const mem = process.memoryUsage();
+  return {
+    heapUsedMB: mem.heapUsed / 1024 / 1024,
+    rssMB: mem.rss / 1024 / 1024,
+    externalMB: mem.external / 1024 / 1024,
+    timestamp: Date.now(),
+  };
+};
+
+/**
+ * メモリ監視クラス
+ * バッチ処理中のメモリ使用量を監視し、圧迫時に警告・遅延を行う
+ */
+export class MemoryMonitor {
+  private config: MemoryMonitorConfig;
+  private peakRssMB = 0;
+  private warningCount = 0;
+  private lastWarningTime = 0;
+
+  /**
+   * ピークRSSを更新
+   */
+  private updatePeakRss(snapshot: MemorySnapshot): void {
+    if (snapshot.rssMB > this.peakRssMB) {
+      this.peakRssMB = snapshot.rssMB;
+    }
+  }
+
+  constructor(config: Partial<MemoryMonitorConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  /**
+   * 現在のメモリ状態をチェックし、必要に応じて警告・遅延を行う
+   * @returns 処理を続行してよい場合はtrue、メモリ圧迫で遅延した場合もtrue（遅延後）
+   */
+  async checkMemory(context?: string): Promise<MemorySnapshot> {
+    const snapshot = getMemorySnapshot();
+    this.updatePeakRss(snapshot);
+
+    const now = Date.now();
+
+    // クリティカル閾値超過時は遅延を入れる
+    if (snapshot.rssMB > this.config.rssCriticalThresholdMB) {
+      if (
+        this.config.enableLogging &&
+        now - this.lastWarningTime > this.config.warningCooldownMs
+      ) {
+        const log = await getLazyLogger();
+        log.warn({
+          message: `Memory pressure critical: RSS ${snapshot.rssMB.toFixed(0)}MB > ${this.config.rssCriticalThresholdMB}MB. Throttling processing.`,
+          details: {
+            context,
+            rssMB: snapshot.rssMB,
+            heapUsedMB: snapshot.heapUsedMB,
+            threshold: this.config.rssCriticalThresholdMB,
+          },
+        });
+        this.lastWarningTime = now;
+      }
+      this.warningCount++;
+
+      // GCを促すための遅延
+      await new Promise((resolve) =>
+        setTimeout(resolve, this.config.throttleDelayMs),
+      );
+    }
+    // 警告閾値超過時はログのみ
+    else if (snapshot.rssMB > this.config.rssWarningThresholdMB) {
+      if (
+        this.config.enableLogging &&
+        now - this.lastWarningTime > this.config.warningCooldownMs
+      ) {
+        const log = await getLazyLogger();
+        log.warn({
+          message: `Memory usage high: RSS ${snapshot.rssMB.toFixed(0)}MB > ${this.config.rssWarningThresholdMB}MB`,
+          details: {
+            context,
+            rssMB: snapshot.rssMB,
+            heapUsedMB: snapshot.heapUsedMB,
+            threshold: this.config.rssWarningThresholdMB,
+          },
+        });
+        this.lastWarningTime = now;
+      }
+      this.warningCount++;
+    }
+
+    return snapshot;
+  }
+
+  /**
+   * ピークRSSを取得
+   */
+  getPeakRssMB(): number {
+    return this.peakRssMB;
+  }
+
+  /**
+   * 警告回数を取得
+   */
+  getWarningCount(): number {
+    return this.warningCount;
+  }
+
+  /**
+   * 統計をリセット
+   */
+  reset(): void {
+    this.peakRssMB = 0;
+    this.warningCount = 0;
+    this.lastWarningTime = 0;
+  }
+
+  /**
+   * サマリーログを出力
+   */
+  async logSummary(context: string): Promise<void> {
+    if (!this.config.enableLogging) return;
+
+    const snapshot = getMemorySnapshot();
+    const log = await getLazyLogger();
+    log.debug({
+      message: `Memory summary for ${context}`,
+      details: {
+        currentRssMB: snapshot.rssMB.toFixed(2),
+        peakRssMB: this.peakRssMB.toFixed(2),
+        currentHeapMB: snapshot.heapUsedMB.toFixed(2),
+        warningCount: this.warningCount,
+      },
+    });
+  }
+
+  /**
+   * 現在のメモリ使用量に基づいて推奨並列数を取得
+   *
+   * メモリ圧迫時は自動的に並列数を下げることで、
+   * テスト環境と本番環境で同じロジックでメモリ制御を行う。
+   *
+   * @param defaultLimit デフォルトの並列数（メモリに余裕がある場合に使用）
+   * @returns 現在のメモリ状況に応じた推奨並列数
+   *
+   * ## 動作
+   * - クリティカル閾値超過: 1（直列化してメモリ解放を促す）
+   * - 警告閾値超過: defaultLimit の半分（メモリ圧迫を緩和）
+   * - 正常: defaultLimit をそのまま返す
+   */
+  getRecommendedParallelLimit(defaultLimit: number): number {
+    const snapshot = getMemorySnapshot();
+    this.updatePeakRss(snapshot);
+
+    // クリティカル閾値超過: 直列化
+    if (snapshot.rssMB > this.config.rssCriticalThresholdMB) {
+      return 1;
+    }
+
+    // 警告閾値超過: 並列数を半減
+    if (snapshot.rssMB > this.config.rssWarningThresholdMB) {
+      return Math.max(1, Math.floor(defaultLimit / 2));
+    }
+
+    // 正常: デフォルト値
+    return defaultLimit;
+  }
+}
+
+/**
+ * シングルトンインスタンス（グローバルな監視用）
+ */
+let globalMonitor: MemoryMonitor | null = null;
+
+/**
+ * グローバルメモリモニターを取得（遅延初期化）
+ */
+export const getGlobalMemoryMonitor = (): MemoryMonitor => {
+  if (!globalMonitor) {
+    globalMonitor = new MemoryMonitor();
+  }
+  return globalMonitor;
+};

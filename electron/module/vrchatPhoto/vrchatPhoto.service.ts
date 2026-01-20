@@ -16,7 +16,19 @@ import {
   type VRChatPhotoContainingFolderPath,
   VRChatPhotoContainingFolderPathSchema,
 } from './../../lib/brandedTypes';
+import { isTestEnvironment } from './../../lib/env';
 import { logger } from './../../lib/logger';
+import {
+  getGlobalMemoryMonitor,
+  MEMORY_THRESHOLDS,
+  MemoryMonitor,
+  PARALLEL_LIMITS,
+} from './../../lib/memoryMonitor';
+import {
+  clearSharpCache,
+  initializeSharp,
+  isSharpInitialized,
+} from './../../lib/sharpConfig';
 import * as fs from './../../lib/wrappedFs';
 import { emitProgress } from '../initProgress/emitter';
 import { getSettingStore, type PhotoFolderScanStates } from '../settingStore';
@@ -38,18 +50,6 @@ const pendingCacheWrites = new Set<string>();
 // キャッシュ書き込み失敗のトラッキング（サイレントエラー防止）
 const CACHE_FAILURE_THRESHOLD = 10;
 let consecutiveCacheFailures = 0;
-
-/**
- * テスト環境かどうかを判定する
- * Playwright、Vitest等のテスト環境ではElectronモジュールが利用不可
- */
-const isTestEnvironment = (): boolean => {
-  return (
-    process.env.PLAYWRIGHT_TEST === 'true' ||
-    process.env.VITEST === 'true' ||
-    process.env.NODE_ENV === 'test'
-  );
-};
 
 /**
  * Electronのappモジュールを遅延取得する
@@ -984,9 +984,15 @@ const filterNewFilesByMtime = async (
 /**
  * 写真情報のバッチを処理する
  * メモリ効率を考慮し、並列処理数を制限
+ *
+ * ## メモリ最適化
+ * - 並列数を5に制限（libvipsのネイティブメモリ使用を抑制）
+ * - RSS監視で圧迫時に遅延
+ * - サブバッチ間でSharpキャッシュをクリア
  */
 async function processPhotoBatch(
   photoPaths: string[],
+  memoryMonitor?: MemoryMonitor,
 ): Promise<
   Array<{ photoPath: string; takenAt: Date; width: number; height: number }>
 > {
@@ -996,11 +1002,20 @@ async function processPhotoBatch(
     width: number;
     height: number;
   }> = [];
-  const PARALLEL_LIMIT = 10; // sharp処理の並列数を制限
 
-  // 並列処理数を制限しながらバッチ処理
-  for (let i = 0; i < photoPaths.length; i += PARALLEL_LIMIT) {
-    const subBatch = photoPaths.slice(i, i + PARALLEL_LIMIT);
+  // 並列処理数をメモリ使用量に基づいて動的に決定
+  const monitor = memoryMonitor ?? getGlobalMemoryMonitor();
+  const parallelLimit = monitor.getRecommendedParallelLimit(
+    PARALLEL_LIMITS.sharpMetadata,
+  );
+
+  for (let i = 0; i < photoPaths.length; i += parallelLimit) {
+    const subBatch = photoPaths.slice(i, i + parallelLimit);
+
+    // メモリ監視
+    await monitor.checkMemory(
+      `processPhotoBatch subBatch ${Math.floor(i / parallelLimit) + 1}`,
+    );
 
     const photoInfoPromises = subBatch.map(async (photoPath) => {
       const matchResult = photoPath.match(
@@ -1103,6 +1118,12 @@ async function processPhotoBatch(
     );
 
     results.push(...subResults);
+
+    // サブバッチ処理後にSharpキャッシュをクリア（メモリ解放）
+    // 大量処理時のメモリ蓄積を防ぐ
+    if (photoPaths.length > PHOTO_METADATA_BATCH_SIZE) {
+      clearSharpCache();
+    }
   }
 
   return results;
@@ -1117,6 +1138,11 @@ async function processPhotoBatch(
  * - Stage 2: ファイルmtimeチェック（変更フォルダ内の新規ファイルを抽出）
  * - Stage 3: sharp処理 + DB保存
  *
+ * ## メモリ最適化
+ * - 初回/フルスキャン時は低メモリモードでSharpを初期化
+ * - RSS監視で圧迫時に自動遅延
+ * - バッチ間でSharpキャッシュをクリア
+ *
  * @param isIncremental true: 差分スキャン（ダイジェスト・mtime使用）、false: フルスキャン
  */
 export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
@@ -1124,6 +1150,19 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   const targetDir = getVRChatPhotoDirPath();
   const settingStore = getSettingStore();
   const extraDirs = settingStore.getVRChatPhotoExtraDirList();
+
+  // Sharp 初期化（未初期化の場合のみ）
+  if (!isSharpInitialized()) {
+    initializeSharp();
+  }
+
+  // メモリ監視を初期化
+  const memoryMonitor = new MemoryMonitor({
+    rssWarningThresholdMB: MEMORY_THRESHOLDS.warningMB,
+    rssCriticalThresholdMB: MEMORY_THRESHOLDS.criticalMB,
+    throttleDelayMs: 100,
+    enableLogging: true,
+  });
 
   const allDirs = [targetDir, ...extraDirs];
   let totalProcessed = 0;
@@ -1224,8 +1263,11 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
           const batch = newFiles.slice(i, i + PHOTO_METADATA_BATCH_SIZE);
           batchNumber++;
 
+          // バッチ処理前にメモリをチェック
+          await memoryMonitor.checkMemory(`batch ${batchNumber} start`);
+
           const batchStartTime = performance.now();
-          const processedBatch = await processPhotoBatch(batch);
+          const processedBatch = await processPhotoBatch(batch, memoryMonitor);
 
           if (processedBatch.length > 0) {
             const dbStartTime = performance.now();
@@ -1274,6 +1316,9 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
               `Batch ${batchNumber}: Processed ${processedBatch.length} photos in ${(batchEndTime - batchStartTime).toFixed(2)} ms (metadata: ${(dbStartTime - batchStartTime).toFixed(2)} ms, DB: ${(dbEndTime - dbStartTime).toFixed(2)} ms)`,
             );
           }
+
+          // バッチ処理後にSharpキャッシュをクリア（メモリ解放）
+          clearSharpCache();
         }
 
         // フォルダスキャン状態を更新
@@ -1338,8 +1383,11 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
     return [];
   }
 
+  // メモリ使用状況のサマリーをログ出力
+  await memoryMonitor.logSummary('createVRChatPhotoPathIndex');
+
   logger.info(
-    `Photo index creation completed: ${totalProcessed} photos processed in ${(totalEndTime - startTime).toFixed(2)} ms (${batchNumber} batches)`,
+    `Photo index creation completed: ${totalProcessed} photos processed in ${(totalEndTime - startTime).toFixed(2)} ms (${batchNumber} batches, peak RSS: ${memoryMonitor.getPeakRssMB().toFixed(0)}MB)`,
   );
 
   return allCreatedModels;
@@ -1543,11 +1591,15 @@ export const getBatchThumbnails = async (
 ): Promise<BatchThumbnailResult> => {
   const success = new Map<string, string>();
   const failed: BatchThumbnailResult['failed'] = [];
-  const PARALLEL_LIMIT = 8; // 並列処理数を制限
 
-  // 並列処理数を制限しながらバッチ処理
-  for (let i = 0; i < photoPaths.length; i += PARALLEL_LIMIT) {
-    const batch = photoPaths.slice(i, i + PARALLEL_LIMIT);
+  // 並列処理数をメモリ使用量に基づいて動的に決定
+  const monitor = getGlobalMemoryMonitor();
+  const thumbnailParallelLimit = monitor.getRecommendedParallelLimit(
+    PARALLEL_LIMITS.thumbnail,
+  );
+
+  for (let i = 0; i < photoPaths.length; i += thumbnailParallelLimit) {
+    const batch = photoPaths.slice(i, i + thumbnailParallelLimit);
 
     const thumbnailPromises = batch.map(async (photoPath) => {
       // getVRChatPhotoItemData は予期しないエラーを throw するため
