@@ -234,13 +234,6 @@ export class MemoryMonitor {
     // 正常: デフォルト値
     return defaultLimit;
   }
-
-  /**
-   * 設定を取得（テスト用）
-   */
-  getConfig(): MemoryMonitorConfig {
-    return { ...this.config };
-  }
 }
 
 /**
@@ -256,13 +249,4 @@ export const getGlobalMemoryMonitor = (): MemoryMonitor => {
     globalMonitor = new MemoryMonitor();
   }
   return globalMonitor;
-};
-
-/**
- * グローバルメモリモニターをリセット（テスト用）
- */
-export const resetGlobalMemoryMonitor = (): void => {
-  if (globalMonitor) {
-    globalMonitor.reset();
-  }
 };

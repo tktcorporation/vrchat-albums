@@ -3,16 +3,14 @@
  *
  * 大量の写真を処理する際のメモリ使用量を制御するための設定。
  *
- * ## 初期化の2段階構造
+ * ## 初期化
  *
- * 1. **早期初期化** (electron/index.ts)
- *    - GTK/libvips の GLib-GObject 競合を防ぐため、アプリ起動直後に実行
- *    - `sharp.concurrency(1); sharp.cache(false);` で最小設定
+ * - **早期初期化** (electron/index.ts)
+ *   - GTK/libvips の GLib-GObject 競合を防ぐため、アプリ起動直後に実行
+ *   - `sharp.concurrency(1); sharp.cache(false);` で最小設定
  *
- * 2. **アプリ内設定** (このモジュール)
- *    - 写真処理開始時に適切な設定に調整
- *    - Linux環境では常に低メモリモード（GLib競合回避）
- *    - Windows/Mac環境ではデフォルト設定
+ * - **アプリ内設定調整** (このモジュール)
+ *   - `initializeSharp()` で写真処理に適した設定に調整
  *
  * ## 参考
  * - https://sharp.pixelplumbing.com/api-utility#concurrency
@@ -30,7 +28,7 @@ import sharp from 'sharp';
  *
  * 遅延インポートにより、Sharp初期化後にのみloggerが読み込まれる。
  */
-const logDebug = async (message: string | object) => {
+const logDebug = async (message: string) => {
   const { logger } = await import('./logger');
   logger.debug(message);
 };
@@ -43,7 +41,7 @@ const logInfo = async (message: object) => {
 /**
  * Sharp設定オプション
  */
-export interface SharpConfigOptions {
+interface SharpConfigOptions {
   /**
    * libvipsのスレッド数
    * - 0: CPUコア数（デフォルト）
@@ -84,28 +82,25 @@ const DEFAULT_CONFIG: SharpConfigOptions = {
   },
 };
 
-/**
- * 低メモリ設定
- *
- * 以下の状況で使用:
- * - 初回起動時の大量写真処理
- * - Linux環境（GTK/libvipsのGLib-GObject競合回避）
- *
- * - concurrency: 1（シングルスレッド）
- * - cache: 無効（メモリ使用量最小化）
- */
-export const LOW_MEMORY_CONFIG: SharpConfigOptions = {
-  concurrency: 1,
-  cache: false,
-};
-
 let isInitialized = false;
-let currentConfig: SharpConfigOptions = LOW_MEMORY_CONFIG;
+let currentCacheConfig: SharpConfigOptions['cache'] = false;
 
 /**
- * Sharpの設定を適用
+ * Sharpを初期化する
+ *
+ * 写真処理開始時に呼び出し、適切な設定に調整する。
+ * electron/index.ts での早期初期化後に呼び出される。
+ *
+ * @param options 設定オプション（省略時はデフォルト設定）
  */
-const applyConfig = (config: SharpConfigOptions): void => {
+export const initializeSharp = (
+  options: Partial<SharpConfigOptions> = {},
+): void => {
+  const config: SharpConfigOptions = {
+    ...DEFAULT_CONFIG,
+    ...options,
+  };
+
   sharp.concurrency(config.concurrency);
 
   if (config.cache === false) {
@@ -114,25 +109,7 @@ const applyConfig = (config: SharpConfigOptions): void => {
     sharp.cache(config.cache);
   }
 
-  currentConfig = config;
-};
-
-/**
- * Sharpを初期化する
- *
- * @param options 設定オプション（省略時はデフォルト設定）
- */
-export const initializeSharp = (
-  options: Partial<SharpConfigOptions> = {},
-): void => {
-  // オプションをデフォルト設定にマージ
-  const config: SharpConfigOptions = {
-    ...DEFAULT_CONFIG,
-    ...options,
-  };
-
-  applyConfig(config);
-
+  currentCacheConfig = config.cache;
   isInitialized = true;
 
   // 非同期でログ出力（fire-and-forget）
@@ -148,39 +125,10 @@ export const initializeSharp = (
 };
 
 /**
- * 低メモリモードに切り替える
- *
- * 初回起動時や大量写真処理時に使用。
- * 処理完了後は restoreDefaultMode() で戻す。
+ * 初期化済みかどうかを確認
  */
-export const switchToLowMemoryMode = (): void => {
-  applyConfig(LOW_MEMORY_CONFIG);
-
-  void logDebug({
-    message: 'Sharp: low memory mode',
-    details: {
-      concurrency: sharp.concurrency(),
-      cache: sharp.cache(),
-    },
-  });
-};
-
-/**
- * デフォルト設定に戻す
- *
- * 大量処理完了後に呼び出す。
- */
-export const restoreDefaultMode = (): void => {
-  applyConfig(DEFAULT_CONFIG);
-
-  void logDebug({
-    message: 'Sharp: default mode restored',
-    details: {
-      concurrency: sharp.concurrency(),
-      cache: sharp.cache(),
-      platform: process.platform,
-    },
-  });
+export const isSharpInitialized = (): boolean => {
+  return isInitialized;
 };
 
 /**
@@ -190,43 +138,11 @@ export const restoreDefaultMode = (): void => {
  * キャッシュクリア後、元の設定に戻る。
  */
 export const clearSharpCache = (): void => {
-  const previousCache = currentConfig.cache;
   sharp.cache(false);
 
-  if (previousCache !== false) {
-    sharp.cache(previousCache);
+  if (currentCacheConfig !== false) {
+    sharp.cache(currentCacheConfig);
   }
 
   void logDebug('Sharp cache cleared');
-};
-
-/**
- * 現在の設定を取得
- */
-export const getCurrentConfig = (): SharpConfigOptions => {
-  return { ...currentConfig };
-};
-
-/**
- * 初期化済みかどうかを確認
- */
-export const isSharpInitialized = (): boolean => {
-  return isInitialized;
-};
-
-/**
- * Sharp統計情報を取得（デバッグ用）
- */
-export const getSharpStats = (): {
-  concurrency: number;
-  cache: ReturnType<typeof sharp.cache>;
-  simd: boolean;
-  versions: typeof sharp.versions;
-} => {
-  return {
-    concurrency: sharp.concurrency(),
-    cache: sharp.cache(),
-    simd: sharp.simd(),
-    versions: sharp.versions,
-  };
 };
