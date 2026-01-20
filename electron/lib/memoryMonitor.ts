@@ -5,7 +5,21 @@
  * Sharpなどのネイティブライブラリ（libvips）のメモリ使用量も含めて監視する
  */
 
-import { logger } from './logger';
+// 遅延インポート用の変数
+// テスト環境でのElectron/GLib競合を避けるため、必要時にのみロード
+let lazyLogger: typeof import('./logger').logger | null = null;
+
+/**
+ * ロガーを遅延取得する
+ * Playwrightテスト時のGLib競合を防ぐため、トップレベルインポートを避ける
+ */
+const getLazyLogger = async (): Promise<typeof import('./logger').logger> => {
+  if (!lazyLogger) {
+    const { logger } = await import('./logger');
+    lazyLogger = logger;
+  }
+  return lazyLogger;
+};
 
 /**
  * メモリ使用量のスナップショット
@@ -33,6 +47,8 @@ export interface MemoryMonitorConfig {
   throttleDelayMs: number;
   /** ログ出力を有効にするか */
   enableLogging: boolean;
+  /** 警告クールダウン時間 (ms) - この時間内は同じ警告を出さない */
+  warningCooldownMs: number;
 }
 
 /**
@@ -56,6 +72,7 @@ const DEFAULT_CONFIG: MemoryMonitorConfig = {
   rssCriticalThresholdMB: MEMORY_THRESHOLDS.criticalMB,
   throttleDelayMs: 100,
   enableLogging: true,
+  warningCooldownMs: 10000,
 };
 
 /**
@@ -91,7 +108,6 @@ export class MemoryMonitor {
   private peakRssMB = 0;
   private warningCount = 0;
   private lastWarningTime = 0;
-  private readonly WARNING_COOLDOWN_MS = 10000; // 10秒間は同じ警告を出さない
 
   /**
    * ピークRSSを更新
@@ -120,9 +136,10 @@ export class MemoryMonitor {
     if (snapshot.rssMB > this.config.rssCriticalThresholdMB) {
       if (
         this.config.enableLogging &&
-        now - this.lastWarningTime > this.WARNING_COOLDOWN_MS
+        now - this.lastWarningTime > this.config.warningCooldownMs
       ) {
-        logger.warn({
+        const log = await getLazyLogger();
+        log.warn({
           message: `Memory pressure critical: RSS ${snapshot.rssMB.toFixed(0)}MB > ${this.config.rssCriticalThresholdMB}MB. Throttling processing.`,
           details: {
             context,
@@ -144,9 +161,10 @@ export class MemoryMonitor {
     else if (snapshot.rssMB > this.config.rssWarningThresholdMB) {
       if (
         this.config.enableLogging &&
-        now - this.lastWarningTime > this.WARNING_COOLDOWN_MS
+        now - this.lastWarningTime > this.config.warningCooldownMs
       ) {
-        logger.warn({
+        const log = await getLazyLogger();
+        log.warn({
           message: `Memory usage high: RSS ${snapshot.rssMB.toFixed(0)}MB > ${this.config.rssWarningThresholdMB}MB`,
           details: {
             context,
@@ -189,11 +207,12 @@ export class MemoryMonitor {
   /**
    * サマリーログを出力
    */
-  logSummary(context: string): void {
+  async logSummary(context: string): Promise<void> {
     if (!this.config.enableLogging) return;
 
     const snapshot = getMemorySnapshot();
-    logger.debug({
+    const log = await getLazyLogger();
+    log.debug({
       message: `Memory summary for ${context}`,
       details: {
         currentRssMB: snapshot.rssMB.toFixed(2),

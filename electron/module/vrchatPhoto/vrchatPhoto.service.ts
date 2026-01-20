@@ -16,6 +16,7 @@ import {
   type VRChatPhotoContainingFolderPath,
   VRChatPhotoContainingFolderPathSchema,
 } from './../../lib/brandedTypes';
+import { isTestEnvironment } from './../../lib/env';
 import { logger } from './../../lib/logger';
 import {
   getGlobalMemoryMonitor,
@@ -49,26 +50,6 @@ const pendingCacheWrites = new Set<string>();
 // キャッシュ書き込み失敗のトラッキング（サイレントエラー防止）
 const CACHE_FAILURE_THRESHOLD = 10;
 let consecutiveCacheFailures = 0;
-
-/**
- * Electron app モジュールの安全なロード判定用
- *
- * テスト環境（Playwright、Vitest）では Electron モジュールが利用できないため、
- * try-catch でフォールバックする前に判定する。
- *
- * ## 注意
- * この関数は「環境による動作分岐」ではなく「Electron API の有無による安全なフォールバック」
- * のために使用する。ビジネスロジックの分岐には使用しないこと。
- *
- * @returns テスト環境（Electron が利用不可）の場合 true
- */
-const isTestEnvironment = (): boolean => {
-  return (
-    process.env.PLAYWRIGHT_TEST === 'true' ||
-    process.env.VITEST === 'true' ||
-    process.env.NODE_ENV === 'test'
-  );
-};
 
 /**
  * Electronのappモジュールを遅延取得する
@@ -1403,7 +1384,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   }
 
   // メモリ使用状況のサマリーをログ出力
-  memoryMonitor.logSummary('createVRChatPhotoPathIndex');
+  await memoryMonitor.logSummary('createVRChatPhotoPathIndex');
 
   logger.info(
     `Photo index creation completed: ${totalProcessed} photos processed in ${(totalEndTime - startTime).toFixed(2)} ms (${batchNumber} batches, peak RSS: ${memoryMonitor.getPeakRssMB().toFixed(0)}MB)`,
