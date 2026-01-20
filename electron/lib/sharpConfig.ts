@@ -146,13 +146,13 @@ const applyConfig = (config: SharpConfigOptions): void => {
 export const initializeSharp = (
   options: Partial<SharpConfigOptions> = {},
 ): void => {
-  const baseConfig = getEnvironmentAppropriateConfig(DEFAULT_CONFIG);
+  // オプションをデフォルト設定にマージ
   const config: SharpConfigOptions = {
-    ...baseConfig,
+    ...DEFAULT_CONFIG,
     ...options,
   };
 
-  // Linux環境では強制的に低メモリ設定
+  // Linux環境では強制的に低メモリ設定（1回のみ呼び出し）
   const finalConfig = getEnvironmentAppropriateConfig(config);
   applyConfig(finalConfig);
 

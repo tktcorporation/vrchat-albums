@@ -16,11 +16,13 @@ import {
   type VRChatPhotoContainingFolderPath,
   VRChatPhotoContainingFolderPathSchema,
 } from './../../lib/brandedTypes';
-import { isLinuxPlatform } from './../../lib/environment';
 import { logger } from './../../lib/logger';
 import {
   getGlobalMemoryMonitor,
+  getParallelBaseLimit,
+  MEMORY_THRESHOLDS,
   MemoryMonitor,
+  PARALLEL_LIMITS,
 } from './../../lib/memoryMonitor';
 import {
   clearSharpCache,
@@ -52,8 +54,16 @@ const CACHE_FAILURE_THRESHOLD = 10;
 let consecutiveCacheFailures = 0;
 
 /**
- * テスト環境かどうかを判定する
- * Playwright、Vitest等のテスト環境ではElectronモジュールが利用不可
+ * Electron app モジュールの安全なロード判定用
+ *
+ * テスト環境（Playwright、Vitest）では Electron モジュールが利用できないため、
+ * try-catch でフォールバックする前に判定する。
+ *
+ * ## 注意
+ * この関数は「環境による動作分岐」ではなく「Electron API の有無による安全なフォールバック」
+ * のために使用する。ビジネスロジックの分岐には使用しないこと。
+ *
+ * @returns テスト環境（Electron が利用不可）の場合 true
  */
 const isTestEnvironment = (): boolean => {
   return (
@@ -612,29 +622,6 @@ export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
 // バッチサイズ定数
 const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（sharp処理は重いため小さく）
 
-// 並列処理のデフォルト値
-// 実際の並列数はメモリ監視に基づいて動的に調整される
-const DEFAULT_SHARP_PARALLEL_LIMIT = 5;
-const DEFAULT_THUMBNAIL_PARALLEL_LIMIT = 8;
-
-/**
- * Sharp並列処理のベース値を取得
- *
- * Linux環境ではGLib-GObject競合を避けるため常に1を返す（シングルスレッド処理）。
- * Windows/Mac環境ではデフォルト値を返し、メモリ監視で動的に調整される。
- *
- * @param defaultLimit デフォルトの並列数
- * @returns Linux環境では1、それ以外はdefaultLimit
- */
-const getSharpParallelBaseLimit = (defaultLimit: number): number => {
-  // Linux環境では常にシングルスレッド（GLib-GObject競合防止）
-  return isLinuxPlatform() ? 1 : defaultLimit;
-};
-
-// メモリ監視の閾値
-const MEMORY_WARNING_THRESHOLD_MB = 1024; // 1GB
-const MEMORY_CRITICAL_THRESHOLD_MB = 1536; // 1.5GB
-
 /**
  * フォルダハッシュ計算エラー
  */
@@ -1042,7 +1029,7 @@ async function processPhotoBatch(
   // 1. Linux環境ではGLib-GObject競合防止のため1を使用
   // 2. Windows/Mac環境ではメモリ監視で動的に調整
   const monitor = memoryMonitor ?? getGlobalMemoryMonitor();
-  const baseLimit = getSharpParallelBaseLimit(DEFAULT_SHARP_PARALLEL_LIMIT);
+  const baseLimit = getParallelBaseLimit(PARALLEL_LIMITS.sharpMetadata);
   const parallelLimit = monitor.getRecommendedParallelLimit(baseLimit);
 
   for (let i = 0; i < photoPaths.length; i += parallelLimit) {
@@ -1202,8 +1189,8 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
 
   // メモリ監視を初期化
   const memoryMonitor = new MemoryMonitor({
-    rssWarningThresholdMB: MEMORY_WARNING_THRESHOLD_MB,
-    rssCriticalThresholdMB: MEMORY_CRITICAL_THRESHOLD_MB,
+    rssWarningThresholdMB: MEMORY_THRESHOLDS.warningMB,
+    rssCriticalThresholdMB: MEMORY_THRESHOLDS.criticalMB,
     throttleDelayMs: 100,
     enableLogging: true,
   });
@@ -1648,7 +1635,7 @@ export const getBatchThumbnails = async (
   // 並列処理数をプラットフォームとメモリ使用量に基づいて決定
   // Linux環境ではGLib-GObject競合防止のため1を使用
   const monitor = getGlobalMemoryMonitor();
-  const baseLimit = getSharpParallelBaseLimit(DEFAULT_THUMBNAIL_PARALLEL_LIMIT);
+  const baseLimit = getParallelBaseLimit(PARALLEL_LIMITS.thumbnail);
   const thumbnailParallelLimit = monitor.getRecommendedParallelLimit(baseLimit);
 
   for (let i = 0; i < photoPaths.length; i += thumbnailParallelLimit) {

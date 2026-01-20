@@ -5,6 +5,7 @@
  * Sharpなどのネイティブライブラリ（libvips）のメモリ使用量も含めて監視する
  */
 
+import { isLinuxPlatform } from './environment';
 import { logger } from './logger';
 
 /**
@@ -45,6 +46,41 @@ const DEFAULT_CONFIG: MemoryMonitorConfig = {
   rssCriticalThresholdMB: 1536,
   throttleDelayMs: 100,
   enableLogging: true,
+};
+
+/**
+ * メモリ監視の閾値定数（一元管理）
+ *
+ * プロジェクト全体で使用するメモリ閾値。
+ * MemoryMonitor のデフォルト設定と同期している。
+ */
+export const MEMORY_THRESHOLDS = {
+  warningMB: 1024,
+  criticalMB: 1536,
+} as const;
+
+/**
+ * 並列処理数の設定定数（一元管理）
+ *
+ * Sharp 処理やサムネイル生成で使用するデフォルトの並列数。
+ * 実際の並列数は getParallelBaseLimit() とメモリ監視で動的に調整される。
+ */
+export const PARALLEL_LIMITS = {
+  sharpMetadata: 5,
+  thumbnail: 8,
+} as const;
+
+/**
+ * 並列処理のベース値を取得
+ *
+ * Linux環境ではGLib-GObject競合を避けるため常に1を返す（シングルスレッド処理）。
+ * Windows/Mac環境ではデフォルト値を返し、メモリ監視で動的に調整される。
+ *
+ * @param defaultLimit デフォルトの並列数
+ * @returns Linux環境では1、それ以外はdefaultLimit
+ */
+export const getParallelBaseLimit = (defaultLimit: number): number => {
+  return isLinuxPlatform() ? 1 : defaultLimit;
 };
 
 /**

@@ -1,8 +1,7 @@
 /**
  * 環境判定ユーティリティ
  *
- * アプリケーション全体で使用する環境判定関数を提供する。
- * 重複定義を避け、一貫した判定ロジックを保証する。
+ * プラットフォーム固有の動作を制御するための関数を提供する。
  */
 
 /**
@@ -20,22 +19,4 @@
  */
 export const isLinuxPlatform = (): boolean => {
   return process.platform === 'linux';
-};
-
-/**
- * 開発環境かどうかを判定
- *
- * @returns NODE_ENV が 'development' または app.isPackaged が false の場合 true
- */
-export const isDevelopment = (): boolean => {
-  return process.env.NODE_ENV === 'development';
-};
-
-/**
- * テスト環境かどうかを判定（Vitest/Jest）
- *
- * @returns NODE_ENV が 'test' の場合 true
- */
-export const isTestEnvironment = (): boolean => {
-  return process.env.NODE_ENV === 'test';
 };
