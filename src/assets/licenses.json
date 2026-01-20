@@ -1006,7 +1006,7 @@
     "path": "node_modules/@sentry-internal/replay",
     "licenseFile": "node_modules/@sentry-internal/replay/LICENSE"
   },
-  "@sentry/babel-plugin-component-annotate@4.6.1": {
+  "@sentry/babel-plugin-component-annotate@4.7.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -1020,7 +1020,7 @@
     "path": "node_modules/@sentry/browser",
     "licenseFile": "node_modules/@sentry/browser/LICENSE"
   },
-  "@sentry/bundler-plugin-core@4.6.1": {
+  "@sentry/bundler-plugin-core@4.7.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -1033,7 +1033,7 @@
     "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64",
     "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli-linux-arm64/README.md"
   },
-  "@sentry/cli-linux-arm64@3.0.1": {
+  "@sentry/cli-linux-arm64@3.0.3": {
     "licenses": "MIT*",
     "repository": "https://github.com/getsentry/sentry-cli",
     "path": "node_modules/@sentry/cli-linux-arm64",
@@ -1046,7 +1046,7 @@
     "path": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli",
     "licenseFile": "node_modules/@sentry/bundler-plugin-core/node_modules/@sentry/cli/LICENSE"
   },
-  "@sentry/cli@3.0.1": {
+  "@sentry/cli@3.0.3": {
     "licenses": "MIT*",
     "repository": "https://github.com/getsentry/sentry-cli",
     "publisher": "Sentry",
@@ -1088,7 +1088,7 @@
     "path": "node_modules/@sentry/node/node_modules/@sentry/opentelemetry",
     "licenseFile": "node_modules/@sentry/node/node_modules/@sentry/opentelemetry/LICENSE"
   },
-  "@sentry/vite-plugin@4.6.1": {
+  "@sentry/vite-plugin@4.7.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -1153,28 +1153,28 @@
     "path": "node_modules/@tailwindcss/vite",
     "licenseFile": "node_modules/@tailwindcss/vite/LICENSE"
   },
-  "@tanstack/query-core@5.90.16": {
+  "@tanstack/query-core@5.90.19": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
     "path": "node_modules/@tanstack/query-core",
     "licenseFile": "node_modules/@tanstack/query-core/LICENSE"
   },
-  "@tanstack/react-query@5.90.16": {
+  "@tanstack/react-query@5.90.19": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
     "path": "node_modules/@tanstack/react-query",
     "licenseFile": "node_modules/@tanstack/react-query/LICENSE"
   },
-  "@tanstack/react-virtual@3.13.14": {
+  "@tanstack/react-virtual@3.13.18": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/virtual",
     "publisher": "Tanner Linsley",
     "path": "node_modules/@tanstack/react-virtual",
     "licenseFile": "node_modules/@tanstack/react-virtual/LICENSE"
   },
-  "@tanstack/virtual-core@3.13.14": {
+  "@tanstack/virtual-core@3.13.18": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/virtual",
     "publisher": "Tanner Linsley",
@@ -1354,7 +1354,7 @@
     "path": "node_modules/@types/react-dom",
     "licenseFile": "node_modules/@types/react-dom/LICENSE"
   },
-  "@types/react@19.2.7": {
+  "@types/react@19.2.9": {
     "licenses": "MIT",
     "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
     "path": "node_modules/@types/react",
@@ -1789,8 +1789,8 @@
     "publisher": "Isaac Z. Schlueter",
     "email": "i@izs.me",
     "url": "http://blog.izs.me/",
-    "path": "node_modules/chownr",
-    "licenseFile": "node_modules/chownr/LICENSE"
+    "path": "node_modules/tar/node_modules/chownr",
+    "licenseFile": "node_modules/tar/node_modules/chownr/LICENSE"
   },
   "cjs-module-lexer@1.4.3": {
     "licenses": "MIT",
@@ -2323,7 +2323,7 @@
     "path": "node_modules/exiftool-vendored.pl",
     "licenseFile": "node_modules/exiftool-vendored.pl/LICENSE"
   },
-  "exiftool-vendored@34.2.0": {
+  "exiftool-vendored@34.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.js",
     "publisher": "Matthew McEachen",
@@ -2966,7 +2966,7 @@
     "path": "node_modules/jiti",
     "licenseFile": "node_modules/jiti/LICENSE"
   },
-  "jotai@2.16.1": {
+  "jotai@2.16.2": {
     "licenses": "MIT",
     "repository": "https://github.com/pmndrs/jotai",
     "publisher": "Daishi Kato",
@@ -4319,7 +4319,7 @@
     "path": "node_modules/react-dom",
     "licenseFile": "node_modules/react-dom/LICENSE"
   },
-  "react-error-boundary@6.0.1": {
+  "react-error-boundary@6.1.0": {
     "licenses": "MIT",
     "repository": "https://github.com/bvaughn/react-error-boundary",
     "publisher": "Brian Vaughn",
@@ -5029,6 +5029,12 @@
   "ufo@1.6.1": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/ufo",
+    "path": "node_modules/ofetch/node_modules/ufo",
+    "licenseFile": "node_modules/ofetch/node_modules/ufo/LICENSE"
+  },
+  "ufo@1.6.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/unjs/ufo",
     "path": "node_modules/ufo",
     "licenseFile": "node_modules/ufo/LICENSE"
   },
@@ -5217,7 +5223,7 @@
     "path": "node_modules/vfile",
     "licenseFile": "node_modules/vfile/license"
   },
-  "vite@7.3.0": {
+  "vite@7.3.1": {
     "licenses": "MIT",
     "repository": "https://github.com/vitejs/vite",
     "publisher": "Evan You",
@@ -5358,7 +5364,7 @@
     "path": "node_modules/yocto-queue",
     "licenseFile": "node_modules/yocto-queue/license"
   },
-  "zod@4.3.4": {
+  "zod@4.3.5": {
     "licenses": "MIT",
     "repository": "https://github.com/colinhacks/zod",
     "publisher": "Colin McDonnell",

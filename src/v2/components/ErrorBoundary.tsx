@@ -1,16 +1,23 @@
 import type React from 'react';
 import { ErrorBoundary as ReactErrorBoundary } from 'react-error-boundary';
+import { match, P } from 'ts-pattern';
 import { trpcReact } from '@/trpc';
 
 interface Props {
   children: React.ReactNode;
 }
 
+const getErrorMessage = (error: unknown): string =>
+  match(error)
+    .with(P.instanceOf(Error), (e) => e.message)
+    .with(P.string, (s) => s)
+    .otherwise(() => 'アプリケーションで問題が発生しました');
+
 /**
  * エラーバウンダリー発火時に表示するフォールバック UI コンポーネント。
  */
 const ErrorFallback: React.FC<{
-  error: Error;
+  error: unknown;
   resetErrorBoundary: () => void;
 }> = ({ error, resetErrorBoundary }) => {
   const reloadMutation = trpcReact.electronUtil.reloadWindow.useMutation();
@@ -27,9 +34,7 @@ const ErrorFallback: React.FC<{
         <h2 className="text-xl font-semibold text-destructive">
           予期せぬエラーが発生しました
         </h2>
-        <p className="mt-2 text-muted-foreground">
-          {error.message || 'アプリケーションで問題が発生しました'}
-        </p>
+        <p className="mt-2 text-muted-foreground">{getErrorMessage(error)}</p>
         <p className="mt-1 text-sm text-muted-foreground/80">
           再読み込みを試してください
         </p>
@@ -51,7 +56,7 @@ const ErrorFallback: React.FC<{
  */
 export const ErrorBoundary: React.FC<Props> = ({ children }) => {
   /** 捕捉したエラー情報をコンソールに出力する */
-  const onError = (error: Error, info: React.ErrorInfo) => {
+  const onError = (error: unknown, info: React.ErrorInfo) => {
     console.error('エラーバウンダリーでエラーをキャッチしました:', error, info);
   };
 
