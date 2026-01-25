@@ -25,11 +25,8 @@ const config: KnipConfig = {
     'grit',
   ],
   ignoreDependencies: [
-    '@types/sharp',
     '@antfu/ni',
-    // shadcn/ui indirect dependencies
-    '@radix-ui/react-select',
-    '@radix-ui/react-separator',
+    // CSS-only import in src/index.css (not detected by knip)
     'tw-animate-css',
   ],
   ignore: [
