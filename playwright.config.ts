@@ -54,7 +54,7 @@ export default defineConfig({
   webServer: {
     // Use dev:vite directly to avoid race condition with build:electron
     // The electron main process files are already built by test:playwright
-    command: 'yarn dev:vite',
+    command: 'pnpm dev:vite',
     url: 'http://localhost:3000',
     reuseExistingServer: false,
     timeout: 60000,

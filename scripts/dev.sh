@@ -6,12 +6,12 @@ eval `dbus-launch --sh-syntax`
 export NODE_ENV=development
 
 # Viteの開発サーバーをバックグラウンドで起動
-yarn dev:vite &
+pnpm dev:vite &
 VITE_PID=$!
 
 # Electronビルドを実行し、完了を待つ
 echo "Building Electron..."
-yarn build:electron
+pnpm build:electron
 
 # ビルドが成功したら、Electronを起動
 if [ $? -eq 0 ]; then

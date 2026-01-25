@@ -21,8 +21,7 @@
     "pages"
   ],
   "scripts": {
-    "preinstall": "npx only-allow yarn",
-    "postinstall": "simple-git-hooks && yarn run license-check:generate && yarn run rebuild-native && bash scripts/ensure-grit.sh",
+    "postinstall": "simple-git-hooks && pnpm run license-check:generate && pnpm run rebuild-native && bash scripts/ensure-grit.sh",
     "rebuild-native": "npx @electron/rebuild -f -w clip-filepaths",
     "setup:debug": "bash debug/genDevFiles.sh",
     "generate:debug-data": "tsx scripts/generate-debug-data.mts",
@@ -30,8 +29,8 @@
     "dev": "SENTRY_DSN='' ./scripts/dev.sh",
     "dev:vite": "vite",
     "dev:electron": "vite build -c electron/vite.config.ts && electron . --disable-gpu",
-    "dev:landing": "yarn workspace @vrchat-albums/landing-page dev",
-    "build:landing": "yarn workspace @vrchat-albums/landing-page build",
+    "dev:landing": "pnpm --filter @vrchat-albums/landing-page dev",
+    "build:landing": "pnpm --filter @vrchat-albums/landing-page build",
     "build": "run-s lint:type-check build:vite build:electron",
     "build:vite": "vite build",
     "build:electron": "vite build -c electron/vite.config.ts",
@@ -91,16 +90,27 @@
     "knip": "knip --config knip.config.ts"
   },
   "simple-git-hooks": {
-    "pre-commit": "yarn lint:biome && yarn lint:type-check",
+    "pre-commit": "pnpm lint:biome && pnpm lint:type-check",
     "prepare-commit-msg": "bash scripts/hooks/prepare-commit-msg.sh"
   },
-  "resolutions": {
-    "cacache/glob": "10.5.0"
+  "pnpm": {
+    "overrides": {
+      "cacache>glob": "10.5.0"
+    },
+    "onlyBuiltDependencies": [
+      "@sentry/cli",
+      "electron",
+      "electron-winstaller",
+      "esbuild",
+      "sharp",
+      "simple-git-hooks",
+      "sqlite3"
+    ]
   },
-  "packageManager": "yarn@4.12.0",
+  "packageManager": "pnpm@10.10.0",
   "engines": {
     "node": "22",
-    "yarn": "4"
+    "pnpm": ">=10"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "1.3.3",
