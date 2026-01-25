@@ -52,3 +52,6 @@ app.log
 # Sentry Config File
 .sentryclirc
 worktrees/
+
+# Jujutsu
+.jj/

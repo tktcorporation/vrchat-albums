@@ -103,13 +103,35 @@ Main-Renderer 間の通信はすべて `electron/api.ts` の tRPC router 経由�
 
 ---
 
-## Git ワークフロー
+## バージョン管理
+
+### Git（デフォルト）
 
 **ブランチ形式**: `{issue-number}/{type}/{summary}`
 
 例: `123/feat/add-user-search`
 
 Types: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `perf`, `test`
+
+### Jujutsu（オプション）
+
+jj を使用したい場合（colocated mode で Git と共存）：
+
+```bash
+# 既存クローンで初期化
+jj git init --colocate
+
+# 基本操作
+jj status          # 状態確認
+jj diff            # 差分表示
+jj commit -m "..."  # コミット
+jj bookmark create 123/feat/xxx  # ブランチ作成
+jj git push        # プッシュ
+```
+
+**注意**: `jj commit` では pre-commit hooks が実行されません。CI が最終チェックを行います。
+
+詳細: `docs/jujutsu-workflow.md`、`.claude/rules/jujutsu.md`
 
 ---
 
