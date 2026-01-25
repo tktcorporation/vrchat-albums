@@ -18,6 +18,7 @@ pnpm = "10"
 
 # GritQL - code search and transformation tool
 "npm:@getgrit/cli" = "latest"
+jj = "latest"
 
 
 [settings]
