@@ -105,33 +105,40 @@ Main-Renderer 間の通信はすべて `electron/api.ts` の tRPC router 経由�
 
 ## バージョン管理
 
-### Git（デフォルト）
+### Jujutsu（デフォルト）
 
-**ブランチ形式**: `{issue-number}/{type}/{summary}`
+このプロジェクトでは **jj (Jujutsu)** を colocated mode で使用します。
 
-例: `123/feat/add-user-search`
+**ブックマーク形式**: `{type}/{summary}` または `{issue-number}/{type}/{summary}`
 
 Types: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `perf`, `test`
 
-### Jujutsu（オプション）
-
-jj を使用したい場合（colocated mode で Git と共存）：
-
 ```bash
-# 既存クローンで初期化
-jj git init --colocate
+# 基本ワークフロー
+jj status                    # 状態確認
+jj diff                      # 差分表示
+jj commit -m "type: message" # コミット
+jj bookmark create feat/xxx -r @-  # ブックマーク作成（コミット後）
+jj git push --bookmark feat/xxx --allow-new  # プッシュ
 
-# 基本操作
-jj status          # 状態確認
-jj diff            # 差分表示
-jj commit -m "..."  # コミット
-jj bookmark create 123/feat/xxx  # ブランチ作成
-jj git push        # プッシュ
+# PR作成（git checkout してから gh を使用）
+git checkout feat/xxx
+gh pr create --title "..." --body "..."
 ```
 
-**注意**: `jj commit` では pre-commit hooks が実行されません。CI が最終チェックを行います。
+**注意**: `jj commit` では pre-commit hooks が実行されません。`yarn lint && yarn test` を手動実行するか、CI を信頼してください。
 
 詳細: `docs/jujutsu-workflow.md`、`.claude/rules/jujutsu.md`
+
+### Git（フォールバック）
+
+jj が利用できない環境では Git を使用：
+
+```bash
+git checkout -b feat/xxx
+git commit -m "type: message"
+git push -u origin feat/xxx
+```
 
 ---
 

@@ -6,15 +6,15 @@ Claude Code が Jujutsu を使用する際のガイドライン。
 
 ## 概要
 
-このプロジェクトでは Jujutsu を **colocated mode** で使用できます。
-`.git/` と `.jj/` が共存し、Git と jj どちらのコマンドも使用可能です。
+このプロジェクトでは **Jujutsu をデフォルトのバージョン管理ツール**として使用します。
+colocated mode で `.git/` と `.jj/` が共存し、必要に応じて Git コマンドも使用可能です。
 
 ---
 
 ## 基本原則
 
-1. **ユーザーの選択を尊重**: ユーザーが jj を使用している場合は jj コマンドを使用
-2. **デフォルトは Git**: 明示的な指示がない場合は Git コマンドを使用
+1. **jj をデフォルトで使用**: コミット、ブックマーク作成、プッシュは jj コマンドを使用
+2. **PR 作成時は git checkout**: `gh pr create` は git ブランチが必要なため、一時的に checkout
 3. **CI が safety net**: pre-commit hooks は jj では実行されないため、CI を信頼
 
 ---
@@ -91,14 +91,18 @@ jj git push --bookmark {bookmark-name}
 ## PR 作成時の手順
 
 ```bash
-# 1. ブックマークを作成
-jj bookmark create 123/feat/my-feature
+# 1. コミット後にブックマークを作成（@- は直前のコミットを指す）
+jj bookmark create feat/my-feature -r @-
 
-# 2. プッシュ
-jj git push --bookmark 123/feat/my-feature
+# 2. プッシュ（新規ブックマークは --allow-new が必要）
+jj git push --bookmark feat/my-feature --allow-new
 
-# 3. PR 作成（gh CLI を使用）
+# 3. git checkout して PR 作成（gh CLI は git ブランチが必要）
+git checkout feat/my-feature
 gh pr create --title "feat: ..." --body "..."
+
+# 4. 作業を続ける場合は main に戻る
+git checkout main && jj git import
 ```
 
 ---
