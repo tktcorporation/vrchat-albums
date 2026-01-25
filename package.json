@@ -88,7 +88,8 @@
     "knip": "knip --config knip.config.ts"
   },
   "simple-git-hooks": {
-    "pre-commit": "yarn lint:biome && yarn lint:type-check"
+    "pre-commit": "yarn lint:biome && yarn lint:type-check",
+    "prepare-commit-msg": "bash scripts/hooks/prepare-commit-msg.sh"
   },
   "resolutions": {
     "cacache/glob": "10.5.0"
