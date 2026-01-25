@@ -869,18 +869,6 @@
     "path": "node_modules/@radix-ui/react-scroll-area",
     "licenseFile": "node_modules/@radix-ui/react-scroll-area/LICENSE"
   },
-  "@radix-ui/react-select@2.2.6": {
-    "licenses": "MIT",
-    "repository": "https://github.com/radix-ui/primitives",
-    "path": "node_modules/@radix-ui/react-select",
-    "licenseFile": "node_modules/@radix-ui/react-select/LICENSE"
-  },
-  "@radix-ui/react-separator@1.1.8": {
-    "licenses": "MIT",
-    "repository": "https://github.com/radix-ui/primitives",
-    "path": "node_modules/@radix-ui/react-separator",
-    "licenseFile": "node_modules/@radix-ui/react-separator/LICENSE"
-  },
   "@radix-ui/react-slot@1.2.3": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
