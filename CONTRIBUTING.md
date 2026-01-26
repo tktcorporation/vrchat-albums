@@ -18,37 +18,28 @@
     cd vrchat-albums
     ```
 
-2.  **使用ツールの準備 (任意)**:
-    プロジェクトでは `@antfu/ni` を使用して、`yarn`, `npm`, `pnpm` などのパッケージマネージャコマンドを統一的に扱えるようにしています。グローバルにインストールしておくと便利です。
-    ```bash
-    npm i -g @antfu/ni
-    ```
-    `ni` を使用する場合、以降の `yarn install` は `ni`、`yarn dev` は `nr dev` のように読み替えてください。
-
-3.  **依存関係のインストール**:
+2.  **依存関係のインストール**:
     プロジェクトルートで以下のコマンドを実行し、必要なパッケージをインストールします。
     ```bash
-    yarn install
-    # または ni を使用する場合
-    # ni
+    pnpm install
     ```
-    プロジェクトでは `yarn` (バージョン4) を使用しています。特別な理由がない限り、`yarn` コマンドを使用してください。
+    プロジェクトでは `pnpm` (バージョン10+) を使用しています。特別な理由がない限り、`pnpm` コマンドを使用してください。
 
-4.  **ネイティブモジュールのリビルド** (必要な場合):
+3.  **ネイティブモジュールのリビルド** (必要な場合):
     特定のネイティブモジュール（例: `clip-filepaths`）で問題が発生した場合は、以下のコマンドでリビルドを試みてください。
     ```bash
-    yarn rebuild-native
+    pnpm rebuild-native
     ```
 
 ## 開発ワークフロー
 
 1.  変更を加えます。
-2.  `yarn lint:fix` を実行して、フォーマットの問題を自動修正します。
-3.  `yarn lint` を実行して、残りのリンティングエラーや型エラーがないことを確認します。
-4.  `yarn test` を実行して、すべてのテストがパスすることを確認します。
+2.  `pnpm lint:fix` を実行して、フォーマットの問題を自動修正します。
+3.  `pnpm lint` を実行して、残りのリンティングエラーや型エラーがないことを確認します。
+4.  `pnpm test` を実行して、すべてのテストがパスすることを確認します。
 5.  上記の手順がすべて成功した場合にのみ、プルリクエストを作成または更新してください。
 
-コミット前には、 pre-commit フックによって `yarn lint` が自動的に実行されます。
+コミット前には、 pre-commit フックによって `pnpm lint` が自動的に実行されます。
 すべての変更は、マージされる前に CI チェックをパスする必要があります。
 
 ## 主要な開発コマンド
@@ -56,31 +47,30 @@
 -   **開発モードでの起動**:
     レンダラープロセスとメインプロセスの両方を開発モードで起動し、ホットリロードを有効にします。
     ```bash
-    yarn dev
-    # または nr dev
+    pnpm dev
     ```
     **注意**: 現状、Electron のメインプロセス (background 側) のホットリロードは完全には機能しない場合があります。変更が反映されない場合は、手動で再起動してください。
 
 -   **ビルド**:
     アプリケーションのプロダクションビルドを生成します。
     ```bash
-    yarn build
+    pnpm build
     ```
 
 -   **リンティングとフォーマット**:
     コードの静的解析とフォーマットを実行します。
     ```bash
     # Biome を使用したチェック
-    yarn lint:biome
+    pnpm lint:biome
     # TypeScript の型チェック (tsc)
-    yarn lint:type-check:tsc 
+    pnpm lint:type-check:tsc 
     # TypeScript の型チェック (tsgo - より高速なRust製チェッカー)
-    yarn lint:type-check:tsgo
+    pnpm lint:type-check:tsgo
     # Actionlint による GitHub Actions ワークフローのチェック
-    yarn lint:actionlint
+    pnpm lint:actionlint
 
     # 上記すべてを実行
-    yarn lint 
+    pnpm lint 
     ```
     自動修正可能な問題を修正するには:
     ```bash
@@ -94,32 +84,32 @@
 -   **テスト**:
     ユニットテストおよびインテグレーションテストを実行します。
     ```bash
-    yarn test
+    pnpm test
     ```
     個別のテストスイートを実行することも可能です:
     ```bash
-    yarn test:web       # レンダラープロセスのテスト (Vitest)
-    yarn test:electron  # メインプロセスのテスト (Vitest)
-    yarn test:playwright # E2E テスト (Playwright)
+    pnpm test:web       # レンダラープロセスのテスト (Vitest)
+    pnpm test:electron  # メインプロセスのテスト (Vitest)
+    pnpm test:playwright # E2E テスト (Playwright)
     ```
 
 -   **デバッグ用データの生成**:
     開発中に使用するデバッグ用の写真やログデータを生成します。
     ```bash
-    yarn generate:debug-data
+    pnpm generate:debug-data
     ```
 
 -   **未使用コードの検出**:
     `ts-prune` を使用して、エクスポートされているが使用されていないコードを検出します。
     ```bash
-    yarn find-deadcode
+    pnpm find-deadcode
     ```
 
 -   **ライセンス情報の生成と確認**:
     プロジェクトで使用しているライブラリのライセンス情報を生成し、許可されていないライセンスがないか確認します。
     ```bash
-    yarn license-check:generate
-    yarn license-check:validate
+    pnpm license-check:generate
+    pnpm license-check:validate
     ```
 
 ## GitHub Codespaces での開発
@@ -133,7 +123,7 @@
 
 ## コーディングスタイルと規約
 
--   プロジェクトでは [Biome](https://biomejs.dev/) を使用してコードのフォーマットとリンティングを行っています。コミット前に `yarn lint:fix` を実行して、コードスタイルを統一してください。
+-   プロジェクトでは [Biome](https://biomejs.dev/) を使用してコードのフォーマットとリンティングを行っています。コミット前に `pnpm lint:fix` を実行して、コードスタイルを統一してください。
     主要なルールは `biome.json` で設定されています。
 -   TypeScript の strict モードが有効になっています。
 -   Sequelize モデルでは TypeScript のデコレーターが使用されています。

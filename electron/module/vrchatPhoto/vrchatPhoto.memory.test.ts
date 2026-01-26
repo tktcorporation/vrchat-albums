@@ -5,10 +5,10 @@
  * libvips（Sharp内部のCライブラリ）のネイティブメモリ使用量を含めて監視します。
  *
  * 実行方法:
- *   yarn test electron/module/vrchatPhoto/vrchatPhoto.memory.test.ts
+ *   pnpm test electron/module/vrchatPhoto/vrchatPhoto.memory.test.ts
  *
  * 詳細なメモリログ付きで実行:
- *   DEBUG_MEMORY=1 yarn test electron/module/vrchatPhoto/vrchatPhoto.memory.test.ts
+ *   DEBUG_MEMORY=1 pnpm test electron/module/vrchatPhoto/vrchatPhoto.memory.test.ts
  */
 
 import * as fs from 'node:fs/promises';

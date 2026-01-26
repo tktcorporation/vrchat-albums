@@ -298,8 +298,8 @@ openFile: procedure.input(z.string()).mutation(async (ctx) => {
 
 | コマンド | 説明 |
 |---------|------|
-| `yarn lint:neverthrow` | Result型強制、catch-errパターン検出 |
-| `yarn lint:ts-pattern` | ts-patternの適切な使用をチェック |
+| `pnpm lint:neverthrow` | Result型強制、catch-errパターン検出 |
+| `pnpm lint:ts-pattern` | ts-patternの適切な使用をチェック |
 
 ### 設定ファイル
 

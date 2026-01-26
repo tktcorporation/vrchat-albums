@@ -26,7 +26,7 @@ jobs:
           NO_COLOR: 1
         run: |
           set +e
-          OUTPUT=$(yarn knip --no-config-hints 2>&1)
+          OUTPUT=$(pnpm knip --no-config-hints 2>&1)
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
 
@@ -59,7 +59,7 @@ jobs:
               echo '<details>'
               echo '<summary>対応方法</summary>'
               echo ''
-              echo '- **未使用の依存関係**: `yarn remove <package>` で削除'
+              echo '- **未使用の依存関係**: `pnpm remove <package>` で削除'
               echo '- **未使用のエクスポート**: エクスポートを削除するか、`knip.config.ts` の `ignore` に追加'
               echo '- **未使用の型**: 型定義を削除するか、将来使用予定なら `knip.config.ts` で除外'
               echo ''

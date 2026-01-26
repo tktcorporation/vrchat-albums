@@ -63,7 +63,7 @@ jj git push --bookmark {bookmark-name}
 
 - simple-git-hooks で設定された lint/test は実行されない
 - CI が最終チェックを行う
-- 必要に応じて手動で `yarn lint:fix && yarn lint && yarn test` を実行
+- 必要に応じて手動で `pnpm lint:fix && pnpm lint && pnpm test` を実行
 
 ### colocated mode の動作
 

@@ -126,7 +126,7 @@ git checkout feat/xxx
 gh pr create --title "..." --body "..."
 ```
 
-**注意**: `jj commit` では pre-commit hooks が実行されません。`yarn lint && yarn test` を手動実行するか、CI を信頼してください。
+**注意**: `jj commit` では pre-commit hooks が実行されません。`pnpm lint && pnpm test` を手動実行するか、CI を信頼してください。
 
 詳細: `docs/jujutsu-workflow.md`、`.claude/rules/jujutsu.md`
 
@@ -145,7 +145,7 @@ git push -u origin feat/xxx
 ## 自動生成ファイル（変更禁止）
 
 - `src/assets/licenses.json`
-- `yarn.lock`
+- `pnpm-lock.yaml`
 - `CHANGELOG.md`
 
 ---

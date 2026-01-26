@@ -185,4 +185,4 @@ import { Text, Heading } from '@/components/ui/text';
 1. **新規コードではトークンを使用** - gray/indigoなどの直接指定を避ける
 2. **コンポーネントを活用** - Badge, Card, Textなどの共通コンポーネントを使う
 3. **段階的移行** - 既存コードは優先度順に移行
-4. **Lintで検証** - `yarn lint` でGritQLパターン違反をチェック
+4. **Lintで検証** - `pnpm lint` でGritQLパターン違反をチェック

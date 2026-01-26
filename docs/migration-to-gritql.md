@@ -71,8 +71,8 @@ grit apply valueobject_export --dry-run
 grit patterns test
 
 # npmスクリプト経由での実行
-yarn lint:grit
-yarn lint:valueobjects:grit
+pnpm lint:grit
+pnpm lint:valueobjects:grit
 ```
 
 ### パターンファイルの追加方法

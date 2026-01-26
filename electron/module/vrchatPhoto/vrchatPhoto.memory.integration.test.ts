@@ -5,10 +5,10 @@
  * 初回起動時の大量写真処理におけるメモリ使用状況をテストします。
  *
  * 実行方法:
- *   yarn test electron/module/vrchatPhoto/vrchatPhoto.memory.integration.test.ts
+ *   pnpm test electron/module/vrchatPhoto/vrchatPhoto.memory.integration.test.ts
  *
  * 大量写真でテスト（時間がかかります）:
- *   PHOTO_COUNT=1000 yarn test electron/module/vrchatPhoto/vrchatPhoto.memory.integration.test.ts
+ *   PHOTO_COUNT=1000 pnpm test electron/module/vrchatPhoto/vrchatPhoto.memory.integration.test.ts
  */
 
 import * as fs from 'node:fs/promises';

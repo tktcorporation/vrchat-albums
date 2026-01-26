@@ -245,9 +245,9 @@ jj git init --colocate
 このプロジェクトでは CI が最終的なチェックを行うため、プッシュ前に手動で確認することを推奨します：
 
 ```bash
-yarn lint:fix
-yarn lint
-yarn test
+pnpm lint:fix
+pnpm lint
+pnpm test
 ```
 
 ### Git コマンドとの併用

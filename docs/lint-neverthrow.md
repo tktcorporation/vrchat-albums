@@ -12,10 +12,10 @@
 
 ```bash
 # neverthrowリンターのみを実行
-yarn lint:neverthrow
+pnpm lint:neverthrow
 
 # すべてのリンターを実行（neverthrowリンターも含む）
-yarn lint
+pnpm lint
 ```
 
 ### 設定ファイル
@@ -511,7 +511,7 @@ export const getReadFileErrorMessage = (error: ReadFileError): string =>
 リンターのテストは `scripts/lint-neverthrow.test.ts` にあります：
 
 ```bash
-yarn test scripts/lint-neverthrow.test.ts
+pnpm test scripts/lint-neverthrow.test.ts
 ```
 
 ## 既存コードの対応
