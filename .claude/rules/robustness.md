@@ -177,9 +177,9 @@ const obj = new MyValueObject(value);          // ❌ 直接newは禁止
 
 | コマンド | 目的 |
 |---------|------|
-| `yarn lint:neverthrow` | Result型の正しい使用を検証 |
-| `yarn lint:valueobjects` | ValueObjectパターンの遵守を検証 |
-| `yarn lint:ts-pattern` | ts-patternの適切な使用を検証 |
+| `pnpm lint:neverthrow` | Result型の正しい使用を検証 |
+| `pnpm lint:valueobjects` | ValueObjectパターンの遵守を検証 |
+| `pnpm lint:ts-pattern` | ts-patternの適切な使用を検証 |
 
 ---
 

@@ -26,7 +26,7 @@
 ### 1. TypeScript Compiler API (`scripts/lint-*.ts`)
 型情報が必要な複雑なチェック向け
 ```bash
-yarn tsx scripts/lint-{name}.ts
+pnpm tsx scripts/lint-{name}.ts
 ```
 参考: `scripts/lint-valueobjects.ts`, `scripts/lint-neverthrow.ts`
 
@@ -46,8 +46,8 @@ grit apply {pattern_name} {target_path} --dry-run
 高 / 中 / 低
 
 ## 関連する既存のlinter
-- yarn lint:neverthrow
-- yarn lint:valueobjects
+- pnpm lint:neverthrow
+- pnpm lint:valueobjects
 ```
 
 ## いつ記録すべきか

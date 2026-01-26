@@ -71,7 +71,7 @@ function main(): void {
     consola.error(
       `@types/node@${typesNode} (major: ${typesMajor}) does not match engines.node: "${enginesNode}" (major: ${enginesMajor})`,
     );
-    consola.info(`Fix: yarn add -D @types/node@~${enginesMajor}.0.0`);
+    consola.info(`Fix: pnpm add -D @types/node@~${enginesMajor}.0.0`);
     process.exit(1);
   }
   consola.success(

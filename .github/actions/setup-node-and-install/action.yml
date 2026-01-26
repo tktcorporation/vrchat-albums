@@ -22,12 +22,7 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        # Use yarn install for workspaces to ensure all dependencies are installed
-        if [ -f "yarn.lock" ]; then
-          yarn install --frozen-lockfile
-        else
-          nci
-        fi
+        pnpm install --frozen-lockfile
 
     - name: Install Grit CLI
       shell: bash

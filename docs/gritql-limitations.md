@@ -137,8 +137,8 @@ jobs:
   deep-check:
     # TypeScript linterで詳細チェック
     run: |
-      yarn lint:valueobjects
-      yarn lint:neverthrow
+      pnpm lint:valueobjects
+      pnpm lint:neverthrow
 ```
 
 ### 段階的な使い分け

@@ -8,7 +8,7 @@ runs:
       shell: bash
       working-directory: ./pages
       run: |
-        # Run build commands directly with npx to avoid yarn workspace state file issues
+        # Run build commands directly with npx
         npx tsc -b && npx vite build
 
     - name: Verify build output

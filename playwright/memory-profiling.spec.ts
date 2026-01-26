@@ -5,10 +5,10 @@
  * Electronメインプロセスのメモリ使用量をリアルタイムで監視します。
  *
  * 実行方法:
- *   yarn test:playwright playwright/memory-profiling.spec.ts
+ *   pnpm test:playwright playwright/memory-profiling.spec.ts
  *
  * テスト用の大量写真を生成して実行:
- *   GENERATE_TEST_PHOTOS=500 yarn test:playwright playwright/memory-profiling.spec.ts
+ *   GENERATE_TEST_PHOTOS=500 pnpm test:playwright playwright/memory-profiling.spec.ts
  */
 
 import * as childProcess from 'node:child_process';

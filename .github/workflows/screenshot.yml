@@ -27,7 +27,7 @@ jobs:
         run: nr generate:debug-data
 
       - name: Install Playwright Browsers
-        run: nr playwright install --with-deps
+        run: pnpm exec playwright install --with-deps
       - name: Run Playwright tests
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- nr test:playwright
 

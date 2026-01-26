@@ -19,15 +19,15 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 ## 環境
 
 - **Node.js**: 22 LTS
-- **パッケージマネージャ**: Yarn 4 (npm禁止)
+- **パッケージマネージャ**: pnpm 10+ (npm禁止)
 
 ## タスク完了プロセス
 
 ```text
 1. Code Implementation
-2. yarn lint:fix
-3. yarn lint
-4. yarn test
+2. pnpm lint:fix
+3. pnpm lint
+4. pnpm test
 5. Task Completion
 ```
 
@@ -126,7 +126,7 @@ git checkout feat/xxx
 gh pr create --title "..." --body "..."
 ```
 
-**注意**: `jj commit` では pre-commit hooks が実行されません。`yarn lint && yarn test` を手動実行するか、CI を信頼してください。
+**注意**: `jj commit` では pre-commit hooks が実行されません。`pnpm lint && pnpm test` を手動実行するか、CI を信頼してください。
 
 詳細: `docs/jujutsu-workflow.md`、`.claude/rules/jujutsu.md`
 
@@ -145,7 +145,7 @@ git push -u origin feat/xxx
 ## 自動生成ファイル（変更禁止）
 
 - `src/assets/licenses.json`
-- `yarn.lock`
+- `pnpm-lock.yaml`
 - `CHANGELOG.md`
 
 ---

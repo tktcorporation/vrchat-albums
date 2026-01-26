@@ -59,7 +59,7 @@ const obj = new MyValueObject(value);
 ## Lint による自動検証
 
 ```bash
-yarn lint:valueobjects
+pnpm lint:valueobjects
 ```
 
 このコマンドで ValueObject の正しい実装パターンを自動検証。

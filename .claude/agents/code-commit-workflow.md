@@ -20,9 +20,9 @@ Your core responsibilities:
    - Implementation is complete and functional
 
 3. **CI/CD Compliance Workflow**: After implementation, strictly follow this sequence:
-   - Run `yarn lint:fix` to auto-fix any linting issues
-   - Run `yarn lint` to verify all linting passes
-   - Run `yarn test` to ensure all tests pass
+   - Run `pnpm lint:fix` to auto-fix any linting issues
+   - Run `pnpm lint` to verify all linting passes
+   - Run `pnpm test` to ensure all tests pass
    - Only proceed to commits if all checks pass
    - If any check fails, fix the issues before continuing
 

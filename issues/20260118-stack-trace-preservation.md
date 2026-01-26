@@ -109,7 +109,7 @@ function checkStackTracePreservation(node: ts.CatchClause): void {
 
 ## 関連する既存のlinter
 
-- `yarn lint:neverthrow` - catch-errパターン検出（関連するがスタックトレースは未チェック）
+- `pnpm lint:neverthrow` - catch-errパターン検出（関連するがスタックトレースは未チェック）
 - `.grit/patterns/neverthrow_catch.md` - 基本的なcatchパターン
 
 ## 備考
