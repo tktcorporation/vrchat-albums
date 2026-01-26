@@ -116,9 +116,9 @@ jobs:
           nr clean:build
           nr build
           if [[ "${{ needs.vars.outputs.is-semver-tag }}" == 'true' ]]; then
-            nlx electron-builder --config=electron-builder.cjs --${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'ubuntu-22.04' && 'linux' || 'mac' }} --publish always
+            pnpm exec electron-builder --config=electron-builder.cjs --${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'ubuntu-22.04' && 'linux' || 'mac' }} --publish always
           else
-            nlx electron-builder --config=electron-builder.cjs --${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'ubuntu-22.04' && 'linux' || 'mac' }} --publish never
+            pnpm exec electron-builder --config=electron-builder.cjs --${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'ubuntu-22.04' && 'linux' || 'mac' }} --publish never
             tag_string=$(echo "${GITHUB_REF##*/}" | sed 's/v//')
             echo "tag_string: $tag_string"
             for file in ./dist/*; do
