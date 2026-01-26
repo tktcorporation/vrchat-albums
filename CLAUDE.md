@@ -45,6 +45,7 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 | `.claude/rules/valueobject.md` | ValueObject パターン（型のみエクスポート） |
 | `.claude/rules/electron-import.md` | Electron インポート（Playwright互換性） |
 | `.claude/rules/testing.md` | テストガイドライン（Vitest、Playwright） |
+| `.claude/rules/ui-ux-design.md` | UI/UXデザイン（デザイントークン、アンチパターン、実装プロセス） |
 
 ---
 
@@ -80,6 +81,23 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 **重要**: 予期されたエラーのみ `Result` でラップ。予期しないエラーは re-throw（Sentry送信のため）。
 
 詳細: `.claude/rules/error-handling.md`
+
+### UI/UXデザイン
+
+**原則**: 引き算のデザイン。コンテンツ（写真）が主役、UIクロームは最小限。
+
+**必須プロセス**:
+1. 既存コンポーネント（`src/components/ui/`）の調査 → 再利用優先
+2. デザイントークン（`src/v2/constants/ui.ts`）の使用 → 色・サイズの直接指定禁止
+3. 最小構成での設計 → 「削除しても機能するか」テスト
+
+**禁止事項**:
+- 色の直接指定（`bg-blue-500` 等）→ セマンティックトークン使用
+- 過剰な装飾（グラデーションテキスト、多重シャドウ、常時アニメーション）
+- 既存コンポーネントの再発明
+- テキストのハードコード → `t()` 関数経由
+
+詳細: `.claude/rules/ui-ux-design.md`
 
 ---
 
