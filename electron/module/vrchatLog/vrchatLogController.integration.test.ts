@@ -70,63 +70,58 @@ vi.mock('./exportService/exportService', () => {
   const fs = require('node:fs');
   const { ok } = require('neverthrow');
   return {
-    exportLogStoreFromDB: vi
+    exportLogStore: vi
       .fn()
-      .mockImplementation(
-        async ({ outputBasePath, startDate, endDate }, _getDBLogs) => {
-          const exportFolderName = 'vrchat-albums-export_2023-12-01_14-30-45';
-          const actualOutputPath = outputBasePath || '/tmp/test-export';
-          const exportDir = path.join(actualOutputPath, exportFolderName);
+      .mockImplementation(async ({ outputBasePath, startDate, endDate }) => {
+        const exportFolderName = 'vrchat-albums-export_2023-12-01_14-30-45';
+        const actualOutputPath = outputBasePath || '/tmp/test-export';
+        const exportDir = path.join(actualOutputPath, exportFolderName);
 
-          // Handle different month directories based on test data
-          const monthDirs = ['2023-10', '2023-11'];
-          const exportedFiles = [];
-          let totalLines = 0;
+        // Handle different month directories based on test data
+        const monthDirs = ['2023-10', '2023-11'];
+        const exportedFiles = [];
+        let totalLines = 0;
 
-          for (const yearMonth of monthDirs) {
-            const monthDir = path.join(exportDir, yearMonth);
-            const logFilePath = path.join(
-              monthDir,
-              `logStore-${yearMonth}.txt`,
-            );
+        for (const yearMonth of monthDirs) {
+          const monthDir = path.join(exportDir, yearMonth);
+          const logFilePath = path.join(monthDir, `logStore-${yearMonth}.txt`);
 
-            // Create directory and file
-            fs.mkdirSync(monthDir, { recursive: true });
+          // Create directory and file
+          fs.mkdirSync(monthDir, { recursive: true });
 
-            // Generate log content based on the month
-            let logContent = '';
-            if (yearMonth === '2023-10') {
-              logContent =
-                '2023-10-15 10:00:00 Log        -  [Behaviour] Joining or Creating Room: Test World\n';
-              logContent +=
-                '2023-10-15 10:05:00 Log        -  [Behaviour] OnPlayerJoined TestPlayer\n';
-              totalLines += 2;
-            } else if (yearMonth === '2023-11') {
-              logContent = '2023-11-01 10:00:00 Test log line\n';
-              totalLines += 1;
-            }
-
-            if (logContent) {
-              fs.writeFileSync(logFilePath, logContent);
-              exportedFiles.push(logFilePath);
-            }
+          // Generate log content based on the month
+          let logContent = '';
+          if (yearMonth === '2023-10') {
+            logContent =
+              '2023-10-15 10:00:00 Log        -  [Behaviour] Joining or Creating Room: Test World\n';
+            logContent +=
+              '2023-10-15 10:05:00 Log        -  [Behaviour] OnPlayerJoined TestPlayer\n';
+            totalLines += 2;
+          } else if (yearMonth === '2023-11') {
+            logContent = '2023-11-01 10:00:00 Test log line\n';
+            totalLines += 1;
           }
 
-          console.log('[Mock] exportLogStoreFromDB called with:', {
-            outputBasePath,
-            startDate,
-            endDate,
-          });
-          console.log('[Mock] Returning exportedFiles:', exportedFiles);
+          if (logContent) {
+            fs.writeFileSync(logFilePath, logContent);
+            exportedFiles.push(logFilePath);
+          }
+        }
 
-          return ok({
-            totalLogLines: totalLines,
-            exportedFiles: exportedFiles,
-            exportStartTime: new Date('2023-12-01T14:30:00'),
-            exportEndTime: new Date('2023-12-01T14:30:45'),
-          });
-        },
-      ),
+        console.log('[Mock] exportLogStore called with:', {
+          outputBasePath,
+          startDate,
+          endDate,
+        });
+        console.log('[Mock] Returning exportedFiles:', exportedFiles);
+
+        return ok({
+          totalLogLines: totalLines,
+          exportedFiles: exportedFiles,
+          exportStartTime: new Date('2023-12-01T14:30:00'),
+          exportEndTime: new Date('2023-12-01T14:30:45'),
+        });
+      }),
   };
 });
 
