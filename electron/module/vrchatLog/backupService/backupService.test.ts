@@ -3,10 +3,9 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { ok } from 'neverthrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LogRecord } from '../converters/dbToLogStore';
 import type { ExportResult } from '../exportService/exportService';
 import * as exportServiceModule from '../exportService/exportService';
-import type { DBLogProvider, ImportBackupMetadata } from './backupService';
+import type { ImportBackupMetadata } from './backupService';
 import { backupService, getBackupErrorMessage } from './backupService';
 
 // モックの設定
@@ -25,7 +24,7 @@ vi.mock('../../../lib/wrappedApp', () => ({
 }));
 
 vi.mock('../exportService/exportService', () => ({
-  exportLogStoreFromDB: vi.fn(),
+  exportLogStore: vi.fn(),
 }));
 
 // Helper function to create a mock Dirent
@@ -53,10 +52,6 @@ describe('backupService', () => {
   });
 
   describe('createPreImportBackup', () => {
-    const mockGetDBLogs: DBLogProvider = async () => {
-      return [] as LogRecord[];
-    };
-
     it('エクスポート機能を使用してバックアップを作成できる', async () => {
       const mockTimestamp = new Date('2023-12-01T14:30:45');
       vi.setSystemTime(mockTimestamp);
@@ -73,15 +68,20 @@ describe('backupService', () => {
         ],
         exportStartTime: mockTimestamp,
         exportEndTime: mockTimestamp,
+        manifestPath: path.join(
+          '/mocked/userData/backups',
+          'vrchat-albums-export_2023-12-01_14-30-45',
+          'export-manifest.json',
+        ),
       };
 
-      vi.mocked(exportServiceModule.exportLogStoreFromDB).mockResolvedValue(
+      vi.mocked(exportServiceModule.exportLogStore).mockResolvedValue(
         ok(mockExportResult),
       );
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
-      const result = await backupService.createPreImportBackup(mockGetDBLogs);
+      const result = await backupService.createPreImportBackup();
 
       expect(result.isOk()).toBe(true);
       if (result.isOk()) {
@@ -97,12 +97,9 @@ describe('backupService', () => {
       }
 
       // エクスポート関数が正しいパラメータで呼ばれたことを確認
-      expect(exportServiceModule.exportLogStoreFromDB).toHaveBeenCalledWith(
-        {
-          outputBasePath: path.join('/mocked/userData', 'backups'),
-        },
-        mockGetDBLogs,
-      );
+      expect(exportServiceModule.exportLogStore).toHaveBeenCalledWith({
+        outputBasePath: path.join('/mocked/userData', 'backups'),
+      });
 
       // メタデータファイルが保存されたことを確認
       expect(fs.writeFile).toHaveBeenCalledWith(
@@ -117,13 +114,13 @@ describe('backupService', () => {
 
     it('エクスポートに失敗した場合は例外がスローされる', async () => {
       // 予期しないエラーなので throw される
-      vi.mocked(exportServiceModule.exportLogStoreFromDB).mockRejectedValue(
+      vi.mocked(exportServiceModule.exportLogStore).mockRejectedValue(
         new Error('Export failed'),
       );
 
-      await expect(
-        backupService.createPreImportBackup(mockGetDBLogs),
-      ).rejects.toThrow('Export failed');
+      await expect(backupService.createPreImportBackup()).rejects.toThrow(
+        'Export failed',
+      );
     });
   });
 
