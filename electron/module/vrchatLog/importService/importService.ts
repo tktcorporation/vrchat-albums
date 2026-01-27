@@ -295,7 +295,7 @@ export class ImportService {
 
     // マニフェスト内のファイル一覧と実際のファイルを照合
     for (const file of manifest.files) {
-      const filePath = path.join(dirPath, file.relativePath);
+      const filePath = path.join(dirPath, ...file.relativePath.split('/'));
       const fileAccessResult = await neverthrow.ResultAsync.fromPromise(
         fs.stat(filePath),
         () => 'NOT_FOUND' as const,

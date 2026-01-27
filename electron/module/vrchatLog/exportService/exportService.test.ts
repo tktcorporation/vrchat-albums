@@ -1,5 +1,4 @@
 import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VRChatLogStoreFilePath } from '../model';
 import { exportLogStore, getExportErrorMessage } from './exportService';
@@ -384,8 +383,9 @@ describe('exportService', () => {
       expect(manifestContent.status).toBe('completed');
       expect(manifestContent.totalLogLines).toBe(3);
       expect(manifestContent.files).toHaveLength(1);
+      // マニフェストの relativePath は常にPOSIX形式
       expect(manifestContent.files[0].relativePath).toBe(
-        path.join('2023-10', 'logStore-2023-10.txt'),
+        '2023-10/logStore-2023-10.txt',
       );
       expect(manifestContent.files[0].sizeBytes).toBe(42);
       expect(manifestContent.exportDateTime).toBeDefined();

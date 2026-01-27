@@ -337,16 +337,17 @@ describe('exportService integration', () => {
     expect(manifestContent.files).toHaveLength(1);
     expect(manifestContent.exportDateTime).toBeDefined();
 
-    // ファイルの relativePath がクロスプラットフォームで正しいことを確認
-    const expectedRelativePath = path.join('2023-10', 'logStore-2023-10.txt');
-    expect(manifestContent.files[0].relativePath).toBe(expectedRelativePath);
+    // マニフェストの relativePath は常にPOSIX形式（/区切り）
+    expect(manifestContent.files[0].relativePath).toBe(
+      '2023-10/logStore-2023-10.txt',
+    );
 
     // マニフェストのサイズが実際のファイルサイズと一致
     const exportedStat = await fs.stat(result.value.exportedFiles[0]);
     expect(manifestContent.files[0].sizeBytes).toBe(exportedStat.size);
   });
 
-  it('パス区切り文字がプラットフォームに依存しない（path.join使用）', async () => {
+  it('マニフェストのrelativePathは常にPOSIX形式（/区切り）で保存される', async () => {
     const monthDir = path.join(sourceDir, '2023-10');
     await fs.mkdir(monthDir, { recursive: true });
     const sourceFile = path.join(monthDir, 'logStore-2023-10.txt');
@@ -364,15 +365,16 @@ describe('exportService integration', () => {
     expect(result.isOk()).toBe(true);
     if (!result.isOk()) return;
 
-    // エクスポートされたファイルパスが path.sep を使用していることを確認
+    // エクスポートされたファイルパスがOS固有の形式であることを確認
     const exportedFile = result.value.exportedFiles[0];
     expect(exportedFile).toBe(path.normalize(exportedFile));
 
-    // マニフェストの relativePath も path.join で構築されていることを確認
+    // マニフェストの relativePath はバックスラッシュを含まない（POSIX形式）
     const manifestContent = JSON.parse(
       await fs.readFile(result.value.manifestPath, 'utf-8'),
     ) as ExportManifest;
     const relPath = manifestContent.files[0].relativePath;
-    expect(relPath).toBe(path.normalize(relPath));
+    expect(relPath).not.toContain('\\');
+    expect(relPath).toBe('2023-10/logStore-2023-10.txt');
   });
 });

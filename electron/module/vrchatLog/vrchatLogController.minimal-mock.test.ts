@@ -259,14 +259,10 @@ describe('vrchatLogController integration test with minimal mocks', () => {
     expect(importResult.importedData.totalLines).toBe(2);
   });
 
-  it('パス区切り文字がクロスプラットフォームで正しく処理される', async () => {
-    // path.join を使用してOS依存のパス区切り文字を検証
+  it('マニフェストのrelativePathがPOSIX形式で保存される', async () => {
     const logContent =
       '2023.10.15 10:00:00 Log        -  [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789abc:12345';
-    const filePath = await createTestLogStoreFile('2023-10', logContent);
-
-    // ファイルパスが正規化されていることを確認
-    expect(filePath).toBe(path.normalize(filePath));
+    await createTestLogStoreFile('2023-10', logContent);
 
     const exportResult = await caller.exportLogStoreData({
       startDate: new Date('2023-10-01'),
@@ -274,14 +270,17 @@ describe('vrchatLogController integration test with minimal mocks', () => {
       outputPath: testExportDir,
     });
 
-    // エクスポートされたファイルパスが正規化されていることを確認
+    // エクスポートされたファイルパスがOS固有の正規化済みであること
     for (const exportedFile of exportResult.exportedFiles) {
       expect(exportedFile).toBe(path.normalize(exportedFile));
     }
 
-    // マニフェストパスが正規化されていることを確認
-    expect(exportResult.manifestPath).toBe(
-      path.normalize(exportResult.manifestPath),
-    );
+    // マニフェストの relativePath がPOSIX形式（バックスラッシュなし）
+    const manifestContent = JSON.parse(
+      await fs.readFile(exportResult.manifestPath, 'utf-8'),
+    ) as { files: Array<{ relativePath: string }> };
+    for (const file of manifestContent.files) {
+      expect(file.relativePath).not.toContain('\\');
+    }
   });
 });

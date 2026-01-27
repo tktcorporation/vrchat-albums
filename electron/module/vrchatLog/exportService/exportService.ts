@@ -306,7 +306,7 @@ export const exportLogStore = async (
 
     // マニフェスト用のファイル情報を収集
     const destStat = await fs.stat(destFile);
-    const relativePath = yearMonth ? path.join(yearMonth, fileName) : fileName;
+    const relativePath = yearMonth ? [yearMonth, fileName].join('/') : fileName;
     manifestFiles.push({
       relativePath,
       sizeBytes: destStat.size,
