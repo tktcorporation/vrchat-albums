@@ -16,7 +16,15 @@ import { getLogStoreFilePathsInRange } from '../fileHandlers/logStorageManager';
 export type ExportError =
   | { type: 'DIR_CREATE_FAILED'; path: string; message: string }
   | { type: 'FILE_COPY_FAILED'; src: string; dest: string; message: string }
-  | { type: 'FILE_READ_FAILED'; path: string; message: string };
+  | { type: 'FILE_READ_FAILED'; path: string; message: string }
+  | {
+      type: 'FILE_VERIFY_FAILED';
+      src: string;
+      dest: string;
+      expectedSize: number;
+      actualSize: number;
+    }
+  | { type: 'MANIFEST_WRITE_FAILED'; path: string; message: string };
 
 /**
  * ExportErrorからユーザー向けメッセージを取得
@@ -36,6 +44,15 @@ export const getExportErrorMessage = (error: ExportError): string =>
       { type: 'FILE_READ_FAILED' },
       (e) => `ファイル読み込みに失敗しました: ${e.path} (${e.message})`,
     )
+    .with(
+      { type: 'FILE_VERIFY_FAILED' },
+      (e) =>
+        `ファイルコピーの検証に失敗しました: ${e.dest} (期待サイズ: ${e.expectedSize}, 実際サイズ: ${e.actualSize})`,
+    )
+    .with(
+      { type: 'MANIFEST_WRITE_FAILED' },
+      (e) => `マニフェストの書き込みに失敗しました: ${e.path} (${e.message})`,
+    )
     .exhaustive();
 
 export interface ExportLogStoreOptions {
@@ -44,11 +61,20 @@ export interface ExportLogStoreOptions {
   outputBasePath?: string;
 }
 
+export interface ExportManifest {
+  version: 1;
+  status: 'completed';
+  exportDateTime: string;
+  files: Array<{ relativePath: string; sizeBytes: number }>;
+  totalLogLines: number;
+}
+
 export interface ExportResult {
   exportedFiles: string[];
   totalLogLines: number;
   exportStartTime: Date;
   exportEndTime: Date;
+  manifestPath: string;
 }
 
 /**
@@ -128,6 +154,72 @@ const copyFileSafe = (
   }));
 
 /**
+ * コピー後のファイルサイズを検証
+ * ソースと宛先のファイルサイズが一致することを確認
+ */
+const verifyFileCopy = (
+  src: string,
+  dest: string,
+): ResultAsync<void, ExportError> =>
+  ResultAsync.fromPromise(
+    Promise.all([fs.stat(src), fs.stat(dest)]).then(([srcStat, destStat]) => {
+      if (srcStat.size !== destStat.size) {
+        throw {
+          type: 'SIZE_MISMATCH' as const,
+          srcSize: srcStat.size,
+          destSize: destStat.size,
+        };
+      }
+    }),
+    (e): ExportError => {
+      if (
+        typeof e === 'object' &&
+        e !== null &&
+        'type' in e &&
+        (e as { type: string }).type === 'SIZE_MISMATCH'
+      ) {
+        const mismatch = e as {
+          type: string;
+          srcSize: number;
+          destSize: number;
+        };
+        return {
+          type: 'FILE_VERIFY_FAILED',
+          src,
+          dest,
+          expectedSize: mismatch.srcSize,
+          actualSize: mismatch.destSize,
+        };
+      }
+      return {
+        type: 'FILE_VERIFY_FAILED',
+        src,
+        dest,
+        expectedSize: -1,
+        actualSize: -1,
+      };
+    },
+  );
+
+/**
+ * エクスポートマニフェストを書き出す
+ */
+const writeExportManifest = (
+  exportDir: string,
+  manifest: ExportManifest,
+): ResultAsync<string, ExportError> => {
+  const manifestPath = path.join(exportDir, 'export-manifest.json');
+  return ResultAsync.fromPromise(
+    fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8'),
+    (e) => ({
+      type: 'MANIFEST_WRITE_FAILED' as const,
+      path: manifestPath,
+      message: e instanceof Error ? e.message : String(e),
+    }),
+  ).map(() => manifestPath);
+};
+
+/**
  * ファイルの非空行数をカウント
  * logStoreファイルは最大10MBなので readFile で十分
  */
@@ -166,6 +258,7 @@ export const exportLogStore = async (
       totalLogLines: 0,
       exportStartTime,
       exportEndTime: new Date(),
+      manifestPath: '',
     });
   }
 
@@ -175,6 +268,7 @@ export const exportLogStore = async (
   const exportDir = path.join(basePath, exportFolderName);
 
   const exportedFiles: string[] = [];
+  const manifestFiles: Array<{ relativePath: string; sizeBytes: number }> = [];
   let totalLogLines = 0;
 
   for (const sourceFile of sourceFiles) {
@@ -198,11 +292,25 @@ export const exportLogStore = async (
       return neverthrow.err(copyResult.error);
     }
 
-    // 行数カウント
-    const lineCountResult = await countFileLines(sourceFile.value);
+    // コピー後のファイルサイズ検証
+    const verifyResult = await verifyFileCopy(sourceFile.value, destFile);
+    if (verifyResult.isErr()) {
+      return neverthrow.err(verifyResult.error);
+    }
+
+    // 行数カウント（コピー先を読むことで実際にエクスポートされたものをカウント）
+    const lineCountResult = await countFileLines(destFile);
     if (lineCountResult.isErr()) {
       return neverthrow.err(lineCountResult.error);
     }
+
+    // マニフェスト用のファイル情報を収集
+    const destStat = await fs.stat(destFile);
+    const relativePath = yearMonth ? path.join(yearMonth, fileName) : fileName;
+    manifestFiles.push({
+      relativePath,
+      sizeBytes: destStat.size,
+    });
 
     totalLogLines += lineCountResult.value;
     exportedFiles.push(destFile);
@@ -210,10 +318,25 @@ export const exportLogStore = async (
 
   const exportEndTime = new Date();
 
+  // エクスポート完了マニフェストを書き出す
+  const manifest: ExportManifest = {
+    version: 1,
+    status: 'completed',
+    exportDateTime: exportEndTime.toISOString(),
+    files: manifestFiles,
+    totalLogLines,
+  };
+
+  const manifestResult = await writeExportManifest(exportDir, manifest);
+  if (manifestResult.isErr()) {
+    return neverthrow.err(manifestResult.error);
+  }
+
   return neverthrow.ok({
     exportedFiles,
     totalLogLines,
     exportStartTime,
     exportEndTime,
+    manifestPath: manifestResult.value,
   });
 };

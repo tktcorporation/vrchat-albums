@@ -113,6 +113,20 @@ describe('vrchatLogController integration test with minimal mocks', () => {
     return filePath;
   };
 
+  /**
+   * エクスポート結果からエクスポートディレクトリパスを取得
+   */
+  const getExportDirPath = (exportResult: {
+    exportedFiles: string[];
+  }): string => {
+    const exportedPath = exportResult.exportedFiles[0];
+    const exportedDirMatch = exportedPath.match(/vrchat-albums-export_[^/\\]+/);
+    if (!exportedDirMatch) {
+      throw new Error('Export directory not found in path');
+    }
+    return path.join(testExportDir, exportedDirMatch[0]);
+  };
+
   it('エクスポートしたデータを再インポートできる（実際のサービスを使用）', async () => {
     // 1. Create test logStore files (export copies files directly, not from DB)
     const logContent = [
@@ -133,12 +147,7 @@ describe('vrchatLogController integration test with minimal mocks', () => {
     expect(exportResult.totalLogLines).toBeGreaterThan(0);
 
     // 3. Import the exported directory
-    const exportedPath = exportResult.exportedFiles[0];
-    const exportedDirMatch = exportedPath.match(/vrchat-albums-export_[^/\\]+/);
-    if (!exportedDirMatch) {
-      throw new Error('Export directory not found in path');
-    }
-    const exportedDirPath = path.join(testExportDir, exportedDirMatch[0]);
+    const exportedDirPath = getExportDirPath(exportResult);
 
     const importResult = await caller.importLogStoreFiles({
       filePaths: [exportedDirPath],
@@ -152,5 +161,127 @@ describe('vrchatLogController integration test with minimal mocks', () => {
     expect(importResult.backup).toBeDefined();
     expect(importResult.backup.id).toMatch(/^backup_\d{8}_\d{6}$/);
     expect(importResult.importedData.processedFiles.length).toBe(1);
+  });
+
+  it('E2Eラウンドトリップ: エクスポート→logStoreクリア→インポートで内容が保持される', async () => {
+    // 1. テスト用logStoreファイルを作成
+    const logLines = [
+      '2023.10.15 10:00:00 Log        -  [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789abc:12345',
+      '2023.10.15 10:00:00 Log        -  [Behaviour] Joining or Creating Room: Test World',
+      '2023.10.15 10:05:00 Log        -  [Behaviour] OnPlayerJoined TestPlayer',
+    ];
+    const logContent = logLines.join('\n');
+    await createTestLogStoreFile('2023-10', logContent);
+
+    // 2. エクスポート
+    const exportResult = await caller.exportLogStoreData({
+      startDate: new Date('2023-10-01'),
+      endDate: new Date('2023-10-31'),
+      outputPath: testExportDir,
+    });
+
+    expect(exportResult.exportedFiles.length).toBe(1);
+    expect(exportResult.totalLogLines).toBe(3);
+
+    // 3. エクスポートされたファイルの内容がオリジナルと一致
+    const exportedContent = await fs.readFile(
+      exportResult.exportedFiles[0],
+      'utf-8',
+    );
+    expect(exportedContent).toBe(logContent);
+
+    // 4. オリジナルのlogStoreディレクトリを削除
+    const logStoreDir = path.join(testUserDataDir, 'logStore');
+    await fs.rm(logStoreDir, { recursive: true, force: true });
+
+    // 5. エクスポートからインポート
+    const exportedDirPath = getExportDirPath(exportResult);
+    const importResult = await caller.importLogStoreFiles({
+      filePaths: [exportedDirPath],
+    });
+
+    expect(importResult.success).toBe(true);
+    expect(importResult.importedData.totalLines).toBe(3);
+
+    // 6. インポート後のlogStoreファイルの内容が元のログ行を含むことを検証
+    const importedLogStorePath = path.join(
+      testUserDataDir,
+      'logStore',
+      '2023-10',
+      'logStore-2023-10.txt',
+    );
+    const importedContent = await fs.readFile(importedLogStorePath, 'utf-8');
+
+    // appendLoglinesToFile は改行で終わるフォーマットを使用するため、各行が含まれることを確認
+    for (const line of logLines) {
+      expect(importedContent).toContain(line);
+    }
+  });
+
+  it('マニフェスト付きエクスポートのインポートが正常に動作する', async () => {
+    // 1. テスト用logStoreファイルを作成
+    const logContent = [
+      '2023.10.15 10:00:00 Log        -  [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789abc:12345',
+      '2023.10.15 10:00:00 Log        -  [Behaviour] Joining or Creating Room: Test World',
+    ].join('\n');
+    await createTestLogStoreFile('2023-10', logContent);
+
+    // 2. エクスポート（マニフェスト付き）
+    const exportResult = await caller.exportLogStoreData({
+      startDate: new Date('2023-10-01'),
+      endDate: new Date('2023-10-31'),
+      outputPath: testExportDir,
+    });
+
+    // マニフェストが存在することを確認
+    expect(exportResult.manifestPath).toBeTruthy();
+    const manifestExists = await fs
+      .access(exportResult.manifestPath)
+      .then(() => true)
+      .catch(() => false);
+    expect(manifestExists).toBe(true);
+
+    // 3. マニフェスト内容を確認
+    const manifestContent = JSON.parse(
+      await fs.readFile(exportResult.manifestPath, 'utf-8'),
+    );
+    expect(manifestContent.version).toBe(1);
+    expect(manifestContent.status).toBe('completed');
+    expect(manifestContent.totalLogLines).toBe(2);
+
+    // 4. マニフェスト付きディレクトリからインポート
+    const exportedDirPath = getExportDirPath(exportResult);
+    const importResult = await caller.importLogStoreFiles({
+      filePaths: [exportedDirPath],
+    });
+
+    expect(importResult.success).toBe(true);
+    expect(importResult.importedData.totalLines).toBe(2);
+  });
+
+  it('パス区切り文字がクロスプラットフォームで正しく処理される', async () => {
+    // path.join を使用してOS依存のパス区切り文字を検証
+    const logContent =
+      '2023.10.15 10:00:00 Log        -  [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789abc:12345';
+    const filePath = await createTestLogStoreFile('2023-10', logContent);
+
+    // ファイルパスが正規化されていることを確認
+    expect(filePath).toBe(path.normalize(filePath));
+
+    const exportResult = await caller.exportLogStoreData({
+      startDate: new Date('2023-10-01'),
+      endDate: new Date('2023-10-31'),
+      outputPath: testExportDir,
+    });
+
+    // エクスポートされたファイルパスが正規化されていることを確認
+    for (const exportedFile of exportResult.exportedFiles) {
+      expect(exportedFile).toBe(path.normalize(exportedFile));
+    }
+
+    // マニフェストパスが正規化されていることを確認
+    expect(exportResult.manifestPath).toBe(
+      path.normalize(exportResult.manifestPath),
+    );
   });
 });

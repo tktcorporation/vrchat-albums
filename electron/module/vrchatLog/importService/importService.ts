@@ -10,6 +10,7 @@ import {
   getBackupErrorMessage,
   type ImportBackupMetadata,
 } from '../backupService/backupService';
+import type { ExportManifest } from '../exportService/exportService';
 import { appendLoglinesToFile } from '../fileHandlers/logStorageManager';
 import { type VRChatLogLine, VRChatLogLineSchema } from '../model';
 
@@ -176,7 +177,8 @@ export class ImportService {
           );
         }
       } else if (stat.isDirectory()) {
-        // ディレクトリの場合：再帰検索
+        // ディレクトリの場合：マニフェスト検証 + 再帰検索
+        await this.verifyExportManifest(targetPath);
         const foundFiles = await this.findLogStoreFilesInDirectory(targetPath);
         allFiles.push(...foundFiles);
         logger.info(
@@ -250,6 +252,76 @@ export class ImportService {
   }
 
   /**
+   * export-manifest.json が存在する場合、ファイル一覧と照合して検証
+   * マニフェストがない場合は何もしない（後方互換性）
+   */
+  private async verifyExportManifest(dirPath: string): Promise<void> {
+    const manifestPath = path.join(dirPath, 'export-manifest.json');
+
+    const accessResult = await neverthrow.ResultAsync.fromPromise(
+      fs.access(manifestPath),
+      () => 'NOT_FOUND' as const,
+    );
+    if (accessResult.isErr()) {
+      // マニフェストなし → 従来通り動作
+      return;
+    }
+
+    const readResult = await neverthrow.ResultAsync.fromPromise(
+      fs.readFile(manifestPath, 'utf-8'),
+      () => 'READ_FAILED' as const,
+    );
+    if (readResult.isErr()) {
+      logger.warn(`Failed to read export manifest: ${manifestPath}`);
+      return;
+    }
+
+    const parseResult = neverthrow.fromThrowable(
+      (s: string) => JSON.parse(s) as ExportManifest,
+      () => 'PARSE_FAILED' as const,
+    )(readResult.value);
+    if (parseResult.isErr()) {
+      logger.warn(`Failed to parse export manifest: ${manifestPath}`);
+      return;
+    }
+
+    const manifest = parseResult.value;
+
+    if (manifest.status !== 'completed') {
+      logger.warn(
+        `Export manifest indicates incomplete export: status=${String(manifest.status)}`,
+      );
+    }
+
+    // マニフェスト内のファイル一覧と実際のファイルを照合
+    for (const file of manifest.files) {
+      const filePath = path.join(dirPath, file.relativePath);
+      const fileAccessResult = await neverthrow.ResultAsync.fromPromise(
+        fs.stat(filePath),
+        () => 'NOT_FOUND' as const,
+      );
+
+      if (fileAccessResult.isErr()) {
+        logger.warn(
+          `Manifest file missing: ${file.relativePath} (expected in export)`,
+        );
+        continue;
+      }
+
+      const fileStat = fileAccessResult.value;
+      if (fileStat.size !== file.sizeBytes) {
+        logger.warn(
+          `Manifest file size mismatch: ${file.relativePath} (expected: ${file.sizeBytes}, actual: ${fileStat.size})`,
+        );
+      }
+    }
+
+    logger.info(
+      `Export manifest verified: ${manifest.files.length} files, ${manifest.totalLogLines} lines`,
+    );
+  }
+
+  /**
    * logStoreファイルの形式を検証
    * 予期しないエラーはthrowされる（Sentryに送信）
    */
@@ -268,7 +340,7 @@ export class ImportService {
 
       // ファイル名の形式確認（logStore-YYYY-MM.txt形式）
       const fileName = path.basename(filePath);
-      if (!fileName.match(/^logStore-\d{4}-\d{2}\.txt$/)) {
+      if (!fileName.match(/^logStore(-\d{4}-\d{2}(-\d{14})?)?\.txt$/)) {
         logger.warn(`File name does not match expected pattern: ${fileName}`);
         // 警告として記録するが、処理は継続
       }

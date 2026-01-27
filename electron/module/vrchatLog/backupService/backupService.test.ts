@@ -68,6 +68,11 @@ describe('backupService', () => {
         ],
         exportStartTime: mockTimestamp,
         exportEndTime: mockTimestamp,
+        manifestPath: path.join(
+          '/mocked/userData/backups',
+          'vrchat-albums-export_2023-12-01_14-30-45',
+          'export-manifest.json',
+        ),
       };
 
       vi.mocked(exportServiceModule.exportLogStore).mockResolvedValue(

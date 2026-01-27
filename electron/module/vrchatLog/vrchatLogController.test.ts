@@ -62,6 +62,7 @@ describe('vrchatLogController', () => {
         totalLogLines: 100,
         exportStartTime: new Date('2023-10-08T10:00:00Z'),
         exportEndTime: new Date('2023-10-08T10:05:00Z'),
+        manifestPath: '/path/to/export/export-manifest.json',
       };
 
       vi.mocked(exportService.exportLogStore).mockResolvedValue(
@@ -96,6 +97,7 @@ describe('vrchatLogController', () => {
         totalLogLines: 50,
         exportStartTime: new Date('2023-10-08T10:00:00Z'),
         exportEndTime: new Date('2023-10-08T10:03:00Z'),
+        manifestPath: '/path/to/export/export-manifest.json',
       };
 
       vi.mocked(exportService.exportLogStore).mockResolvedValue(
@@ -167,6 +169,7 @@ describe('vrchatLogController', () => {
         totalLogLines: 0,
         exportStartTime: new Date(),
         exportEndTime: new Date(),
+        manifestPath: '',
       };
 
       vi.mocked(exportService.exportLogStore).mockResolvedValue(
