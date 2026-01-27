@@ -18,7 +18,7 @@ vi.mock('../../lib/wrappedApp', () => ({
 vi.mock('./exportService/exportService', () => {
   const { ok } = require('neverthrow');
   return {
-    exportLogStoreFromDB: vi.fn(async ({ outputBasePath }) =>
+    exportLogStore: vi.fn(async ({ outputBasePath }) =>
       ok({
         totalLogLines: 0,
         exportedFiles: [

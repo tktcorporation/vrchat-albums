@@ -61,16 +61,7 @@ vi.mock('../logSync/service', async () => {
 import * as initRDBClient from '../../lib/sequelize';
 import { eventEmitter } from '../../trpc';
 import { initSettingStore } from '../settingStore';
-import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
-import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 
-import {
-  VRChatPlayerIdSchema,
-  VRChatPlayerNameSchema,
-  VRChatWorldIdSchema,
-  VRChatWorldInstanceIdSchema,
-  VRChatWorldNameSchema,
-} from './model';
 import { vrchatLogRouter } from './vrchatLogController';
 
 describe('vrchatLogController integration test with minimal mocks', () => {
@@ -111,54 +102,27 @@ describe('vrchatLogController integration test with minimal mocks', () => {
     await initRDBClient.__cleanupTestRDBClient();
   });
 
-  // Unused function - commented out to pass linting
-  // const createTestLogStoreFile = async (
-  //   yearMonth: string,
-  //   content: string,
-  // ) => {
-  //   const monthDir = path.join(testExportDir, yearMonth);
-  //   await fs.mkdir(monthDir, { recursive: true });
-  //   const filePath = path.join(monthDir, `logStore-${yearMonth}.txt`);
-  //   await fs.writeFile(filePath, content);
-  //   return filePath;
-  // };
-
-  const createTestWorldJoinLog = async (joinDateTime: Date) => {
-    const logsResult = await worldJoinLogService.createVRChatWorldJoinLogModel([
-      {
-        logType: 'worldJoin' as const,
-        joinDate: joinDateTime,
-        worldId: VRChatWorldIdSchema.parse(`wrld_${uuidv7()}`),
-        worldName: VRChatWorldNameSchema.parse('Test World'),
-        worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
-      },
-    ]);
-    if (logsResult.isErr()) {
-      throw new Error(
-        `Failed to create world join log: ${logsResult.error.message}`,
-      );
-    }
-    return logsResult.value[0];
-  };
-
-  const createTestPlayerJoinLog = async (joinDateTime: Date) => {
-    const logs = await playerJoinLogService.createVRChatPlayerJoinLogModel([
-      {
-        logType: 'playerJoin' as const,
-        playerName: VRChatPlayerNameSchema.parse('TestPlayer'),
-        playerId: VRChatPlayerIdSchema.parse(`usr_${uuidv7()}`),
-        joinDate: joinDateTime,
-      },
-    ]);
-    return logs[0];
+  /**
+   * testUserDataDir/logStore 配下にテスト用logStoreファイルを作成
+   */
+  const createTestLogStoreFile = async (yearMonth: string, content: string) => {
+    const logStoreDir = path.join(testUserDataDir, 'logStore', yearMonth);
+    await fs.mkdir(logStoreDir, { recursive: true });
+    const filePath = path.join(logStoreDir, `logStore-${yearMonth}.txt`);
+    await fs.writeFile(filePath, content, 'utf-8');
+    return filePath;
   };
 
   it('エクスポートしたデータを再インポートできる（実際のサービスを使用）', async () => {
-    // 1. Create test data in DB
-    await createTestWorldJoinLog(new Date('2023-10-15T10:00:00'));
-    await createTestPlayerJoinLog(new Date('2023-10-15T10:05:00'));
+    // 1. Create test logStore files (export copies files directly, not from DB)
+    const logContent = [
+      '2023.10.15 10:00:00 Log        -  [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789abc:12345',
+      '2023.10.15 10:00:00 Log        -  [Behaviour] Joining or Creating Room: Test World',
+      '2023.10.15 10:05:00 Log        -  [Behaviour] OnPlayerJoined TestPlayer',
+    ].join('\n');
+    await createTestLogStoreFile('2023-10', logContent);
 
-    // 2. Export data
+    // 2. Export data (copies logStore files directly)
     const exportResult = await caller.exportLogStoreData({
       startDate: new Date('2023-10-01'),
       endDate: new Date('2023-10-31'),
@@ -168,17 +132,7 @@ describe('vrchatLogController integration test with minimal mocks', () => {
     expect(exportResult.exportedFiles.length).toBeGreaterThan(0);
     expect(exportResult.totalLogLines).toBeGreaterThan(0);
 
-    // 3. Clear DB
-    await initRDBClient.__forceSyncRDBClient();
-
-    // Verify DB is empty
-    const worldLogsAfterClear =
-      await worldJoinLogService.findVRChatWorldJoinLogList({
-        orderByJoinDateTime: 'asc',
-      });
-    expect(worldLogsAfterClear.length).toBe(0);
-
-    // 4. Import the exported directory
+    // 3. Import the exported directory
     const exportedPath = exportResult.exportedFiles[0];
     const exportedDirMatch = exportedPath.match(/vrchat-albums-export_[^/\\]+/);
     if (!exportedDirMatch) {
@@ -192,11 +146,9 @@ describe('vrchatLogController integration test with minimal mocks', () => {
 
     expect(importResult.success).toBe(true);
     expect(importResult.importedData.totalLines).toBeGreaterThan(0);
-    expect(importResult.importedData.totalLines).toBe(3); // 1 world join + 1 player join + 1 separator line
+    expect(importResult.importedData.totalLines).toBe(3);
 
-    // 5. Verify that the import completed successfully
-    // Note: The import process only imports raw log lines into logStore,
-    // it doesn't recreate the structured database records (that would require log sync)
+    // 4. Verify that the import completed successfully
     expect(importResult.backup).toBeDefined();
     expect(importResult.backup.id).toMatch(/^backup_\d{8}_\d{6}$/);
     expect(importResult.importedData.processedFiles.length).toBe(1);
