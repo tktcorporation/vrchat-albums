@@ -246,13 +246,9 @@ export const performMigration = async (): Promise<
       const { importService, getImportErrorMessage } = await import(
         '../vrchatLog/importService/importService'
       );
-      const importResult = await importService.importLogStoreFiles(
-        [oldLogStorePath],
-        async () => {
-          // DBLogProvider is not needed for migration
-          return [];
-        },
-      );
+      const importResult = await importService.importLogStoreFiles([
+        oldLogStorePath,
+      ]);
 
       if (importResult.isOk()) {
         result.details.logStore = true;

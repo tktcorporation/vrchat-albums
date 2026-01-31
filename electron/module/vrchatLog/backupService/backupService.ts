@@ -10,9 +10,8 @@ import {
   ExportPathObjectSchema,
 } from '../../../lib/pathObject';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
-import type { LogRecord } from '../converters/dbToLogStore';
 import {
-  exportLogStoreFromDB,
+  exportLogStore,
   getExportErrorMessage,
 } from '../exportService/exportService';
 
@@ -70,11 +69,6 @@ export interface ImportBackupMetadata {
   exportedFiles: string[]; // エクスポートされたファイル一覧
 }
 
-export type DBLogProvider = (
-  startDate?: Date,
-  endDate?: Date,
-) => Promise<LogRecord[]>;
-
 /**
  * バックアップサービス
  * 既存のエクスポート機能を活用してインポート前のデータバックアップを作成
@@ -87,21 +81,18 @@ export class BackupService {
   /**
    * インポート前バックアップ作成（既存エクスポート機能活用）
    */
-  async createPreImportBackup(
-    getDBLogs: DBLogProvider,
-  ): Promise<neverthrow.Result<ImportBackupMetadata, BackupError>> {
+  async createPreImportBackup(): Promise<
+    neverthrow.Result<ImportBackupMetadata, BackupError>
+  > {
     const backupTimestamp = new Date();
 
     logger.info('Creating pre-import backup using export functionality');
 
-    // 1. 既存エクスポート機能で全データエクスポート
-    const exportResultAsync = await exportLogStoreFromDB(
-      {
-        // 全期間エクスポート（startDate/endDate指定なし）
-        outputBasePath: this.getBackupBasePath(),
-      },
-      getDBLogs,
-    );
+    // 1. 既存エクスポート機能で全データエクスポート（logStoreファイル直接コピー）
+    const exportResultAsync = await exportLogStore({
+      // 全期間エクスポート（startDate/endDate指定なし）
+      outputBasePath: this.getBackupBasePath(),
+    });
 
     if (exportResultAsync.isErr()) {
       return neverthrow.err({

@@ -144,7 +144,7 @@ const DataExport = memo(() => {
     <SettingsSection
       icon={Download}
       title="ログデータエクスポート"
-      description="データベースからlogStore形式でログデータをエクスポートします"
+      description="logStoreファイルを直接コピーしてエクスポートします"
     >
       <div className={SPACING.stack.relaxed}>
         {/* 期間設定 */}
@@ -292,10 +292,10 @@ const DataExport = memo(() => {
         {/* 説明 */}
         <SettingsInfoBox title="エクスポート形式について" variant="info">
           <ul className={`${TYPOGRAPHY.body.small} space-y-1`}>
-            <li>• データベースからlogStore形式でエクスポートします</li>
+            <li>• logStoreファイルを直接コピーしてエクスポートします</li>
             <li>• 月別にファイルが分割されます（例: logStore-2023-10.txt）</li>
-            <li>• ワールド参加、プレイヤー参加/退出ログが含まれます</li>
-            <li>• 時系列順でソートされた形式で出力されます</li>
+            <li>• 元のログデータがそのまま保持されます</li>
+            <li>• エクスポート先フォルダに日時付きで保存されます</li>
           </ul>
         </SettingsInfoBox>
       </div>

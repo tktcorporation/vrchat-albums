@@ -1,391 +1,419 @@
 import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  type ExportLogStoreOptions,
-  exportLogStoreFromDB,
-  getLogStoreExportPath,
-} from './exportService';
+import type { VRChatLogStoreFilePath } from '../model';
+import { exportLogStore, getExportErrorMessage } from './exportService';
 
-// fs.writeFile をモック
+// fs をモック
 vi.mock('fs', () => ({
   promises: {
-    writeFile: vi.fn().mockResolvedValue(undefined),
+    copyFile: vi.fn().mockResolvedValue(undefined),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    readFile: vi.fn().mockResolvedValue(''),
+    stat: vi.fn().mockResolvedValue({ size: 100 }),
+    writeFile: vi.fn().mockResolvedValue(undefined),
   },
 }));
+
+// logStorageManager をモック
+vi.mock('../fileHandlers/logStorageManager', () => ({
+  getLogStoreFilePathsInRange: vi.fn().mockResolvedValue([]),
+}));
+
+import { getLogStoreFilePathsInRange } from '../fileHandlers/logStorageManager';
+
+const createMockFilePath = (
+  filePath: string,
+  yearMonth: string | null,
+): VRChatLogStoreFilePath =>
+  ({
+    value: filePath,
+    getYearMonth: () => yearMonth,
+  }) as unknown as VRChatLogStoreFilePath;
 
 describe('exportService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // モック関数のデフォルト戻り値を再設定
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+    vi.mocked(fs.copyFile).mockResolvedValue(undefined);
     vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.readFile).mockResolvedValue('');
+    vi.mocked(fs.stat).mockResolvedValue({ size: 100 } as never);
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
   });
 
-  describe('getLogStoreExportPath', () => {
-    it('日付からlogStore形式のパスを生成できる', () => {
-      const date = new Date('2023-10-08T15:30:45');
-      const exportDateTime = new Date('2023-11-15T10:20:30');
-      const result = getLogStoreExportPath(
-        date,
-        '/path/to/logStore',
-        exportDateTime,
-      );
+  describe('exportLogStore', () => {
+    it('logStoreファイルをコピーしてエクスポートできる', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockResolvedValue('line1\nline2\nline3\n');
 
-      // クロスプラットフォーム対応: パス区切り文字を正規化
-      const expectedPath = path.join(
-        '/path/to/logStore',
-        'vrchat-albums-export_2023-11-15_10-20-30',
-        '2023-10',
-        'logStore-2023-10.txt',
-      );
-      expect(result).toBe(expectedPath);
-    });
-
-    it('異なる年月でも正しいパスを生成できる', () => {
-      const date = new Date('2024-01-15T09:15:30');
-      const exportDateTime = new Date('2024-02-20T14:45:10');
-      const result = getLogStoreExportPath(date, '/exports', exportDateTime);
-
-      // クロスプラットフォーム対応: パス区切り文字を正規化
-      const expectedPath = path.join(
-        '/exports',
-        'vrchat-albums-export_2024-02-20_14-45-10',
-        '2024-01',
-        'logStore-2024-01.txt',
-      );
-      expect(result).toBe(expectedPath);
-    });
-
-    it('デフォルトパスが使用される', () => {
-      const date = new Date('2023-10-08T15:30:45');
-      const result = getLogStoreExportPath(date);
-
-      // エクスポート日時フォルダが含まれることを確認
-      expect(result).toMatch(
-        /vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/,
-      );
-
-      // クロスプラットフォーム対応: パス区切り文字を正規化して確認
-      const expectedPathPart = path.join('2023-10', 'logStore-2023-10.txt');
-      expect(result).toContain(expectedPathPart);
-    });
-  });
-
-  describe('exportLogStoreFromDB', () => {
-    it('日付範囲を指定してエクスポートできる', async () => {
-      const options: ExportLogStoreOptions = {
-        startDate: new Date('2023-10-08T00:00:00'),
-        endDate: new Date('2023-10-08T23:59:59'),
+      const result = await exportLogStore({
+        startDate: new Date('2023-10-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
         outputBasePath: '/test/exports',
-      };
+      });
 
-      // DB取得処理をモック（実際の実装では外部から注入される）
-      const mockGetDBLogs = vi.fn().mockResolvedValue([
-        {
-          type: 'worldJoin' as const,
-          record: {
-            id: 'world-1',
-            worldId: 'wrld_12345678-1234-1234-1234-123456789abc',
-            worldName: 'Test World',
-            worldInstanceId: '12345',
-            joinDateTime: new Date('2023-10-08T15:30:45'),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-        {
-          type: 'playerJoin' as const,
-          record: {
-            id: 'player-1',
-            playerName: 'TestPlayer',
-            playerId: 'usr_12345678-1234-1234-1234-123456789abc',
-            joinDateTime: new Date('2023-10-08T15:31:00'),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-      ]);
+      expect(result.isOk()).toBe(true);
+      if (!result.isOk()) return;
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
-      expect(result.exportedFiles).toHaveLength(1);
-      // エクスポート日時フォルダが含まれることを確認
-      expect(result.exportedFiles[0]).toMatch(
+      expect(result.value.exportedFiles).toHaveLength(1);
+      expect(result.value.exportedFiles[0]).toMatch(
         /vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/,
       );
-      expect(result.exportedFiles[0]).toContain('2023-10');
-      expect(result.exportedFiles[0]).toContain('logStore-2023-10.txt');
-      expect(result.totalLogLines).toBe(3); // worldJoin=2行 + playerJoin=1行
+      expect(result.value.exportedFiles[0]).toContain('2023-10');
+      expect(result.value.exportedFiles[0]).toContain('logStore-2023-10.txt');
+      expect(result.value.totalLogLines).toBe(3);
 
-      // ファイル書き込みが呼ばれたことを確認
-      expect(fs.writeFile).toHaveBeenCalledTimes(1);
-      // ディレクトリ作成が呼ばれたことを確認（エクスポート日時フォルダを含む）
+      // fs.copyFile が呼ばれたことを確認
+      expect(fs.copyFile).toHaveBeenCalledTimes(1);
       expect(fs.mkdir).toHaveBeenCalledTimes(1);
-      const mkdirCallPath = String(vi.mocked(fs.mkdir).mock.calls[0][0]);
-      expect(mkdirCallPath).toMatch(
-        /vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/,
-      );
-      expect(mkdirCallPath).toContain('2023-10');
-      // パスの構造を確認
-      const pathParts = String(mkdirCallPath).split(path.sep);
-      expect(pathParts).toContain('test');
-      expect(pathParts).toContain('exports');
-      expect(pathParts[pathParts.length - 1]).toBe('2023-10');
+
+      // マニフェストが書き出されたことを確認
+      expect(fs.writeFile).toHaveBeenCalledTimes(1);
+      expect(result.value.manifestPath).toContain('export-manifest.json');
     });
 
-    it('複数月にまたがるデータを月別ファイルにエクスポートできる', async () => {
-      const options: ExportLogStoreOptions = {
-        startDate: new Date('2023-09-30T00:00:00'),
-        endDate: new Date('2023-10-01T23:59:59'),
+    it('複数月のファイルをエクスポートできる', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-09/logStore-2023-09.txt',
+          '2023-09',
+        ),
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockResolvedValue('line1\nline2\n');
+
+      const result = await exportLogStore({
+        startDate: new Date('2023-09-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
         outputBasePath: '/test/exports',
-      };
+      });
 
-      const mockGetDBLogs = vi.fn().mockResolvedValue([
-        {
-          type: 'worldJoin' as const,
-          record: {
-            id: 'world-1',
-            worldId: 'wrld_12345678-1234-1234-1234-123456789abc',
-            worldName: 'September World',
-            worldInstanceId: '12345',
-            joinDateTime: new Date('2023-09-30T23:30:00'),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-        {
-          type: 'worldJoin' as const,
-          record: {
-            id: 'world-2',
-            worldId: 'wrld_87654321-4321-4321-4321-abcdefabcdef',
-            worldName: 'October World',
-            worldInstanceId: '54321',
-            joinDateTime: new Date('2023-10-01T01:00:00'),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-      ]);
+      expect(result.isOk()).toBe(true);
+      if (!result.isOk()) return;
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
-      expect(result.exportedFiles).toHaveLength(2);
-      // エクスポート日時フォルダが含まれることを確認
-      for (const filePath of result.exportedFiles) {
-        expect(filePath).toMatch(
-          /vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/,
-        );
-      }
+      expect(result.value.exportedFiles).toHaveLength(2);
       expect(
-        result.exportedFiles.some(
+        result.value.exportedFiles.some(
           (p: string) =>
             p.includes('2023-09') && p.includes('logStore-2023-09.txt'),
         ),
       ).toBe(true);
       expect(
-        result.exportedFiles.some(
+        result.value.exportedFiles.some(
           (p: string) =>
             p.includes('2023-10') && p.includes('logStore-2023-10.txt'),
         ),
       ).toBe(true);
-      expect(result.totalLogLines).toBe(4); // 各worldJoin=2行ずつ
+      expect(result.value.totalLogLines).toBe(4); // 2行 × 2ファイル
 
-      // 2つのファイルが作成されたことを確認
-      expect(fs.writeFile).toHaveBeenCalledTimes(2);
-      // ディレクトリ作成が呼ばれたことを確認（エクスポート日時フォルダを含む）
+      expect(fs.copyFile).toHaveBeenCalledTimes(2);
       expect(fs.mkdir).toHaveBeenCalledTimes(2);
-      const mkdirCalls = vi.mocked(fs.mkdir).mock.calls;
-
-      // 1つ目のディレクトリパスを確認
-      const mkdirPath1 = String(mkdirCalls[0][0]);
-      expect(mkdirPath1).toMatch(
-        /vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/,
-      );
-      expect(mkdirPath1).toContain('2023-09');
-      const pathParts1 = String(mkdirPath1).split(path.sep);
-      expect(pathParts1[pathParts1.length - 1]).toBe('2023-09');
-
-      // 2つ目のディレクトリパスを確認
-      const mkdirPath2 = String(mkdirCalls[1][0]);
-      expect(mkdirPath2).toMatch(
-        /vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/,
-      );
-      expect(mkdirPath2).toContain('2023-10');
-      const pathParts2 = String(mkdirPath2).split(path.sep);
-      expect(pathParts2[pathParts2.length - 1]).toBe('2023-10');
     });
 
-    it('データが存在しない場合は空の結果を返す', async () => {
-      const options: ExportLogStoreOptions = {
-        startDate: new Date('2023-10-08T00:00:00'),
-        endDate: new Date('2023-10-08T23:59:59'),
-      };
+    it('ファイルが存在しない場合は空の結果を返す', async () => {
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue([]);
 
-      const mockGetDBLogs = vi.fn().mockResolvedValue([]);
+      const result = await exportLogStore({
+        startDate: new Date('2023-10-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
+      });
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
+      expect(result.isOk()).toBe(true);
+      if (!result.isOk()) return;
 
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
+      expect(result.value.exportedFiles).toHaveLength(0);
+      expect(result.value.totalLogLines).toBe(0);
+      expect(result.value.manifestPath).toBe('');
 
-      const result = exportResult.value;
-      expect(result.exportedFiles).toHaveLength(0);
-      expect(result.totalLogLines).toBe(0);
-
-      // ファイル操作が呼ばれていないことを確認
-      expect(fs.writeFile).not.toHaveBeenCalled();
+      expect(fs.copyFile).not.toHaveBeenCalled();
       expect(fs.mkdir).not.toHaveBeenCalled();
     });
 
     it('全期間指定（日付なし）でエクスポートできる', async () => {
-      const options: ExportLogStoreOptions = {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockResolvedValue('line1\nline2\nline3\n');
+
+      const result = await exportLogStore({
         outputBasePath: '/test/exports',
-      };
+      });
 
-      const mockGetDBLogs = vi.fn().mockResolvedValue([
-        {
-          type: 'worldJoin' as const,
-          record: {
-            id: 'world-1',
-            worldId: 'wrld_12345678-1234-1234-1234-123456789abc',
-            worldName: 'All Time World',
-            worldInstanceId: '12345',
-            joinDateTime: new Date('2023-10-08T15:30:45'),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-        {
-          type: 'playerJoin' as const,
-          record: {
-            id: 'player-1',
-            playerName: 'AllTimePlayer',
-            playerId: 'usr_12345678-1234-1234-1234-123456789abc',
-            joinDateTime: new Date('2023-10-08T15:31:00'),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-      ]);
+      expect(result.isOk()).toBe(true);
+      if (!result.isOk()) return;
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
+      expect(result.value.exportedFiles).toHaveLength(1);
+      expect(result.value.totalLogLines).toBe(3);
 
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
-      expect(result.exportedFiles).toHaveLength(1);
-      expect(result.totalLogLines).toBe(3); // worldJoin=2行 + playerJoin=1行
-
-      // DB取得関数が日付パラメータなしで呼ばれることを確認
-      expect(mockGetDBLogs).toHaveBeenCalledWith(undefined, undefined);
-
-      // ファイル書き込みが呼ばれたことを確認
-      expect(fs.writeFile).toHaveBeenCalledTimes(1);
-      expect(fs.mkdir).toHaveBeenCalledTimes(1);
+      // getLogStoreFilePathsInRange が呼ばれたことを確認
+      expect(getLogStoreFilePathsInRange).toHaveBeenCalledWith(
+        expect.any(Date),
+        expect.any(Date),
+      );
     });
 
-    it('ローカルタイムからUTCへの変換を適切に処理する', async () => {
-      // フロントエンドから送られるローカルタイムを模擬
-      // '2023-10-08T00:00:00' (ローカルタイム開始)
-      // '2023-10-08T23:59:59.999' (ローカルタイム終了)
-      const localStartTime = new Date('2023-10-08T00:00:00');
-      const localEndTime = new Date('2023-10-08T23:59:59.999');
+    it('コピーエラーが発生した場合はエラー結果を返す', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.copyFile).mockRejectedValue(new Error('Copy error'));
 
-      const options: ExportLogStoreOptions = {
-        startDate: localStartTime,
-        endDate: localEndTime,
+      const result = await exportLogStore({
+        startDate: new Date('2023-10-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
+      });
+
+      expect(result.isErr()).toBe(true);
+      if (!result.isErr()) return;
+
+      expect(result.error.type).toBe('FILE_COPY_FAILED');
+      if (result.error.type !== 'FILE_COPY_FAILED') return;
+      expect(result.error.message).toBe('Copy error');
+    });
+
+    it('行数カウントでエラーが発生した場合はエラー結果を返す', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockRejectedValue(new Error('Read error'));
+
+      const result = await exportLogStore({
+        startDate: new Date('2023-10-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
+      });
+
+      expect(result.isErr()).toBe(true);
+      if (!result.isErr()) return;
+
+      expect(result.error.type).toBe('FILE_READ_FAILED');
+      if (result.error.type !== 'FILE_READ_FAILED') return;
+      expect(result.error.message).toBe('Read error');
+    });
+
+    it('レガシーファイル（yearMonth=null）はルートに配置される', async () => {
+      const mockFiles = [
+        createMockFilePath('/app/logStore/logStore.txt', null),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockResolvedValue('line1\n');
+
+      const result = await exportLogStore({
         outputBasePath: '/test/exports',
-      };
+      });
 
-      const mockGetDBLogs = vi.fn().mockResolvedValue([
-        {
-          type: 'worldJoin' as const,
-          record: {
-            id: 'world-1',
-            worldId: 'wrld_12345678-1234-1234-1234-123456789abc',
-            worldName: 'Timezone Test World',
-            worldInstanceId: '12345',
-            joinDateTime: new Date('2023-10-08T15:30:45Z'), // UTC時刻でDB保存
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-      ]);
+      expect(result.isOk()).toBe(true);
+      if (!result.isOk()) return;
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
-      expect(result.exportedFiles).toHaveLength(1);
-      expect(result.totalLogLines).toBe(2); // worldJoin=2行
-
-      // DB取得関数がローカルタイム（JavaScript Date）で呼ばれることを確認
-      expect(mockGetDBLogs).toHaveBeenCalledWith(localStartTime, localEndTime);
-
-      // 実際のDB比較ではJavaScriptがローカルタイムとUTCを自動変換するため、
-      // ここではパラメータが正しく渡されることのみ確認
+      expect(result.value.exportedFiles).toHaveLength(1);
+      // レガシーファイルは年月サブディレクトリなしで配置
+      expect(result.value.exportedFiles[0]).toContain('logStore.txt');
+      expect(result.value.exportedFiles[0]).toMatch(
+        /vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/,
+      );
     });
 
-    it('DBエラーが発生した場合は適切に処理される', async () => {
-      const options: ExportLogStoreOptions = {
-        startDate: new Date('2023-10-08T00:00:00'),
-        endDate: new Date('2023-10-08T23:59:59'),
-      };
+    it('コピー後のファイルサイズ不一致でFILE_VERIFY_FAILEDエラーを返す', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      // stat: ソースとコピー先でサイズが異なる
+      vi.mocked(fs.stat)
+        .mockResolvedValueOnce({ size: 100 } as never) // src
+        .mockResolvedValueOnce({ size: 50 } as never); // dest
 
-      const mockGetDBLogs = vi
-        .fn()
-        .mockRejectedValue(new Error('Database error'));
+      const result = await exportLogStore({
+        startDate: new Date('2023-10-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
+        outputBasePath: '/test/exports',
+      });
 
-      // DBエラーはそのままthrowされる（予期しないエラー）
-      await expect(
-        exportLogStoreFromDB(options, mockGetDBLogs),
-      ).rejects.toThrow('Database error');
+      expect(result.isErr()).toBe(true);
+      if (!result.isErr()) return;
+
+      expect(result.error.type).toBe('FILE_VERIFY_FAILED');
+      if (result.error.type !== 'FILE_VERIFY_FAILED') return;
+      expect(result.error.expectedSize).toBe(100);
+      expect(result.error.actualSize).toBe(50);
     });
 
-    it('書き込みエラーが発生した場合はエラー結果を返す', async () => {
-      const options: ExportLogStoreOptions = {
-        startDate: new Date('2023-10-08T00:00:00'),
-        endDate: new Date('2023-10-08T23:59:59'),
-      };
+    it('splitファイル（タイムスタンプ付き）をエクスポートできる', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10-20231015120000.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockResolvedValue('line1\nline2\n');
 
-      const mockGetDBLogs = vi.fn().mockResolvedValue([
-        {
-          type: 'worldJoin' as const,
-          record: {
-            id: 'world-1',
-            worldId: 'wrld_12345678-1234-1234-1234-123456789abc',
-            worldName: 'Test World',
-            worldInstanceId: '12345',
-            joinDateTime: new Date('2023-10-08T15:30:45'),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        },
-      ]);
+      const result = await exportLogStore({
+        startDate: new Date('2023-10-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
+        outputBasePath: '/test/exports',
+      });
 
-      // ファイル書き込みでエラーを発生させる
-      vi.mocked(fs.writeFile).mockRejectedValue(new Error('Write error'));
+      expect(result.isOk()).toBe(true);
+      if (!result.isOk()) return;
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
+      expect(result.value.exportedFiles).toHaveLength(2);
+      expect(
+        result.value.exportedFiles.some((p) =>
+          p.includes('logStore-2023-10.txt'),
+        ),
+      ).toBe(true);
+      expect(
+        result.value.exportedFiles.some((p) =>
+          p.includes('logStore-2023-10-20231015120000.txt'),
+        ),
+      ).toBe(true);
+      expect(result.value.totalLogLines).toBe(4); // 2行 × 2ファイル
+    });
 
-      expect(exportResult.isErr()).toBe(true);
-      if (!exportResult.isErr()) return;
+    it('年跨ぎの複数月ファイルをエクスポートできる', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-12/logStore-2023-12.txt',
+          '2023-12',
+        ),
+        createMockFilePath(
+          '/app/logStore/2024-01/logStore-2024-01.txt',
+          '2024-01',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockResolvedValue('line1\nline2\n');
 
-      expect(exportResult.error.type).toBe('FILE_WRITE_FAILED');
-      expect(exportResult.error.message).toBe('Write error');
+      const result = await exportLogStore({
+        startDate: new Date('2023-12-01T00:00:00'),
+        endDate: new Date('2024-01-31T23:59:59'),
+        outputBasePath: '/test/exports',
+      });
+
+      expect(result.isOk()).toBe(true);
+      if (!result.isOk()) return;
+
+      expect(result.value.exportedFiles).toHaveLength(2);
+      expect(
+        result.value.exportedFiles.some((p) => p.includes('2023-12')),
+      ).toBe(true);
+      expect(
+        result.value.exportedFiles.some((p) => p.includes('2024-01')),
+      ).toBe(true);
+      expect(result.value.totalLogLines).toBe(4);
+    });
+
+    it('マニフェスト書き込み失敗でMANIFEST_WRITE_FAILEDエラーを返す', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockResolvedValue('line1\n');
+      vi.mocked(fs.writeFile).mockRejectedValue(new Error('Disk full'));
+
+      const result = await exportLogStore({
+        startDate: new Date('2023-10-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
+        outputBasePath: '/test/exports',
+      });
+
+      expect(result.isErr()).toBe(true);
+      if (!result.isErr()) return;
+
+      expect(result.error.type).toBe('MANIFEST_WRITE_FAILED');
+      if (result.error.type !== 'MANIFEST_WRITE_FAILED') return;
+      expect(result.error.message).toBe('Disk full');
+    });
+
+    it('マニフェストに正しいファイル情報が含まれる', async () => {
+      const mockFiles = [
+        createMockFilePath(
+          '/app/logStore/2023-10/logStore-2023-10.txt',
+          '2023-10',
+        ),
+      ];
+      vi.mocked(getLogStoreFilePathsInRange).mockResolvedValue(mockFiles);
+      vi.mocked(fs.readFile).mockResolvedValue('line1\nline2\nline3\n');
+      vi.mocked(fs.stat).mockResolvedValue({ size: 42 } as never);
+
+      const result = await exportLogStore({
+        startDate: new Date('2023-10-01T00:00:00'),
+        endDate: new Date('2023-10-31T23:59:59'),
+        outputBasePath: '/test/exports',
+      });
+
+      expect(result.isOk()).toBe(true);
+
+      // writeFile に渡されたマニフェスト内容を検証
+      const writeFileCall = vi.mocked(fs.writeFile).mock.calls[0];
+      const manifestContent = JSON.parse(writeFileCall[1] as string);
+
+      expect(manifestContent.version).toBe(1);
+      expect(manifestContent.status).toBe('completed');
+      expect(manifestContent.totalLogLines).toBe(3);
+      expect(manifestContent.files).toHaveLength(1);
+      // マニフェストの relativePath は常にPOSIX形式
+      expect(manifestContent.files[0].relativePath).toBe(
+        '2023-10/logStore-2023-10.txt',
+      );
+      expect(manifestContent.files[0].sizeBytes).toBe(42);
+      expect(manifestContent.exportDateTime).toBeDefined();
+    });
+  });
+
+  describe('getExportErrorMessage', () => {
+    it('FILE_VERIFY_FAILEDのエラーメッセージを返す', () => {
+      const msg = getExportErrorMessage({
+        type: 'FILE_VERIFY_FAILED',
+        src: '/src/file.txt',
+        dest: '/dest/file.txt',
+        expectedSize: 100,
+        actualSize: 50,
+      });
+      expect(msg).toContain('検証に失敗');
+      expect(msg).toContain('100');
+      expect(msg).toContain('50');
+    });
+
+    it('MANIFEST_WRITE_FAILEDのエラーメッセージを返す', () => {
+      const msg = getExportErrorMessage({
+        type: 'MANIFEST_WRITE_FAILED',
+        path: '/test/manifest.json',
+        message: 'Disk full',
+      });
+      expect(msg).toContain('マニフェスト');
+      expect(msg).toContain('Disk full');
     });
   });
 });

@@ -152,10 +152,9 @@ describe('migration service integration', () => {
       });
 
       // Verify importService was called
-      expect(importService.importLogStoreFiles).toHaveBeenCalledWith(
-        [logStorePath],
-        expect.any(Function),
-      );
+      expect(importService.importLogStoreFiles).toHaveBeenCalledWith([
+        logStorePath,
+      ]);
 
       // Verify settings were copied
       expect(
@@ -266,10 +265,9 @@ describe('migration service integration', () => {
       expect(result._unsafeUnwrap().details.logStore).toBe(true);
 
       // Verify importService was called with the logStore directory
-      expect(importService.importLogStoreFiles).toHaveBeenCalledWith(
-        [logStorePath],
-        expect.any(Function),
-      );
+      expect(importService.importLogStoreFiles).toHaveBeenCalledWith([
+        logStorePath,
+      ]);
     });
   });
 
