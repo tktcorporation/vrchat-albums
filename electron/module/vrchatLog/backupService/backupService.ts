@@ -10,9 +10,8 @@ import {
   ExportPathObjectSchema,
 } from '../../../lib/pathObject';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
-import type { LogRecord } from '../converters/dbToLogStore';
 import {
-  exportLogStoreFromDB,
+  exportLogStore,
   getExportErrorMessage,
 } from '../exportService/exportService';
 
@@ -70,11 +69,6 @@ export interface ImportBackupMetadata {
   exportedFiles: string[]; // エクスポートされたファイル一覧
 }
 
-export type DBLogProvider = (
-  startDate?: Date,
-  endDate?: Date,
-) => Promise<LogRecord[]>;
-
 /**
  * バックアップサービス
  * 既存のエクスポート機能を活用してインポート前のデータバックアップを作成
@@ -86,22 +80,20 @@ export type DBLogProvider = (
 export class BackupService {
   /**
    * インポート前バックアップ作成（既存エクスポート機能活用）
+   * logStoreから直接ファイルをコピーしてバックアップを作成
    */
-  async createPreImportBackup(
-    getDBLogs: DBLogProvider,
-  ): Promise<neverthrow.Result<ImportBackupMetadata, BackupError>> {
+  async createPreImportBackup(): Promise<
+    neverthrow.Result<ImportBackupMetadata, BackupError>
+  > {
     const backupTimestamp = new Date();
 
     logger.info('Creating pre-import backup using export functionality');
 
-    // 1. 既存エクスポート機能で全データエクスポート
-    const exportResultAsync = await exportLogStoreFromDB(
-      {
-        // 全期間エクスポート（startDate/endDate指定なし）
-        outputBasePath: this.getBackupBasePath(),
-      },
-      getDBLogs,
-    );
+    // 1. logStoreから直接ファイルをコピーしてエクスポート
+    const exportResultAsync = await exportLogStore({
+      // 全期間エクスポート（startDate/endDate指定なし）
+      outputBasePath: this.getBackupBasePath(),
+    });
 
     if (exportResultAsync.isErr()) {
       return neverthrow.err({
@@ -112,15 +104,15 @@ export class BackupService {
 
     const exportResult = exportResultAsync.value;
 
-    // エクスポートファイルが存在しない場合（空のDB）
+    // エクスポートファイルが存在しない場合（空のlogStore）
     if (exportResult.exportedFiles.length === 0) {
-      logger.info('No data to backup (empty database)');
+      logger.info('No data to backup (empty logStore)');
       // 空のバックアップメタデータを作成
       const backupId = this.generateBackupId(backupTimestamp);
       const metadata: ImportBackupMetadata = {
         id: backupId,
         backupTimestamp,
-        exportFolderPath: '', // 空のDB時はエクスポートフォルダなし
+        exportFolderPath: '', // 空のlogStore時はエクスポートフォルダなし
         sourceFiles: [],
         status: 'completed',
         importTimestamp: backupTimestamp,
