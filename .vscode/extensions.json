@@ -6,13 +6,12 @@
     "usernamehw.errorlens",
     "ofhumanbondage.react-proptypes-intellisense",
     "wix.vscode-import-cost",
-    "pflannery.vscode-versionlens",
+    "legalfina.npm-version-lens",
     "editorconfig.editorconfig",
     "wakatime.vscode-wakatime",
     "bradlc.vscode-tailwindcss",
     "github.vscode-github-actions",
     "vivaxy.vscode-conventional-commits",
-    "github.vscode-github-actions",
     "biomejs.biome"
   ]
 }
