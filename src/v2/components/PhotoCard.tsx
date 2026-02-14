@@ -210,21 +210,6 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
       ],
     );
 
-    /** カードの右クリックハンドラ */
-    const handleContextMenu = useCallback(() => {
-      if (!isMultiSelectMode || !selectedPhotos.includes(currentPhotoId)) {
-        // モード外 or 未選択写真を右クリック: これを選択しモード開始
-        setSelectedPhotos([currentPhotoId]);
-        setIsMultiSelectMode(true);
-      }
-    }, [
-      isMultiSelectMode,
-      setIsMultiSelectMode,
-      currentPhotoId,
-      selectedPhotos,
-      setSelectedPhotos,
-    ]);
-
     /** コンテキストメニュー項目共通のアクションラッパー */
     const handleMenuAction = (
       e: React.MouseEvent,
@@ -249,7 +234,6 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
           width: '100%',
         }}
         onClick={handleClick}
-        onContextMenu={handleContextMenu}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         onKeyDown={(e) => {
@@ -353,7 +337,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
           <ContextMenuContent onClick={(e) => e.stopPropagation()}>
             <ContextMenuItem
               onClick={(e) => handleMenuAction(e, handleCopyPhotoData)}
-              disabled={selectedPhotos.length === 0 && !isSelected}
+              disabled={!photoLoaded}
             >
               {selectedPhotos.length > 1
                 ? `${selectedPhotos.length}枚の写真をコピー`
