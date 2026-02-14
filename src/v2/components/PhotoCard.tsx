@@ -210,20 +210,30 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
       ],
     );
 
-    /** カードの右クリックハンドラ */
-    const handleContextMenu = useCallback(() => {
-      if (!isMultiSelectMode || !selectedPhotos.includes(currentPhotoId)) {
-        // モード外 or 未選択写真を右クリック: これを選択しモード開始
-        setSelectedPhotos([currentPhotoId]);
-        setIsMultiSelectMode(true);
-      }
-    }, [
-      isMultiSelectMode,
-      setIsMultiSelectMode,
-      currentPhotoId,
-      selectedPhotos,
-      setSelectedPhotos,
-    ]);
+    /** カードの右クリックハンドラ（キャプチャフェーズで処理） */
+    const handleContextMenu = useCallback(
+      (e: React.MouseEvent) => {
+        if (isMultiSelectMode) {
+          // 複数選択モード中: コンテキストメニューを抑止し、写真を開く
+          e.preventDefault();
+          e.stopPropagation();
+          setSelectedPhotos([]);
+          setIsMultiSelectMode(false);
+          if (photoLoaded) {
+            openInPhotoAppMutation.mutate(photo.photoPath.value);
+          }
+        }
+        // 非複数選択モード: 何もしない（Radix ContextMenuにイベントを委譲）
+      },
+      [
+        isMultiSelectMode,
+        setIsMultiSelectMode,
+        setSelectedPhotos,
+        photoLoaded,
+        photo,
+        openInPhotoAppMutation,
+      ],
+    );
 
     /** コンテキストメニュー項目共通のアクションラッパー */
     const handleMenuAction = (
@@ -249,7 +259,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
           width: '100%',
         }}
         onClick={handleClick}
-        onContextMenu={handleContextMenu}
+        onContextMenuCapture={handleContextMenu}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         onKeyDown={(e) => {
@@ -353,7 +363,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
           <ContextMenuContent onClick={(e) => e.stopPropagation()}>
             <ContextMenuItem
               onClick={(e) => handleMenuAction(e, handleCopyPhotoData)}
-              disabled={selectedPhotos.length === 0 && !isSelected}
+              disabled={!photoLoaded}
             >
               {selectedPhotos.length > 1
                 ? `${selectedPhotos.length}枚の写真をコピー`
