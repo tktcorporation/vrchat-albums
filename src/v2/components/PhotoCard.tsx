@@ -210,22 +210,6 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
       ],
     );
 
-    /** カードの右クリックハンドラ（キャプチャフェーズで処理） */
-    const handleContextMenu = useCallback(
-      (e: React.MouseEvent) => {
-        if (isMultiSelectMode) {
-          // 複数選択モード中: コンテキストメニューを抑止し、写真を開く（選択状態は維持）
-          e.preventDefault();
-          e.stopPropagation();
-          if (photoLoaded) {
-            openInPhotoAppMutation.mutate(photo.photoPath.value);
-          }
-        }
-        // 非複数選択モード: 何もしない（Radix ContextMenuにイベントを委譲）
-      },
-      [isMultiSelectMode, photoLoaded, photo, openInPhotoAppMutation],
-    );
-
     /** コンテキストメニュー項目共通のアクションラッパー */
     const handleMenuAction = (
       e: React.MouseEvent,
@@ -250,7 +234,6 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
           width: '100%',
         }}
         onClick={handleClick}
-        onContextMenuCapture={handleContextMenu}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         onKeyDown={(e) => {
