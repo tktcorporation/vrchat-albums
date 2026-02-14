@@ -214,25 +214,16 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     const handleContextMenu = useCallback(
       (e: React.MouseEvent) => {
         if (isMultiSelectMode) {
-          // 複数選択モード中: コンテキストメニューを抑止し、写真を開く
+          // 複数選択モード中: コンテキストメニューを抑止し、写真を開く（選択状態は維持）
           e.preventDefault();
           e.stopPropagation();
-          setSelectedPhotos([]);
-          setIsMultiSelectMode(false);
           if (photoLoaded) {
             openInPhotoAppMutation.mutate(photo.photoPath.value);
           }
         }
         // 非複数選択モード: 何もしない（Radix ContextMenuにイベントを委譲）
       },
-      [
-        isMultiSelectMode,
-        setIsMultiSelectMode,
-        setSelectedPhotos,
-        photoLoaded,
-        photo,
-        openInPhotoAppMutation,
-      ],
+      [isMultiSelectMode, photoLoaded, photo, openInPhotoAppMutation],
     );
 
     /** コンテキストメニュー項目共通のアクションラッパー */
