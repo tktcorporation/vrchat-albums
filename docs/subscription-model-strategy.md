@@ -7,7 +7,7 @@ VRChat Albums を月額課金型のフリーミアムモデルに移行する戦
 
 **推奨モデル**: フリーミアム + 月額/年額サブスクリプション
 **推奨価格帯**: 月額 ¥300〜500 / 年額 ¥3,000〜5,000
-**決済基盤**: LemonSqueezy（ライセンスキー管理内蔵）
+**決済基盤**: Polar.sh（最安MoR）or LemonSqueezy（ライセンスキー管理内蔵）
 
 ---
 
@@ -21,8 +21,9 @@ VRChat Albums を月額課金型のフリーミアムモデルに移行する戦
 | BOOTH アバター（既製品） | ¥1,500〜¥9,000 | 人気帯は ¥3,000〜¥6,000 |
 | BOOTH アバター改変 | ¥5,000〜¥50,000 | カスタム度合いで変動 |
 | VRCX | 完全無料（OSS） | 友達管理・ログビューア。課金なし |
+| VRChat Creator Economy | アバター最低1,200 Credits〜 | 2025年5月ローンチの公式マーケットプレイス |
 
-**ポイント**: VRChat ユーザーはアバターや関連アセットに年間 ¥50,000+ を支出する層が40%存在。ツール類（VRCX等）は無料が標準だが、**独自価値があれば課金の余地あり**。
+**ポイント**: VRChat ユーザーはアバターや関連アセットに年間 ¥50,000+ を支出する層が40%存在。ツール類（VRCX等）は無料が標準だが、**独自価値があれば課金の余地あり**。VRChat 自体もクリエイターエコノミーに注力し始めており、エコシステム全体で課金への抵抗感は低下傾向にある。
 
 ### 1.2 VRChat ユーザー層
 
@@ -172,20 +173,33 @@ VRChat Albums を月額課金型のフリーミアムモデルに移行する戦
 
 ## 5. 技術実装方針
 
-### 5.1 決済プラットフォーム: LemonSqueezy
+### 5.1 決済プラットフォーム比較
 
-**選定理由**:
+| 観点 | Polar.sh | LemonSqueezy | Paddle | Stripe |
+|------|---------|-------------|--------|--------|
+| ライセンスキー管理 | 自動配信対応 | ネイティブ対応 | レガシーSDK（非推奨） | なし（別途Keygen等が必要） |
+| MoR（税務代行） | 対応 | 対応 | 対応 | 非対応（自身で対応） |
+| 手数料 | **4% + $0.40** | 5% + $0.50 | 5% + $0.50 | 2.9% + $0.30（+税務コスト） |
+| 個人開発者向け | 最適（OSS向け） | 最適 | 中〜大規模向け | 汎用 |
+| ノーコードストア | あり | あり | あり | なし |
+| 日本円対応 | 対応 | 対応 | 対応 | 対応 |
+| 備考 | OSS開発者向け設計、最安MoR | Stripe が2024年に買収（将来性注意） | デスクトップ実績豊富 | 柔軟だが税務自己管理 |
 
-| 観点 | LemonSqueezy | Paddle | Stripe |
-|------|-------------|--------|--------|
-| ライセンスキー管理 | ネイティブ対応 | レガシーSDK（非推奨） | なし（別途Keygen等が必要） |
-| MoR（税務代行） | 対応 | 対応 | 非対応（自身で対応） |
-| 手数料 | 5% + $0.50 | 5% + $0.50 | 2.9% + $0.30（+税務コスト） |
-| 個人開発者向け | 最適 | 中〜大規模向け | 汎用 |
-| ノーコードストア | あり | あり | なし |
-| 日本円対応 | 対応 | 対応 | 対応 |
+**推奨**: **Polar.sh**（最安手数料 + MoR + OSS フレンドリー）
+**代替**: LemonSqueezy（ライセンスキー管理のドキュメントが充実）
 
-### 5.2 Electron アプリ内ライセンス検証フロー
+### 5.2 ライセンスキー管理の選択肢
+
+| サービス | 特徴 | Electron対応 | 備考 |
+|---------|------|-------------|------|
+| **Keygen** | API ベース、オフライン対応、パーペチュアルフォールバック | 公式サンプルあり | Polar/LemonSqueezy と連携可 |
+| **Cryptlex** | デバイスフィンガープリント、フローティングライセンス | SDK提供 | エンタープライズ寄り |
+| **Keyforge** | Stripe/LemonSqueezy/Polar連携 | ドキュメントあり | 新興サービス |
+| **決済PF内蔵** | LemonSqueezy/Polarのネイティブ機能 | API経由 | 追加コストなし |
+
+**推奨**: まずは決済プラットフォーム内蔵のライセンスキー機能で開始し、要件が複雑化したら Keygen に移行。
+
+### 5.3 Electron アプリ内ライセンス検証フロー
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -374,11 +388,29 @@ VRC+ ($9.99/月) > VRChat Albums Pro (¥400/月) > 無料ツール群
 
 ## 参考リンク
 
+### 決済・ライセンス
+- [Polar.sh](https://polar.sh) - OSS開発者向け最安MoRプラットフォーム
+- [Polar.sh Pricing](https://polar.sh/resources/pricing) - 4% + $0.40
 - [LemonSqueezy - ライセンスキー管理](https://docs.lemonsqueezy.com/help/licensing/generating-license-keys)
 - [LemonSqueezy - ライセンスキー検証ガイド](https://docs.lemonsqueezy.com/guides/tutorials/license-keys)
-- [Obsidian Pricing](https://obsidian.md/pricing)
+- [Keygen for Electron Apps](https://keygen.sh/for-electron-apps/) - Electron向けライセンス管理
+- [Paddle vs LemonSqueezy 比較](https://www.paddle.com/compare/lemon-squeezy)
+
+### VRChat エコシステム
 - [VRChat Plus FAQ](https://hello.vrchat.com/vrchat-plus-faq)
+- [VRChat Creator Economy](https://creators.vrchat.com/economy/) - 公式クリエイターエコノミー
+- [VRChat Avatar Marketplace](https://hello.vrchat.com/avatar-marketplace) - 2025年5月ローンチ
 - [VRChat メタバース人口動態レポート 2026](https://vchavcha.com/en/virtual-news/vrchat-metaverse-demographics-report-2026/)
 - [日本が VRChat 公式サイト訪問数で世界1位](https://www.moguravr.com/vrchat-japan-visitor-market-share-2025-en/)
-- [Paddle vs LemonSqueezy 比較](https://www.paddle.com/compare/lemon-squeezy)
+- [VRChat: The Metaverse That's Actually Growing](https://vrdb.app/blog/vrchat-metaverse-growing-japan-2026-v2)
+- [VRCX (GitHub)](https://github.com/vrcx-team/VRCX) - 無料の競合ツール参考
+
+### 課金モデル参考
+- [Obsidian Pricing](https://obsidian.md/pricing)
+- [Obsidian Pricing Guide](https://www.eesel.ai/blog/obsidian-pricing) - 詳細分析
 - [RevenueCat - State of Subscription Apps 2025](https://www.revenuecat.com/state-of-subscription-apps-2025/)
+- [Freemium vs Subscription Model](https://dev.to/paywallpro/freemium-vs-subscription-model-which-is-better-for-app-revenue-4kc0)
+
+### 写真管理アプリ
+- [Adobe Photography Pricing Updates 2025](https://blog.adobe.com/en/publish/2024/12/15/all-new-photography-innovations-pricing-updates)
+- [Adobe Lightroom Plans](https://www.adobe.com/products/photoshop-lightroom/plans.html)
