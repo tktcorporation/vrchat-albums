@@ -17,7 +17,7 @@ import {
 
 describe('DBQueue', () => {
   beforeAll(async () => {
-    __initTestRDBClient();
+    await __initTestRDBClient();
   }, 10000);
   beforeEach(async () => {
     await __forceSyncRDBClient();

@@ -416,7 +416,7 @@ describe('vrchatLogController integration - Import and Rollback', () => {
 
   beforeAll(async () => {
     // テスト用データベース初期化
-    initRDBClient.__initTestRDBClient();
+    await initRDBClient.__initTestRDBClient();
     await initRDBClient.__forceSyncRDBClient();
   }, 10000);
 

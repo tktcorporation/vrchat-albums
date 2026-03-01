@@ -11,7 +11,7 @@ import * as model from './playerLeaveLog.service';
 
 describe('module/VRChatPlayerLeaveLogModel', () => {
   beforeAll(async () => {
-    client.__initTestRDBClient();
+    await client.__initTestRDBClient();
     // migrate db
     await client.syncRDBClient({
       checkRequired: false,

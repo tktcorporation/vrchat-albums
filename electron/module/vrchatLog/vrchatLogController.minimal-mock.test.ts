@@ -80,7 +80,7 @@ describe('vrchatLogController integration test with minimal mocks', () => {
 
   beforeAll(async () => {
     // Initialize test database
-    initRDBClient.__initTestRDBClient();
+    await initRDBClient.__initTestRDBClient();
     await initRDBClient.__forceSyncRDBClient();
   }, 10000);
 
