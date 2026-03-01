@@ -176,7 +176,7 @@ const initializeRDBClient = async () => {
     .join(getAppUserDataPath(), 'db.sqlite')
     .split(path.sep)
     .join(path.posix.sep);
-  sequelizeClient.initRDBClient({
+  await sequelizeClient.initRDBClient({
     db_url: filePath,
   });
 };

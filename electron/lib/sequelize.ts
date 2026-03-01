@@ -29,7 +29,7 @@ const _newRDBClient = (props: { db_url: string }) => {
     storage: props.db_url,
     retry: {
       max: 10,
-      timeout: 3000,
+      timeout: 10000,
     },
     models: [
       VRChatWorldJoinLogModel,
@@ -51,13 +51,26 @@ const _newRDBClient = (props: { db_url: string }) => {
 };
 
 /**
+ * SQLite の PRAGMA を設定する。
+ * - journal_mode=WAL: 読み書きの並行処理を可能にする
+ * - busy_timeout=5000: DB ロック時に最大5秒待機する
+ */
+const configureSQLitePragmas = async (client: Sequelize): Promise<void> => {
+  await client.query('PRAGMA journal_mode=WAL');
+  await client.query('PRAGMA busy_timeout=5000');
+  logger.info('SQLite PRAGMAs configured: journal_mode=WAL, busy_timeout=5000');
+};
+
+/**
  * 外部から呼び出される初期化関数。
  * `_initRDBClient` をラップしている。
  */
-export const initRDBClient = (props: { db_url: string }) => {
-  return _initRDBClient({
+export const initRDBClient = async (props: { db_url: string }) => {
+  const client = _initRDBClient({
     db_url: props.db_url,
   });
+  await configureSQLitePragmas(client.__client);
+  return client;
 };
 
 /**
@@ -84,16 +97,18 @@ const _initRDBClient = (props: { db_url: string }) => {
 /**
  * テスト用の RDBClient を初期化する
  */
-export const __initTestRDBClient = () => {
+export const __initTestRDBClient = async () => {
   // テスト環境でなければエラー
   if (process.env.NODE_ENV !== 'test') {
     throw new Error('NODE_ENV is not test');
   }
   // const dbPath = ':memory:';
   const dbPath = path.join(process.cwd(), 'debug', 'db', `test.${uuidv7()}.db`);
-  return _initRDBClient({
+  const client = _initRDBClient({
     db_url: dbPath,
   });
+  await configureSQLitePragmas(client.__client);
+  return client;
 };
 /**
  * テスト用に生成した RDBClient を破棄しリセットする。
@@ -117,9 +132,23 @@ export const getRDBClient = () => {
   return rdbClient;
 };
 
+/**
+ * sync 対象のモデル一覧。
+ * Migrations はスキーマ管理用なので最後に同期する。
+ */
+const SYNC_MODELS = [
+  VRChatWorldJoinLogModel,
+  VRChatWorldJoinLogFromPhotoModel,
+  VRChatPlayerJoinLogModel,
+  VRChatPlayerLeaveLogModel,
+  VRChatPhotoPathModel,
+  Migrations,
+] as const;
+
 // 共通の sync 処理を抽出した関数
 /**
  * Sequelize の sync を実行する共通処理。
+ * モデルごとに分割して実行し、DB ロック時間を短縮する。
  * マイグレーション情報の記録も行う。
  */
 const executeSyncRDB = async (options: { force: boolean }) => {
@@ -132,12 +161,19 @@ const executeSyncRDB = async (options: { force: boolean }) => {
   migrationProgeress = true;
   const appVersion = settingService.getAppVersion();
   try {
-    // migration 実行
-    const result = await getRDBClient().__client.sync({
-      force: options.force,
-      alter: true,
-    });
-    logger.info('executeSyncRDB', result.options);
+    // モデルごとに分割して sync を実行
+    for (const model of SYNC_MODELS) {
+      const modelName = model.name;
+      const startTime = performance.now();
+      await model.sync({
+        force: options.force,
+        alter: true,
+      });
+      const elapsed = performance.now() - startTime;
+      logger.info(
+        `executeSyncRDB: ${modelName} synced in ${elapsed.toFixed(0)}ms`,
+      );
+    }
 
     // migration のバージョンを保存
     const now = new Date();

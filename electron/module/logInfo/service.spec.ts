@@ -13,7 +13,7 @@ import { getFrequentPlayerNames } from './service';
 describe('logInfo service', () => {
   describe('getFrequentPlayerNames', () => {
     beforeAll(async () => {
-      client.__initTestRDBClient();
+      await client.__initTestRDBClient();
     }, 10000);
 
     beforeEach(async () => {

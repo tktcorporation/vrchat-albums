@@ -7,7 +7,7 @@ import { searchSessionsByPlayerName } from './service';
 
 describe('searchSessionsByPlayerName integration test', () => {
   beforeAll(async () => {
-    client.__initTestRDBClient();
+    await client.__initTestRDBClient();
   }, 10000);
 
   beforeEach(async () => {

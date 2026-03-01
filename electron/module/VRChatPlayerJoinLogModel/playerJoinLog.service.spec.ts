@@ -7,7 +7,7 @@ import * as service from './playerJoinLog.service';
 describe('VRChatPlayerJoinLogModel', () => {
   describe('createVRChatPlayerJoinLogModel', () => {
     beforeAll(async () => {
-      client.__initTestRDBClient();
+      await client.__initTestRDBClient();
     }, 10000);
     beforeEach(async () => {
       await client.__forceSyncRDBClient();

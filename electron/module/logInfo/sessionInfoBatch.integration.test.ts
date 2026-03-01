@@ -15,7 +15,7 @@ import { logInfoRouter } from './logInfoCointroller';
 
 describe('SessionInfoBatch world change behavior', () => {
   beforeAll(async () => {
-    client.__initTestRDBClient();
+    await client.__initTestRDBClient();
   }, 10000);
 
   beforeEach(async () => {

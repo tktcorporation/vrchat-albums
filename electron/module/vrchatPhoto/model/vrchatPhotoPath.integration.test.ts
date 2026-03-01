@@ -20,7 +20,7 @@ import {
  */
 describe('VRChatPhotoPath Model Integration Tests', () => {
   beforeAll(async () => {
-    client.__initTestRDBClient();
+    await client.__initTestRDBClient();
   }, 10000);
 
   beforeEach(async () => {

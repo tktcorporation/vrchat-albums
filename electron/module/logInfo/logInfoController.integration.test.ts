@@ -17,7 +17,7 @@ import { getPlayerJoinListInSameWorld } from './logInfoCointroller';
 // 実際のデータベースを使用した統合テスト
 describe('getPlayerJoinListInSameWorld 統合テスト', () => {
   beforeAll(async () => {
-    initRDBClient.__initTestRDBClient();
+    await initRDBClient.__initTestRDBClient();
   }, 10000);
 
   beforeEach(async () => {

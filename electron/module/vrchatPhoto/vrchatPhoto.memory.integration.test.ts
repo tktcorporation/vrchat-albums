@@ -141,7 +141,7 @@ describe('写真インデックス作成のメモリプロファイリング', (
     initSettingStoreForTest(mockSettingStore);
 
     // DBを初期化
-    client.__initTestRDBClient();
+    await client.__initTestRDBClient();
 
     console.log(`\n=== Test Configuration ===`);
     console.log(`Test directory: ${testDir}`);

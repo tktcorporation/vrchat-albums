@@ -14,7 +14,7 @@ import * as model from './s_model';
 
 describe('module/logInfo/s_model', () => {
   beforeAll(async () => {
-    client.__initTestRDBClient();
+    await client.__initTestRDBClient();
     // migrate db
     await client.syncRDBClient({
       checkRequired: false,

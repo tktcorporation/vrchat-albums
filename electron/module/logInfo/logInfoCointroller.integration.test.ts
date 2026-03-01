@@ -15,7 +15,7 @@ import { VRChatPlayerNameSchema } from '../vrchatLog/model';
 
 describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
   beforeAll(async () => {
-    client.__initTestRDBClient();
+    await client.__initTestRDBClient();
   }, 10000);
 
   beforeEach(async () => {

@@ -18,7 +18,7 @@ import {
 
 describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => {
   beforeAll(async () => {
-    client.__initTestRDBClient();
+    await client.__initTestRDBClient();
   }, 10000);
 
   beforeEach(async () => {
