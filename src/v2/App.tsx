@@ -527,7 +527,7 @@ const Contents = memo(() => {
             {/* テキストエリア - タイポグラフィ */}
             <div className="space-y-3">
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 tracking-tight">
-                初期化中...
+                データを読み込み中...
               </h2>
               <p
                 className="text-sm text-gray-500 dark:text-gray-500 min-h-[1.5em]"
