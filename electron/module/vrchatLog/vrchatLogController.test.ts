@@ -1,9 +1,6 @@
 import { ok } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  DBLogProvider,
-  ExportResult,
-} from './exportService/exportService';
+import type { ExportResult } from './exportService/exportService';
 import * as exportService from './exportService/exportService';
 import { vrchatLogRouter } from './vrchatLogController';
 
@@ -15,7 +12,8 @@ const createMockContext = () => ({
 
 // exportServiceをモック
 vi.mock('./exportService/exportService', () => ({
-  exportLogStoreFromDB: vi.fn(),
+  exportLogStore: vi.fn(),
+  getExportErrorMessage: vi.fn((e) => e.message || 'Export error'),
 }));
 
 // logger をモック
@@ -67,7 +65,7 @@ describe('vrchatLogController', () => {
         exportEndTime: new Date('2023-10-08T10:05:00Z'),
       };
 
-      vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
+      vi.mocked(exportService.exportLogStore).mockResolvedValue(
         ok(mockExportResult),
       );
 
@@ -86,17 +84,14 @@ describe('vrchatLogController', () => {
       });
 
       expect(result).toEqual(mockExportResult);
-      expect(exportService.exportLogStoreFromDB).toHaveBeenCalledWith(
-        {
-          startDate: undefined,
-          endDate: undefined,
-          outputBasePath: '/custom/path',
-        },
-        expect.any(Function), // getDBLogsFromDatabase関数
-      );
+      expect(exportService.exportLogStore).toHaveBeenCalledWith({
+        startDate: undefined,
+        endDate: undefined,
+        outputBasePath: '/custom/path',
+      });
     });
 
-    it('期間指定でエクスポートが実行される（ローカルタイム処理）', async () => {
+    it('期間指定でエクスポートが実行される', async () => {
       const mockExportResult: ExportResult = {
         exportedFiles: ['/path/to/export/logStore-2023-10.txt'],
         totalLogLines: 50,
@@ -104,16 +99,16 @@ describe('vrchatLogController', () => {
         exportEndTime: new Date('2023-10-08T10:03:00Z'),
       };
 
-      vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
+      vi.mocked(exportService.exportLogStore).mockResolvedValue(
         ok(mockExportResult),
       );
 
       const router = vrchatLogRouter();
       const mutation = router.exportLogStoreData;
 
-      // フロントエンドから送られるローカルタイム
-      const startDate = new Date('2023-10-08T00:00:00'); // ローカルタイム開始
-      const endDate = new Date('2023-10-08T23:59:59.999'); // ローカルタイム終了
+      // フロントエンドから送られる期間指定
+      const startDate = new Date('2023-10-08T00:00:00');
+      const endDate = new Date('2023-10-08T23:59:59.999');
 
       const result = await mutation({
         input: {
@@ -133,21 +128,16 @@ describe('vrchatLogController', () => {
       });
 
       expect(result).toEqual(mockExportResult);
-      expect(exportService.exportLogStoreFromDB).toHaveBeenCalledWith(
-        {
-          startDate,
-          endDate,
-          outputBasePath: '/custom/path',
-        },
-        expect.any(Function), // getDBLogsFromDatabase関数
-      );
+      expect(exportService.exportLogStore).toHaveBeenCalledWith({
+        startDate,
+        endDate,
+        outputBasePath: '/custom/path',
+      });
     });
 
     it('エクスポートエラー時に適切に例外がスローされる', async () => {
-      const exportError = new Error('Export failed: Database connection error');
-      vi.mocked(exportService.exportLogStoreFromDB).mockRejectedValue(
-        exportError,
-      );
+      const exportError = new Error('Export failed: File system error');
+      vi.mocked(exportService.exportLogStore).mockRejectedValue(exportError);
 
       const router = vrchatLogRouter();
       const mutation = router.exportLogStoreData;
@@ -167,12 +157,10 @@ describe('vrchatLogController', () => {
           }),
           signal: new AbortController().signal,
         }),
-      ).rejects.toThrow('Export failed: Database connection error');
+      ).rejects.toThrow('Export failed: File system error');
     });
-  });
 
-  describe('getDBLogsFromDatabase (timezone handling)', () => {
-    it('期間指定なしで全データ取得が呼ばれる', async () => {
+    it('期間指定なしで全データエクスポートが呼ばれる', async () => {
       const mockExportResult: ExportResult = {
         exportedFiles: [],
         totalLogLines: 0,
@@ -180,7 +168,7 @@ describe('vrchatLogController', () => {
         exportEndTime: new Date(),
       };
 
-      vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
+      vi.mocked(exportService.exportLogStore).mockResolvedValue(
         ok(mockExportResult),
       );
 
@@ -196,53 +184,12 @@ describe('vrchatLogController', () => {
         signal: new AbortController().signal,
       });
 
-      // exportLogStoreFromDBが期間指定なしで呼ばれることを確認
-      expect(exportService.exportLogStoreFromDB).toHaveBeenCalledWith(
-        {
-          startDate: undefined,
-          endDate: undefined,
-          outputBasePath: undefined,
-        },
-        expect.any(Function), // getDBLogsFromDatabase関数
-      );
-    });
-
-    it('期間指定時にローカルタイムが適切に処理される', async () => {
-      let capturedGetDBLogs: DBLogProvider | undefined;
-
-      vi.mocked(exportService.exportLogStoreFromDB).mockImplementation(
-        async (_options, getDBLogs) => {
-          capturedGetDBLogs = getDBLogs;
-          return ok({
-            exportedFiles: [],
-            totalLogLines: 0,
-            exportStartTime: new Date(),
-            exportEndTime: new Date(),
-          });
-        },
-      );
-
-      const router = vrchatLogRouter();
-      const mutation = router.exportLogStoreData;
-
-      const startDate = new Date('2023-10-08T00:00:00'); // ローカルタイム
-      const endDate = new Date('2023-10-08T23:59:59'); // ローカルタイム
-
-      await mutation({
-        input: {
-          startDate,
-          endDate,
-        },
-        ctx: createMockContext(),
-        path: 'exportLogStoreData',
-        type: 'mutation',
-        getRawInput: async () => ({ startDate, endDate }),
-        signal: new AbortController().signal,
+      // exportLogStoreが期間指定なしで呼ばれることを確認
+      expect(exportService.exportLogStore).toHaveBeenCalledWith({
+        startDate: undefined,
+        endDate: undefined,
+        outputBasePath: undefined,
       });
-
-      // getDBLogsFromDatabase関数が期待される引数で呼ばれることを確認
-      expect(capturedGetDBLogs).toBeDefined();
-      expect(typeof capturedGetDBLogs).toBe('function');
     });
   });
 });
