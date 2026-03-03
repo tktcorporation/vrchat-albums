@@ -150,8 +150,8 @@ test.describe('初期化プログレス表示', () => {
       );
       expect(loadingScreenVisible).toBe(true);
 
-      // 「初期化中...」テキストの表示を確認
-      const initText = await page.isVisible('text=初期化中');
+      // 「データを読み込み中...」テキストの表示を確認
+      const initText = await page.isVisible('text=データを読み込み中');
       expect(initText).toBe(true);
 
       // プログレスバーの表示を確認
