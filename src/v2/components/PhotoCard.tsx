@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Circle } from 'lucide-react';
+import { Circle, Flag } from 'lucide-react';
 import React, { memo, useCallback, useRef, useState } from 'react';
 import {
   ContextMenu,
@@ -39,6 +39,10 @@ interface PhotoCardProps {
   displayHeight?: number;
   /** 選択された写真をコピーする関数（全グループにアクセス可能） */
   onCopySelected?: () => void;
+  /** この写真がピックアップ済みかどうか */
+  isPickedUp?: boolean;
+  /** ピックアップのトグル */
+  onTogglePickup?: (photoId: string) => void;
 }
 
 /**
@@ -56,6 +60,8 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     setIsMultiSelectMode,
     displayHeight,
     onCopySelected,
+    isPickedUp,
+    onTogglePickup,
   }) => {
     const { t } = useI18n();
     const elementRef = useRef<HTMLDivElement>(null);
@@ -233,6 +239,13 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
           height: displayHeight ? `${displayHeight}px` : undefined,
           width: '100%',
         }}
+        draggable={photoLoaded}
+        onDragStart={(e) => {
+          if (photoLoaded) {
+            e.dataTransfer.setData('text/plain', currentPhotoId);
+            e.dataTransfer.effectAllowed = 'copy';
+          }
+        }}
         onClick={handleClick}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
@@ -284,6 +297,19 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
                 />
               )}
             </div>
+
+            {isPickedUp && (
+              <div
+                className="absolute bottom-2 right-2 z-10"
+              >
+                <div className="flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-full p-0.5">
+                  <Flag
+                    size={ICON_SIZE.xs.pixels}
+                    className="text-primary/70"
+                  />
+                </div>
+              </div>
+            )}
 
             <div
               className={clsx(
@@ -353,6 +379,18 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
             >
               {t('common.contextMenu.showInExplorer')}
             </ContextMenuItem>
+            {onTogglePickup && (
+              <ContextMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePickup(currentPhotoId);
+                }}
+              >
+                {isPickedUp
+                  ? t('pickup.removeFromPickup')
+                  : t('pickup.addToPickup')}
+              </ContextMenuItem>
+            )}
           </ContextMenuContent>
         </ContextMenu>
       </div>
