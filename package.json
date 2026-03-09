@@ -1,5 +1,6 @@
 {
   "name": "vrchat-albums",
+  "private": true,
   "version": "0.25.1",
   "main": "main/index.cjs",
   "author": {
@@ -41,6 +42,8 @@
     "publish": "run-s clean:build build \"electron-dist -- --publish always\"",
     "electron-dist": "NODE_ENV=production electron-builder --config=electron-builder.cjs",
     "clean:build": "rimraf dist main src/out",
+    "changeset": "changeset",
+    "version-packages": "bash scripts/changeset-version.sh",
     "update-changelog": "git-cliff -c ./cliff.toml -o CHANGELOG.md",
     "clean:debug": "bash debug/cleanDevFiles.sh",
     "find-deadcode": "ts-prune",
@@ -174,6 +177,8 @@
   "devDependencies": {
     "@antfu/ni": "^28.2.0",
     "@biomejs/biome": "2.3.10",
+    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/cli": "^2.30.0",
     "@electron/rebuild": "^4.0.2",
     "@playwright/test": "1.57.0",
     "@testing-library/dom": "~10.4.1",

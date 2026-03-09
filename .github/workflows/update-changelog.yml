@@ -8,6 +8,8 @@ on:
 
 jobs:
   update-changelog:
+    # changeset release PR ではスキップ（changesets が CHANGELOG を管理する）
+    if: startsWith(github.head_ref, 'changeset-release/') != true
     runs-on: ubuntu-latest
     permissions:
       contents: write
