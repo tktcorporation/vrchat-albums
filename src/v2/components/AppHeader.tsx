@@ -1,6 +1,7 @@
 import {
   Copy,
   Download,
+  Flag,
   Minus,
   RefreshCw,
   Settings,
@@ -30,6 +31,8 @@ interface AppHeaderProps {
     'isRefreshing' | 'startRefreshing' | 'finishRefreshing'
   >;
   showGalleryControls?: boolean;
+  pickupCount?: number;
+  onOpenPickup?: () => void;
 }
 
 /**
@@ -46,6 +49,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onCopySelected,
   loadingState,
   showGalleryControls = false,
+  pickupCount,
+  onOpenPickup,
 }) => {
   const { t } = useI18n();
   const [updateDownloaded, setUpdateDownloaded] = useState(false);
@@ -164,6 +169,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   }`}
                 />
               </Button>
+              {pickupCount != null && pickupCount > 0 && onOpenPickup && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onOpenPickup}
+                  className="h-7 gap-1 px-1.5"
+                  title={t('pickup.dialogTitle')}
+                >
+                  <Flag className={ICON_SIZE.sm.class} />
+                  <span className="text-xs font-medium min-w-[1ch]">
+                    {pickupCount}
+                  </span>
+                </Button>
+              )}
             </>
           ))}
       </div>
