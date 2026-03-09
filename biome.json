@@ -69,7 +69,8 @@
       "!**/playwright/.cache",
       "!**/.grit",
       "!**/package.json",
-      "!**/pnpm-lock.yaml"
+      "!**/pnpm-lock.yaml",
+      "!.devenv.json"
     ]
   }
 }

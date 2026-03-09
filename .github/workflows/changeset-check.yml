@@ -1,0 +1,54 @@
+name: Changeset Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+jobs:
+  changeset-check:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changesets
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # changeset release PR はスキップ
+          if [[ "$PR_TITLE" == "chore: release" ]]; then
+            echo "Release PR detected, skipping changeset check"
+            exit 0
+          fi
+
+          # main ブランチとの差分でコードファイルが変更されたか確認
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          CODE_CHANGED=false
+
+          for file in $CHANGED_FILES; do
+            case "$file" in
+              src/*|electron/*|scripts/*|package.json|tsconfig*.json|vite.config.*|electron-builder.*)
+                CODE_CHANGED=true
+                break
+                ;;
+            esac
+          done
+
+          if [ "$CODE_CHANGED" = "false" ]; then
+            echo "No code changes detected, skipping changeset check"
+            exit 0
+          fi
+
+          # changeset ファイルの存在チェック（README.md 以外）
+          CHANGESET_FILES=$(find .changeset -name '*.md' ! -name 'README.md' 2>/dev/null | head -1)
+
+          if [ -z "$CHANGESET_FILES" ]; then
+            echo "::error::No changeset found. Run 'pnpm changeset' to create one, or 'pnpm changeset --empty' for changes that don't need a version bump."
+            exit 1
+          fi
+
+          echo "Changeset found"
