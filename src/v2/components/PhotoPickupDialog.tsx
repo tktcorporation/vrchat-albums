@@ -53,7 +53,10 @@ const PhotoPickupDialog = memo(
     }, [open, onRefetch]);
 
     // 全写真のパスをバッチ取得
-    const photoIds = useMemo(() => pickupList.map((p) => p.photoId), [pickupList]);
+    const photoIds = useMemo(
+      () => pickupList.map((p) => p.photoId),
+      [pickupList],
+    );
     const { data: photoPathEntries } =
       trpcReact.vrchatPhoto.getVrchatPhotoPathsByIds.useQuery(
         { ids: photoIds },
@@ -167,11 +170,7 @@ const PickupThumbnail = memo(
     return (
       <div className="relative group aspect-square bg-muted rounded overflow-hidden">
         {thumbnail ? (
-          <img
-            src={thumbnail}
-            alt=""
-            className="w-full h-full object-cover"
-          />
+          <img src={thumbnail} alt="" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full animate-pulse bg-muted" />
         )}

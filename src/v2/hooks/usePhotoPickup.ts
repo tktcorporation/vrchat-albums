@@ -15,17 +15,12 @@ export function usePhotoPickup() {
   const { data: pickupPhotoIds = [] } =
     trpcReact.photoPickup.photoIdSet.useQuery();
 
-  const pickupSet = useMemo(
-    () => new Set(pickupPhotoIds),
-    [pickupPhotoIds],
-  );
+  const pickupSet = useMemo(() => new Set(pickupPhotoIds), [pickupPhotoIds]);
 
-  const {
-    data: pickupList = [],
-    refetch: refetchList,
-  } = trpcReact.photoPickup.list.useQuery(undefined, {
-    enabled: false,
-  });
+  const { data: pickupList = [], refetch: refetchList } =
+    trpcReact.photoPickup.list.useQuery(undefined, {
+      enabled: false,
+    });
 
   const addMutation = trpcReact.photoPickup.add.useMutation({
     onSuccess: () => {

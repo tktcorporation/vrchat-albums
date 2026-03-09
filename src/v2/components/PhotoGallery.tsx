@@ -7,10 +7,10 @@ import { usePhotoPickup } from '../hooks/usePhotoPickup';
 import { useI18n } from '../i18n/store';
 import { isPhotoLoaded } from '../types/photo';
 import { useMigrationNotice } from './MigrationNotice';
-import PhotoPickupDialog from './PhotoPickupDialog';
-import PhotoPickupDropZone from './PhotoPickupDropZone';
 import GalleryContent from './PhotoGallery/GalleryContent';
 import { usePhotoGallery } from './PhotoGallery/usePhotoGallery';
+import PhotoPickupDialog from './PhotoPickupDialog';
+import PhotoPickupDropZone from './PhotoPickupDropZone';
 import SettingsModal from './settings/SettingsModal';
 
 interface PhotoGalleryProps extends UseLoadingStateResult {}

@@ -299,9 +299,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
             </div>
 
             {isPickedUp && (
-              <div
-                className="absolute bottom-2 right-2 z-10"
-              >
+              <div className="absolute bottom-2 right-2 z-10">
                 <div className="flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-full p-0.5">
                   <Flag
                     size={ICON_SIZE.xs.pixels}
