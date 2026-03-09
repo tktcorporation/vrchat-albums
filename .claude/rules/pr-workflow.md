@@ -21,14 +21,15 @@ gh pr checks <PR番号> --watch
 コミット・プッシュ前に changeset ファイルが存在するか確認し、なければ作成すること。
 
 ```bash
-# .changeset/<変更を端的に表す名前>.md を作成
-# minor: 機能追加、patch: バグ修正
+pnpm changeset
+# 対話的にバージョンの種類（patch/minor）と変更内容を入力
+# .changeset/ にmarkdownファイルが自動作成される
 ```
 
 形式:
 ```markdown
 ---
-"cross-recorder": minor
+"vrchat-albums": minor
 ---
 
 変更の説明
