@@ -4,8 +4,10 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
 
+  // Volume name must start with [a-zA-Z0-9] to comply with Docker naming rules
+  // Using 'devcontainer-' prefix so ${localWorkspaceFolderBasename} ('.github') doesn't start the name
   "mounts": [
-    "source=${localWorkspaceFolderBasename}-pnpm-store,target=${containerWorkspaceFolder}/.pnpm-store,type=volume"
+    "source=devcontainer-${localWorkspaceFolderBasename}-pnpm-store,target=${containerWorkspaceFolder}/.pnpm-store,type=volume"
   ],
 
   "features": {
@@ -72,7 +74,7 @@
     "install-packages": [
       "bash",
       "-c",
-      "set -e; sudo apt-get update && sudo apt-get install -y build-essential fzf ripgrep bc gpg ca-certificates curl"
+      "set -e; sudo apt-get update && sudo apt-get install -y build-essential fzf ripgrep bc gpg ca-certificates curl tmux"
     ]
   },
   "updateContentCommand": {
@@ -90,7 +92,11 @@
   },
   "postCreateCommand": {
     "mise-install": "mise install",
-    "install-grit": "curl -fsSL https://docs.grit.io/install | bash"
+    "fix-pnpm-store-permissions": [
+      "bash",
+      "-lc",
+      "sudo chown -R $(whoami) .pnpm-store"
+    ]
   },
   "postStartCommand": {
     "setup-chrome-devtools-mcp": [

@@ -1,9 +1,9 @@
 [tools]
-node = ["22"]
-yarn = "latest"
+node = ["22", "24"]
 uv = "latest"
 python = "3.14"
 pnpm = "10"
+jj = "latest"
 
 "npm:@anthropic-ai/claude-code" = "latest"
 "npm:@openai/codex" = "latest"
@@ -13,12 +13,6 @@ pnpm = "10"
 
 # Browser automation
 "npm:playwright" = "latest"
-
-"npm:fxp-cli" = "latest"
-
-# GritQL - code search and transformation tool
-"npm:@getgrit/cli" = "latest"
-jj = "latest"
 
 
 [settings]
@@ -31,14 +25,10 @@ auto_install = true
 # pipx バックエンドで uvx を使う設定
 pipx.uvx = true
 
-[tasks]
-"lint:xml" = "cat CLAUDE.md | fxp val"
-
 [tasks.chromium-path]
 run = "ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1"
 description = "Get Playwright Chromium executable path"
 
-[tasks.create-devenv]
-run = "npx @tktco/create-devenv@latest"
-description = "Run create-devenv CLI"
-
+[tasks.berm]
+run = "npx @tktco/berm@latest"
+description = "Run berm CLI"
