@@ -168,6 +168,17 @@ const ja: Translations = {
       error: 'データ移行に失敗しました',
     },
   },
+  pickup: {
+    addToPickup: 'ピックアップに追加',
+    removeFromPickup: 'ピックアップから外す',
+    dropZoneLabel: 'ここにドロップしてピックアップ',
+    dialogTitle: 'ピックアップ',
+    copyAll: 'すべてコピー',
+    clearAll: '全クリア',
+    clearAllConfirm: 'ピックアップを全クリアしますか？',
+    emptyMessage: 'ピックアップに写真がありません',
+    photoCount: '{count}枚',
+  },
 };
 
 export default ja;

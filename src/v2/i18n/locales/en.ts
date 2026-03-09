@@ -167,6 +167,17 @@ const en: Translations = {
       error: 'Data migration failed',
     },
   },
+  pickup: {
+    addToPickup: 'Add to Pickup',
+    removeFromPickup: 'Remove from Pickup',
+    dropZoneLabel: 'Drop here to pick up',
+    dialogTitle: 'Pickup',
+    copyAll: 'Copy All',
+    clearAll: 'Clear All',
+    clearAllConfirm: 'Clear all pickups?',
+    emptyMessage: 'No photos in pickup',
+    photoCount: '{count} photos',
+  },
 };
 
 export default en;

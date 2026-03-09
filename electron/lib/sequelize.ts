@@ -4,6 +4,7 @@ import { ResultAsync } from 'neverthrow';
 import path from 'pathe';
 import { match } from 'ts-pattern';
 import { uuidv7 } from 'uuidv7';
+import { PhotoPickupModel } from '../module/photoPickup/model';
 import * as settingService from './../module/settings/service';
 import { VRChatPlayerJoinLogModel } from '../module/VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import { VRChatPlayerLeaveLogModel } from '../module/VRChatPlayerLeaveLogModel/playerLeaveLog.model';
@@ -37,6 +38,7 @@ const _newRDBClient = (props: { db_url: string }) => {
       VRChatPlayerJoinLogModel,
       VRChatPlayerLeaveLogModel,
       VRChatPhotoPathModel,
+      PhotoPickupModel,
       // TODO: アプリイベントモデルは今後実装
       // VRChatAppEventModel,
       Migrations,
@@ -142,6 +144,7 @@ const SYNC_MODELS = [
   VRChatPlayerJoinLogModel,
   VRChatPlayerLeaveLogModel,
   VRChatPhotoPathModel,
+  PhotoPickupModel,
   Migrations,
 ] as const;
 

@@ -178,4 +178,15 @@ export interface Translations {
       error: string;
     };
   };
+  pickup: {
+    addToPickup: string;
+    removeFromPickup: string;
+    dropZoneLabel: string;
+    dialogTitle: string;
+    copyAll: string;
+    clearAll: string;
+    clearAllConfirm: string;
+    emptyMessage: string;
+    photoCount: string;
+  };
 }
