@@ -1,9 +1,33 @@
 {
   "version": "0.1.0",
-  "installedAt": "2026-01-18T04:36:16.594Z",
+  "installedAt": "2026-03-09T15:50:53.203Z",
   "modules": [".", ".devcontainer", ".github", ".claude"],
   "source": {
     "owner": "tktcorporation",
     "repo": ".github"
+  },
+  "baseRef": "0773a11fd15e55b1d6c0e988227c1834ee2052ae",
+  "baseHashes": {
+    ".mcp.json": "bf80bacd0dd7ac8444872085a06e05e99ba3578666f7e457ea97ca6873bdba39",
+    ".mise.toml": "99efaec5e72a54fea9c1c8a22b3346eca94bc1a75e56ae9f7e5365145e06b7d6",
+    ".claude/settings.json": "7f00ae167133761afc87c89960d6d189202ac389a40b421efcb817007d5997ae",
+    ".devcontainer/.env.devcontainer.example": "f80e49ff9ad5ff202eb3c5271650847568f5bac7bac9b69091f3ae58821a1d80",
+    ".devcontainer/.gitignore": "d812b42821b26865ba390f4d94ba82194ccc30c06459356701863524338fb8f7",
+    ".devcontainer/devcontainer.json": "dcd1c927fead7868f13e33eeb5d559ec44e72b551c62194ddd1afb534afda4b8",
+    ".devcontainer/run-chrome-devtools-mcp.sh": "2eb08c920aa9fddbd5c40e0ce1c0d5ba2085bd1586c4df409b3e97ee645a5fcf",
+    ".devcontainer/setup-chrome-devtools-mcp.sh": "7b02ad1b0c763a6483451c290ec4fa10268f9b632f8075eab8a7cd4e2cbc5418",
+    ".devcontainer/test-chrome-devtools-mcp.sh": "fe586ac868fdab29366164860c67cffbb814399d430ef99b0275cc452f727d11",
+    ".github/labeler.yml": "dcbfee7a741ed5412190665122925c552922bbbbcd8fe6e19ede4a42067b5360",
+    ".claude/hooks/ensure-jj.sh": "421ce414217ac1d1c9be07773f4864425ed8e77b160531e143f3c4f099997792",
+    ".claude/hooks/prefer-jj.sh": "d0d71e9dfee09a3a9acdc951b45745482a005617ce80ee5afeb4c735b819a5f9",
+    ".claude/rules/code-intent-documentation.md": "70e24e643cac7e23f0fe7e20ff42aeb0a75321af0e1169c10a2193b8343a96eb",
+    ".claude/rules/jujutsu.md": "c486d683fd3e1f5e84b8ddffd5d73b9f77d4971cf51fbd3ad61cdc536e00f36c",
+    ".claude/rules/pr-ci-watch.md": "66828359ee672ae5941568774a576dbc3a36b87940690e06fc9bdc05ee224aff",
+    ".claude/rules/pr-workflow.md": "98ca9ef153164874f4f3de0e585433391b2b7b0e34646f651c05e5a3e6be28ea",
+    ".github/workflows/issue-link.yml": "84c9dbae60c3d93f8e5598d5b2ee92f213677e633bbcf67132ab6b3edef41cfe",
+    ".github/workflows/label.yml": "cbe93885e3fcba84cff42e6607cf26727037ed2820c4f07a590ef3ccee68e694",
+    ".claude/skills/ui-craft/SKILL.md": "0be38a68ccaa91605d2da59d26d57428543e82aa811a4cb76f805fba3f07a2c8",
+    ".claude/skills/upstream-fix/SKILL.md": "c5bf952ce8c6ec6b1e8442da7382ec5be0e4789f642be050623c961bc957de3a",
+    ".claude/skills/ui-craft/references/component-libraries.md": "01f19a3912dd5c69089239ff9f9d52e6968fa42feef6354346cb4f3f794ec0a4"
   }
 }

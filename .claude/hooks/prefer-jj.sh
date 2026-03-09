@@ -1,45 +1,47 @@
 #!/bin/bash
-# Claude Code hook: Prefer jj over git for commits
-#
-# This hook intercepts Bash commands and blocks git commit/add
-# in favor of jj commands, per project workflow.
+# Hook: git commit/add を検出して jj の使用を促す
+# PreToolUse hook for Bash tool
 
+set -euo pipefail
+
+# stdin から JSON を読み取る
 input=$(cat)
-command=$(echo "$input" | jq -r '.tool_input.command // ""')
 
-# Block git commit -> suggest jj commit
-if [[ "$command" =~ ^git\ commit ]]; then
-  cat <<'EOF' >&2
+# tool_input.command を抽出
+command=$(echo "$input" | jq -r '.tool_input.command // empty')
 
-╭─────────────────────────────────────────────────╮
-│  ⚠️  git commit is blocked - use jj instead     │
-╰─────────────────────────────────────────────────╯
+if [ -z "$command" ]; then
+  exit 0
+fi
 
-Instead of:  git commit -m "message"
-Use:         jj commit -m "message"
-
-See: CLAUDE.md, .claude/rules/jujutsu.md
-
+# git commit を検出
+if echo "$command" | grep -qE '^\s*git\s+commit'; then
+  cat <<'EOF'
+╭──────────────────────────────────────────────╮
+│  git commit の代わりに jj を使ってください    │
+│                                              │
+│  jj commit -m "message"                      │
+│  jj describe -m "message"                    │
+│                                              │
+│  参考: CLAUDE.md, .claude/rules/jujutsu.md   │
+╰──────────────────────────────────────────────╯
 EOF
   exit 2
 fi
 
-# Block git add -> suggest jj workflow (jj auto-stages)
-if [[ "$command" =~ ^git\ add ]]; then
-  cat <<'EOF' >&2
-
-╭─────────────────────────────────────────────────╮
-│  ⚠️  git add is not needed with jj             │
-╰─────────────────────────────────────────────────╯
-
-jj automatically tracks all changes.
-Just use: jj commit -m "message"
-
-See: .claude/rules/jujutsu.md
-
+# git add を検出
+if echo "$command" | grep -qE '^\s*git\s+add'; then
+  cat <<'EOF'
+╭──────────────────────────────────────────────╮
+│  git add は不要です                           │
+│                                              │
+│  jj は変更を自動的に追跡します               │
+│  直接 jj commit -m "message" を使ってください │
+│                                              │
+│  参考: CLAUDE.md, .claude/rules/jujutsu.md   │
+╰──────────────────────────────────────────────╯
 EOF
   exit 2
 fi
 
-# Allow all other commands
 exit 0

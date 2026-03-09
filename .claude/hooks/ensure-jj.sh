@@ -1,67 +1,64 @@
 #!/bin/bash
-# Claude Code hook: Ensure jj is installed at session start
-#
-# Priority:
-#   1. mise install jj (if mise available)
-#   2. Direct binary download from GitHub releases (fallback)
+# Hook: セッション開始時に jj がインストールされていることを確認する
+# SessionStart hook
 
-JJ_INSTALL_DIR="$HOME/bin"
+set -euo pipefail
 
-# Already available in PATH -> done
+# 1. PATH に jj があればOK
 if command -v jj &>/dev/null; then
-  echo "jj is ready ($(command -v jj))" >&2
   exit 0
 fi
 
-# Try mise first
+# 2. mise 経由でインストールを試みる
 if command -v mise &>/dev/null; then
-  mise install jj 2>/dev/null
-  if command -v jj &>/dev/null; then
-    echo "jj installed via mise ($(command -v jj))" >&2
-    exit 0
+  echo "jj が見つかりません。mise 経由でインストールします..."
+  if mise install jj 2>/dev/null; then
+    eval "$(mise activate bash 2>/dev/null)" || true
+    if command -v jj &>/dev/null; then
+      echo "jj $(jj --version) をインストールしました"
+      exit 0
+    fi
   fi
 fi
 
-# Fallback: download binary from GitHub releases
-echo "Installing jj from GitHub releases..." >&2
+# 3. GitHub リリースからダウンロード
+echo "mise でのインストールに失敗しました。GitHub から直接ダウンロードします..."
 
-ARCH="$(uname -m)"
-OS="$(uname -s)"
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
 
 case "${OS}-${ARCH}" in
-  Linux-x86_64)  TARGET="x86_64-unknown-linux-musl" ;;
-  Linux-aarch64) TARGET="aarch64-unknown-linux-musl" ;;
-  Darwin-x86_64) TARGET="x86_64-apple-darwin" ;;
-  Darwin-arm64)  TARGET="aarch64-apple-darwin" ;;
+  linux-x86_64)  TARGET="x86_64-unknown-linux-musl" ;;
+  linux-aarch64) TARGET="aarch64-unknown-linux-musl" ;;
+  darwin-x86_64) TARGET="x86_64-apple-darwin" ;;
+  darwin-arm64)  TARGET="aarch64-apple-darwin" ;;
   *)
-    echo "Warning: Unsupported platform ${OS}-${ARCH}. Install jj manually: https://jj-vcs.github.io/jj/latest/install-and-setup/" >&2
+    echo "警告: サポートされていないプラットフォーム (${OS}-${ARCH})"
+    echo "手動でインストールしてください: https://jj-vcs.github.io/jj/latest/install-and-setup/"
     exit 0
     ;;
 esac
 
-# Get latest version tag
-LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/jj-vcs/jj/releases/latest" 2>/dev/null | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/jj-vcs/jj/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+
 if [ -z "$LATEST_TAG" ]; then
-  echo "Warning: Could not fetch latest jj version. Install jj manually: https://jj-vcs.github.io/jj/latest/install-and-setup/" >&2
+  echo "警告: 最新バージョンの取得に失敗しました"
+  echo "手動でインストールしてください: https://jj-vcs.github.io/jj/latest/install-and-setup/"
   exit 0
 fi
 
-URL="https://github.com/jj-vcs/jj/releases/download/${LATEST_TAG}/jj-${LATEST_TAG}-${TARGET}.tar.gz"
+DOWNLOAD_URL="https://github.com/jj-vcs/jj/releases/download/${LATEST_TAG}/jj-${LATEST_TAG}-${TARGET}.tar.gz"
+INSTALL_DIR="${HOME}/bin"
 
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
+mkdir -p "$INSTALL_DIR"
 
-if curl -fsSL "$URL" -o "$TMP_DIR/jj.tar.gz" 2>/dev/null; then
-  tar xzf "$TMP_DIR/jj.tar.gz" -C "$TMP_DIR" 2>/dev/null
-  if [ -f "$TMP_DIR/jj" ]; then
-    mkdir -p "$JJ_INSTALL_DIR"
-    mv "$TMP_DIR/jj" "$JJ_INSTALL_DIR/jj"
-    chmod +x "$JJ_INSTALL_DIR/jj"
-    export PATH="$JJ_INSTALL_DIR:$PATH"
-    echo "jj ${LATEST_TAG} installed to ${JJ_INSTALL_DIR}/jj" >&2
-    exit 0
-  fi
+if curl -fsSL "$DOWNLOAD_URL" | tar xz -C "$INSTALL_DIR" jj 2>/dev/null; then
+  chmod +x "${INSTALL_DIR}/jj"
+  export PATH="${INSTALL_DIR}:${PATH}"
+  echo "jj ${LATEST_TAG} を ${INSTALL_DIR} にインストールしました"
+else
+  echo "警告: jj のダウンロードに失敗しました"
+  echo "手動でインストールしてください: https://jj-vcs.github.io/jj/latest/install-and-setup/"
 fi
 
-echo "Warning: Failed to install jj. Install manually: https://jj-vcs.github.io/jj/latest/install-and-setup/" >&2
 exit 0
