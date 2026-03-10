@@ -5,13 +5,12 @@ import * as neverthrow from 'neverthrow';
 import { ResultAsync } from 'neverthrow';
 import { match } from 'ts-pattern';
 import {
-  exportLogsToLogStore,
-  formatLogStoreContent,
-  type LogRecord,
-} from '../converters/dbToLogStore';
+  getLogStoreDir,
+  getLogStoreFilePathsInRange,
+} from '../fileHandlers/logStorageManager';
 
 /**
- * DBからlogStore形式でエクスポートするサービス
+ * logStoreからファイルをコピーしてエクスポートするサービス
  */
 
 /**
@@ -20,7 +19,9 @@ import {
 export type ExportError =
   | { type: 'DIR_CREATE_FAILED'; path: string; message: string }
   | { type: 'FILE_WRITE_FAILED'; path: string; message: string }
-  | { type: 'DB_QUERY_FAILED'; message: string };
+  | { type: 'FILE_READ_FAILED'; path: string; message: string }
+  | { type: 'FILE_COPY_FAILED'; src: string; dest: string; message: string }
+  | { type: 'NO_LOGSTORE_FILES'; message: string };
 
 /**
  * ExportErrorからユーザー向けメッセージを取得
@@ -36,8 +37,17 @@ export const getExportErrorMessage = (error: ExportError): string =>
       (e) => `ファイル書き込みに失敗しました: ${e.path} (${e.message})`,
     )
     .with(
-      { type: 'DB_QUERY_FAILED' },
-      (e) => `データベースクエリに失敗しました: ${e.message}`,
+      { type: 'FILE_READ_FAILED' },
+      (e) => `ファイル読み込みに失敗しました: ${e.path} (${e.message})`,
+    )
+    .with(
+      { type: 'FILE_COPY_FAILED' },
+      (e) =>
+        `ファイルコピーに失敗しました: ${e.src} → ${e.dest} (${e.message})`,
+    )
+    .with(
+      { type: 'NO_LOGSTORE_FILES' },
+      (e) => `エクスポート対象のログファイルがありません: ${e.message}`,
     )
     .exhaustive();
 
@@ -53,11 +63,6 @@ export interface ExportResult {
   exportStartTime: Date;
   exportEndTime: Date;
 }
-
-export type DBLogProvider = (
-  startDate?: Date,
-  endDate?: Date,
-) => Promise<LogRecord[]>;
 
 /**
  * Electronのダウンロードパスを安全に取得
@@ -132,49 +137,6 @@ export const getLogStoreExportPath = (
 };
 
 /**
- * ログレコードを月別にグループ化
- * @param logRecords ログレコード配列
- * @returns 月別にグループ化されたログレコード
- */
-const groupLogRecordsByMonth = (
-  logRecords: LogRecord[],
-): Map<string, LogRecord[]> => {
-  const groupedRecords = new Map<string, LogRecord[]>();
-
-  for (const logRecord of logRecords) {
-    const recordDate = match(logRecord)
-      .with(
-        { type: 'worldJoin' },
-        (record) => (record.record as { joinDateTime: Date }).joinDateTime,
-      )
-      .with(
-        { type: 'playerJoin' },
-        (record) => (record.record as { joinDateTime: Date }).joinDateTime,
-      )
-      .with(
-        { type: 'playerLeave' },
-        (record) => (record.record as { leaveDateTime: Date }).leaveDateTime,
-      )
-      // TODO: アプリイベントの処理は今後実装
-      // .with(
-      //   { type: 'appEvent' },
-      //   (record) => (record.record as { eventDateTime: Date }).eventDateTime,
-      // )
-      .exhaustive();
-
-    const yearMonth = datefns.format(recordDate, 'yyyy-MM');
-
-    if (!groupedRecords.has(yearMonth)) {
-      groupedRecords.set(yearMonth, []);
-    }
-
-    groupedRecords.get(yearMonth)?.push(logRecord);
-  }
-
-  return groupedRecords;
-};
-
-/**
  * ディレクトリを作成（再帰的）
  * @param dirPath 作成するディレクトリパス
  */
@@ -188,34 +150,52 @@ const ensureDirectoryExists = (
   })).map(() => undefined);
 
 /**
- * ファイル書き込み（ResultAsync版）
+ * ファイルコピー（ResultAsync版）
  */
-const writeFileSafe = (
-  filePath: string,
-  content: string,
+const copyFileSafe = (
+  src: string,
+  dest: string,
 ): ResultAsync<void, ExportError> =>
-  ResultAsync.fromPromise(fs.writeFile(filePath, content, 'utf-8'), (e) => ({
-    type: 'FILE_WRITE_FAILED' as const,
-    path: filePath,
+  ResultAsync.fromPromise(fs.copyFile(src, dest), (e) => ({
+    type: 'FILE_COPY_FAILED' as const,
+    src,
+    dest,
     message: e instanceof Error ? e.message : String(e),
   }));
 
 /**
- * DBからlogStore形式でデータをエクスポート
- * @param options エクスポートオプション
- * @param getDBLogs DB取得関数
- * @returns エクスポート結果
+ * ファイルの行数をカウント
  */
-export const exportLogStoreFromDB = async (
+const countFileLines = async (filePath: string): Promise<number> => {
+  const content = await fs.readFile(filePath, 'utf-8');
+  return content.split('\n').filter((line) => line.trim().length > 0).length;
+};
+
+/**
+ * logStoreからファイルをコピーしてエクスポート
+ *
+ * DBからの変換ではなく、logStoreディレクトリから直接ファイルをコピーすることで:
+ * - 変換時のバグリスクを回避
+ * - VRChatログ仕様変更への耐性を確保
+ * - exit ログなどDBに保存されないログも保持
+ *
+ * @param options エクスポートオプション
+ * @returns エクスポート結果
+ * @see https://github.com/tktcorporation/vrchat-albums/issues/477
+ */
+export const exportLogStore = async (
   options: ExportLogStoreOptions,
-  getDBLogs: DBLogProvider,
 ): Promise<neverthrow.Result<ExportResult, ExportError>> => {
   const exportStartTime = new Date();
 
-  // DBからログデータを取得（期間指定がない場合は全データ取得）
-  const logRecords = await getDBLogs(options.startDate, options.endDate);
+  // 期間を決定（指定がない場合は全期間）
+  const startDate = options.startDate ?? new Date(2000, 0, 1);
+  const endDate = options.endDate ?? new Date();
 
-  if (logRecords.length === 0) {
+  // 対象期間のlogStoreファイルを取得
+  const logStoreFiles = await getLogStoreFilePathsInRange(startDate, endDate);
+
+  if (logStoreFiles.length === 0) {
     return neverthrow.ok({
       exportedFiles: [],
       totalLogLines: 0,
@@ -224,43 +204,40 @@ export const exportLogStoreFromDB = async (
     });
   }
 
-  // 月別にグループ化
-  const groupedRecords = groupLogRecordsByMonth(logRecords);
-
   const exportedFiles: string[] = [];
   let totalLogLines = 0;
 
-  // 月別にファイルを作成
-  for (const [yearMonth, monthRecords] of groupedRecords) {
-    // logStore形式に変換
-    const logLines = exportLogsToLogStore(monthRecords);
-    totalLogLines += logLines.length;
+  const logStoreDir = getLogStoreDir();
 
-    if (logLines.length > 0) {
-      // ファイルパスを生成
-      const sampleDate = datefns.parse(yearMonth, 'yyyy-MM', new Date());
-      const filePath = getLogStoreExportPath(
-        sampleDate,
-        options.outputBasePath,
-        exportStartTime,
-      );
+  // 各ファイルをエクスポート先にコピー
+  for (const logStoreFile of logStoreFiles) {
+    const srcPath = logStoreFile.value;
 
-      // ディレクトリを作成
-      const dirPath = path.dirname(filePath);
-      const dirResult = await ensureDirectoryExists(dirPath);
-      if (dirResult.isErr()) {
-        return neverthrow.err(dirResult.error);
-      }
+    // 相対パスを計算（logStoreディレクトリからの相対パス）
+    const relativePath = path.relative(logStoreDir, srcPath);
 
-      // ファイルに書き込み
-      const content = formatLogStoreContent(logLines);
-      const writeResult = await writeFileSafe(filePath, content);
-      if (writeResult.isErr()) {
-        return neverthrow.err(writeResult.error);
-      }
+    // エクスポート先パスを生成
+    const basePath = options.outputBasePath || getDefaultLogStorePath();
+    const exportFolder = generateExportFolderName(exportStartTime);
+    const destPath = path.join(basePath, exportFolder, relativePath);
 
-      exportedFiles.push(filePath);
+    // ディレクトリを作成
+    const dirPath = path.dirname(destPath);
+    const dirResult = await ensureDirectoryExists(dirPath);
+    if (dirResult.isErr()) {
+      return neverthrow.err(dirResult.error);
     }
+
+    // ファイルをコピー
+    const copyResult = await copyFileSafe(srcPath, destPath);
+    if (copyResult.isErr()) {
+      return neverthrow.err(copyResult.error);
+    }
+
+    // 行数をカウント
+    totalLogLines += await countFileLines(srcPath);
+
+    exportedFiles.push(destPath);
   }
 
   const exportEndTime = new Date();
@@ -268,65 +245,6 @@ export const exportLogStoreFromDB = async (
   return neverthrow.ok({
     exportedFiles,
     totalLogLines,
-    exportStartTime,
-    exportEndTime,
-  });
-};
-
-/**
- * 単一ファイルとしてlogStoreデータをエクスポート
- * @param options エクスポートオプション
- * @param getDBLogs DB取得関数
- * @param outputFilePath 出力ファイルパス
- * @returns エクスポート結果
- */
-export const exportLogStoreToSingleFile = async (
-  options: ExportLogStoreOptions,
-  getDBLogs: DBLogProvider,
-  outputFilePath: string,
-): Promise<neverthrow.Result<ExportResult, ExportError>> => {
-  const exportStartTime = new Date();
-
-  // DBからログデータを取得（期間指定がない場合は全データ取得）
-  const logRecords = await getDBLogs(options.startDate, options.endDate);
-
-  if (logRecords.length === 0) {
-    return neverthrow.ok({
-      exportedFiles: [],
-      totalLogLines: 0,
-      exportStartTime,
-      exportEndTime: new Date(),
-    });
-  }
-
-  // logStore形式に変換
-  const logLines = exportLogsToLogStore(logRecords);
-
-  // エクスポート実行日時のサブフォルダ名を生成
-  const exportFolder = generateExportFolderName(exportStartTime);
-  const outputDir = path.dirname(outputFilePath);
-  const outputFileName = path.basename(outputFilePath);
-  const finalOutputPath = path.join(outputDir, exportFolder, outputFileName);
-
-  // ディレクトリを作成
-  const dirPath = path.dirname(finalOutputPath);
-  const dirResult = await ensureDirectoryExists(dirPath);
-  if (dirResult.isErr()) {
-    return neverthrow.err(dirResult.error);
-  }
-
-  // ファイルに書き込み
-  const content = formatLogStoreContent(logLines);
-  const writeResult = await writeFileSafe(finalOutputPath, content);
-  if (writeResult.isErr()) {
-    return neverthrow.err(writeResult.error);
-  }
-
-  const exportEndTime = new Date();
-
-  return neverthrow.ok({
-    exportedFiles: [finalOutputPath],
-    totalLogLines: logLines.length,
     exportStartTime,
     exportEndTime,
   });

@@ -5,8 +5,6 @@ import z from 'zod';
 import { ERROR_CATEGORIES, UserFacingError } from '../../lib/errors';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
-import * as playerJoinLogService from './../VRChatPlayerJoinLogModel/playerJoinLog.service';
-import * as playerLeaveLogService from './../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import * as vrchatLogFileDirService from './../vrchatLogFileDir/service';
 import * as worldJoinLogService from './../vrchatWorldJoinLog/service';
 import {
@@ -18,10 +16,9 @@ import {
   rollbackService,
 } from './backupService/rollbackService';
 import { FILTER_PATTERNS } from './constants/logPatterns';
-import type { LogRecord } from './converters/dbToLogStore';
 import { VRChatLogFileError } from './error';
 import {
-  exportLogStoreFromDB,
+  exportLogStore,
   getExportErrorMessage,
 } from './exportService/exportService';
 import {
@@ -155,133 +152,6 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   return neverthrow.ok(undefined);
 };
 
-/**
- * DBからlogStore形式でエクスポートする
- * 期間指定がない場合は全データを取得
- */
-const getDBLogsFromDatabase = async (
-  startDate?: Date,
-  endDate?: Date,
-): Promise<LogRecord[]> => {
-  const logRecords: LogRecord[] = [];
-
-  // ワールド参加ログを取得
-  const worldJoinQueryOptions: Parameters<
-    typeof worldJoinLogService.findVRChatWorldJoinLogList
-  >[0] = {
-    orderByJoinDateTime: 'asc',
-  };
-
-  // 期間指定がある場合のみフィルタを追加
-  if (startDate) {
-    worldJoinQueryOptions.gtJoinDateTime = startDate;
-  }
-  if (endDate) {
-    worldJoinQueryOptions.ltJoinDateTime = endDate;
-  }
-
-  const worldJoinResult = await worldJoinLogService.findVRChatWorldJoinLogList(
-    worldJoinQueryOptions,
-  );
-
-  for (const log of worldJoinResult) {
-    logRecords.push({
-      type: 'worldJoin',
-      record: {
-        id: log.id,
-        worldId: log.worldId,
-        worldName: log.worldName,
-        worldInstanceId: log.worldInstanceId,
-        joinDateTime: log.joinDateTime,
-        createdAt: log.createdAt,
-        updatedAt: log.updatedAt || new Date(),
-      },
-    });
-  }
-
-  // プレイヤー参加ログを取得
-  let playerJoinResult: Awaited<
-    ReturnType<
-      typeof playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime
-    >
-  >;
-
-  if (startDate) {
-    playerJoinResult =
-      await playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: startDate,
-        endJoinDateTime: endDate || null,
-      });
-  } else {
-    // 期間指定がない場合は、最古の日付から現在までを取得
-    const oldestDate = new Date('2017-01-01'); // VRChatリリース日程度
-    playerJoinResult =
-      await playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: oldestDate,
-        endJoinDateTime: endDate || new Date(),
-      });
-  }
-
-  if (playerJoinResult.isOk()) {
-    for (const log of playerJoinResult.value) {
-      logRecords.push({
-        type: 'playerJoin',
-        record: {
-          id: log.id,
-          playerName: log.playerName,
-          playerId: log.playerId,
-          joinDateTime: log.joinDateTime,
-          createdAt: log.createdAt,
-          updatedAt: log.updatedAt || new Date(),
-        },
-      });
-    }
-  }
-
-  // プレイヤー退出ログを取得
-  const playerLeaveQueryOptions: Parameters<
-    typeof playerLeaveLogService.findVRChatPlayerLeaveLogList
-  >[0] = {
-    orderByLeaveDateTime: 'asc',
-  };
-
-  // 期間指定がある場合のみフィルタを追加
-  if (startDate) {
-    playerLeaveQueryOptions.gtLeaveDateTime = startDate;
-  }
-  if (endDate) {
-    playerLeaveQueryOptions.ltLeaveDateTime = endDate;
-  }
-
-  const playerLeaveResult =
-    await playerLeaveLogService.findVRChatPlayerLeaveLogList(
-      playerLeaveQueryOptions,
-    );
-
-  for (const log of playerLeaveResult) {
-    logRecords.push({
-      type: 'playerLeave',
-      record: {
-        id: log.id,
-        playerName: log.playerName,
-        playerId: log.playerId,
-        leaveDateTime: log.leaveDateTime,
-        createdAt: log.createdAt,
-        updatedAt: log.updatedAt || new Date(),
-      },
-    });
-  }
-
-  // TODO: アプリイベントログの取得は今後実装
-  // const appEventRecords = await appEventService.getAppEventLogRecords(
-  //   startDate,
-  //   endDate,
-  // );
-  // logRecords.push(...appEventRecords);
-
-  return logRecords;
-};
-
 export const vrchatLogRouter = () =>
   trpcRouter({
     appendLoglinesToFileFromLogFilePathList: procedure
@@ -318,18 +188,15 @@ export const vrchatLogRouter = () =>
         const { input } = opts;
         const dateRangeMsg =
           input.startDate && input.endDate
-            ? `${input.startDate.toISOString()} to ${input.endDate.toISOString()} (received as local time, converted to UTC for DB query)`
+            ? `${input.startDate.toISOString()} to ${input.endDate.toISOString()}`
             : '全期間';
         logger.info(`exportLogStoreData: ${dateRangeMsg}`);
 
-        const exportResult = await exportLogStoreFromDB(
-          {
-            startDate: input.startDate,
-            endDate: input.endDate,
-            outputBasePath: input.outputPath,
-          },
-          getDBLogsFromDatabase,
-        );
+        const exportResult = await exportLogStore({
+          startDate: input.startDate,
+          endDate: input.endDate,
+          outputBasePath: input.outputPath,
+        });
 
         if (exportResult.isErr()) {
           const errorMessage = getExportErrorMessage(exportResult.error);
@@ -366,9 +233,7 @@ export const vrchatLogRouter = () =>
 
       // backupService.createPreImportBackup は Result 型を返すため、try-catch は不要
       // 予期しないエラーは自動的に throw されて Sentry に送信される
-      const backupResult = await backupService.createPreImportBackup(
-        getDBLogsFromDatabase,
-      );
+      const backupResult = await backupService.createPreImportBackup();
 
       if (backupResult.isErr()) {
         const errorMessage = getBackupErrorMessage(backupResult.error);
@@ -408,7 +273,6 @@ export const vrchatLogRouter = () =>
         // 予期しないエラーは自動的に throw されて Sentry に送信される
         const importResult = await importService.importLogStoreFiles(
           input.filePaths,
-          getDBLogsFromDatabase,
         );
 
         if (importResult.isErr()) {

@@ -7,7 +7,6 @@ import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
 import {
   type BackupError,
   backupService,
-  type DBLogProvider,
   getBackupErrorMessage,
   type ImportBackupMetadata,
 } from '../backupService/backupService';
@@ -77,7 +76,6 @@ export class ImportService {
    */
   async importLogStoreFiles(
     paths: string[],
-    getDBLogs: DBLogProvider,
   ): Promise<neverthrow.Result<ImportResult, ImportError>> {
     logger.info(`Starting import process for ${paths.length} paths`);
 
@@ -90,8 +88,8 @@ export class ImportService {
 
     logger.info(`Found ${filePaths.length} logStore files to import`);
 
-    // 2. インポート前バックアップ作成（エクスポート機能活用）
-    const backupResult = await backupService.createPreImportBackup(getDBLogs);
+    // 2. インポート前バックアップ作成（logStoreから直接コピー）
+    const backupResult = await backupService.createPreImportBackup();
     if (backupResult.isErr()) {
       return neverthrow.err({
         type: 'BACKUP_FAILED',
