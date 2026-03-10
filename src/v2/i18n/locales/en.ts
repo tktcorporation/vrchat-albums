@@ -177,6 +177,34 @@ const en: Translations = {
     clearAllConfirm: 'Clear all pickups?',
     emptyMessage: 'No photos in pickup',
     photoCount: '{count} photos',
+    addedToast: 'Added to pickup',
+  },
+  startup: {
+    syncing: {
+      title: 'Loading your data',
+      defaultMessage: 'Loading...',
+    },
+    setup: {
+      title: 'Initial Setup',
+      description: 'Set your VRChat log and photo folders to get started.',
+      configureFolders: 'Configure Folders',
+      folderDescription: 'Select your VRChat log folder and photo folder.',
+      confirm: 'Confirm and continue',
+    },
+    error: {
+      permission: 'Permission Error',
+      permissionDescription:
+        'Permission is required to access files and folders.',
+      database: 'Database Error',
+      databaseDescription: 'Could not connect to the database.',
+      network: 'Network Error',
+      networkDescription: 'Please check your network connection.',
+      generic: 'Application Error',
+      genericDescription: 'An unexpected error occurred.',
+      details: 'Error Details',
+      retry: 'Retry',
+      reportBug: 'Report a bug',
+    },
   },
 };
 

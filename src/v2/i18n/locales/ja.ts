@@ -178,6 +178,35 @@ const ja: Translations = {
     clearAllConfirm: 'ピックアップを全クリアしますか？',
     emptyMessage: 'ピックアップに写真がありません',
     photoCount: '{count}枚',
+    addedToast: 'ピックアップに追加しました',
+  },
+  startup: {
+    syncing: {
+      title: 'データを読み込んでいます',
+      defaultMessage: '読み込み中...',
+    },
+    setup: {
+      title: '初期セットアップ',
+      description:
+        'VRChatのログフォルダと写真フォルダを設定して、アプリを使い始めましょう。',
+      configureFolders: 'フォルダを設定',
+      folderDescription:
+        'VRChatのログフォルダと写真フォルダを選択してください。',
+      confirm: '設定を確認して続ける',
+    },
+    error: {
+      permission: 'アクセス許可エラー',
+      permissionDescription: 'ファイルやフォルダへのアクセス許可が必要です。',
+      database: 'データベースエラー',
+      databaseDescription: 'データベースに接続できませんでした。',
+      network: 'ネットワークエラー',
+      networkDescription: 'ネットワーク接続を確認してください。',
+      generic: 'アプリケーションエラー',
+      genericDescription: '予期せぬエラーが発生しました。',
+      details: 'エラー詳細',
+      retry: '再試行',
+      reportBug: 'バグを報告する',
+    },
   },
 };
 

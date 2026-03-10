@@ -71,10 +71,39 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
     refetchList,
     addPickup,
     removePickup,
-    togglePickup,
     clearAll,
     isPickedUp,
   } = usePhotoPickup();
+
+  /**
+   * ピックアップ追加時にトースト通知を出すラッパー。
+   * 初回追加時にヘッダーのフラッグアイコンの存在を知らせる。
+   */
+  const handleAddPickup = useCallback(
+    (photoId: string) => {
+      addPickup(photoId);
+      toast({
+        title: t('pickup.addedToast'),
+        variant: 'default',
+      });
+    },
+    [addPickup, toast, t],
+  );
+
+  /**
+   * ピックアップトグル時のラッパー。
+   * 追加時のみトースト通知。
+   */
+  const handleTogglePickup = useCallback(
+    (photoId: string) => {
+      if (isPickedUp(photoId)) {
+        removePickup(photoId);
+      } else {
+        handleAddPickup(photoId);
+      }
+    },
+    [isPickedUp, removePickup, handleAddPickup],
+  );
 
   /** 選択をクリアし、複数選択モードを解除するハンドラ */
   const handleClearSelection = () => {
@@ -177,8 +206,8 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
     pickupCount,
     pickupList,
     refetchPickupList: refetchList,
-    onTogglePickup: togglePickup,
-    onAddPickup: addPickup,
+    onTogglePickup: handleTogglePickup,
+    onAddPickup: handleAddPickup,
     onRemovePickup: removePickup,
     onClearAllPickups: clearAll,
     isPickedUp,
@@ -199,7 +228,7 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
         galleryData={galleryData}
       />
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-      <PhotoPickupDropZone pickupCount={pickupCount} onDrop={addPickup} />
+      <PhotoPickupDropZone pickupCount={pickupCount} onDrop={handleAddPickup} />
       <PhotoPickupDialog
         open={showPickupDialog}
         onOpenChange={setShowPickupDialog}
