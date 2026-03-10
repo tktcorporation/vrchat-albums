@@ -19,6 +19,7 @@ import {
 } from './module/initProgress/schema';
 import { logInfoRouter } from './module/logInfo/logInfoCointroller';
 import { logSyncRouter } from './module/logSync/logSyncController';
+import { photoPickupRouter } from './module/photoPickup/controller';
 import * as service from './module/service';
 import { initSettingStore } from './module/settingStore';
 import { settingsRouter } from './module/settings/settingsController';
@@ -44,6 +45,7 @@ export const router = trpcRouter({
   vrchatWorldJoinLog: vrchatWorldJoinLogRouter(),
   logInfo: logInfoRouter(),
   logSync: logSyncRouter(),
+  photoPickup: photoPickupRouter(),
   vrchatApi: vrchatApiRouter,
   debug: debugRouter,
   updater: updaterRouter,

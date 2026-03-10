@@ -3,11 +3,14 @@ import { trpcReact } from '@/trpc';
 import { useToast } from '../hooks/use-toast';
 import { useDebounce } from '../hooks/useDebounce';
 import type { UseLoadingStateResult } from '../hooks/useLoadingState';
+import { usePhotoPickup } from '../hooks/usePhotoPickup';
 import { useI18n } from '../i18n/store';
 import { isPhotoLoaded } from '../types/photo';
 import { useMigrationNotice } from './MigrationNotice';
 import GalleryContent from './PhotoGallery/GalleryContent';
 import { usePhotoGallery } from './PhotoGallery/usePhotoGallery';
+import PhotoPickupDialog from './PhotoPickupDialog';
+import PhotoPickupDropZone from './PhotoPickupDropZone';
 import SettingsModal from './settings/SettingsModal';
 
 interface PhotoGalleryProps extends UseLoadingStateResult {}
@@ -24,6 +27,15 @@ export interface PhotoGalleryData {
     UseLoadingStateResult,
     'isRefreshing' | 'startRefreshing' | 'finishRefreshing'
   >;
+  pickupCount: number;
+  pickupList: Array<{ photoId: string; createdAt: Date }>;
+  refetchPickupList: () => void;
+  onTogglePickup: (photoId: string) => void;
+  onAddPickup: (photoId: string) => void;
+  onRemovePickup: (photoId: string) => void;
+  onClearAllPickups: () => void;
+  isPickedUp: (photoId: string) => boolean;
+  onOpenPickup?: () => void;
 }
 
 /**
@@ -38,6 +50,7 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
   );
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // 300ms のデバウンス
   const [showSettings, setShowSettings] = useState(false);
+  const [showPickupDialog, setShowPickupDialog] = useState(false);
   const { t } = useI18n();
   const { toast } = useToast();
   const { MigrationDialog } = useMigrationNotice();
@@ -51,6 +64,46 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
   } = usePhotoGallery(debouncedSearchQuery, searchType, {
     onGroupingEnd: props.finishLoadingGrouping,
   });
+
+  const {
+    pickupCount,
+    pickupList,
+    refetchList,
+    addPickup,
+    removePickup,
+    clearAll,
+    isPickedUp,
+  } = usePhotoPickup();
+
+  /**
+   * ピックアップ追加時にトースト通知を出すラッパー。
+   * 初回追加時にヘッダーのフラッグアイコンの存在を知らせる。
+   */
+  const handleAddPickup = useCallback(
+    (photoId: string) => {
+      addPickup(photoId);
+      toast({
+        title: t('pickup.addedToast'),
+        variant: 'default',
+      });
+    },
+    [addPickup, toast, t],
+  );
+
+  /**
+   * ピックアップトグル時のラッパー。
+   * 追加時のみトースト通知。
+   */
+  const handleTogglePickup = useCallback(
+    (photoId: string) => {
+      if (isPickedUp(photoId)) {
+        removePickup(photoId);
+      } else {
+        handleAddPickup(photoId);
+      }
+    },
+    [isPickedUp, removePickup, handleAddPickup],
+  );
 
   /** 選択をクリアし、複数選択モードを解除するハンドラ */
   const handleClearSelection = () => {
@@ -150,6 +203,15 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
       startRefreshing: props.startRefreshing,
       finishRefreshing: props.finishRefreshing,
     },
+    pickupCount,
+    pickupList,
+    refetchPickupList: refetchList,
+    onTogglePickup: handleTogglePickup,
+    onAddPickup: handleAddPickup,
+    onRemovePickup: removePickup,
+    onClearAllPickups: clearAll,
+    isPickedUp,
+    onOpenPickup: () => setShowPickupDialog(true),
   };
 
   return (
@@ -166,6 +228,15 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
         galleryData={galleryData}
       />
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      <PhotoPickupDropZone pickupCount={pickupCount} onDrop={handleAddPickup} />
+      <PhotoPickupDialog
+        open={showPickupDialog}
+        onOpenChange={setShowPickupDialog}
+        pickupList={pickupList}
+        onRemove={removePickup}
+        onClearAll={clearAll}
+        onRefetch={refetchList}
+      />
     </div>
   );
 });

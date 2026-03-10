@@ -332,6 +332,8 @@ const VirtualizedGallery = memo(
                           isMultiSelectMode={isMultiSelectMode}
                           setIsMultiSelectMode={setIsMultiSelectMode}
                           onCopySelected={galleryData?.onCopySelected}
+                          isPickedUp={galleryData?.isPickedUp}
+                          onTogglePickup={galleryData?.onTogglePickup}
                         />
                       </div>
                     </div>
@@ -439,6 +441,8 @@ const GalleryContent = memo(
             onCopySelected={galleryData.onCopySelected}
             loadingState={galleryData.loadingState}
             showGalleryControls={true}
+            pickupCount={galleryData.pickupCount}
+            onOpenPickup={galleryData.onOpenPickup}
           />
         )}
         {/* コンテナは常にレンダリング（幅測定のため） */}

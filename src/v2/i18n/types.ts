@@ -178,4 +178,42 @@ export interface Translations {
       error: string;
     };
   };
+  pickup: {
+    addToPickup: string;
+    removeFromPickup: string;
+    dropZoneLabel: string;
+    dialogTitle: string;
+    copyAll: string;
+    clearAll: string;
+    clearAllConfirm: string;
+    emptyMessage: string;
+    photoCount: string;
+    addedToast: string;
+  };
+  startup: {
+    syncing: {
+      title: string;
+      defaultMessage: string;
+    };
+    setup: {
+      title: string;
+      description: string;
+      configureFolders: string;
+      folderDescription: string;
+      confirm: string;
+    };
+    error: {
+      permission: string;
+      permissionDescription: string;
+      database: string;
+      databaseDescription: string;
+      network: string;
+      networkDescription: string;
+      generic: string;
+      genericDescription: string;
+      details: string;
+      retry: string;
+      reportBug: string;
+    };
+  };
 }
