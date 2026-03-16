@@ -4,8 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import type { ConfigEnv, UserConfig } from 'vite';
 
-const rootDir = import.meta.dirname;
-const srcRoot = join(rootDir, 'src');
+const srcRoot = join(__dirname, 'src');
 
 export default ({ command }: ConfigEnv): UserConfig => {
   // DEV
@@ -17,14 +16,14 @@ export default ({ command }: ConfigEnv): UserConfig => {
       resolve: {
         alias: {
           '@': srcRoot,
-          '@electron': join(rootDir, 'electron'),
-          '@shared': join(rootDir, 'shared'),
+          '@electron': join(__dirname, 'electron'),
+          '@shared': join(__dirname, 'shared'),
         },
       },
       build: {
         outDir: join(srcRoot, '/out'),
         emptyOutDir: true,
-        rolldownOptions: {
+        rollupOptions: {
           external: [
             '@sentry/electron',
             '@sentry/electron/main',
@@ -66,14 +65,14 @@ export default ({ command }: ConfigEnv): UserConfig => {
     resolve: {
       alias: {
         '@': srcRoot,
-        '@electron': join(rootDir, 'electron'),
-        '@shared': join(rootDir, 'shared'),
+        '@electron': join(__dirname, 'electron'),
+        '@shared': join(__dirname, 'shared'),
       },
     },
     build: {
       outDir: join(srcRoot, '/out'),
       emptyOutDir: true,
-      rolldownOptions: {
+      rollupOptions: {
         external: [
           '@sentry/electron',
           '@sentry/electron/main',
