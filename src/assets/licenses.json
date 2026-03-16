@@ -80,7 +80,7 @@
     "path": "node_modules/@sequelize/sqlite3",
     "licenseFile": "node_modules/@sequelize/sqlite3/LICENSE"
   },
-  "@tailwindcss/vite@0.0.0-insiders.d24b112": {
+  "@tailwindcss/vite@4.2.1": {
     "licenses": "MIT",
     "repository": "https://github.com/tailwindlabs/tailwindcss",
     "path": "node_modules/@tailwindcss/vite",
@@ -121,7 +121,7 @@
     "path": "node_modules/@trpc/server",
     "licenseFile": "node_modules/@trpc/server/LICENSE"
   },
-  "@vitejs/plugin-react@6.0.1": {
+  "@vitejs/plugin-react@5.1.2": {
     "licenses": "MIT",
     "repository": "https://github.com/vitejs/vite-plugin-react",
     "publisher": "Evan You",
@@ -338,7 +338,7 @@
     "path": "node_modules/tailwind-merge",
     "licenseFile": "node_modules/tailwind-merge/LICENSE.md"
   },
-  "tailwindcss@0.0.0-insiders.d24b112": {
+  "tailwindcss@4.2.1": {
     "licenses": "MIT",
     "repository": "https://github.com/tailwindlabs/tailwindcss",
     "path": "node_modules/tailwindcss",

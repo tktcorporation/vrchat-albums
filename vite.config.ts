@@ -24,7 +24,7 @@ export default ({ command }: ConfigEnv): UserConfig => {
       build: {
         outDir: join(srcRoot, '/out'),
         emptyOutDir: true,
-        rollupOptions: {
+        rolldownOptions: {
           external: [
             '@sentry/electron',
             '@sentry/electron/main',
@@ -66,14 +66,14 @@ export default ({ command }: ConfigEnv): UserConfig => {
     resolve: {
       alias: {
         '@': srcRoot,
-        '@electron': join(__dirname, 'electron'),
-        '@shared': join(__dirname, 'shared'),
+        '@electron': join(rootDir, 'electron'),
+        '@shared': join(rootDir, 'shared'),
       },
     },
     build: {
       outDir: join(srcRoot, '/out'),
       emptyOutDir: true,
-      rollupOptions: {
+      rolldownOptions: {
         external: [
           '@sentry/electron',
           '@sentry/electron/main',

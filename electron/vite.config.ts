@@ -29,7 +29,8 @@ export default defineConfig({
       },
       formats: ['cjs'],
     },
-    rollupOptions: {
+    // Vite 8: rollupOptions → rolldownOptions（互換レイヤーあり）
+    rolldownOptions: {
       external: [
         // Sentry 関連のモジュール
         '@sentry/electron',
@@ -57,7 +58,6 @@ export default defineConfig({
         '@sequelize/snowflake',
         // Node.js の組み込みモジュールを外部化
         ...nodeBuiltins,
-        // 必要に応じて他の外部依存関係を追加
       ],
       output: {
         entryFileNames: '[name].cjs',
@@ -76,14 +76,6 @@ export default defineConfig({
     alias: {
       '@electron': rootDir,
       '@shared': join(rootDir, '../shared'),
-    },
-  },
-  // esbuild の設定を追加
-  esbuild: {
-    // デコレータのサポートを有効化
-    target: 'node20',
-    supported: {
-      decorators: true,
     },
   },
 });
