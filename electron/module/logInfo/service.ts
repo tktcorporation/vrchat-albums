@@ -20,6 +20,7 @@ import type {
 import * as vrchatLogService from '../vrchatLog/service';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import * as vrchatPhotoService from '../vrchatPhoto/vrchatPhoto.service';
+import * as metadataService from '../vrchatPhotoMetadata/service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 import { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import { LogInfoError } from './error';
@@ -522,6 +523,31 @@ export async function loadLogInfoIndexFromVRChatLog({
       photoIndexEndTime - photoIndexStartTime
     } ms`,
   );
+
+  // 6.5. 写真メタデータ抽出 (VRChat公式XMP + VRCX iTXt)
+  if (photoResults && photoResults.length > 0) {
+    emitStageStart('photo_metadata', '写真メタデータを抽出中...');
+    const metadataStartTime = performance.now();
+    const photoPaths = photoResults.map((p) => p.photoPath);
+    const metadataResult =
+      await metadataService.extractAndSaveMetadataBatch(photoPaths);
+    if (metadataResult.isOk()) {
+      logger.info(
+        `Photo metadata extracted: ${metadataResult.value} new records`,
+      );
+    } else {
+      logger.warn({
+        message: `Photo metadata extraction failed: ${metadataResult.error.message}`,
+        stack: new Error(metadataResult.error.message),
+      });
+    }
+    const metadataEndTime = performance.now();
+    logger.debug(
+      `Photo metadata extraction took ${
+        metadataEndTime - metadataStartTime
+      } ms`,
+    );
+  }
 
   // 7. 写真フォルダからのログインポート（通常ログ処理後に実行）
   const importLogPhotoStartTime = performance.now();

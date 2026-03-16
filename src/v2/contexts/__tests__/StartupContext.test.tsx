@@ -32,6 +32,7 @@ vi.mock('../../hooks/useInitProgress', () => ({
     log_append: 'ログファイル読み込み',
     log_load: 'ログデータ保存',
     photo_index: '写真インデックス',
+    photo_metadata: '写真メタデータ抽出',
     completed: '完了',
   },
 }));
