@@ -89,6 +89,10 @@ vi.mock('../vrchatPhoto/vrchatPhoto.service', () => ({
   createVRChatPhotoPathIndex: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('../vrchatPhotoMetadata/service', () => ({
+  extractAndSaveMetadataBatch: vi.fn().mockResolvedValue(neverthrow.ok(0)),
+}));
+
 // getAppUserDataPathのモック
 vi.mock('../../lib/wrappedApp', () => ({
   getAppUserDataPath: vi.fn().mockReturnValue('/mock/user/data'),

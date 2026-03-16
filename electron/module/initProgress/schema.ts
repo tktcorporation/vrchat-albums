@@ -14,6 +14,7 @@ export const InitStageSchema = z.enum([
   'log_append',
   'log_load',
   'photo_index',
+  'photo_metadata',
   'completed',
   'error',
 ]);
@@ -65,6 +66,7 @@ export const STAGE_LABELS: Record<InitStage, string> = {
   log_append: 'ログファイル読み込み',
   log_load: 'ログデータ保存',
   photo_index: '写真インデックス',
+  photo_metadata: '写真メタデータ抽出',
   completed: '完了',
   error: 'エラー',
 } as const;

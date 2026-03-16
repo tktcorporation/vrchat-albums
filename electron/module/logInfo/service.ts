@@ -3,7 +3,7 @@ import { col, fn, literal, Op } from '@sequelize/core';
 import * as datefns from 'date-fns';
 import * as neverthrow from 'neverthrow';
 import { err, ResultAsync } from 'neverthrow';
-import { match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { logger } from '../../lib/logger';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
@@ -20,6 +20,7 @@ import type {
 import * as vrchatLogService from '../vrchatLog/service';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import * as vrchatPhotoService from '../vrchatPhoto/vrchatPhoto.service';
+import * as metadataService from '../vrchatPhotoMetadata/service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 import { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import { LogInfoError } from './error';
@@ -522,6 +523,42 @@ export async function loadLogInfoIndexFromVRChatLog({
       photoIndexEndTime - photoIndexStartTime
     } ms`,
   );
+
+  // 6.5. 写真メタデータ抽出 (VRChat公式XMP)
+  if (photoResults && photoResults.length > 0) {
+    emitStageStart('photo_metadata', '写真メタデータを抽出中...');
+    const metadataStartTime = performance.now();
+    const photoPaths = photoResults.map((p) => p.photoPath);
+    const metadataResult =
+      await metadataService.extractAndSaveMetadataBatch(photoPaths);
+    if (metadataResult.isOk()) {
+      logger.info(
+        `Photo metadata extracted: ${metadataResult.value} new records`,
+      );
+    } else {
+      // DB_ERROR は予期しないエラーなので error レベル（Sentry送信）
+      // NO_METADATA_FOUND / PARSE_ERROR はファイル単位の想定内失敗なので warn
+      match(metadataResult.error)
+        .with({ type: 'DB_ERROR' }, (e) => {
+          logger.error({
+            message: `Photo metadata DB error: ${e.message}`,
+            stack: new Error(e.message),
+          });
+        })
+        .with({ type: P.union('NO_METADATA_FOUND', 'PARSE_ERROR') }, (e) => {
+          logger.warn({
+            message: `Photo metadata extraction issue: ${e.message}`,
+          });
+        })
+        .exhaustive();
+    }
+    const metadataEndTime = performance.now();
+    logger.debug(
+      `Photo metadata extraction took ${
+        metadataEndTime - metadataStartTime
+      } ms`,
+    );
+  }
 
   // 7. 写真フォルダからのログインポート（通常ログ処理後に実行）
   const importLogPhotoStartTime = performance.now();

@@ -26,6 +26,7 @@ import { updaterRouter } from './module/updater/router';
 import { vrchatApiRouter } from './module/vrchatApi/vrchatApiController';
 import { vrchatLogRouter } from './module/vrchatLog/vrchatLogController';
 import { vrchatPhotoRouter } from './module/vrchatPhoto/vrchatPhoto.controller';
+import { vrchatPhotoMetadataRouter } from './module/vrchatPhotoMetadata/vrchatPhotoMetadata.controller';
 import { vrchatWorldJoinLogRouter } from './module/vrchatWorldJoinLog/vrchatWorldJoinLog.controller';
 import { eventEmitter as ee, procedure, router as trpcRouter } from './trpc';
 
@@ -40,6 +41,7 @@ export const router = trpcRouter({
   settings: settingsRouter(),
   electronUtil: electronUtilRouter(),
   vrchatPhoto: vrchatPhotoRouter(),
+  vrchatPhotoMetadata: vrchatPhotoMetadataRouter(),
   vrchatLog: vrchatLogRouter(),
   vrchatWorldJoinLog: vrchatWorldJoinLogRouter(),
   logInfo: logInfoRouter(),

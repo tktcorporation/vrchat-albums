@@ -19,7 +19,8 @@ const STAGE_CONFIG: ReadonlyArray<{ stage: InitStage; weight: number }> = [
   { stage: 'directory_check', weight: 15 },
   { stage: 'log_append', weight: 15 },
   { stage: 'log_load', weight: 25 },
-  { stage: 'photo_index', weight: 25 },
+  { stage: 'photo_index', weight: 20 },
+  { stage: 'photo_metadata', weight: 5 },
 ] as const;
 
 /**
