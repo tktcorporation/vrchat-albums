@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import sharp from 'sharp';
+import { Transformer } from '@napi-rs/image';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,7 +85,10 @@ async function generatePlatformIcon(platform: Platform): Promise<void> {
 
     // SVGからPNGを生成
     const svgBuffer = Buffer.from(svgContent);
-    await sharp(svgBuffer).resize(1024, 1024).png().toFile(outputPngPath);
+    const pngData = await Transformer.fromSvg(svgBuffer)
+      .resize(1024, 1024)
+      .png();
+    fs.writeFileSync(outputPngPath, pngData);
 
     // ファイルサイズを表示
     const stats = fs.statSync(outputPngPath);
@@ -123,10 +126,13 @@ async function main(): Promise<void> {
   // 汎用アイコンも生成（互換性のため）
   console.log('📦 Generating generic icon.png...');
   const svgBuffer = fs.readFileSync(sourceSvgPath);
-  await sharp(svgBuffer)
+  const genericPng = await Transformer.fromSvg(svgBuffer)
     .resize(1024, 1024)
-    .png()
-    .toFile(path.join(__dirname, '..', 'assets', 'icon.png'));
+    .png();
+  fs.writeFileSync(
+    path.join(__dirname, '..', 'assets', 'icon.png'),
+    genericPng,
+  );
 
   console.log('✨ All icons generated successfully!');
   console.log('\n📝 Note: All icons are generated from assets/icon.svg');

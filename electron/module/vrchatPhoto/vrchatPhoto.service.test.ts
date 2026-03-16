@@ -18,30 +18,14 @@ vi.mock('node:fs/promises');
 vi.mock('./model/vrchatPhotoPath.model');
 vi.mock('../settingStore');
 vi.mock('hash-wasm');
-vi.mock('sharp', () => {
-  const mockSharpInstance = {
-    metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 }),
-    resize: vi.fn().mockReturnThis(),
-    toBuffer: vi.fn().mockResolvedValue(Buffer.from('mockImageData')),
-  };
-  const mockSharp = vi.fn(() => mockSharpInstance);
-  // 静的メソッドを追加（sharpConfig.tsで使用）
-  (mockSharp as unknown as Record<string, unknown>).concurrency = vi.fn(
-    () => 2,
-  );
-  (mockSharp as unknown as Record<string, unknown>).cache = vi.fn(() => ({
-    memory: { current: 0, high: 0, max: 50 },
-    files: { current: 0, max: 10 },
-    items: { current: 0, max: 50 },
-  }));
-  (mockSharp as unknown as Record<string, unknown>).simd = vi.fn(() => true);
-  (mockSharp as unknown as Record<string, unknown>).versions = {
-    vips: '8.17.0',
-    sharp: '0.34.0',
-  };
-  return {
-    default: mockSharp,
-  };
+vi.mock('@napi-rs/image', () => {
+  class MockTransformer {
+    metadata = vi.fn().mockResolvedValue({ width: 1920, height: 1080 });
+    resize = vi.fn().mockReturnThis();
+    webp = vi.fn().mockResolvedValue(Buffer.from('mockImageData'));
+    png = vi.fn().mockResolvedValue(Buffer.from('mockImageData'));
+  }
+  return { Transformer: MockTransformer };
 });
 vi.mock('./../../lib/logger', () => ({
   logger: {
@@ -232,6 +216,11 @@ describe('createVRChatPhotoPathIndex', () => {
         ReturnType<typeof nodefsPromises.stat>
       >;
     });
+
+    // readFile モック - 画像処理エンジン（@napi-rs/image）用のダミーバッファを返す
+    vi.mocked(nodefsPromises.readFile).mockResolvedValue(
+      Buffer.from('fake_image_data'),
+    );
 
     // DB model モック
     vi.mocked(model.createOrUpdateListVRChatPhotoPath).mockResolvedValue([]);
