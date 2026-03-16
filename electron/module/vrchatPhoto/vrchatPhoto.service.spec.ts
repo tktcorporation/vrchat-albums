@@ -1,5 +1,5 @@
 import * as fsPromises from 'node:fs/promises';
-import sharp, { type Metadata, type Sharp } from 'sharp';
+import { Transformer } from '@napi-rs/image';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   cleanupThumbnailCache,
@@ -24,23 +24,28 @@ vi.mock('electron', () => ({
   },
 }));
 
-// sharpモジュールをモック
-vi.mock('sharp', () => {
-  // sharpクラスのモックオブジェクトを作成
-  const mockSharpInstance = {
-    metadata: vi.fn(), // 具体的な値は各テストで設定
-    resize: vi.fn().mockReturnThis(),
-    webp: vi.fn().mockReturnThis(), // WebP変換用のメソッドチェーン
-    toBuffer: vi.fn(), // 具体的な値は各テストで設定
-  };
+// @napi-rs/imageモジュールをモック
+const mockWebp = vi.fn().mockResolvedValue(Buffer.from('dummy_thumbnail_data'));
+const mockResize = vi.fn().mockReturnValue({ webp: mockWebp });
+const mockPng = vi.fn().mockResolvedValue(Buffer.from('dummy_png_data'));
+const mockMetadata = vi.fn().mockResolvedValue({
+  width: 1920,
+  height: 1080,
+  format: 'png',
+});
 
-  // sharpファクトリー関数のモック
-  const mockSharp = vi.fn().mockReturnValue(mockSharpInstance);
-
-  return {
-    default: mockSharp,
-    // 他のsharpのプロパティや関数も必要に応じてモック
-  };
+vi.mock('@napi-rs/image', () => {
+  // new で呼び出すため、arrow function ではなく通常の function を使用
+  // biome-ignore lint/complexity/useArrowFunction: vi.fn().mockImplementation は new で呼ばれるため function 式が必須
+  const MockTransformer = vi.fn().mockImplementation(function () {
+    return {
+      metadata: mockMetadata,
+      resize: mockResize,
+      png: mockPng,
+      webp: mockWebp,
+    };
+  });
+  return { Transformer: MockTransformer };
 });
 
 describe('vrchatPhoto.service', () => {
@@ -57,6 +62,31 @@ describe('vrchatPhoto.service', () => {
     vi.mocked(fsPromises.readdir).mockResolvedValue([] as any);
     // unlink モックのデフォルト設定
     vi.mocked(fsPromises.unlink).mockResolvedValue(undefined);
+
+    // readFile モックのデフォルト設定（画像データを返す）
+    vi.mocked(fsPromises.readFile).mockResolvedValue(
+      Buffer.from('fake_image_data'),
+    );
+
+    // Transformer モックの再設定
+    mockWebp.mockResolvedValue(Buffer.from('dummy_thumbnail_data'));
+    mockResize.mockReturnValue({ webp: mockWebp });
+    mockPng.mockResolvedValue(Buffer.from('dummy_png_data'));
+    mockMetadata.mockResolvedValue({
+      width: 1920,
+      height: 1080,
+      format: 'png',
+    });
+    // resetAllMocks で Transformer の mockImplementation がクリアされるため再設定
+    // biome-ignore lint/complexity/useArrowFunction: vi.fn().mockImplementation は new で呼ばれるため function 式が必須
+    vi.mocked(Transformer).mockImplementation(function () {
+      return {
+        metadata: mockMetadata,
+        resize: mockResize,
+        png: mockPng,
+        webp: mockWebp,
+      } as unknown as Transformer;
+    });
   });
 
   // この関数は、指定された画像ファイルのパスとリサイズ幅を受け取り、
@@ -65,39 +95,6 @@ describe('vrchatPhoto.service', () => {
     const mockInputPhotoPath =
       '/path/to/VRChat_2023-10-26_10-30-00.123_1920x1080.png';
     const mockResizeWidth = 256;
-    let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
-    // sharpインスタンスの型を明示的に指定
-    let mockSharpInstance: {
-      metadata: ReturnType<typeof vi.fn>;
-      resize: ReturnType<typeof vi.fn>;
-      webp: ReturnType<typeof vi.fn>;
-      toBuffer: ReturnType<typeof vi.fn>;
-    };
-
-    // 各テストケースの前に、sharpモックの基本的な振る舞いを設定する。
-    // sharpファクトリ関数がモックインスタンスを返すようにし、
-    // そのインスタンスの各メソッド（metadata, resize, webp, toBuffer）もモックする。
-    beforeEach(async () => {
-      // sharpモジュールのモックを再取得
-      sharpFactory = vi.mocked(sharp);
-      // モックされたsharpインスタンスのメソッドを再取得/設定
-      // これはsharpFactoryが呼び出されるたびに新しいモックインスタンスを返すようにするため
-      // グローバルモックで返されるインスタンスを上書きする
-      mockSharpInstance = {
-        metadata: vi.fn().mockResolvedValue({
-          // デフォルトの成功時の値を設定
-          width: 1920,
-          height: 1080,
-          format: 'png',
-        } as Metadata),
-        resize: vi.fn().mockReturnThis(), // メソッドチェーンのためthisを返す
-        webp: vi.fn().mockReturnThis(), // WebP変換用のメソッドチェーン
-        toBuffer: vi
-          .fn()
-          .mockResolvedValue(Buffer.from('dummy_thumbnail_data')), // デフォルトの成功時の値を設定
-      };
-      sharpFactory.mockReturnValue(mockSharpInstance as unknown as Sharp);
-    });
 
     // 正常系のテストケース
     // 画像処理が成功し、期待されるbase64文字列が返されることを確認する。
@@ -108,8 +105,7 @@ describe('vrchatPhoto.service', () => {
       const expectedBase64String = `data:image/webp;base64,${mockThumbnailBuffer.toString(
         'base64',
       )}`;
-      // このテストケース専用にtoBufferの戻り値を設定
-      mockSharpInstance.toBuffer.mockResolvedValue(mockThumbnailBuffer);
+      mockWebp.mockResolvedValue(mockThumbnailBuffer);
 
       const result = await getVRChatPhotoItemData({
         photoPath: mockInputPhotoPath,
@@ -122,25 +118,24 @@ describe('vrchatPhoto.service', () => {
         // 正常終了の場合、値が期待されるbase64文字列と一致することを確認
         expect(result.value).toBe(expectedBase64String);
       }
-      // sharpファクトリが正しい引数で呼び出されたことを確認
-      expect(sharpFactory).toHaveBeenCalledWith(mockInputPhotoPath);
+      // readFileが正しい引数で呼び出されたことを確認
+      expect(fsPromises.readFile).toHaveBeenCalledWith(mockInputPhotoPath);
+      // Transformerが呼び出されたことを確認
+      expect(Transformer).toHaveBeenCalled();
       // resizeメソッドが正しい引数で呼び出されたことを確認
-      expect(mockSharpInstance.resize).toHaveBeenCalledWith(mockResizeWidth);
+      expect(mockResize).toHaveBeenCalledWith(mockResizeWidth);
       // webpメソッドが呼び出されたことを確認
-      expect(mockSharpInstance.webp).toHaveBeenCalledWith({ quality: 80 });
-      // toBufferメソッドが呼び出されたことを確認
-      expect(mockSharpInstance.toBuffer).toHaveBeenCalled();
+      expect(mockWebp).toHaveBeenCalledWith(80);
     });
 
     // エラーハンドリングのテストケース群
     describe('Error handling', () => {
-      // sharpのファクトリ関数自体が「Input file is missing」エラーをスローする場合のテスト
+      // readFileが「Input file is missing」エラーをスローする場合のテスト
       // この場合、"InputFileIsMissing" という特定のエラーオブジェクトが返されることを期待する。
-      it('should return "InputFileIsMissing" error when sharp instantiation throws "Input file is missing"', async () => {
-        // sharpファクトリがエラーをスローするように設定
-        sharpFactory.mockImplementationOnce(() => {
-          throw new Error('Input file is missing');
-        });
+      it('should return "InputFileIsMissing" error when file read throws "Input file is missing"', async () => {
+        vi.mocked(fsPromises.readFile).mockRejectedValueOnce(
+          new Error('Input file is missing'),
+        );
 
         const result = await getVRChatPhotoItemData({
           photoPath: mockInputPhotoPath,
@@ -155,18 +150,15 @@ describe('vrchatPhoto.service', () => {
         }
       });
 
-      // sharpのファクトリ関数が「Input file is missing」以外のエラーをスローする場合のテスト
+      // 「Input file is missing」以外のエラーをスローする場合のテスト
       // この場合、発生したエラーがそのままスローされることを期待する。
-      it('should throw error for other sharp instantiation errors', async () => {
-        const errorMessage = 'Some other sharp error';
-        // sharpファクトリが特定のエラーメッセージでエラーをスローするように設定
-        // width指定なしでテストすることで、webpチェーンをスキップする
-        sharpFactory.mockImplementationOnce(() => {
-          throw new Error(errorMessage);
-        });
+      it('should throw error for other errors', async () => {
+        const errorMessage = 'Some other error';
+        vi.mocked(fsPromises.readFile).mockRejectedValueOnce(
+          new Error(errorMessage),
+        );
 
         // getVRChatPhotoItemDataの呼び出しが特定のエラーメッセージで失敗することを期待
-        // width指定なしでテスト（元サイズパス）
         await expect(
           getVRChatPhotoItemData({
             photoPath: mockInputPhotoPath,
@@ -174,20 +166,18 @@ describe('vrchatPhoto.service', () => {
         ).rejects.toThrow(errorMessage);
       });
 
-      // sharpインスタンスのtoBufferメソッドがエラーをスローする場合のテスト
-      // この場合、発生したエラーがそのままスローされることを期待する。
-      it('should throw error when sharp.toBuffer throws an error', async () => {
-        const errorMessage = 'ToBuffer error';
-        // toBufferメソッドが特定のエラーメッセージでエラーをスローするように設定
-        mockSharpInstance.toBuffer.mockRejectedValueOnce(
-          new Error(errorMessage),
-        );
+      // Transformerがエラーをスローする場合のテスト
+      it('should throw error when image processing throws an error', async () => {
+        const errorMessage = 'Processing error';
+        // biome-ignore lint/complexity/useArrowFunction: vi.fn().mockImplementation は new で呼ばれるため function 式が必須
+        vi.mocked(Transformer).mockImplementationOnce(function () {
+          throw new Error(errorMessage);
+        });
 
-        // getVRChatPhotoItemDataの呼び出しが特定のエラーメッセージで失敗することを期待
-        // width指定なしでテスト（元サイズパスでtoBufferエラーを確認）
         await expect(
           getVRChatPhotoItemData({
             photoPath: mockInputPhotoPath,
+            width: mockResizeWidth,
           }),
         ).rejects.toThrow(errorMessage);
       });
@@ -200,9 +190,6 @@ describe('vrchatPhoto.service', () => {
     const mockReaddir = vi.mocked(fsPromises.readdir);
     const mockStat = vi.mocked(fsPromises.stat);
     const mockUnlink = vi.mocked(fsPromises.unlink);
-
-    // 各テストでモックを上書き設定するため、beforeEach で追加設定は不要
-    // グローバルの beforeEach で mkdir, unlink がデフォルト設定済み
 
     it('キャッシュサイズが閾値以下の場合はクリーンアップしない', async () => {
       // 400MB = 400 * 1024 * 1024 bytes (閾値450MB未満)
@@ -256,8 +243,6 @@ describe('vrchatPhoto.service', () => {
       await cleanupThumbnailCache();
 
       // ファイル削除が呼ばれる（古いファイルから削除して250MB以下になるまで）
-      // 480MB -> 削除で250MB以下にするには 230MB 以上削除が必要
-      // 120MB x 2 = 240MB を削除すると 240MB になる
       expect(mockUnlink).toHaveBeenCalled();
     });
 
@@ -286,8 +271,6 @@ describe('vrchatPhoto.service', () => {
 
       await cleanupThumbnailCache();
 
-      // 600MB から 250MB まで削減するには 350MB 削除が必要
-      // 100MB x 4 = 400MB を削除すると 200MB になる
       // 少なくとも何らかの削除が行われることを確認
       expect(mockUnlink).toHaveBeenCalled();
     });
@@ -335,30 +318,8 @@ describe('vrchatPhoto.service', () => {
 
   describe('getBatchThumbnails', () => {
     const mockStat = vi.mocked(fsPromises.stat);
-    let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
-    let mockSharpInstance: {
-      metadata: ReturnType<typeof vi.fn>;
-      resize: ReturnType<typeof vi.fn>;
-      webp: ReturnType<typeof vi.fn>;
-      toBuffer: ReturnType<typeof vi.fn>;
-    };
 
     beforeEach(async () => {
-      sharpFactory = vi.mocked(sharp);
-      mockSharpInstance = {
-        metadata: vi.fn().mockResolvedValue({
-          width: 1920,
-          height: 1080,
-          format: 'png',
-        }),
-        resize: vi.fn().mockReturnThis(),
-        webp: vi.fn().mockReturnThis(),
-        toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumbnail_data')),
-      };
-      sharpFactory.mockReturnValue(
-        mockSharpInstance as unknown as ReturnType<typeof sharp>,
-      );
-
       // キャッシュミスを強制（ENOENT）
       const enoentError = new Error('ENOENT') as Error & { code: string };
       enoentError.code = 'ENOENT';
@@ -390,14 +351,14 @@ describe('vrchatPhoto.service', () => {
     it('一部のパスが失敗しても成功したものは返す（混合ケース）', async () => {
       const { getBatchThumbnails } = await import('./vrchatPhoto.service');
 
-      // 2番目のリクエストでエラーを発生させる
+      // 2番目のリクエストでreadFileエラーを発生させる
       let callCount = 0;
-      sharpFactory.mockImplementation(() => {
+      vi.mocked(fsPromises.readFile).mockImplementation(async () => {
         callCount++;
         if (callCount === 2) {
           throw new Error('Input file is missing');
         }
-        return mockSharpInstance as unknown as ReturnType<typeof sharp>;
+        return Buffer.from('fake_image_data');
       });
 
       const paths = [
@@ -422,9 +383,9 @@ describe('vrchatPhoto.service', () => {
     it('全て失敗した場合は空のsuccessと失敗リストを返す', async () => {
       const { getBatchThumbnails } = await import('./vrchatPhoto.service');
 
-      sharpFactory.mockImplementation(() => {
-        throw new Error('Input file is missing');
-      });
+      vi.mocked(fsPromises.readFile).mockRejectedValue(
+        new Error('Input file is missing'),
+      );
 
       const paths = ['/path/to/missing1.png', '/path/to/missing2.png'];
 
@@ -455,30 +416,6 @@ describe('vrchatPhoto.service', () => {
     // CACHE_EXPIRY_DAYS = 7
     const mockStat = vi.mocked(fsPromises.stat);
     const mockReadFile = vi.mocked(fsPromises.readFile);
-    let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
-    let mockSharpInstance: {
-      metadata: ReturnType<typeof vi.fn>;
-      resize: ReturnType<typeof vi.fn>;
-      webp: ReturnType<typeof vi.fn>;
-      toBuffer: ReturnType<typeof vi.fn>;
-    };
-
-    beforeEach(() => {
-      sharpFactory = vi.mocked(sharp);
-      mockSharpInstance = {
-        metadata: vi.fn().mockResolvedValue({
-          width: 1920,
-          height: 1080,
-          format: 'png',
-        }),
-        resize: vi.fn().mockReturnThis(),
-        webp: vi.fn().mockReturnThis(),
-        toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumbnail_data')),
-      };
-      sharpFactory.mockReturnValue(
-        mockSharpInstance as unknown as ReturnType<typeof sharp>,
-      );
-    });
 
     it('有効期限内のキャッシュは使用される', async () => {
       const mockPhotoPath =
@@ -500,7 +437,7 @@ describe('vrchatPhoto.service', () => {
 
       // キャッシュからのデータが返される
       expect(result.isOk()).toBe(true);
-      // sharpは呼ばれない（キャッシュからデータを取得したため）
+      // readFileが呼ばれる（キャッシュからデータを取得したため）
       expect(mockReadFile).toHaveBeenCalled();
     });
 
@@ -516,8 +453,8 @@ describe('vrchatPhoto.service', () => {
         mtimeMs: eightDaysAgo,
       } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>);
 
-      // sharpで新しいサムネイルを生成
-      mockSharpInstance.toBuffer.mockResolvedValue(newThumbnailData);
+      // Transformerで新しいサムネイルを生成
+      mockWebp.mockResolvedValue(newThumbnailData);
 
       const result = await getVRChatPhotoItemData({
         photoPath: mockPhotoPath,
@@ -526,8 +463,8 @@ describe('vrchatPhoto.service', () => {
 
       // 新しく生成されたデータが返される
       expect(result.isOk()).toBe(true);
-      // sharpが呼ばれる（キャッシュが期限切れなので再生成）
-      expect(sharpFactory).toHaveBeenCalled();
+      // Transformerが呼ばれる（キャッシュが期限切れなので再生成）
+      expect(Transformer).toHaveBeenCalled();
     });
 
     it('キャッシュファイルが存在しない場合は新規生成', async () => {
@@ -542,8 +479,8 @@ describe('vrchatPhoto.service', () => {
       error.code = 'ENOENT';
       mockStat.mockRejectedValue(error);
 
-      // sharpで新しいサムネイルを生成
-      mockSharpInstance.toBuffer.mockResolvedValue(newThumbnailData);
+      // Transformerで新しいサムネイルを生成
+      mockWebp.mockResolvedValue(newThumbnailData);
 
       const result = await getVRChatPhotoItemData({
         photoPath: mockPhotoPath,
@@ -552,8 +489,8 @@ describe('vrchatPhoto.service', () => {
 
       // 新しく生成されたデータが返される
       expect(result.isOk()).toBe(true);
-      // sharpが呼ばれる
-      expect(sharpFactory).toHaveBeenCalled();
+      // Transformerが呼ばれる
+      expect(Transformer).toHaveBeenCalled();
     });
   });
 
@@ -561,30 +498,24 @@ describe('vrchatPhoto.service', () => {
     const mockWriteFile = vi.mocked(fsPromises.writeFile);
     const mockMkdir = vi.mocked(fsPromises.mkdir);
     const mockStat = vi.mocked(fsPromises.stat);
-    let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
-    let mockSharpInstance: {
-      metadata: ReturnType<typeof vi.fn>;
-      resize: ReturnType<typeof vi.fn>;
-      webp: ReturnType<typeof vi.fn>;
-      toBuffer: ReturnType<typeof vi.fn>;
-    };
 
     beforeEach(async () => {
       vi.resetAllMocks();
-      sharpFactory = vi.mocked(sharp);
-      mockSharpInstance = {
-        metadata: vi.fn().mockResolvedValue({
-          width: 1920,
-          height: 1080,
-          format: 'png',
-        }),
-        resize: vi.fn().mockReturnThis(),
-        webp: vi.fn().mockReturnThis(),
-        toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumbnail_data')),
-      };
-      sharpFactory.mockReturnValue(
-        mockSharpInstance as unknown as ReturnType<typeof sharp>,
+
+      vi.mocked(fsPromises.readFile).mockResolvedValue(
+        Buffer.from('fake_image_data'),
       );
+      mockWebp.mockResolvedValue(Buffer.from('thumbnail_data'));
+      mockResize.mockReturnValue({ webp: mockWebp });
+      // biome-ignore lint/complexity/useArrowFunction: vi.fn().mockImplementation は new で呼ばれるため function 式が必須
+      vi.mocked(Transformer).mockImplementation(function () {
+        return {
+          metadata: mockMetadata,
+          resize: mockResize,
+          png: mockPng,
+          webp: mockWebp,
+        } as unknown as Transformer;
+      });
 
       // mkdir モックを設定（ensureCacheDir で使用）
       mockMkdir.mockResolvedValue(undefined);
@@ -619,10 +550,8 @@ describe('vrchatPhoto.service', () => {
         expect(result.isOk()).toBe(true);
       }
 
-      // pendingCacheWrites により、複数の並行書き込みは防止される
-      // 最初のリクエストで書き込みが開始されると、後続のリクエストはスキップされる
-      // ただし、sharpは各リクエストで呼ばれる（キャッシュミスなので）
-      expect(sharpFactory).toHaveBeenCalled();
+      // Transformerは各リクエストで呼ばれる（キャッシュミスなので）
+      expect(Transformer).toHaveBeenCalled();
     });
 
     it('異なるキーへの並行書き込みは全て実行される', async () => {
@@ -646,8 +575,8 @@ describe('vrchatPhoto.service', () => {
         expect(result.isOk()).toBe(true);
       }
 
-      // 全ての異なるパスでsharpが呼ばれる
-      expect(sharpFactory).toHaveBeenCalledTimes(3);
+      // 全ての異なるパスでTransformerが呼ばれる
+      expect(Transformer).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -656,30 +585,24 @@ describe('vrchatPhoto.service', () => {
     const mockRename = vi.mocked(fsPromises.rename);
     const mockMkdir = vi.mocked(fsPromises.mkdir);
     const mockStat = vi.mocked(fsPromises.stat);
-    let sharpFactory: ReturnType<typeof vi.mocked<typeof sharp>>;
-    let mockSharpInstance: {
-      metadata: ReturnType<typeof vi.fn>;
-      resize: ReturnType<typeof vi.fn>;
-      webp: ReturnType<typeof vi.fn>;
-      toBuffer: ReturnType<typeof vi.fn>;
-    };
 
     beforeEach(async () => {
       vi.resetAllMocks();
-      sharpFactory = vi.mocked(sharp);
-      mockSharpInstance = {
-        metadata: vi.fn().mockResolvedValue({
-          width: 1920,
-          height: 1080,
-          format: 'png',
-        }),
-        resize: vi.fn().mockReturnThis(),
-        webp: vi.fn().mockReturnThis(),
-        toBuffer: vi.fn().mockResolvedValue(Buffer.from('thumbnail_data')),
-      };
-      sharpFactory.mockReturnValue(
-        mockSharpInstance as unknown as ReturnType<typeof sharp>,
+
+      vi.mocked(fsPromises.readFile).mockResolvedValue(
+        Buffer.from('fake_image_data'),
       );
+      mockWebp.mockResolvedValue(Buffer.from('thumbnail_data'));
+      mockResize.mockReturnValue({ webp: mockWebp });
+      // biome-ignore lint/complexity/useArrowFunction: vi.fn().mockImplementation は new で呼ばれるため function 式が必須
+      vi.mocked(Transformer).mockImplementation(function () {
+        return {
+          metadata: mockMetadata,
+          resize: mockResize,
+          png: mockPng,
+          webp: mockWebp,
+        } as unknown as Transformer;
+      });
 
       // mkdir モックを設定（ensureCacheDir で使用）
       mockMkdir.mockResolvedValue(undefined);
@@ -713,7 +636,6 @@ describe('vrchatPhoto.service', () => {
       }
 
       // 10回連続失敗時に警告ログが呼ばれることを確認
-      // （warnは他の場所でも呼ばれる可能性があるため、内容を確認）
       const cacheFailureWarning = loggerWarnSpy.mock.calls.find(
         (call) =>
           typeof call[0] === 'object' &&
@@ -755,14 +677,12 @@ describe('vrchatPhoto.service', () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
 
-      // 閾値の10回に達しないため、警告ログは出ない（はず）
-      // ただし6回目で成功してリセットされるので、5 + 5 = 10回の失敗だが連続は5回まで
+      // 連続失敗が10回に達しないので警告は出ないはず
       const cacheFailureWarning = loggerWarnSpy.mock.calls.find(
         (call) =>
           typeof call[0] === 'object' &&
           call[0].message?.includes('Thumbnail cache has failed'),
       );
-      // 連続失敗が10回に達しないので警告は出ないはず
       expect(cacheFailureWarning).toBeUndefined();
 
       loggerWarnSpy.mockRestore();
@@ -771,14 +691,7 @@ describe('vrchatPhoto.service', () => {
 
   describe('Memory Monitoring', () => {
     it('checkMemoryUsage が正しいメモリ使用量を返す', async () => {
-      // checkMemoryUsage はエクスポートされていないため、
-      // 間接的にテストする必要がある。
-      // getPhotoPathBatches 内でメモリ監視が行われるが、
-      // ユニットテストでは process.memoryUsage() をモックするのは難しい。
-      // このテストは統合テストレベルで確認するのが適切。
-
-      // 代わりに、メモリ使用量が500MBを超えた場合のログ出力をテスト
-      // (ただし、実際のヒープサイズをコントロールするのは困難)
+      // このテストは統合テストレベルで確認するのが適切
       expect(true).toBe(true); // プレースホルダー
     });
   });

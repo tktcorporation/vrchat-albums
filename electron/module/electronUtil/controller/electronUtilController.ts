@@ -1,8 +1,8 @@
+import { Transformer } from '@napi-rs/image';
 import consola from 'consola';
 import * as datefns from 'date-fns';
 import { clipboard } from 'electron';
 import * as path from 'pathe';
-import sharp from 'sharp';
 import z from 'zod';
 import { reloadMainWindow } from '../../../electronUtil';
 import {
@@ -29,10 +29,12 @@ export const electronUtilRouter = () =>
       reloadMainWindow();
     }),
     getVRChatPhotoItemData: procedure.input(z.string()).query(async (ctx) => {
-      const photoBuf = await sharp(ctx.input).resize(256).toBuffer();
+      const { readFile } = await import('node:fs/promises');
+      const fileData = await readFile(ctx.input);
+      const photoBuf = await new Transformer(fileData).resize(256).png();
       return `data:image/${path
         .extname(ctx.input)
-        .replace('.', '')};base64,${photoBuf.toString('base64')}`;
+        .replace('.', '')};base64,${Buffer.from(photoBuf).toString('base64')}`;
     }),
     copyTextToClipboard: procedure.input(z.string()).mutation(async (ctx) => {
       clipboard.writeText(ctx.input);

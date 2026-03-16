@@ -1,8 +1,8 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Transformer } from '@napi-rs/image';
 import type { ExifDateTime } from 'exiftool-vendored';
-import sharp from 'sharp';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as wrappedExiftool from './wrappedExifTool';
 
@@ -17,16 +17,10 @@ describe('wrappedExifTool', () => {
     // テスト用のファイルパスを生成
     testImagePath = path.join(tempDir, 'test-image.png');
 
-    // テスト用の画像を作成
-    const image = sharp({
-      create: {
-        width: 100,
-        height: 100,
-        channels: 4,
-        background: { r: 255, g: 255, b: 255, alpha: 1 },
-      },
-    });
-    await image.png().toFile(testImagePath);
+    // テスト用の画像を作成（RGBA ピクセルから PNG を生成）
+    const pixels = Buffer.alloc(100 * 100 * 4, 255); // 白色 RGBA
+    const pngData = await Transformer.fromRgbaPixels(pixels, 100, 100).png();
+    await fs.promises.writeFile(testImagePath, pngData);
   });
 
   afterEach(async () => {

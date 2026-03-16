@@ -5,7 +5,6 @@ import { writeClipboardFilePaths } from 'clip-filepaths';
 import { app, clipboard, dialog, nativeImage, shell } from 'electron';
 import * as neverthrow from 'neverthrow';
 import { ResultAsync } from 'neverthrow';
-import sharp from 'sharp';
 import { match, P } from 'ts-pattern';
 import { FileIOError } from './error';
 
@@ -128,9 +127,9 @@ const openPathWithAssociatedApp = openPathWithShell;
 const copyImageDataByPath = async (
   filePath: string,
 ): Promise<neverthrow.Result<void, never>> => {
-  // All errors from sharp() and clipboard operations are unexpected
+  // All errors from readFile and clipboard operations are unexpected
   // and should propagate to Sentry
-  const photoBuf = await sharp(filePath).toBuffer();
+  const photoBuf = await fs.readFile(filePath);
   const image = nativeImage.createFromBuffer(photoBuf);
   clipboard.writeImage(image);
   // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない

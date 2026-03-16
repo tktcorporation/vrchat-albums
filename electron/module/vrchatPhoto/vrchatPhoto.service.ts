@@ -3,12 +3,12 @@ import type { Dirent } from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
+import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
 import { xxhash128 } from 'hash-wasm';
 import * as neverthrow from 'neverthrow';
 import { ResultAsync } from 'neverthrow';
 import * as path from 'pathe';
-import sharp from 'sharp';
 import { match, P } from 'ts-pattern';
 import {
   type FolderDigest,
@@ -598,7 +598,7 @@ export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
 };
 
 // バッチサイズ定数
-const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（sharp処理は重いため小さく）
+const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（画像処理は重いため小さく）
 
 /**
  * フォルダハッシュ計算エラー
@@ -988,7 +988,7 @@ const filterNewFilesByMtime = async (
  * ## メモリ最適化
  * - 並列数を5に制限（libvipsのネイティブメモリ使用を抑制）
  * - RSS監視で圧迫時に遅延
- * - サブバッチ間でSharpキャッシュをクリア
+ * - サブバッチ間でキャッシュをクリア
  */
 async function processPhotoBatch(
   photoPaths: string[],
@@ -1037,9 +1037,12 @@ async function processPhotoBatch(
         new Date(),
       );
 
-      // sharpインスタンスを使い捨てにしてメモリリークを防ぐ
+      // Transformerインスタンスを使い捨てにしてメモリリークを防ぐ
       const metadataResult = await neverthrow.ResultAsync.fromPromise(
-        sharp(photoPath).metadata(),
+        fsPromises.readFile(photoPath).then(async (buf) => {
+          const transformer = new Transformer(buf);
+          return transformer.metadata();
+        }),
         (error): { type: 'SHARP_ERROR'; message: string } => {
           const nodeError = error as NodeJS.ErrnoException;
           return match(nodeError.code)
@@ -1066,10 +1069,10 @@ async function processPhotoBatch(
               };
             })
             .otherwise(() => {
-              // sharpの内部エラー、破損ファイル等 → Sentry送信のため再スロー
+              // 画像処理の内部エラー、破損ファイル等 → Sentry送信のため再スロー
               // デバッグのためファイルパス情報を付加
               const contextualError = new Error(
-                `Sharp processing failed for: ${photoPath}`,
+                `Image processing failed for: ${photoPath}`,
                 { cause: error },
               );
               throw contextualError;
@@ -1119,7 +1122,7 @@ async function processPhotoBatch(
 
     results.push(...subResults);
 
-    // サブバッチ処理後にSharpキャッシュをクリア（メモリ解放）
+    // サブバッチ処理後にキャッシュをクリア（メモリ解放）
     // 大量処理時のメモリ蓄積を防ぐ
     if (photoPaths.length > PHOTO_METADATA_BATCH_SIZE) {
       clearSharpCache();
@@ -1136,12 +1139,12 @@ async function processPhotoBatch(
  * ## 3段階フィルタリング
  * - Stage 1: フォルダダイジェストチェック（変更がないフォルダをスキップ）
  * - Stage 2: ファイルmtimeチェック（変更フォルダ内の新規ファイルを抽出）
- * - Stage 3: sharp処理 + DB保存
+ * - Stage 3: 画像処理 + DB保存
  *
  * ## メモリ最適化
- * - 初回/フルスキャン時は低メモリモードでSharpを初期化
+ * - 初回/フルスキャン時は画像処理エンジンを初期化
  * - RSS監視で圧迫時に自動遅延
- * - バッチ間でSharpキャッシュをクリア
+ * - バッチ間でキャッシュをクリア
  *
  * @param isIncremental true: 差分スキャン（ダイジェスト・mtime使用）、false: フルスキャン
  */
@@ -1151,7 +1154,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   const settingStore = getSettingStore();
   const extraDirs = settingStore.getVRChatPhotoExtraDirList();
 
-  // Sharp 初期化（未初期化の場合のみ）
+  // 画像処理エンジン初期化（未初期化の場合のみ）
   if (!isSharpInitialized()) {
     initializeSharp();
   }
@@ -1258,7 +1261,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
           `Found ${newFiles.length} new files in: ${changedFolder.folderPath}`,
         );
 
-        // Stage 3: バッチ処理（sharp + DB保存）
+        // Stage 3: バッチ処理（画像処理 + DB保存）
         for (let i = 0; i < newFiles.length; i += PHOTO_METADATA_BATCH_SIZE) {
           const batch = newFiles.slice(i, i + PHOTO_METADATA_BATCH_SIZE);
           batchNumber++;
@@ -1317,7 +1320,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
             );
           }
 
-          // バッチ処理後にSharpキャッシュをクリア（メモリ解放）
+          // バッチ処理後にキャッシュをクリア（メモリ解放）
           clearSharpCache();
         }
 
@@ -1491,10 +1494,10 @@ export const getVRChatPhotoItemData = async ({
         }
 
         // キャッシュにない場合は生成してキャッシュに保存
-        const photoBuf = await sharp(photoPath)
+        const photoFileData = await fsPromises.readFile(photoPath);
+        const photoBuf = await new Transformer(photoFileData)
           .resize(width)
-          .webp({ quality: 80 }) // WebPに変換（ファイルサイズ削減）
-          .toBuffer();
+          .webp(80); // WebPに変換（ファイルサイズ削減）
 
         // 非同期でキャッシュに保存（レスポンスを遅らせない）
         // エラーは saveThumbnailToCache 内部でログ出力される
@@ -1504,7 +1507,7 @@ export const getVRChatPhotoItemData = async ({
       }
 
       // 元サイズの場合はキャッシュなし
-      const photoBuf = await sharp(photoPath).toBuffer();
+      const photoBuf = await fsPromises.readFile(photoPath);
       return `data:image/${path
         .extname(photoPath)
         .replace('.', '')};base64,${photoBuf.toString('base64')}`;
@@ -1608,7 +1611,7 @@ export const getBatchThumbnails = async (
         const result = await getVRChatPhotoItemData({ photoPath, width });
         return { photoPath, result, unexpectedError: null as Error | null };
       } catch (error) {
-        // 予期しないエラー（sharp内部エラー等）はここでキャッチ
+        // 予期しないエラー（画像処理内部エラー等）はここでキャッチ
         return {
           photoPath,
           result: null,
@@ -1623,7 +1626,7 @@ export const getBatchThumbnails = async (
 
     for (const item of results) {
       if (item.unexpectedError) {
-        // 予期しないエラー（sharp内部エラー等）をログ出力
+        // 予期しないエラー（画像処理内部エラー等）をログ出力
         // Sentryに送信されるのは logger.error() 経由
         logger.error({
           message: 'Unexpected error during batch thumbnail fetch',

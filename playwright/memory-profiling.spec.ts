@@ -141,7 +141,8 @@ const generateTestPhotos = async (
   dir: string,
   count: number,
 ): Promise<string[]> => {
-  const sharp = (await import('sharp')).default;
+  const { Transformer } = await import('@napi-rs/image');
+  const { writeFileSync } = await import('node:fs');
   const photoPaths: string[] = [];
 
   console.log(`Generating ${count} test photos in ${dir}...`);
@@ -159,21 +160,17 @@ const generateTestPhotos = async (
     const fileName = `VRChat_${dateStr.replace(/\./g, '.')}_test${i}.png`;
     const filePath = path.join(dir, fileName);
 
-    // 1920x1080のダミー画像を生成
-    await sharp({
-      create: {
-        width: 1920,
-        height: 1080,
-        channels: 3,
-        background: {
-          r: Math.floor(Math.random() * 255),
-          g: Math.floor(Math.random() * 255),
-          b: Math.floor(Math.random() * 255),
-        },
-      },
-    })
-      .png()
-      .toFile(filePath);
+    // 1920x1080のダミー画像を生成（RGBA ピクセルから PNG を生成）
+    const r = Math.floor(Math.random() * 255);
+    const g = Math.floor(Math.random() * 255);
+    const b = Math.floor(Math.random() * 255);
+    const pixel = Buffer.from([r, g, b, 255]);
+    const pixels = Buffer.alloc(1920 * 1080 * 4);
+    for (let p = 0; p < 1920 * 1080; p++) {
+      pixel.copy(pixels, p * 4);
+    }
+    const pngData = await Transformer.fromRgbaPixels(pixels, 1920, 1080).png();
+    writeFileSync(filePath, pngData);
 
     photoPaths.push(filePath);
 
@@ -334,8 +331,8 @@ test.describe('初回起動時のメモリプロファイリング', () => {
       if (
         text.includes('memory') ||
         text.includes('Memory') ||
-        text.includes('sharp') ||
-        text.includes('Sharp')
+        text.includes('image') ||
+        text.includes('Image')
       ) {
         console.log(`[Electron] ${text.trim()}`);
       }

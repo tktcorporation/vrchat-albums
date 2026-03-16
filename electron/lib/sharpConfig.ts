@@ -1,129 +1,29 @@
 /**
- * Sharp (libvips) の設定管理
+ * 画像処理エンジンの初期化管理
  *
- * 大量の写真を処理する際のメモリ使用量を制御するための設定。
+ * @napi-rs/image (Rust製) を使用。
+ * sharp (libvips) と異なり、キャッシュや並行性の設定APIは不要。
+ * GTK/libvips の GLib-GObject 競合問題も発生しない。
  *
- * ## 初期化
+ * ## 背景
+ * sharp から @napi-rs/image への移行により、以下が不要になった:
+ * - electron/index.ts での早期初期化（GLib-GObject 競合回避）
+ * - concurrency / cache の手動設定
  *
- * - **早期初期化** (electron/index.ts)
- *   - GTK/libvips の GLib-GObject 競合を防ぐため、アプリ起動直後に実行
- *   - `sharp.concurrency(1); sharp.cache(false);` で最小設定
- *
- * - **アプリ内設定調整** (このモジュール)
- *   - `initializeSharp()` で写真処理に適した設定に調整
- *
- * ## 参考
- * - https://sharp.pixelplumbing.com/api-utility#concurrency
- * - https://sharp.pixelplumbing.com/api-utility#cache
+ * この薄いラッパーは、既存コードの initializeSharp() / clearSharpCache() /
+ * isSharpInitialized() 呼び出しとの互換性を維持するために残している。
+ * 将来的に呼び出し元が不要と判断されれば削除可能。
  */
-
-import sharp from 'sharp';
-
-/**
- * loggerを遅延インポート（キャッシュ付き）
- *
- * sharpConfig.tsがloggerをトップレベルでインポートすると、
- * loggerが@sentry/electron/mainやelectron-logをインポートし、
- * それがGTKを読み込んでGLib-GObject競合を引き起こす。
- *
- * 遅延インポートにより、Sharp初期化後にのみloggerが読み込まれる。
- */
-let lazyLogger: typeof import('./logger').logger | null = null;
-
-const getLazyLogger = async () => {
-  if (!lazyLogger) {
-    const { logger } = await import('./logger');
-    lazyLogger = logger;
-  }
-  return lazyLogger;
-};
-
-/**
- * Sharp設定オプション
- */
-interface SharpConfigOptions {
-  /**
-   * libvipsのスレッド数
-   * - 0: CPUコア数（デフォルト）
-   * - 1: シングルスレッド（メモリ使用量最小）
-   * - 2-4: 推奨範囲（バランス）
-   */
-  concurrency: number;
-
-  /**
-   * キャッシュ設定
-   * - false: キャッシュ無効
-   * - { memory, files, items }: 詳細設定
-   */
-  cache:
-    | false
-    | {
-        /** メモリキャッシュ上限 (MB) */
-        memory: number;
-        /** ファイルキャッシュ数 */
-        files: number;
-        /** アイテムキャッシュ数 */
-        items: number;
-      };
-}
-
-/**
- * デフォルト設定（メモリ効率重視）
- *
- * - concurrency: 2（並列処理とメモリのバランス）
- * - cache: 制限付き（memory: 50MB, files: 10, items: 50）
- */
-const DEFAULT_CONFIG: SharpConfigOptions = {
-  concurrency: 2,
-  cache: {
-    memory: 50,
-    files: 10,
-    items: 50,
-  },
-};
 
 let isInitialized = false;
-let currentCacheConfig: SharpConfigOptions['cache'] = false;
 
 /**
- * Sharpを初期化する
+ * 画像処理エンジンを初期化する
  *
- * 写真処理開始時に呼び出し、適切な設定に調整する。
- * electron/index.ts での早期初期化後に呼び出される。
- *
- * @param options 設定オプション（省略時はデフォルト設定）
+ * @napi-rs/image はステートレスなため、初期化フラグの設定のみ行う。
  */
-export const initializeSharp = (
-  options: Partial<SharpConfigOptions> = {},
-): void => {
-  const config: SharpConfigOptions = {
-    ...DEFAULT_CONFIG,
-    ...options,
-  };
-
-  sharp.concurrency(config.concurrency);
-
-  if (config.cache === false) {
-    sharp.cache(false);
-  } else {
-    sharp.cache(config.cache);
-  }
-
-  currentCacheConfig = config.cache;
+export const initializeSharp = (): void => {
   isInitialized = true;
-
-  // 非同期でログ出力（fire-and-forget）
-  void getLazyLogger().then((l) =>
-    l.info({
-      message: 'Sharp initialized',
-      details: {
-        concurrency: sharp.concurrency(),
-        cache: sharp.cache(),
-        simd: sharp.simd(),
-        platform: process.platform,
-      },
-    }),
-  );
 };
 
 /**
@@ -134,17 +34,11 @@ export const isSharpInitialized = (): boolean => {
 };
 
 /**
- * Sharpのキャッシュをクリアする
+ * キャッシュクリア（互換性のためのno-op）
  *
- * バッチ処理間でメモリを解放するために使用。
- * キャッシュクリア後、元の設定に戻る。
+ * @napi-rs/image にはグローバルキャッシュがないため何もしない。
+ * 呼び出し元がこの関数を使わなくなれば削除可能。
  */
 export const clearSharpCache = (): void => {
-  sharp.cache(false);
-
-  if (currentCacheConfig !== false) {
-    sharp.cache(currentCacheConfig);
-  }
-
-  void getLazyLogger().then((l) => l.debug('Sharp cache cleared'));
+  // no-op: @napi-rs/image has no global cache to clear
 };
