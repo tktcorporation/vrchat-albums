@@ -20,4 +20,4 @@ jobs:
         
         - name: run license-checker
           run: |
-            nr license-check:validate
+            pnpm license-check:validate

@@ -1,5 +1,5 @@
 name: 'Setup Node.js and Install Dependencies'
-description: 'Common setup for Node.js and dependency installation using mise'
+description: 'Common setup for Node.js and dependency installation'
 inputs:
   working-directory:
     description: 'Working directory for the installation'
@@ -9,10 +9,10 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup mise
-      uses: jdx/mise-action@v2
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
       with:
-        install: true
+        node-version-file: 'package.json'
 
     - name: Enable Corepack
       shell: bash
@@ -27,4 +27,3 @@ runs:
     - name: Install Grit CLI
       shell: bash
       run: curl -fsSL https://docs.grit.io/install | bash
-

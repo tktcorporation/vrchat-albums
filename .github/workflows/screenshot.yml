@@ -18,18 +18,18 @@ jobs:
         uses: ./.github/actions/setup-node-and-install
 
       - name: build app
-        run: nr build
+        run: pnpm build
 
       - name: Remove old screenshots
         run: rm -rf playwright/previews/*.png
 
       - name: Setup dummy photos by command
-        run: nr generate:debug-data
+        run: pnpm generate:debug-data
 
       - name: Install Playwright Browsers
         run: pnpm exec playwright install --with-deps
       - name: Run Playwright tests
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- nr test:playwright
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test:playwright
 
       - name: upload screenshot
         id: upload-screenshot
