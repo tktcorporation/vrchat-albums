@@ -42,9 +42,9 @@ export type MetadataServiceError =
  * readExif は exiftool-vendored の Tags を返すが、parser は Record<string, any> を期待する。
  * プロセスのライフサイクル管理は wrappedExifTool 側で行われる。
  */
-// biome-ignore lint/suspicious/noExplicitAny: parser が Record<string, any> を期待するため
 const exifTagReader = readExif as (
   filePath: string,
+  // biome-ignore lint/suspicious/noExplicitAny: parser が Record<string, any> を期待するため
 ) => Promise<Record<string, any>>;
 
 // ============================================================================
