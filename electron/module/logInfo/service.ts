@@ -524,7 +524,7 @@ export async function loadLogInfoIndexFromVRChatLog({
     } ms`,
   );
 
-  // 6.5. 写真メタデータ抽出 (VRChat公式XMP + VRCX iTXt)
+  // 6.5. 写真メタデータ抽出 (VRChat公式XMP)
   if (photoResults && photoResults.length > 0) {
     emitStageStart('photo_metadata', '写真メタデータを抽出中...');
     const metadataStartTime = performance.now();

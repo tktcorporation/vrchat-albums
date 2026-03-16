@@ -147,7 +147,13 @@ export const setExifToBuffer = async (
   }
 };
 
-const readExif = async (filePath: string) => {
+/**
+ * ファイルパスから EXIF/XMP タグを読み取る
+ *
+ * 共有の ExifTool シングルトンを使用する。
+ * 呼び出し元: wrappedExifTool 内部、vrchatPhotoMetadata/service.ts
+ */
+export const readExif = async (filePath: string) => {
   const exiftool = await getExiftoolInstance();
   const exif = await exiftool.read(filePath);
   return exif;

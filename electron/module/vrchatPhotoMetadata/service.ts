@@ -9,6 +9,7 @@
 
 import { err, ok, type Result, ResultAsync } from 'neverthrow';
 import { logger } from '../../lib/logger';
+import { readExif } from '../../lib/wrappedExifTool';
 import {
   type MetadataParseError,
   parsePhotoMetadata,
@@ -33,41 +34,18 @@ export type MetadataServiceError =
   | { type: 'DB_ERROR'; message: string };
 
 // ============================================================================
-// Exiftool アダプター
+// ExifTool アダプター
 // ============================================================================
 
-// biome-ignore lint/suspicious/noExplicitAny: exiftool Tags は広い型
-type ExifTagReader = (filePath: string) => Promise<Record<string, any>>;
-
 /**
- * exiftool インスタンスを遅延初期化するファクトリ
- *
- * ExifTool はプロセスをフォークするため、初回呼び出し時にのみ生成する。
- * 内部ヘルパーのため Result 型は不要。
+ * wrappedExifTool.readExif を parser の ExifTagReader 型に適合させるキャスト。
+ * readExif は exiftool-vendored の Tags を返すが、parser は Record<string, any> を期待する。
+ * プロセスのライフサイクル管理は wrappedExifTool 側で行われる。
  */
-const createExifTagReader = (): ExifTagReader => {
-  // biome-ignore lint/suspicious/noExplicitAny: exiftool-vendored の ExifTool 型を直接参照すると動的import と競合するため any で保持
-  let exiftoolInstance: any = null;
-
-  return async (filePath: string) => {
-    if (!exiftoolInstance) {
-      const { ExifTool } = await import('exiftool-vendored');
-      exiftoolInstance = new ExifTool();
-    }
-    const tags = await exiftoolInstance.read(filePath);
-    return tags as Record<string, unknown>;
-  };
-};
-
-/** シングルトンのexifタグリーダー */
-let exifTagReader: ExifTagReader | null = null;
-
-const getExifTagReader = () => {
-  if (!exifTagReader) {
-    exifTagReader = createExifTagReader();
-  }
-  return exifTagReader;
-};
+// biome-ignore lint/suspicious/noExplicitAny: parser が Record<string, any> を期待するため
+const exifTagReader = readExif as (
+  filePath: string,
+) => Promise<Record<string, any>>;
 
 // ============================================================================
 // サービス関数
@@ -79,7 +57,7 @@ const getExifTagReader = () => {
 export const extractMetadataFromPhoto = async (
   photoPath: string,
 ): Promise<Result<VRChatPhotoMetadata, MetadataParseError>> => {
-  return parsePhotoMetadata(photoPath, getExifTagReader());
+  return parsePhotoMetadata(photoPath, exifTagReader);
 };
 
 /**
@@ -132,7 +110,7 @@ export const extractAndSaveMetadataBatch = async (
   // バッチでメタデータ抽出
   const metadataMap = await parsePhotoMetadataBatch(
     targetPaths,
-    getExifTagReader(),
+    exifTagReader,
     concurrency,
   );
 
@@ -197,8 +175,8 @@ export const getMetadataForPhoto = async (
   }
 
   return ok({
-    authorId: record.authorId ?? '',
-    authorDisplayName: record.authorDisplayName ?? '',
+    authorId: record.authorId,
+    authorDisplayName: record.authorDisplayName,
     worldId: record.worldId,
     worldDisplayName: record.worldDisplayName,
   });
@@ -226,8 +204,8 @@ export const getMetadataForPhotos = async (
   const metadataMap = new Map<string, VRChatPhotoMetadata>();
   for (const record of result.value) {
     metadataMap.set(record.photoPath, {
-      authorId: record.authorId ?? '',
-      authorDisplayName: record.authorDisplayName ?? '',
+      authorId: record.authorId,
+      authorDisplayName: record.authorDisplayName,
       worldId: record.worldId,
       worldDisplayName: record.worldDisplayName,
     });

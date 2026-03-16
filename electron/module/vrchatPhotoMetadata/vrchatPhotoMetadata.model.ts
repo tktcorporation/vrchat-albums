@@ -42,13 +42,15 @@ export class VRChatPhotoMetadataModel extends Model<
   @Index({ unique: true })
   declare photoPath: string;
 
-  /** 撮影者のVRChatユーザーID (usr_xxx) */
+  /** 撮影者のVRChatユーザーID (usr_xxx) — メタデータがある = AuthorID が存在する */
   @Attribute(DataTypes.STRING)
-  declare authorId: string | null;
+  @NotNull
+  declare authorId: string;
 
-  /** 撮影者の表示名 */
+  /** 撮影者の表示名 — Author フィールドがない場合は authorId がフォールバック値として入る */
   @Attribute(DataTypes.STRING)
-  declare authorDisplayName: string | null;
+  @NotNull
+  declare authorDisplayName: string;
 
   /** ワールドID (wrld_xxx) */
   @Attribute(DataTypes.STRING)
@@ -72,8 +74,8 @@ export class VRChatPhotoMetadataModel extends Model<
 
 export interface VRChatPhotoMetadataCreationAttributes {
   photoPath: string;
-  authorId: string | null;
-  authorDisplayName: string | null;
+  authorId: string;
+  authorDisplayName: string;
   worldId: string | null;
   worldDisplayName: string | null;
 }

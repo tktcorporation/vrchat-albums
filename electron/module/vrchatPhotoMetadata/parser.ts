@@ -8,7 +8,7 @@
  */
 
 import { err, ok, type Result, ResultAsync } from 'neverthrow';
-import type { VRChatPhotoMetadata } from './schema';
+import { type VRChatPhotoMetadata, VRChatPhotoMetadataSchema } from './schema';
 
 // ============================================================================
 // エラー型
@@ -34,46 +34,67 @@ export type MetadataParseError =
  * - WorldID (vrc:WorldID): ワールドID
  * - WorldDisplayName (vrc:WorldDisplayName): ワールド表示名
  */
+/**
+ * exiftool Tags から VRChat XMP フィールドの候補値を正規化して取得するヘルパー
+ *
+ * exiftool-vendored は XMP カスタムネームスペースのフィールドを
+ * 複数の名前で返す可能性がある（例: AuthorID, vrc:AuthorID）。
+ * ここで候補を統一し、string | null に正規化する。
+ */
+const resolveStringTag = (
+  // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
+  tags: Record<string, any>,
+  ...keys: string[]
+): string | null => {
+  for (const key of keys) {
+    const value = tags[key];
+    if (typeof value === 'string' && value.length > 0) {
+      return value;
+    }
+  }
+  return null;
+};
+
 export const extractOfficialMetadata = (
   // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
   tags: Record<string, any>,
 ): VRChatPhotoMetadata | null => {
-  // vrc:AuthorID が存在しない場合はメタデータなしと判断
-  const authorId = tags.AuthorID ?? tags['vrc:AuthorID'] ?? null;
-  if (!authorId || typeof authorId !== 'string') {
+  // AuthorID がなければ VRChat メタデータなしと判断（最低限の存在チェック）
+  const authorId = resolveStringTag(tags, 'AuthorID', 'vrc:AuthorID');
+  if (!authorId) {
     return null;
   }
 
   const authorDisplayName =
-    tags.Author ??
-    tags.Creator ??
-    tags['xmp:Creator'] ??
-    tags['dc:creator'] ??
-    null;
+    resolveStringTag(tags, 'Author', 'Creator', 'xmp:Creator', 'dc:creator') ??
+    authorId;
 
-  const worldId =
-    tags.WorldID ?? tags['vrc:WorldID'] ?? tags.VRCWorldID ?? null;
+  const worldId = resolveStringTag(
+    tags,
+    'WorldID',
+    'vrc:WorldID',
+    'VRCWorldID',
+  );
+  const worldDisplayName = resolveStringTag(
+    tags,
+    'WorldDisplayName',
+    'vrc:WorldDisplayName',
+    'VRCWorldDisplayName',
+  );
 
-  const worldDisplayName =
-    tags.WorldDisplayName ??
-    tags['vrc:WorldDisplayName'] ??
-    tags.VRCWorldDisplayName ??
-    null;
+  // Zod スキーマで最終検証（Parse Don't Validate）
+  const parsed = VRChatPhotoMetadataSchema.safeParse({
+    authorId,
+    authorDisplayName,
+    worldId,
+    worldDisplayName,
+  });
 
-  return {
-    authorId: typeof authorId === 'string' ? authorId : String(authorId),
-    authorDisplayName:
-      typeof authorDisplayName === 'string'
-        ? authorDisplayName
-        : authorDisplayName
-          ? String(authorDisplayName)
-          : authorId,
-    worldId: typeof worldId === 'string' && worldId.length > 0 ? worldId : null,
-    worldDisplayName:
-      typeof worldDisplayName === 'string' && worldDisplayName.length > 0
-        ? worldDisplayName
-        : null,
-  };
+  if (!parsed.success) {
+    return null;
+  }
+
+  return parsed.data;
 };
 
 /**
