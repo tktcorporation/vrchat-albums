@@ -17,9 +17,6 @@
   },
   "productName": "VRChatAlbums",
   "type": "module",
-  "workspaces": [
-    "pages"
-  ],
   "scripts": {
     "postinstall": "simple-git-hooks && pnpm run license-check:generate && pnpm run rebuild-native && bash scripts/ensure-grit.sh",
     "rebuild-native": "npx @electron/rebuild -f -w clip-filepaths",

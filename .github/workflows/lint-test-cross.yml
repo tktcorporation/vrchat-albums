@@ -18,7 +18,7 @@ jobs:
         run: curl -fsSL https://docs.grit.io/install | bash
 
       - name: lint
-        run: nr lint
+        run: pnpm lint
 
   test:
     strategy:
@@ -34,4 +34,4 @@ jobs:
         uses: ./.github/actions/setup-node-and-install
 
       - name: test
-        run: nr test
+        run: pnpm test

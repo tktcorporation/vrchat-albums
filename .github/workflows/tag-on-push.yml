@@ -19,7 +19,7 @@ jobs:
         uses: ./.github/actions/setup-node-and-install
 
       - name: lint
-        run: nr lint
+        run: pnpm lint
 
   create_tag:
     needs: lint

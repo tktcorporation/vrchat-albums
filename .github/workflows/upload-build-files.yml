@@ -113,8 +113,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NOT_DRAFT_RELEASE: 'false'
         run: |
-          nr clean:build
-          nr build
+          pnpm clean:build
+          pnpm build
           if [[ "${{ needs.vars.outputs.is-semver-tag }}" == 'true' ]]; then
             pnpm exec electron-builder --config=electron-builder.cjs --${{ matrix.os == 'windows-latest' && 'win' || matrix.os == 'ubuntu-22.04' && 'linux' || 'mac' }} --publish always
           else
@@ -128,7 +128,7 @@ jobs:
           fi
 
       - name: Upload sourcemaps
-        run: nr sentry:sourcemaps
+        run: pnpm sentry:sourcemaps
 
   publish-release:
     needs: [vars, draft-release, electron-build]
