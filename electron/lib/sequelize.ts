@@ -8,6 +8,7 @@ import * as settingService from './../module/settings/service';
 import { VRChatPlayerJoinLogModel } from '../module/VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import { VRChatPlayerLeaveLogModel } from '../module/VRChatPlayerLeaveLogModel/playerLeaveLog.model';
 import { VRChatPhotoPathModel } from '../module/vrchatPhoto/model/vrchatPhotoPath.model';
+import { VRChatPhotoMetadataModel } from '../module/vrchatPhotoMetadata/vrchatPhotoMetadata.model';
 import { VRChatWorldJoinLogModel } from '../module/vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import { VRChatWorldJoinLogFromPhotoModel } from '../module/vrchatWorldJoinLogFromPhoto/vrchatWorldJoinLogFromPhoto.model';
 import { logger } from './logger';
@@ -37,6 +38,7 @@ const _newRDBClient = (props: { db_url: string }) => {
       VRChatPlayerJoinLogModel,
       VRChatPlayerLeaveLogModel,
       VRChatPhotoPathModel,
+      VRChatPhotoMetadataModel,
       // TODO: アプリイベントモデルは今後実装
       // VRChatAppEventModel,
       Migrations,
@@ -142,6 +144,7 @@ const SYNC_MODELS = [
   VRChatPlayerJoinLogModel,
   VRChatPlayerLeaveLogModel,
   VRChatPhotoPathModel,
+  VRChatPhotoMetadataModel,
   Migrations,
 ] as const;
 
