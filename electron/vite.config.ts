@@ -40,7 +40,7 @@ export default defineConfig({
         'electron-unhandled',
         'electron-updater',
         'exiftool-vendored',
-        'sharp',
+        '@napi-rs/image',
         'clip-filepaths',
         // Sequelize 関連のモジュール
         '@sequelize/core',
