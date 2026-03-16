@@ -4,7 +4,8 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import type { ConfigEnv, UserConfig } from 'vite';
 
-const srcRoot = join(__dirname, 'src');
+const rootDir = import.meta.dirname;
+const srcRoot = join(rootDir, 'src');
 
 export default ({ command }: ConfigEnv): UserConfig => {
   // DEV
@@ -16,8 +17,8 @@ export default ({ command }: ConfigEnv): UserConfig => {
       resolve: {
         alias: {
           '@': srcRoot,
-          '@electron': join(__dirname, 'electron'),
-          '@shared': join(__dirname, 'shared'),
+          '@electron': join(rootDir, 'electron'),
+          '@shared': join(rootDir, 'shared'),
         },
       },
       build: {

@@ -2,6 +2,8 @@ import { builtinModules } from 'node:module';
 import { join } from 'node:path';
 import { defineConfig } from 'vite';
 
+const rootDir = import.meta.dirname;
+
 // Node.js の組み込みモジュールのリストを作成（'node:' プレフィックス付きと無しの両方）
 const nodeBuiltins = [
   ...builtinModules,
@@ -10,20 +12,20 @@ const nodeBuiltins = [
 
 export default defineConfig({
   mode: process.env.NODE_ENV || 'development',
-  root: __dirname,
+  root: rootDir,
   define: {
     'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN),
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
     __SENTRY_RELEASE__: JSON.stringify(process.env.SENTRY_RELEASE),
   },
   build: {
-    outDir: join(__dirname, '../main'),
+    outDir: join(rootDir, '../main'),
     emptyOutDir: true,
     target: 'node20',
     lib: {
       entry: {
-        index: join(__dirname, 'index.ts'),
-        preload: join(__dirname, 'preload.ts'),
+        index: join(rootDir, 'index.ts'),
+        preload: join(rootDir, 'preload.ts'),
       },
       formats: ['cjs'],
     },
@@ -72,8 +74,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@electron': __dirname,
-      '@shared': join(__dirname, '../shared'),
+      '@electron': rootDir,
+      '@shared': join(rootDir, '../shared'),
     },
   },
   // esbuild の設定を追加
@@ -82,15 +84,6 @@ export default defineConfig({
     target: 'node20',
     supported: {
       decorators: true,
-    },
-  },
-  // TypeScript の設定
-  optimizeDeps: {
-    esbuildOptions: {
-      target: 'node20',
-      supported: {
-        decorators: true,
-      },
     },
   },
 });
