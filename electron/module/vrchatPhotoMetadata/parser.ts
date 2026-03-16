@@ -7,7 +7,7 @@
  * @see electron/module/vrchatPhotoMetadata/schema.ts - メタデータの Zod スキーマ定義
  */
 
-import { err, ok, type Result } from 'neverthrow';
+import { err, ok, type Result, ResultAsync } from 'neverthrow';
 import type { VRChatPhotoMetadata } from './schema';
 
 // ============================================================================
@@ -88,17 +88,18 @@ export const parsePhotoMetadata = async (
   // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
   readExifTags: (filePath: string) => Promise<Record<string, any>>,
 ): Promise<Result<VRChatPhotoMetadata, MetadataParseError>> => {
-  let tags: Record<string, unknown>;
-  try {
-    tags = await readExifTags(filePath);
-  } catch (e) {
-    return err({
+  const tagsResult = await ResultAsync.fromPromise(
+    readExifTags(filePath),
+    (e): MetadataParseError => ({
       type: 'PARSE_ERROR',
       message: `Failed to read EXIF/XMP from ${filePath}: ${e instanceof Error ? e.message : String(e)}`,
-    });
+    }),
+  );
+  if (tagsResult.isErr()) {
+    return err(tagsResult.error);
   }
 
-  const metadata = extractOfficialMetadata(tags);
+  const metadata = extractOfficialMetadata(tagsResult.value);
   if (metadata === null) {
     return err({
       type: 'NO_METADATA_FOUND',

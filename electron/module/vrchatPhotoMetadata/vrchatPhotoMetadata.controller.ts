@@ -17,7 +17,16 @@ export const vrchatPhotoMetadataRouter = () =>
     getPhotoMetadata: procedure
       .input(z.object({ photoPath: z.string().min(1) }))
       .query(async (ctx) => {
-        return metadataService.getMetadataForPhoto(ctx.input.photoPath);
+        const result = await metadataService.getMetadataForPhoto(
+          ctx.input.photoPath,
+        );
+        if (result.isErr()) {
+          logger.error({
+            message: `Failed to get photo metadata: ${result.error.message}`,
+          });
+          return null;
+        }
+        return result.value;
       }),
 
     /**
@@ -30,11 +39,17 @@ export const vrchatPhotoMetadataRouter = () =>
         }),
       )
       .query(async (ctx) => {
-        const metadataMap = await metadataService.getMetadataForPhotos(
+        const result = await metadataService.getMetadataForPhotos(
           ctx.input.photoPaths,
         );
+        if (result.isErr()) {
+          logger.error({
+            message: `Failed to get photo metadata batch: ${result.error.message}`,
+          });
+          return [];
+        }
         // Map → 配列に変換 (tRPC転送用)
-        return Array.from(metadataMap.entries()).map(
+        return Array.from(result.value.entries()).map(
           ([photoPath, metadata]) => ({
             photoPath,
             ...metadata,
@@ -48,7 +63,16 @@ export const vrchatPhotoMetadataRouter = () =>
     getPhotosByWorldId: procedure
       .input(z.object({ worldId: z.string().min(1) }))
       .query(async (ctx) => {
-        return metadataService.getPhotosByWorldId(ctx.input.worldId);
+        const result = await metadataService.getPhotosByWorldId(
+          ctx.input.worldId,
+        );
+        if (result.isErr()) {
+          logger.error({
+            message: `Failed to get photos by world ID: ${result.error.message}`,
+          });
+          return [];
+        }
+        return result.value;
       }),
 
     /**

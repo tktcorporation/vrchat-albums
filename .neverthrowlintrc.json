@@ -18,7 +18,8 @@
         "findVRChatWorldJoinLogList",
         "syncLogsInBackground",
         "processQueue",
-        "getVrcUserInfoByUserName"
+        "getVrcUserInfoByUserName",
+        "createExifTagReader"
       ]
     }
   ],
