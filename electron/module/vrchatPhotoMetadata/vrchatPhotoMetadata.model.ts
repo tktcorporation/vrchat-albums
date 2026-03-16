@@ -144,15 +144,34 @@ export const getPhotoMetadataByWorldId = async (
 };
 
 /**
- * メタデータが既に存在する写真パスの一覧を取得する
+ * 入力パスのうち、まだメタデータが存在しないパスだけを返す
  *
- * 差分処理: 既にメタデータ抽出済みの写真をスキップするために使用
+ * SQL の NOT IN でフィルタするため、全件をメモリにロードしない。
+ * SQLite のパラメータ上限を避けるためチャンク分割する。
+ *
+ * 呼び出し元: service.extractAndSaveMetadataBatch（差分処理）
  */
-export const getPhotoPathsWithMetadata = async (): Promise<Set<string>> => {
-  const records = await VRChatPhotoMetadataModel.findAll({
-    attributes: ['photoPath'],
-    raw: true,
-  });
+const CHUNK_SIZE = 500;
+export const filterPathsWithoutMetadata = async (
+  photoPaths: string[],
+): Promise<string[]> => {
+  if (photoPaths.length === 0) {
+    return [];
+  }
 
-  return new Set(records.map((r) => r.photoPath));
+  // DB に存在するパスをチャンクごとに照合
+  const existingPaths = new Set<string>();
+  for (let i = 0; i < photoPaths.length; i += CHUNK_SIZE) {
+    const chunk = photoPaths.slice(i, i + CHUNK_SIZE);
+    const records = await VRChatPhotoMetadataModel.findAll({
+      attributes: ['photoPath'],
+      where: { photoPath: { [Op.in]: chunk } },
+      raw: true,
+    });
+    for (const r of records) {
+      existingPaths.add(r.photoPath);
+    }
+  }
+
+  return photoPaths.filter((p) => !existingPaths.has(p));
 };

@@ -3,7 +3,7 @@ import { col, fn, literal, Op } from '@sequelize/core';
 import * as datefns from 'date-fns';
 import * as neverthrow from 'neverthrow';
 import { err, ResultAsync } from 'neverthrow';
-import { match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { logger } from '../../lib/logger';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
@@ -536,10 +536,21 @@ export async function loadLogInfoIndexFromVRChatLog({
         `Photo metadata extracted: ${metadataResult.value} new records`,
       );
     } else {
-      logger.warn({
-        message: `Photo metadata extraction failed: ${metadataResult.error.message}`,
-        stack: new Error(metadataResult.error.message),
-      });
+      // DB_ERROR は予期しないエラーなので error レベル（Sentry送信）
+      // NO_METADATA_FOUND / PARSE_ERROR はファイル単位の想定内失敗なので warn
+      match(metadataResult.error)
+        .with({ type: 'DB_ERROR' }, (e) => {
+          logger.error({
+            message: `Photo metadata DB error: ${e.message}`,
+            stack: new Error(e.message),
+          });
+        })
+        .with({ type: P.union('NO_METADATA_FOUND', 'PARSE_ERROR') }, (e) => {
+          logger.warn({
+            message: `Photo metadata extraction issue: ${e.message}`,
+          });
+        })
+        .exhaustive();
     }
     const metadataEndTime = performance.now();
     logger.debug(

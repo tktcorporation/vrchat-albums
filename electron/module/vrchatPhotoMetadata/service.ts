@@ -18,10 +18,10 @@ import {
 import type { VRChatPhotoMetadata } from './schema';
 import {
   createOrUpdatePhotoMetadataBatch,
+  filterPathsWithoutMetadata,
   getPhotoMetadataByPhotoPath,
   getPhotoMetadataByPhotoPaths,
   getPhotoMetadataByWorldId,
-  getPhotoPathsWithMetadata,
   type VRChatPhotoMetadataCreationAttributes,
 } from './vrchatPhotoMetadata.model';
 
@@ -76,26 +76,25 @@ export const extractAndSaveMetadataBatch = async (
     return ok(0);
   }
 
-  // 既にメタデータがある写真をスキップ
-  const existingPathsResult = await ResultAsync.fromPromise(
-    getPhotoPathsWithMetadata(),
+  // 既にメタデータがある写真をスキップ（SQL側でフィルタ、全件メモリロードを回避）
+  const newPathsResult = await ResultAsync.fromPromise(
+    filterPathsWithoutMetadata(photoPaths),
     (e): MetadataServiceError => ({
       type: 'DB_ERROR',
-      message: `Failed to query existing metadata: ${e instanceof Error ? e.message : String(e)}`,
+      message: `Failed to filter existing metadata: ${e instanceof Error ? e.message : String(e)}`,
     }),
   );
-  if (existingPathsResult.isErr()) {
-    return err(existingPathsResult.error);
+  if (newPathsResult.isErr()) {
+    return err(newPathsResult.error);
   }
-  const existingPaths = existingPathsResult.value;
 
-  const newPaths = photoPaths.filter((p) => !existingPaths.has(p));
+  const newPaths = newPathsResult.value;
   if (newPaths.length === 0) {
     return ok(0);
   }
 
   logger.info(
-    `Extracting metadata from ${newPaths.length} photos (${existingPaths.size} already processed)`,
+    `Extracting metadata from ${newPaths.length} photos (${photoPaths.length - newPaths.length} already processed)`,
   );
 
   // PNG/JPEGファイルのみフィルタ（XMPメタデータはPNG/JPEGどちらにも存在し得る）

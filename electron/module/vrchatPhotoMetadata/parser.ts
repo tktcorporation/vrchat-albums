@@ -22,24 +22,20 @@ export type MetadataParseError =
 // VRChat公式メタデータ (XMP) パーサー
 // ============================================================================
 
-/**
- * exiftool の Tags オブジェクトから VRChat 公式メタデータを抽出する
- *
- * exiftool-vendored は XMP カスタムネームスペース (vrc:) のフィールドも
- * 読み取り可能。フィールドが存在しない場合は null を返す。
- *
- * VRChat 2025.3.1 で導入されたフィールド:
+/*
+ * VRChat 2025.3.1 で導入された XMP フィールド:
  * - AuthorID (vrc:AuthorID): 撮影者ユーザーID
  * - Author: 撮影者表示名
  * - WorldID (vrc:WorldID): ワールドID
  * - WorldDisplayName (vrc:WorldDisplayName): ワールド表示名
- */
-/**
- * exiftool Tags から VRChat XMP フィールドの候補値を正規化して取得するヘルパー
  *
  * exiftool-vendored は XMP カスタムネームスペースのフィールドを
  * 複数の名前で返す可能性がある（例: AuthorID, vrc:AuthorID）。
- * ここで候補を統一し、string | null に正規化する。
+ * resolveStringTag で候補を統一し、extractOfficialMetadata で Zod 検証する。
+ */
+
+/**
+ * exiftool Tags から指定キーの候補値を正規化して string | null に変換するヘルパー
  */
 const resolveStringTag = (
   // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
@@ -55,6 +51,12 @@ const resolveStringTag = (
   return null;
 };
 
+/**
+ * exiftool の Tags オブジェクトから VRChat 公式メタデータを抽出する
+ *
+ * AuthorID が存在しなければ VRChat メタデータなしと判断して null を返す。
+ * Zod スキーマで最終検証する（Parse Don't Validate）。
+ */
 export const extractOfficialMetadata = (
   // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
   tags: Record<string, any>,
