@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.26.0
+
+### Minor Changes
+
+- [#717](https://github.com/tktcorporation/vrchat-albums/pull/717) [`ab3f0c8`](https://github.com/tktcorporation/vrchat-albums/commit/ab3f0c8af5f5db464b2680f45af01132a584a65d) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Changeset によるリリース自動化の導入
+
+- [#722](https://github.com/tktcorporation/vrchat-albums/pull/722) [`47bd9a8`](https://github.com/tktcorporation/vrchat-albums/commit/47bd9a8452b674143f270ae5bb4c2eaf6428e865) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Replace sharp (C++/libvips) with @napi-rs/image (Rust-based) for image processing
+
+- [#721](https://github.com/tktcorporation/vrchat-albums/pull/721) [`e89edbd`](https://github.com/tktcorporation/vrchat-albums/commit/e89edbd09010ee7e328f4897109e2cdbc00567a4) Thanks [@tktcorporation](https://github.com/tktcorporation)! - VRChat 公式 XMP メタデータ（2025.3.1 以降）のパース・保存機能を追加。写真インデックス作成時に撮影者・ワールド情報を自動抽出し DB に保存する。
+
 All notable changes to this project will be documented in this file.
 
 ## [unreleased]
@@ -67,13 +77,13 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - プレイヤーリストの初期状態をスケルトン表示に統一 (#654)
-- Trpc-electron IPC バグによる巨大toast表示を抑制 (#655)
+- Trpc-electron IPC バグによる巨大 toast 表示を抑制 (#655)
 
 ### 🚜 Refactor
 
 - Neverthrow error handling patterns improvement (#656)
-- デザインシステム刷新 - 8pxグリッド・セマンティックトークン統一 (#658)
-- 写真スキャン最適化 + Zod brand型で型安全性向上 (#659)
+- デザインシステム刷新 - 8px グリッド・セマンティックトークン統一 (#658)
+- 写真スキャン最適化 + Zod brand 型で型安全性向上 (#659)
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -84,13 +94,13 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add must-use-result check to neverthrow linter (#647)
-- DateJumpSidebarにGoogle Photos/immich風機能を追加 (#648)
+- DateJumpSidebar に Google Photos/immich 風機能を追加 (#648)
 - 設定画面のトンマナを統一 (#649)
 
 ### 🐛 Bug Fixes
 
 - スクロール時のレイアウトシフトを改善 (#645)
-- レイアウトシフト対策 - Immich方式スケルトン実装とアニメーション削除 (#650)
+- レイアウトシフト対策 - Immich 方式スケルトン実装とアニメーション削除 (#650)
 - レイアウトシフト・上方向スクロール問題の解消と幅計算の一元化 (#651)
 - 本番ビルドでグループ高さが統一される問題を修正
 
@@ -112,8 +122,8 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- Claude Code v2のベストプラクティスとlinterシステムの実装 (#617)
-- 利用規約をMarkdown形式に変換しスタイル・内容を改善 (#619)
+- Claude Code v2 のベストプラクティスと linter システムの実装 (#617)
+- 利用規約を Markdown 形式に変換しスタイル・内容を改善 (#619)
 - Upgrade Electron to v39 for Node.js 22 compatibility (#632)
 
 ### 🐛 Bug Fixes
@@ -121,23 +131,23 @@ All notable changes to this project will be documented in this file.
 - Restrict platform display to Windows only in landing page (#590)
 - プラットフォーム別アプリアイコンの自動生成システムを実装 (#597)
 - 初回起動時以外でも「初期化中」と表示される問題を修正 (#610)
-- GitHub Actionsワークフローの依存関係インストール処理を統一 (#612)
-- Yarn workspaceの依存関係インストール問題を修正 (#613)
-- Yarn workspaceの依存関係とLanding Pageデプロイワークフローを修正 (#614)
-- Grit CLIをdevDependenciesに追加してCIのlintエラーを修正 (#621)
-- TsxをdevDependenciesに追加してnpx依存を解消 (#622)
+- GitHub Actions ワークフローの依存関係インストール処理を統一 (#612)
+- Yarn workspace の依存関係インストール問題を修正 (#613)
+- Yarn workspace の依存関係と Landing Page デプロイワークフローを修正 (#614)
+- Grit CLI を devDependencies に追加して CI の lint エラーを修正 (#621)
+- Tsx を devDependencies に追加して npx 依存を解消 (#622)
 
 ### ⚙️ Miscellaneous Tasks
 
 - Remove unused icon files and update electron-builder configuration (#595)
-- 開発環境設定の改善とMCPサーバー統合 (#596)
-- ドキュメントの整理とXML検証ツールの追加 (#600)
+- 開発環境設定の改善と MCP サーバー統合 (#596)
+- ドキュメントの整理と XML 検証ツールの追加 (#600)
 - 依存関係の包括的アップデートとバージョン管理改善 (#601)
 - Update dependencies to latest minor and patch versions (#603)
-- コンテナ環境でのElectron起動に--no-sandboxオプションを追加 (#604)
+- コンテナ環境での Electron 起動に--no-sandbox オプションを追加 (#604)
 - Update landing page dependencies to latest patch versions (#605)
 - Upgrade 12 major dependencies including React 19, tRPC v11, TanStack Query v5 (#606)
-- Chrome DevTools MCPサーバーと開発環境の設定追加 (#615)
+- Chrome DevTools MCP サーバーと開発環境の設定追加 (#615)
 - 開発環境設定の改善 (#627)
 
 ## [0.19.0] - 2025-08-11
@@ -149,14 +159,14 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
-- *(#549)* LogLoad中のエラーハンドリングを改善し、部分的な成功を許容 (#551)
+- _(#549)_ LogLoad 中のエラーハンドリングを改善し、部分的な成功を許容 (#551)
 - Replace wildcard pattern in sentry:sourcemaps script with explicit script names (#571)
 - Improve light mode contrast by making foreground elements brighter (#574)
 - Update LP image references to use playwright/previews images (#578)
 - Automate landing page screenshot sync from playwright tests (#581)
 - Automate landing page screenshot sync and UI improvements (#583)
 - 右クリック写真コピーで全選択写真をコピーできない問題を修正 (#587)
-- Screenイベントリスナーのクリーンアップ処理を追加 (#589)
+- Screen イベントリスナーのクリーンアップ処理を追加 (#589)
 
 ### 🚜 Refactor
 
@@ -176,20 +186,20 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- 写真選択UIをモダンでシンプルなデザインに改善 (#497)
-- ランディングページの実装とTailwind CSS v4への移行 (#532)
-- VRChat Albums紹介用ランディングページの実装 (#533)
-- *(#529)* ウィンドウヘッダーのダブルクリックで最大化/復元機能 (#537)
+- 写真選択 UI をモダンでシンプルなデザインに改善 (#497)
+- ランディングページの実装と Tailwind CSS v4 への移行 (#532)
+- VRChat Albums 紹介用ランディングページの実装 (#533)
+- _(#529)_ ウィンドウヘッダーのダブルクリックで最大化/復元機能 (#537)
 
 ### 🐛 Bug Fixes
 
 - 日付ジャンプサイドバーがアプリケーションヘッダーと重なる問題を修正 (#503)
-- App trayの項目整理とアイコンクリック動作を追加 (#505)
-- I18nの漏れを修正 (#502)
+- App tray の項目整理とアイコンクリック動作を追加 (#505)
+- I18n の漏れを修正 (#502)
 - フォトギャラリーのグループ間の余白を適切なサイズに調整 (#506)
-- Primary colorの不一致を修正 (#504)
-- 入力要素のスタイル統一とSSH agent forwarding設定 (#526) (#527)
-- *(#476)* UIコンポーネントのprimary color統一 (#535)
+- Primary color の不一致を修正 (#504)
+- 入力要素のスタイル統一と SSH agent forwarding 設定 (#526) (#527)
+- _(#476)_ UI コンポーネントの primary color 統一 (#535)
 - ランディングページのビルドエラーを修正 (#543)
 
 ### 🚜 Refactor
@@ -199,16 +209,16 @@ All notable changes to this project will be documented in this file.
 - Apply ts-pattern to startup stage handling (#522)
 - Phase 1 - Consolidate duplicate code patterns (#531)
 - アイコンサイズの統一と定数化 (#542)
-- *(#538)* Transition durationの統一 (#540)
-- TRPCエラーハンドリング、Sentryフィルタリング、利用規約改善 (#501)
+- _(#538)_ Transition duration の統一 (#540)
+- TRPC エラーハンドリング、Sentry フィルタリング、利用規約改善 (#501)
 
 ## [0.17.0] - 2025-06-22
 
 ### 🚀 Features
 
-- 写真クリック時にOSの標準写真ビューアーで開くように変更 (#475)
+- 写真クリック時に OS の標準写真ビューアーで開くように変更 (#475)
 - 写真コピー機能を画像データコピーからファイルパスコピーに変更 (#481)
-- 旧アプリからのデータ移行機能を再実装（Playwrightテスト対応版） (#463) (#488)
+- 旧アプリからのデータ移行機能を再実装（Playwright テスト対応版） (#463) (#488)
 - 写真ギャラリーに日付ジャンプサイドバーを実装 (#489)
 - 写真ギャラリーに日付ジャンプサイドバー機能を実装 (#495)
 
@@ -228,12 +238,12 @@ All notable changes to this project will be documented in this file.
 - 検索候補選択時の検索タイプ明示的指定機能を追加 (#458)
 - 旧アプリからのデータ移行機能を実装 (#463)
 - ローディングアニメーションを追加 (#466)
-- 初回起動時の自動起動設定をデフォルトTrueに変更 (#467)
+- 初回起動時の自動起動設定をデフォルト True に変更 (#467)
 
 ### 🐛 Bug Fixes
 
-- PlayerName検索のパフォーマンス最適化 (#457)
-- ワールドリンクのURL構造を修正 (#460)
+- PlayerName 検索のパフォーマンス最適化 (#457)
+- ワールドリンクの URL 構造を修正 (#460)
 
 ## [0.15.0] - 2025-06-16
 
@@ -241,7 +251,7 @@ All notable changes to this project will be documented in this file.
 
 - Add player name search (#415)
 - Add frequently played players to search overlay (#416)
-- DB→logStore逆変換機能とエクスポート機能の実装 (#440) (#441)
+- DB→logStore 逆変換機能とエクスポート機能の実装 (#440) (#441)
 - エクスポート先に日時付きサブフォルダを作成 (#442)
 - Improve export functionality with default full-period mode and timezone handling (#446)
 - バックアップエクスポート、インポート機能の実装 (#449)
@@ -253,7 +263,7 @@ All notable changes to this project will be documented in this file.
 - Show world headers even when no photos exist in sessions (#423) (#426)
 - Implement comprehensive timeout prevention for getPlayerListInSameWorld queries (#431)
 - Improve timeout error stack traces and debugging for cache operations (#433)
-- 検索オーバーレイのUX改善 (#434)
+- 検索オーバーレイの UX 改善 (#434)
 - Optimize session batch processing with PhotoAsLog integration and timeout improvements (#435)
 - Improve cache key strategy for session player lists to prevent data integrity issues (#436)
 - Remove session duration limits and optimize query performance (#437)
@@ -272,7 +282,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🧪 Testing
 
-- ValueObjectの型安全性向上とテスト修正 (#450)
+- ValueObject の型安全性向上とテスト修正 (#450)
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -292,22 +302,22 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - ログ情報のロード設定を修正し、過去のログも含めるように変更 (#373)
-- Log保存時のバリデーション調整、photoAsLogとの動作調整 (#383)
-- LocationGroupHeaderでセッション内全プレイヤーが表示されない問題を修正 (#396)
-- LocationGroupHeaderでrejoinしたプレイヤーの重複表示を防止 + docs更新 (#397)
-- LocationGroupHeaderとPhotoGridの横幅整列問題を修正 (#398)
+- Log 保存時のバリデーション調整、photoAsLog との動作調整 (#383)
+- LocationGroupHeader でセッション内全プレイヤーが表示されない問題を修正 (#396)
+- LocationGroupHeader で rejoin したプレイヤーの重複表示を防止 + docs 更新 (#397)
+- LocationGroupHeader と PhotoGrid の横幅整列問題を修正 (#398)
 
 ### 🚜 Refactor
 
 - ログの更新処理をまとめる (#379)
-- LocationGroupHeader.tsxを単一責任原則に従って分割 (#380)
-- VRChatログサービスを分割リファクタ (#381)
-- AppHeaderを統合してUI一貫性を改善し、ボタンサイズを最適化 (#399)
+- LocationGroupHeader.tsx を単一責任原則に従って分割 (#380)
+- VRChat ログサービスを分割リファクタ (#381)
+- AppHeader を統合して UI 一貫性を改善し、ボタンサイズを最適化 (#399)
 
 ### ⚙️ Miscellaneous Tasks
 
 - Updates tests to cover the new photo directory functionality (#382)
-- Pr-issue-link.ymlのbranch-prefixを修正 (#391)
+- Pr-issue-link.yml の branch-prefix を修正 (#391)
 - ワールドセッション管理機能をリファクタ (#394)
 
 ## [0.13.0] - 2025-06-01
@@ -325,7 +335,7 @@ All notable changes to this project will be documented in this file.
 
 - Sentry setup (#323)
 - Embed screenshots in PR comments (#324)
-- Sentryイベントの個人情報マスク処理を追加 (#351)
+- Sentry イベントの個人情報マスク処理を追加 (#351)
 
 ### 🐛 Bug Fixes
 
@@ -338,48 +348,48 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Lintスクリプトの更新と@typescript/native-previewの追加 (#309) (#320)
+- Lint スクリプトの更新と@typescript/native-preview の追加 (#309) (#320)
 - Fix Sentry IPC preload (#330)
 - Fix license generation output paths (#328)
 - Add Claude Code GitHub Workflow (#333)
-- Claude.ymlにallowedToolsを追加し、使用可能なツールのリストを更新 (#338)
+- Claude.yml に allowedTools を追加し、使用可能なツールのリストを更新 (#338)
 - Fix workflow tool key and revert licenses (#344)
 - Issue-link to match numeric branches (#346)
-- Electron-pan-clipからclip-filepathsへの移行と依存関係の更新 (#347)
-- Lint時に actionlint を実行 (#349)
+- Electron-pan-clip から clip-filepaths への移行と依存関係の更新 (#347)
+- Lint 時に actionlint を実行 (#349)
 
 ## [0.12.0] - 2025-04-29
 
 ### 🚀 Features
 
-- Log処理を全件ではなく新しい分だけ処理することができるようにする WIP (#302)
+- Log 処理を全件ではなく新しい分だけ処理することができるようにする WIP (#302)
 - 複数写真のコピー機能を実装 (#306)
 
 ### 🐛 Bug Fixes
 
 - 同じワールドにいたプレイヤーのリスト取得ロジックを修正 (#289)
 - 通常ロードでは旧形式のログファイルは対象としない (#298)
-- VRChatの写真パスインデックス作成処理を改善し、旧形式のログファイルを除外 (#299)
-- Refresh時に新しいログ分のデータが更新されない問題を修正 (#301)
+- VRChat の写真パスインデックス作成処理を改善し、旧形式のログファイルを除外 (#299)
+- Refresh 時に新しいログ分のデータが更新されない問題を修正 (#301)
 
 ### ⚙️ Miscellaneous Tasks
 
 - ログファイルを分割して保存するようにする (#296)
-- Log load処理に時間がかかる原因を探るためのデバッグ行追加 (#297)
+- Log load 処理に時間がかかる原因を探るためのデバッグ行追加 (#297)
 - 写真をセッションにグループ化するロジックを改善 (#300)
 
 ## [0.11.1] - 2025-03-05
 
 ### 🐛 Bug Fixes
 
-- Sequelizeモデルにテーブル名を明示的に指定 (#286)
+- Sequelize モデルにテーブル名を明示的に指定 (#286)
 
 ## [0.10.3] - 2025-03-05
 
 ### 🚜 Refactor
 
-- ロケーショングループヘッダーのUIを変更 (#278)
-- Electron設定をViteベースに移行し、モジュールタイプを更新 (#282)
+- ロケーショングループヘッダーの UI を変更 (#278)
+- Electron 設定を Vite ベースに移行し、モジュールタイプを更新 (#282)
 
 ### 🎨 Styling
 
@@ -395,7 +405,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
-- Sync処理とグルーピング処理のローディングを別々に処理 (#272)
+- Sync 処理とグルーピング処理のローディングを別々に処理 (#272)
 
 ## [0.10.0] - 2025-02-04
 
@@ -428,7 +438,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🚀 Features
 
-- シェア画像のファイル名の形式をphotoLogの形式に変更 (#244)
+- シェア画像のファイル名の形式を photoLog の形式に変更 (#244)
 - Auto-update 機能の実装 (#246)
 
 ## [0.6.1] - 2025-01-25
@@ -450,13 +460,13 @@ All notable changes to this project will be documented in this file.
 
 ### 🐛 Bug Fixes
 
-- Pathの処理をwin/linux互換にする (#219)
+- Path の処理を win/linux 互換にする (#219)
 
 ## [0.5.0] - 2025-01-14
 
 ### 🚀 Features
 
-- シェア用のWorld Join プレビューを追加 (#201)
+- シェア用の World Join プレビューを追加 (#201)
 - プレビュー表示でプレイヤー名全量を表示するオプション追加 (#202)
 - プレーヤーリストのクリップボードへのコピー機能を追加 (#205)
 
@@ -475,7 +485,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Context-menu で写真の操作を行えるようにする (#176)
-- Photo表示の効率化 (#178)
+- Photo 表示の効率化 (#178)
 
 ### 🐛 Bug Fixes
 
@@ -489,14 +499,14 @@ All notable changes to this project will be documented in this file.
 - Migrate は window が作成されてからにする (#135)
 - データベース同期のエラーハンドリングを強化 (#143)
 - 開発者ツールを常時表示に変更し、データベース同期エラーの調査を容易に (#144)
-- LocationGroupHeaderにプレイヤー情報表示を実装 (#147)
-- 設定画面にappログを開くためのボタンを追加 (#148)
+- LocationGroupHeader にプレイヤー情報表示を実装 (#147)
+- 設定画面に app ログを開くためのボタンを追加 (#148)
 - LocationGroupHeader のクエリ発行を画面内に入るまで遅延させる (#149)
-- Sentry導入のための設定 (#152)
-- Photoのグルーピング処理を徐々に行うように変更 (#154)
-- 写真を撮っていない時でもJoin記録を表示するように (#164)
-- 写真を撮っていないjoin記録を表示するかの切り替えフィルタを実装 (#165)
-- ワールドJoinのグルーピング処理を調整 (#166)
+- Sentry 導入のための設定 (#152)
+- Photo のグルーピング処理を徐々に行うように変更 (#154)
+- 写真を撮っていない時でも Join 記録を表示するように (#164)
+- 写真を撮っていない join 記録を表示するかの切り替えフィルタを実装 (#165)
+- ワールド Join のグルーピング処理を調整 (#166)
 - 利用規約の同意をせずにアプリケーションを利用できないようにする (#167)
 - ワールドリンクを外部リンクで開けるように (#170)
 - ワールド名での検索機能実装 (#172)
@@ -511,7 +521,7 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Sentryの導入 (#151)
+- Sentry の導入 (#151)
 
 ### Change
 
@@ -521,7 +531,7 @@ All notable changes to this project will be documented in this file.
 ### Fest
 
 - UI を中心に大幅に構成変更 (#132)
-- Log.erro時にsentry呼び出し, bg更新処理追加 (#153)
+- Log.erro 時に sentry 呼び出し, bg 更新処理追加 (#153)
 
 ## [0.2.0-alpha.7] - 2024-11-10
 
@@ -541,7 +551,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - 自動アップデートの仮実装 (#119)
-- 写真サイズの拡大縮小機能WIP (#121)
+- 写真サイズの拡大縮小機能 WIP (#121)
 
 ### 🚜 Refactor
 
@@ -583,7 +593,7 @@ All notable changes to this project will be documented in this file.
 - Use bash shell (#99)
 - Fix uploader (#100)
 - Changelog settings (#101)
-- Exeファイルが gh release できない (#102)
+- Exe ファイルが gh release できない (#102)
 
 ### Release
 
@@ -601,10 +611,10 @@ All notable changes to this project will be documented in this file.
 
 - Update build processes
 - `changelog.md` を生成するように (#90)
-- Changelog のci設定修正 (#91)
+- Changelog の ci 設定修正 (#91)
 - Release ci の修正 (#92)
 - バージョンが上がったら `v*` を push (#93)
-- `v*` のtag push (#94)
+- `v*` の tag push (#94)
 - 修正 (#95)
 - 修正 (#96)
 - 修正 (#97)
@@ -636,31 +646,31 @@ All notable changes to this project will be documented in this file.
 - Trpc error が発生した場合にエラーが記録されるようにする
 - 作成、プレビューする画像のサイズを可変に
 - 写真一覧画面でのエラーハンドリング強化
-- 作成画面のUX改善
+- 作成画面の UX 改善
 - HOME を変更
 - エラーハンドリング強化
 - Error を使ってエラー追跡できるように
 - エラーハンドリングの強化
 - App log を直接開くボタンを設置
 - Phpto click で写真を開く
-- Service に同一worldへのjoinを記録しないオプションを追加
-- 重複削除のフラグをstoreから取得するように
+- Service に同一 world への join を記録しないオプションを追加
+- 重複削除のフラグを store から取得するように
 - ワールド名の表示機能
-- PhotoListでworld名表示
+- PhotoList で world 名表示
 - Join log と photo をまとめて表示する
 - ワールド名をリンク化
 - 細かいスタイル修正
 - バックグラウンド処理を有効化
-- リンクホバーでunderline
-- Http or httpsのリンクをクリックしたときにデフォルトブラウザで開く
-- Background作成用の処理を書くためのTODOコメント
+- リンクホバーで underline
+- Http or https のリンクをクリックしたときにデフォルトブラウザで開く
+- Background 作成用の処理を書くための TODO コメント
 - リンククリックでデフォルトブラウザを開く
 - バックグラウンド設定用のボタンとページを追加
-- バックグラウンド設定ページのUI実装
-- バックグラウンド処理切り替えUIの中身実装
+- バックグラウンド設定ページの UI 実装
+- バックグラウンド処理切り替え UI の中身実装
 - ファイルが既に存在していたら作成しない
-- バックグラウンドでjoin log 作成処理
-- ファイル作成ページとJoinListページを統合
+- バックグラウンドで join log 作成処理
+- ファイル作成ページと JoinList ページを統合
 - Use noto sans jp as default font
 - Add a sr-only guide
 - Change app icon
@@ -668,14 +678,14 @@ All notable changes to this project will be documented in this file.
 - アプリ名変更
 - 状態の持ち方を整備
 - ファイル作成後にリロードする
-- UIデザイン修正
+- UI デザイン修正
 - 画面内に入った時にロード処理を行う
-- JoinList のUIアップデート
-- Toastでのエラーメッセージ表示を詳細にする
-- PC起動時のautoStart設定
+- JoinList の UI アップデート
+- Toast でのエラーメッセージ表示を詳細にする
+- PC 起動時の autoStart 設定
 - バージョン情報の表記を追加
 - 使用ライブラリのライセンス情報を記載
-- 設定画面のUIアップデート
+- 設定画面の UI アップデート
 - Join 情報がない場合も unknown として表示する
 - Join List の並び順を降順に統一
 - WorldJoin と playerJoin の抽出
@@ -685,18 +695,18 @@ All notable changes to this project will be documented in this file.
 - Player と world の join 情報ログに絞って取得する
 - LoadIndex の controller 作成
 - LoadIndex の処理を追加(うまく動いていない)
-- JoinInfoLogList の表示UI実装
-- 選択した写真の撮影worldを返す仮実装
+- JoinInfoLogList の表示 UI 実装
+- 選択した写真の撮影 world を返す仮実装
 - 写真を撮ったワールドの詳細情報を取得して表示
 - Resetdb に確認ボタンを付ける(いらないかも)
-- Sequelize で db 処理を記述 local起動成功
+- Sequelize で db 処理を記述 local 起動成功
 - Db sync が必要かどうかを確認してから実行するように
-- Player情報を出すUI wip
+- Player 情報を出す UI wip
 - 初回起動時にのみマイグレーション処理
 - デザイン調整
 - 起動時に log の書き込みと index 読み込みを行う
 - 起動時に未設定の項目があったら設定画面へ誘導する
-- ワールド情報表示のmvp制作wip
+- ワールド情報表示の mvp 制作 wip
 - (wip) sheet で settings を開く
 - Update the app design [wip]
 - Scroll いい感じ wip
@@ -704,23 +714,23 @@ All notable changes to this project will be documented in this file.
 - 葉にないだけスクロールするように
 - 設定画面のスタイル微調整
 - 色味 wip
-- 選択したphotoの情報を url に保持
-- 写真一覧の取得と表示、その他UI調整
-- 同じjoin内で撮影した写真も表示
+- 選択した photo の情報を url に保持
+- 写真一覧の取得と表示、その他 UI 調整
+- 同じ join 内で撮影した写真も表示
 - 写真が描画範囲に入ったときだけロードする
 - Virtual scroll を使う
-- 写真リストのUI改善
-- 写真リストのUI改善
+- 写真リストの UI 改善
+- 写真リストの UI 改善
 - ダミー写真ファイルの生成ロジック変更
 - 写真の描画を改善
-- 写真一覧ui改善
-- 写真領域の縦幅を調整, 写真が存在しないときのhook を仮作成
+- 写真一覧 ui 改善
+- 写真領域の縦幅を調整, 写真が存在しないときの hook を仮作成
 - Validate not found vrcPhotoPath
 - バーチャルスクロールの動きを直す
 - バーチャルスクロール微調整
-- Virtualscrollの縦幅を可変、日付を入れる
+- Virtualscroll の縦幅を可変、日付を入れる
 - Join 記録の表示を追加
-- ワールド名表示のUI調整
+- ワールド名表示の UI 調整
 - グルーピング修正
 - Shadcn-ui@latest add context-menu
 - 写真のコピー機能実装
@@ -753,9 +763,9 @@ All notable changes to this project will be documented in this file.
 - Handle new month photo dir log
 - Buildsettings
 - Fix font file path in infoFile/lib.ts
-- サムネイル画像のtimezone を正す
+- サムネイル画像の timezone を正す
 - Lint command
-- Date変換の修正とさらなるlogging
+- Date 変換の修正とさらなる logging
 - Timezone
 - Logfile が長い場合に Maximum call stack size exceeded. が起こる問題を修正
 - レンダリングループ
@@ -764,7 +774,7 @@ All notable changes to this project will be documented in this file.
 - 同じ写真が出てくる問題を key を変更して解決できるかどうか
 - PhotoList は上の方が新しい物が来る
 - PhotoList の key を unique にする
-- Key指定の間違いを修正
+- Key 指定の間違いを修正
 - 表示のタイムゾーンを修正
 - Fix setup script
 - Yarn lint:fix
@@ -785,9 +795,9 @@ All notable changes to this project will be documented in this file.
 - 初期表示時の状態の持ち方を改善
 - バックグラウンドファイル作成時に数が実態より多く出ていた問題
 - New Join List の並びを日時の降順
-- 何故か描画時にswitch が切り替わるが、整合性はとれるように
+- 何故か描画時に switch が切り替わるが、整合性はとれるように
 - 複数バックグラウンドプロセスが立ち上がらないようにしたい
-- ウィンドウを開く度にtrayが作成されていた問題を修正
+- ウィンドウを開く度に tray が作成されていた問題を修正
 - 並び順の修正
 - Fix command
 - App version を package.json から取得する
@@ -799,21 +809,21 @@ All notable changes to this project will be documented in this file.
 - Tests
 - LoadIndex の処理を修正
 - Prisma client を prod で使うための設定
-- Build設定を変えることでエラー解決を試みる
+- Build 設定を変えることでエラー解決を試みる
 - Window を出す前に migrate を走らせない
-- 起動時にmigrateを走らせる
+- 起動時に migrate を走らせる
 - Db path の組み立て方を変更
 - Wondows の場合 file url は `file///` で始める
 - 環境変数の渡し方を変更
 - `node_modules/.bin/prisma` が存在するかを確認して実行
-- コマンドの実行結果をUTF-8エンコードして戻す
-- エラーをutf8で上げ直す
+- コマンドの実行結果を UTF-8 エンコードして戻す
+- エラーを utf8 で上げ直す
 - Sjis の encode
 - Encoding
 - Debug
 - Tsconfig の修正
-- Test修正
-- Test修正
+- Test 修正
+- Test 修正
 - PackageJsonPath の取得方法変更
 - AppVersion の取得方法を変更
 - AppVersion の取得方法変更
@@ -834,7 +844,7 @@ All notable changes to this project will be documented in this file.
 - Biome init and lint
 - Lint:fix
 - Composables でリファクタ
-- SettingStoreの呼び出し箇所を限定
+- SettingStore の呼び出し箇所を限定
 - 使用する store を外部から差し込み可能に
 - Router path の取得ができなかった場合に例外
 - Package 構成変更
@@ -937,7 +947,7 @@ All notable changes to this project will be documented in this file.
 - Addtest to ci
 - Precommit command の変更
 - Update eslintrc
-- Lint実行の順番を変更
+- Lint 実行の順番を変更
 - CompilerOptions の変更
 - デバッグ用にログ追加
 - Gen sourcemap
@@ -982,7 +992,7 @@ All notable changes to this project will be documented in this file.
 - Add shadcn drawer
 - Production で debug log は流さない
 - Update dependencies
-- Debug 用script の修正
+- Debug 用 script の修正
 - Bump version 0.2.0
 
 ### Add
@@ -994,14 +1004,14 @@ All notable changes to this project will be documented in this file.
 ### Build
 
 - ビルド結果に app version を含める
-- *(deps)* Bump ip from 2.0.0 to 2.0.1
+- _(deps)_ Bump ip from 2.0.0 to 2.0.1
 - Set product name
 
 ### Change
 
 - Refactor and move AppBar
 - UI を少し整え
-- World名も取得する
+- World 名も取得する
 - Refactor router paths and add constants file
 
 ### Clean
@@ -1028,7 +1038,7 @@ All notable changes to this project will be documented in this file.
 
 ### Note
 
-- Todo記述
+- Todo 記述
 
 ### Update
 
