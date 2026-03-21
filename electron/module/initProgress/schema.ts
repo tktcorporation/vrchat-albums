@@ -15,6 +15,7 @@ export const InitStageSchema = z.enum([
   'log_load',
   'photo_index',
   'photo_metadata',
+  'world_join_image',
   'completed',
   'error',
 ]);
@@ -67,6 +68,7 @@ export const STAGE_LABELS: Record<InitStage, string> = {
   log_load: 'ログデータ保存',
   photo_index: '写真インデックス',
   photo_metadata: '写真メタデータ抽出',
+  world_join_image: 'ワールド参加画像生成',
   completed: '完了',
   error: 'エラー',
 } as const;
