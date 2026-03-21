@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.27.0
+
+### Minor Changes
+
+- [#727](https://github.com/tktcorporation/vrchat-albums/pull/727) [`31062b1`](https://github.com/tktcorporation/vrchat-albums/commit/31062b16510f63eae4ab9557473f22874c18fa8c) Thanks [@tktcorporation](https://github.com/tktcorporation)! - logger.warnWithSentry() を追加し、警告レベルのイベントを Sentry に送信可能に。重要な 8 箇所の warn を移行
+
+### Patch Changes
+
+- [#725](https://github.com/tktcorporation/vrchat-albums/pull/725) [`32c7e01`](https://github.com/tktcorporation/vrchat-albums/commit/32c7e0195cfebecce78df9cdfac5a8f31a027ae6) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真ファイルが削除・移動された場合の ENOENT エラーを予期されたエラーとして処理し、Sentry への不要な送信を防止
+
+- [#726](https://github.com/tktcorporation/vrchat-albums/pull/726) [`372eff2`](https://github.com/tktcorporation/vrchat-albums/commit/372eff234828bd9f37056dfee35075457ed03d6a) Thanks [@tktcorporation](https://github.com/tktcorporation)! - ワールド参加ログのパーサーが不正なインスタンス ID でクラッシュする問題を修正し、アプリ起動失敗を防止
+
+- [#730](https://github.com/tktcorporation/vrchat-albums/pull/730) [`cdb8a0c`](https://github.com/tktcorporation/vrchat-albums/commit/cdb8a0c5d4222403e4c1e868dc126c179e4d8051) Thanks [@tktcorporation](https://github.com/tktcorporation)! - GitHub Release Notes の生成を git-cliff から CHANGELOG.md（changesets 管理）ベースに統一
+
 ## 0.26.0
 
 ### Minor Changes
@@ -1050,4 +1064,3 @@
 - Setup electron
 - Ugoitakamo?
 - No styled shadcn button
-
