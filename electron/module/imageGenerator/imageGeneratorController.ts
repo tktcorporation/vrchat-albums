@@ -1,7 +1,47 @@
-import { match } from 'ts-pattern';
 import { z } from 'zod';
+import { handleResultError } from '../../lib/errorHelpers';
+import {
+  ERROR_CATEGORIES,
+  ERROR_CODES,
+  UserFacingError,
+} from '../../lib/errors';
 import { procedure, router as trpcRouter } from '../../trpc';
+import type { ImageGenerationError } from './error';
 import { generateSharePreview } from './service';
+
+/**
+ * 画像生成エラーを UserFacingError に変換するマッピング
+ *
+ * 背景: handleResultError で使用し、ImageGenerationError の各 type を
+ * ユーザー向けメッセージに変換する。
+ */
+const imageGenerationErrorMappings: {
+  [key: string]: (error: ImageGenerationError) => UserFacingError;
+} & {
+  default?: (error: ImageGenerationError) => UserFacingError;
+} = {
+  SVG_RENDER_FAILED: (error) =>
+    UserFacingError.withStructuredInfo({
+      code: ERROR_CODES.UNKNOWN,
+      category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+      message: `SVG render failed: ${error.message}`,
+      userMessage: '画像の生成に失敗しました。',
+    }),
+  FONT_LOAD_FAILED: (error) =>
+    UserFacingError.withStructuredInfo({
+      code: ERROR_CODES.FILE_NOT_FOUND,
+      category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+      message: `Font load failed: ${error.message}`,
+      userMessage: 'フォントの読み込みに失敗しました。',
+    }),
+  default: (error) =>
+    UserFacingError.withStructuredInfo({
+      code: ERROR_CODES.UNKNOWN,
+      category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+      message: `Image generation failed: ${error.message}`,
+      userMessage: '画像生成中にエラーが発生しました。',
+    }),
+};
 
 /**
  * 画像生成の tRPC ルーター
@@ -23,36 +63,6 @@ export const imageGeneratorRouter = trpcRouter({
     )
     .mutation(async ({ input }) => {
       const result = await generateSharePreview(input);
-
-      if (result.isErr()) {
-        throw match(result.error)
-          .with(
-            { type: 'SVG_RENDER_FAILED' },
-            (e) => new Error(`SVG render failed: ${e.message}`),
-          )
-          .with(
-            { type: 'IMAGE_CONVERSION_FAILED' },
-            (e) => new Error(`Image conversion failed: ${e.message}`),
-          )
-          .with(
-            { type: 'FONT_LOAD_FAILED' },
-            (e) => new Error(`Font load failed: ${e.message}`),
-          )
-          .with(
-            { type: 'WORLD_API_FAILED' },
-            (e) => new Error(`World API failed: ${e.message}`),
-          )
-          .with(
-            { type: 'IMAGE_DOWNLOAD_FAILED' },
-            (e) => new Error(`Image download failed: ${e.message}`),
-          )
-          .with(
-            { type: 'FILE_WRITE_FAILED' },
-            (e) => new Error(`File write failed: ${e.message}`),
-          )
-          .exhaustive();
-      }
-
-      return result.value;
+      return handleResultError(result, imageGenerationErrorMappings);
     }),
 });

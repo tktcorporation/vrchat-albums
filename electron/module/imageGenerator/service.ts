@@ -49,6 +49,7 @@ export const generateWorldJoinImage = async (params: {
   worldName: string;
   imageBase64: string;
   players: { playerName: string }[] | null;
+  /** 現在は未使用。将来的に画像内に日時を表示する際に使用予定。 */
   joinDateTime: Date;
 }): Promise<neverthrow.Result<Buffer, ImageGenerationError>> => {
   const imageBuffer = Buffer.from(params.imageBase64, 'base64');

@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as neverthrow from 'neverthrow';
 import * as path from 'pathe';
+import { match, P } from 'ts-pattern';
 import { VRChatWorldIdSchema } from '../../lib/brandedTypes';
 import { logger } from '../../lib/logger';
 import type { ImageGenerationError } from '../imageGenerator/error';
@@ -125,12 +126,19 @@ const generateMissingWorldJoinImagesInternal = async (params: {
 
       // 4. ワールド画像をダウンロード → base64
       const { ofetch } = await import('ofetch');
-      const imageResponse = await ofetch(worldInfo.imageUrl, {
-        responseType: 'arrayBuffer',
-      }).catch(() => null);
-
-      if (!imageResponse) {
-        logger.warn(`Failed to download world image for ${join.worldId}`);
+      let imageResponse: ArrayBuffer;
+      try {
+        imageResponse = await ofetch(worldInfo.imageUrl, {
+          responseType: 'arrayBuffer',
+        });
+      } catch (downloadError) {
+        logger.warn({
+          message: `Failed to download world image for ${join.worldId}`,
+          stack:
+            downloadError instanceof Error
+              ? downloadError
+              : new Error(String(downloadError)),
+        });
         errors++;
         continue;
       }
@@ -170,11 +178,31 @@ const generateMissingWorldJoinImagesInternal = async (params: {
         message: `Generated ${generated}/${missingJoins.length} images`,
       });
     } catch (error) {
-      // 予期しないエラーはログに記録して次の画像生成を続行
-      logger.error({
-        message: `Unexpected error generating world join image for ${join.worldId}`,
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
+      match(error)
+        .with(
+          P.instanceOf(Error),
+          P.when(
+            (e) =>
+              e instanceof Error &&
+              ('code' in e ||
+                e.name === 'FetchError' ||
+                e.name === 'AbortError'),
+          ),
+          (e) => {
+            // ネットワーク系やファイル I/O の予期されたエラー: ログに記録して続行
+            logger.warn({
+              message: `Expected error generating world join image for ${join.worldId}: ${e.message}`,
+              stack: e,
+            });
+          },
+        )
+        .otherwise((e) => {
+          // 予期しないエラー（TypeError, ReferenceError 等）は Sentry に送信
+          logger.error({
+            message: `Unexpected error generating world join image for ${join.worldId}`,
+            stack: e instanceof Error ? e : new Error(String(e)),
+          });
+        });
       errors++;
     }
   }

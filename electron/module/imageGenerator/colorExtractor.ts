@@ -128,10 +128,15 @@ function calcColors(data: Buffer, step: number): DominantColors {
 export async function extractDominantColorsFromBuffer(
   imageBuffer: Buffer,
 ): Promise<DominantColors> {
-  const transformer = new Transformer(imageBuffer);
-  const rawPixels = await transformer.rawPixels();
+  try {
+    const transformer = new Transformer(imageBuffer);
+    const rawPixels = await transformer.rawPixels();
 
-  // RGBA: 4 bytes per pixel, sample every 20th pixel (step = 80 bytes)
-  const step = 4 * 20;
-  return calcColors(rawPixels, step);
+    // RGBA: 4 bytes per pixel, sample every 20th pixel (step = 80 bytes)
+    const step = 4 * 20;
+    return calcColors(rawPixels, step);
+  } catch {
+    // 破損した画像や不正なフォーマットの場合はデフォルトカラーを返す
+    return DEFAULT_COLORS;
+  }
 }

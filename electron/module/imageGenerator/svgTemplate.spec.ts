@@ -83,6 +83,19 @@ describe('generatePreviewSvg', () => {
     expect(result.svg).not.toContain('PLAYERS');
   });
 
+  it('should escape XML special characters in world name', () => {
+    const result = generatePreviewSvg({
+      worldName: 'Test <World> & "Quotes"',
+      imageBase64: 'dGVzdA==',
+      players: [{ playerName: '<script>alert(1)</script>' }],
+      showAllPlayers: true,
+      colors: defaultColors,
+    });
+    expect(result.svg).not.toContain('<script>');
+    expect(result.svg).toContain('&lt;script&gt;');
+    expect(result.svg).toContain('Test &lt;World&gt;');
+  });
+
   it('should handle empty players array', () => {
     const result = generatePreviewSvg({
       worldName: 'Test',

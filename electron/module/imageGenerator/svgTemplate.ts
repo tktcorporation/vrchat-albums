@@ -1,5 +1,15 @@
 import { match } from 'ts-pattern';
 
+/** SVG/XML 特殊文字をエスケープする（インジェクション防止） */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 /**
  * SVG テンプレート生成に必要なパラメータ。
  *
@@ -150,7 +160,7 @@ function generatePlayerElements(
           text-anchor="middle"
           dominant-baseline="middle"
           filter="none"
-        >${player.playerName}</text>
+        >${escapeXml(player.playerName)}</text>
       </g>
     `);
 
@@ -340,7 +350,7 @@ export function generatePreviewSvg({
           dominant-baseline="hanging"
           class="header"
         >
-          ${worldName}
+          ${escapeXml(worldName)}
         </text>
         <rect
           x="0"
