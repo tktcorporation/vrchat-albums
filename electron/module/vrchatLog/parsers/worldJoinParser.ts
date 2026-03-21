@@ -1,3 +1,4 @@
+import { err, ok, type Result } from 'neverthrow';
 import type {
   VRChatLogLine,
   VRChatWorldId,
@@ -20,36 +21,80 @@ export interface VRChatWorldJoinLog {
 }
 
 /**
+ * ワールド参加ログのパースエラー型
+ *
+ * 予期されたエラーのみ含む。予期しないエラーは throw して Sentry に送信する。
+ */
+export type WorldJoinParseError =
+  | { type: 'LOG_FORMAT_MISMATCH' }
+  | { type: 'INVALID_WORLD_ID'; worldId: string }
+  | { type: 'INVALID_INSTANCE_ID'; instanceId: string; worldId: string }
+  | { type: 'WORLD_NAME_NOT_FOUND' };
+
+/**
  * ワールド参加ログのパース機能
  */
 
 /**
  * ログエントリーからワールド参加情報を抽出
+ *
+ * VRChat ログの "Joining" 行からワールドID・インスタンスID・ワールド名を抽出する。
+ * VRChat のログ形式には以下のバリエーションがある:
+ * - 標準形式: `Joining wrld_xxx:instanceId`
+ * - インスタンスIDなし: `Joining wrld_xxx` (ローカルワールドや新しいログ形式)
+ *
+ * インスタンスIDが存在しない、または不正な形式の場合はエラーを返す。
+ *
  * @param logLines ログ行の配列
  * @param index 現在処理中のログ行のインデックス
- * @returns ワールド参加情報、または抽出できない場合null
+ * @returns ワールド参加情報、またはエラー
  */
 export const extractWorldJoinInfoFromLogs = (
   logLines: VRChatLogLine[],
   index: number,
-): VRChatWorldJoinLog | null => {
+): Result<VRChatWorldJoinLog, WorldJoinParseError> => {
   const logEntry = logLines[index];
+
+  // コロンとインスタンスIDをオプショナルにしたパターン
+  // - グループ3: wrld_xxx (ワールドID)
+  // - グループ5: インスタンスID (存在する場合のみ)
   const regex =
-    /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2}) .* \[Behaviour\] Joining (wrld_[a-f0-9-]+):(.*)/;
+    /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2}) .* \[Behaviour\] Joining (wrld_[a-f0-9-]+)(:(.*))?$/;
   const matches = logEntry.match(regex);
 
-  if (!matches || matches.length < 4) {
-    return null;
+  if (!matches) {
+    return err({ type: 'LOG_FORMAT_MISMATCH' });
   }
 
   const date = matches[1];
   const time = matches[2];
   const worldId = matches[3];
-  const instanceId = matches[4];
+  // matches[4] はコロン付き全体 (e.g. ":12345"), matches[5] がインスタンスID部分
+  const instanceId = matches[5];
 
-  // valueObjectsを使用して型安全に検証
-  const validatedWorldId = VRChatWorldIdSchema.parse(worldId);
-  const validatedInstanceId = VRChatWorldInstanceIdSchema.parse(instanceId);
+  // ワールドIDの検証
+  const worldIdResult = VRChatWorldIdSchema.safeParse(worldId);
+  if (!worldIdResult.success) {
+    return err({ type: 'INVALID_WORLD_ID', worldId });
+  }
+  const validatedWorldId = worldIdResult.data;
+
+  // インスタンスIDの検証
+  // VRChat ログにインスタンスIDが含まれない場合（ローカルワールド等）や、
+  // 予期しない形式の場合（wrld_xxx がインスタンスIDとして記録される等）はエラーを返す
+  if (instanceId === undefined || instanceId === '') {
+    return err({
+      type: 'INVALID_INSTANCE_ID',
+      instanceId: instanceId ?? '',
+      worldId,
+    });
+  }
+
+  const instanceIdResult = VRChatWorldInstanceIdSchema.safeParse(instanceId);
+  if (!instanceIdResult.success) {
+    return err({ type: 'INVALID_INSTANCE_ID', instanceId, worldId });
+  }
+  const validatedInstanceId = instanceIdResult.data;
 
   let foundWorldName: string | null = null;
 
@@ -62,20 +107,18 @@ export const extractWorldJoinInfoFromLogs = (
     }
   }
 
-  if (foundWorldName) {
-    const joinDate = parseLogDateTime(date, time);
-    const validatedWorldName = VRChatWorldNameSchema.parse(foundWorldName);
-
-    return {
-      logType: 'worldJoin',
-      joinDate,
-      worldInstanceId: validatedInstanceId,
-      worldId: validatedWorldId,
-      worldName: validatedWorldName,
-    };
+  if (!foundWorldName) {
+    return err({ type: 'WORLD_NAME_NOT_FOUND' });
   }
 
-  throw new Error(
-    'Failed to extract world name from the subsequent log entries',
-  );
+  const joinDate = parseLogDateTime(date, time);
+  const validatedWorldName = VRChatWorldNameSchema.parse(foundWorldName);
+
+  return ok({
+    logType: 'worldJoin',
+    joinDate,
+    worldInstanceId: validatedInstanceId,
+    worldId: validatedWorldId,
+    worldName: validatedWorldName,
+  });
 };

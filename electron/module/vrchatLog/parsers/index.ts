@@ -86,10 +86,49 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
 
     // ワールド参加ログ
     if (l.includes('Joining wrld_')) {
-      const info = extractWorldJoinInfoFromLogs(logLines, index);
-      if (info) {
-        logInfos.push(info);
+      const result = extractWorldJoinInfoFromLogs(logLines, index);
+
+      if (result.isOk()) {
+        logInfos.push(result.value);
         worldJoinIndices.push(index);
+      } else {
+        // LOG_FORMAT_MISMATCH は単にこの行がワールド参加ログでないことを意味する
+        // （他のログ行パーサーで処理される可能性がある）ためスキップ
+        if (result.error.type !== 'LOG_FORMAT_MISMATCH') {
+          const errorMessage = match(result.error)
+            .with(
+              { type: 'INVALID_WORLD_ID' },
+              (e) => `Invalid world ID format: "${e.worldId}"`,
+            )
+            .with(
+              { type: 'INVALID_INSTANCE_ID' },
+              (e) =>
+                `Invalid instance ID format: "${e.instanceId}" for world "${e.worldId}". ` +
+                'VRChat log may contain a world ID without an instance ID (e.g. local world).',
+            )
+            .with(
+              { type: 'WORLD_NAME_NOT_FOUND' },
+              () => 'Failed to extract world name from subsequent log entries',
+            )
+            .exhaustive();
+
+          errors.push({
+            line: l,
+            error: errorMessage,
+            type: 'world_join',
+          });
+
+          // Sentry に送信して、どのパターンで例外が起きているか追跡可能にする。
+          // 将来的にデータモデルを拡張（Instance ID オプショナル化等）する際の判断材料となる。
+          logger.error({
+            message: `World join parse error: ${errorMessage}`,
+            details: {
+              logLine: l,
+              errorType: result.error.type,
+              ...result.error,
+            },
+          });
+        }
       }
     }
 
@@ -240,7 +279,10 @@ export {
   extractPlayerLeaveInfoFromLog,
 } from './playerActionParser';
 // 型定義の再エクスポート
-export type { VRChatWorldJoinLog } from './worldJoinParser';
+export type {
+  VRChatWorldJoinLog,
+  WorldJoinParseError,
+} from './worldJoinParser';
 // 個別のパーサー関数も再エクスポート
 export { extractWorldJoinInfoFromLogs } from './worldJoinParser';
 export type { VRChatWorldLeaveLog } from './worldLeaveParser';
