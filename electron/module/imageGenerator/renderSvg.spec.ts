@@ -33,6 +33,24 @@ describe('renderSvgToPng', () => {
   });
 });
 
+describe('renderSvgToPng error handling', () => {
+  it('should return SVG_RENDER_FAILED for invalid SVG', async () => {
+    const result = await renderSvgToPng('not-valid-svg');
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.type).toBe('SVG_RENDER_FAILED');
+    }
+  });
+
+  it('should return SVG_RENDER_FAILED for empty string', async () => {
+    const result = await renderSvgToPng('');
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.type).toBe('SVG_RENDER_FAILED');
+    }
+  });
+});
+
 describe('renderSvgToJpeg', () => {
   it('should render SVG to JPEG buffer', async () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">

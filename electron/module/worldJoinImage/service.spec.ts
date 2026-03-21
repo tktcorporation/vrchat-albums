@@ -138,8 +138,29 @@ describe('generateMissingWorldJoinImages', () => {
       expect(result.value.generated).toBe(1);
       expect(result.value.errors).toBe(0);
     }
+    // Verify generateWorldJoinImage was called with correct arguments
     expect(generateWorldJoinImage).toHaveBeenCalledOnce();
+    const genCall = vi.mocked(generateWorldJoinImage).mock.calls[0][0];
+    expect(genCall.worldName).toBe('Test World');
+    expect(genCall.imageBase64).toBe(
+      Buffer.from(new ArrayBuffer(8)).toString('base64'),
+    );
+    expect(genCall.joinDateTime).toEqual(new Date('2024-01-15T12:00:00'));
+
+    // Verify mkdir was called with { recursive: true }
+    expect(fsPromises.mkdir).toHaveBeenCalledOnce();
+    expect(vi.mocked(fsPromises.mkdir).mock.calls[0][1]).toEqual({
+      recursive: true,
+    });
+
+    // Verify writeFile was called with path containing YYYY-MM directory and proper filename
     expect(fsPromises.writeFile).toHaveBeenCalledOnce();
+    const writePath = vi.mocked(fsPromises.writeFile).mock
+      .calls[0][0] as string;
+    expect(writePath).toMatch(/\/photos\/2024-01\//);
+    expect(writePath).toMatch(
+      /VRChat_2024-01-15_12-00-00\.000_wrld_12345678-1234-1234-1234-123456789abc\.jpeg$/,
+    );
   });
 
   it('should count error when world API fails', async () => {

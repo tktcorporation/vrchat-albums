@@ -130,6 +130,7 @@ const generateMissingWorldJoinImagesInternal = async (params: {
       try {
         imageResponse = await ofetch(worldInfo.imageUrl, {
           responseType: 'arrayBuffer',
+          timeout: 30_000,
         });
       } catch (downloadError) {
         logger.warn({
