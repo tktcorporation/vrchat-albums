@@ -46,7 +46,7 @@ describe('generateMissingWorldJoinImages', () => {
 
   it('should return 0 generated when all images exist', async () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
-      makeJoinLog('wrld_test'),
+      makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
     vi.mocked(fs.existsSync).mockReturnValue(true);
 
@@ -86,12 +86,12 @@ describe('generateMissingWorldJoinImages', () => {
 
   it('should generate image for missing join', async () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
-      makeJoinLog('wrld_test'),
+      makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
     vi.mocked(fs.existsSync).mockReturnValue(false);
     vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
       neverthrow.ok({
-        id: 'wrld_test',
+        id: 'wrld_12345678-1234-1234-1234-123456789abc',
         name: 'Test World',
         imageUrl: 'https://example.com/image.png',
         description: '',
@@ -144,13 +144,13 @@ describe('generateMissingWorldJoinImages', () => {
 
   it('should count error when world API fails', async () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
-      makeJoinLog('wrld_test'),
+      makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
     vi.mocked(fs.existsSync).mockReturnValue(false);
     vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
       neverthrow.err({
         type: 'WORLD_NOT_FOUND' as const,
-        worldId: 'wrld_test',
+        worldId: 'wrld_12345678-1234-1234-1234-123456789abc',
       }),
     );
 
@@ -167,12 +167,12 @@ describe('generateMissingWorldJoinImages', () => {
 
   it('should count error when image download fails', async () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
-      makeJoinLog('wrld_test'),
+      makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
     vi.mocked(fs.existsSync).mockReturnValue(false);
     vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
       neverthrow.ok({
-        id: 'wrld_test',
+        id: 'wrld_12345678-1234-1234-1234-123456789abc',
         name: 'Test World',
         imageUrl: 'https://example.com/image.png',
         description: '',

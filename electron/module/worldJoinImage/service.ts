@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as neverthrow from 'neverthrow';
 import * as path from 'pathe';
+import { VRChatWorldIdSchema } from '../../lib/brandedTypes';
 import { logger } from '../../lib/logger';
 import type { ImageGenerationError } from '../imageGenerator/error';
 import { generateWorldJoinImage } from '../imageGenerator/service';
@@ -102,7 +103,16 @@ const generateMissingWorldJoinImagesInternal = async (params: {
 
     try {
       // 3. VRChat API でワールド情報取得
-      const worldInfoResult = await getVrcWorldInfoByWorldId(join.worldId);
+      // DB の worldId は string 型だが、API は VRChatWorldId (branded type) を要求する
+      const parsedWorldId = VRChatWorldIdSchema.safeParse(join.worldId);
+      if (!parsedWorldId.success) {
+        logger.warn(`Invalid world ID format: ${join.worldId}`);
+        errors++;
+        continue;
+      }
+      const worldInfoResult = await getVrcWorldInfoByWorldId(
+        parsedWorldId.data,
+      );
       if (worldInfoResult.isErr()) {
         logger.warn(
           `Failed to get world info for ${join.worldId}: ${worldInfoResult.error.type}`,
