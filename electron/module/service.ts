@@ -1,19 +1,11 @@
 import path from 'node:path';
-import type * as neverthrow from 'neverthrow';
-import type { ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import { logger } from './../lib/logger';
-// import * as infoFileService from './joinLogInfoFile/service';
-// import { getToCreateWorldJoinLogInfos } from './joinLogInfoFile/service';
-// import { YearMonthPathNotFoundError } from './service/error';
-// import { PhotoFileNameSchema, parsePhotoFileName } from './service/type';
 import * as utilsService from './electronUtil/service';
-// import type VRChatPhotoFileError from './service/vrchatPhoto/error';
-// import * as vrchatPhotoService from './service/vrchatPhoto/service';
 import { getSettingStore } from './settingStore';
-// import * as vrchatLogService from './service/vrchatLog/vrchatLog';
 import * as vrchatLogFileDirService from './vrchatLogFileDir/service';
-// import type VRChatLogFileError from './vrchatLog/error';
 
+/** @deprecated Use tagged errors from vrchatLogFileDir/errors.ts instead */
 export type VRChatLogFilesDirError = 'logFilesNotFound' | 'logFileDirNotFound';
 
 export type VRChatLogFilesDirResult = {
@@ -25,14 +17,16 @@ export type VRChatLogFilesDirResult = {
  * VRChat ログディレクトリ設定を取得する（Result型）
  * 設定画面や起動時の検証で使用
  */
-export const getVRChatLogFilesDir = (): ResultAsync<
+export const getVRChatLogFilesDir = (): Effect.Effect<
   VRChatLogFilesDirResult,
   VRChatLogFilesDirError
 > => {
-  return vrchatLogFileDirService.getVRChatLogFileDir().map((result) => ({
-    storedPath: result.storedPath?.value ?? null,
-    path: result.path.value,
-  }));
+  return vrchatLogFileDirService.getVRChatLogFileDir().pipe(
+    Effect.map((result) => ({
+      storedPath: result.storedPath?.value ?? null,
+      path: result.path.value,
+    })),
+  );
 };
 
 /** すべての設定値をクリアする */
@@ -55,7 +49,7 @@ export const openPathOnExplorer = (filePath: string) => {
 };
 
 /** アプリのログフォルダをエクスプローラーで開く */
-export const openElectronLogOnExplorer = async () => {
+export const openElectronLogOnExplorer = () => {
   const electronLogPath = logger.electronLogFilePath;
   logger.debug(`electronLogPath ${electronLogPath}`);
   return utilsService.openPathInExplorer(electronLogPath);
@@ -68,14 +62,17 @@ export const openDirOnExplorer = (dirPath: string) => {
 };
 
 /** ダイアログからログ保存先を設定する */
-export const setVRChatLogFilesDirByDialog = async (): Promise<
-  neverthrow.Result<void, Error | 'canceled'>
+export const setVRChatLogFilesDirByDialog = (): Effect.Effect<
+  void,
+  Error | 'canceled'
 > => {
-  const settingStore = getSettingStore();
-  return (await utilsService.openGetDirDialog()).map((dirPath) => {
-    settingStore.setLogFilesDir(dirPath);
-    return undefined;
-  });
+  return utilsService.openGetDirDialog().pipe(
+    Effect.map((dirPath) => {
+      const settingStore = getSettingStore();
+      settingStore.setLogFilesDir(dirPath);
+      return undefined;
+    }),
+  );
 };
 
 /** 直接指定したパスをログ保存先として登録する */

@@ -1,4 +1,4 @@
-import { ok } from 'neverthrow';
+import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 import { getData } from '../../lib/getData';
 import type { VRChatWorldInfoFromApi } from '../vrchatApi/service';
@@ -43,12 +43,10 @@ describe('viewer_api', () => {
       created_at: '',
       updated_at: '',
     };
-    vi.mocked(getData).mockResolvedValueOnce(ok(mockWorldInfo));
-    const res = await getData<VRChatWorldInfoFromApi>(reqUrl);
-    expect(res).toBeDefined();
-    expect(res.isOk()).toBe(true);
-
-    const worldInfo = await res._unsafeUnwrap();
+    vi.mocked(getData).mockReturnValueOnce(Effect.succeed(mockWorldInfo));
+    const worldInfo = await Effect.runPromise(
+      getData<VRChatWorldInfoFromApi>(reqUrl),
+    );
     expect(worldInfo).toBeDefined();
     expect(worldInfo.id).toBe(worldId);
     expect(typeof worldInfo.name).toBe('string');

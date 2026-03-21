@@ -1,15 +1,18 @@
+import { Cause, Effect, Exit, Option } from 'effect';
 import { match } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import type { VRChatLogLine } from '../model';
 import {
   extractPlayerJoinInfoFromLog,
   extractPlayerLeaveInfoFromLog,
+  type PlayerActionParseError,
   type VRChatPlayerJoinLog,
   type VRChatPlayerLeaveLog,
 } from './playerActionParser';
 import {
   extractWorldJoinInfoFromLogs,
   type VRChatWorldJoinLog,
+  type WorldJoinParseError,
 } from './worldJoinParser';
 import {
   extractWorldLeaveInfoFromLog,
@@ -42,6 +45,20 @@ export interface ParseResult {
   )[];
   errors: ParseErrorInfo[];
 }
+
+/**
+ * Effect の Exit から失敗エラーを抽出するヘルパー
+ * 型付きエラー（Fail チャネル）のみを抽出し、Defect はそのまま throw する
+ */
+const extractFailure = <E>(exit: Exit.Exit<unknown, E>): E | null => {
+  if (Exit.isSuccess(exit)) return null;
+  const failOpt = Cause.failureOption(exit.cause);
+  if (Option.isSome(failOpt)) return failOpt.value;
+  // Defect の場合はそのまま throw
+  const dieOpt = Cause.dieOption(exit.cause);
+  if (Option.isSome(dieOpt)) throw dieOpt.value;
+  return null;
+};
 
 /**
  * ログ行の配列をワールド参加・退出・プレイヤー参加/退出情報に変換
@@ -86,13 +103,18 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
 
     // ワールド参加ログ
     if (l.includes('Joining wrld_')) {
-      const result = extractWorldJoinInfoFromLogs(logLines, index);
+      const exit = Effect.runSyncExit(
+        extractWorldJoinInfoFromLogs(logLines, index),
+      );
 
-      if (result.isOk()) {
-        logInfos.push(result.value);
+      if (Exit.isSuccess(exit)) {
+        logInfos.push(exit.value);
         worldJoinIndices.push(index);
       } else {
-        const errorMessage = match(result.error)
+        const worldError = extractFailure<WorldJoinParseError>(exit);
+        if (!worldError) continue;
+
+        const errorMessage = match(worldError)
           .with(
             { type: 'LOG_FORMAT_MISMATCH' },
             () =>
@@ -128,8 +150,8 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
           message: new Error(`World join parse error: ${errorMessage}`),
           details: {
             logLine: l,
-            errorType: result.error.type,
-            ...result.error,
+            errorType: worldError.type,
+            ...worldError,
           },
         });
       }
@@ -143,11 +165,14 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
 
     // プレイヤー参加ログ
     if (l.includes('[Behaviour] OnPlayerJoined')) {
-      const result = extractPlayerJoinInfoFromLog(l);
+      const exit = Effect.runSyncExit(extractPlayerJoinInfoFromLog(l));
 
-      if (result.isOk()) {
-        logInfos.push(result.value);
+      if (Exit.isSuccess(exit)) {
+        logInfos.push(exit.value);
       } else {
+        const playerError = extractFailure<PlayerActionParseError>(exit);
+        if (!playerError) continue;
+
         // ログ行からプレイヤー名とIDを抽出（デバッグ用）
         const playerNameMatch = l.match(
           /OnPlayerJoined (.+?)(?:\s+\((usr_[^)]+)\))?$/,
@@ -161,7 +186,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
           : 'No player ID found';
 
         // エラータイプに応じた詳細なエラーメッセージを生成
-        const errorMessage = match(result.error)
+        const errorMessage = match(playerError)
           .with(
             'LOG_FORMAT_MISMATCH',
             () => 'Log format mismatch for player join',
@@ -192,7 +217,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
             logLine: l,
             playerName,
             playerId,
-            errorType: result.error,
+            errorType: playerError,
           },
         });
       }
@@ -200,11 +225,14 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
 
     // プレイヤー退出ログ（OnPlayerLeftRoomは除外）
     if (l.includes('OnPlayerLeft') && !l.includes('OnPlayerLeftRoom')) {
-      const result = extractPlayerLeaveInfoFromLog(l);
+      const exit = Effect.runSyncExit(extractPlayerLeaveInfoFromLog(l));
 
-      if (result.isOk()) {
-        logInfos.push(result.value);
+      if (Exit.isSuccess(exit)) {
+        logInfos.push(exit.value);
       } else {
+        const leaveError = extractFailure<PlayerActionParseError>(exit);
+        if (!leaveError) continue;
+
         // ログ行からプレイヤー名とIDを抽出（デバッグ用）
         const playerNameMatch = l.match(
           /OnPlayerLeft (.+?)(?:\s+\((usr_[^)]+)\))?$/,
@@ -218,7 +246,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
           : 'No player ID found';
 
         // エラータイプに応じた詳細なエラーメッセージを生成
-        const errorMessage = match(result.error)
+        const errorMessage = match(leaveError)
           .with(
             'LOG_FORMAT_MISMATCH',
             () => 'Log format mismatch for player leave',
@@ -249,7 +277,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
             logLine: l,
             playerName,
             playerId,
-            errorType: result.error,
+            errorType: leaveError,
           },
         });
       }

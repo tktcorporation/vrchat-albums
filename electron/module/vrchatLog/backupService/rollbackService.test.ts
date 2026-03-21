@@ -1,11 +1,11 @@
 import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import * as neverthrow from 'neverthrow';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as dbQueueModule from '../../../lib/dbQueue';
 import * as logSyncModule from '../../logSync/service';
-import { VRChatLogFileError } from '../error';
+import { LogFilesNotFound } from '../errors';
 import * as logStorageManagerModule from '../fileHandlers/logStorageManager';
 import type { ImportBackupMetadata } from './backupService';
 import * as backupServiceModule from './backupService';
@@ -45,9 +45,13 @@ vi.mock('../../logSync/service', () => ({
 
 vi.mock('../../../lib/dbQueue', () => ({
   getDBQueue: vi.fn(() => ({
-    transaction: vi.fn(async (callback) => {
-      const result = await callback();
-      return neverthrow.ok(result);
+    transaction: vi.fn((callback: (t: unknown) => Promise<unknown>) => {
+      return Effect.tryPromise({
+        try: () => callback(undefined),
+        catch: (e) => {
+          throw e;
+        },
+      });
     }),
   })),
 }));
@@ -118,8 +122,8 @@ describe('rollbackService', () => {
       vi.mocked(fs.cp).mockResolvedValue(undefined as unknown as never);
 
       // DB再構築
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.ok({
+      vi.mocked(logSyncModule.syncLogs).mockReturnValue(
+        Effect.succeed({
           createdWorldJoinLogModelList: [],
           createdPlayerJoinLogModelList: [],
           createdPlayerLeaveLogModelList: [],
@@ -130,11 +134,9 @@ describe('rollbackService', () => {
       // バックアップ状態更新
       vi.mocked(
         backupServiceModule.backupService.updateBackupMetadata,
-      ).mockResolvedValue(neverthrow.ok(undefined));
+      ).mockReturnValue(Effect.succeed(undefined));
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
-
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(rollbackService.rollbackToBackup(mockBackup));
 
       // logStoreがクリアされたことを確認
       expect(fs.rm).toHaveBeenCalledWith(path.join('/mocked', 'logStore'), {
@@ -171,13 +173,18 @@ describe('rollbackService', () => {
       // バックアップディレクトリが存在しない
       vi.mocked(fs.stat).mockRejectedValue(new Error('ENOENT'));
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
+      const exit = await Effect.runPromiseExit(
+        rollbackService.rollbackToBackup(mockBackup),
+      );
 
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(getRollbackErrorMessage(result.error)).toContain(
-          'バックアップディレクトリが見つかりません',
-        );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failOpt)) {
+          expect(getRollbackErrorMessage(failOpt.value)).toContain(
+            'バックアップディレクトリが見つかりません',
+          );
+        }
       }
     });
 
@@ -198,13 +205,18 @@ describe('rollbackService', () => {
         } as unknown as Dirent<Buffer>,
       ]);
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
+      const exit = await Effect.runPromiseExit(
+        rollbackService.rollbackToBackup(mockBackup),
+      );
 
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(getRollbackErrorMessage(result.error)).toContain(
-          '有効な月別データが見つかりません',
-        );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failOpt)) {
+          expect(getRollbackErrorMessage(failOpt.value)).toContain(
+            '有効な月別データが見つかりません',
+          );
+        }
       }
     });
 
@@ -230,7 +242,7 @@ describe('rollbackService', () => {
 
       // ファイルシステムエラーは予期しないエラーとしてthrowされる（Sentryに送信）
       await expect(
-        rollbackService.rollbackToBackup(mockBackup),
+        Effect.runPromise(rollbackService.rollbackToBackup(mockBackup)),
       ).rejects.toThrow('Copy failed');
     });
 
@@ -253,38 +265,52 @@ describe('rollbackService', () => {
       vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.cp).mockResolvedValue(undefined as unknown as never);
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.err(new VRChatLogFileError('LOG_FILES_NOT_FOUND')),
+      vi.mocked(logSyncModule.syncLogs).mockReturnValue(
+        Effect.fail(
+          new LogFilesNotFound({
+            message: 'No VRChat log files found',
+          }),
+        ),
       );
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
+      const exit = await Effect.runPromiseExit(
+        rollbackService.rollbackToBackup(mockBackup),
+      );
 
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(getRollbackErrorMessage(result.error)).toContain(
-          'DB再構築に失敗しました',
-        );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failOpt)) {
+          expect(getRollbackErrorMessage(failOpt.value)).toContain(
+            'DB再構築に失敗しました',
+          );
+        }
       }
     });
 
     it('キューがタイムアウトした場合は適切に処理される', async () => {
       // トランザクションがTASK_TIMEOUTエラーを返すようにモック
       vi.mocked(dbQueueModule.getDBQueue).mockReturnValueOnce({
-        transaction: vi.fn(async () => {
-          return neverthrow.err({
+        transaction: vi.fn(() => {
+          return Effect.fail({
             type: 'TASK_TIMEOUT' as const,
             message: 'Task timeout',
           });
         }),
       } as unknown as ReturnType<typeof dbQueueModule.getDBQueue>);
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
+      const exit = await Effect.runPromiseExit(
+        rollbackService.rollbackToBackup(mockBackup),
+      );
 
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(getRollbackErrorMessage(result.error)).toContain(
-          'トランザクションに失敗しました',
-        );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failOpt)) {
+          expect(getRollbackErrorMessage(failOpt.value)).toContain(
+            'トランザクションに失敗しました',
+          );
+        }
       }
     });
 
@@ -292,14 +318,14 @@ describe('rollbackService', () => {
       const unexpectedError = new Error('Unexpected database error');
       // トランザクションが予期しないエラーをthrowするようにモック
       vi.mocked(dbQueueModule.getDBQueue).mockReturnValueOnce({
-        transaction: vi.fn(async () => {
-          throw unexpectedError;
+        transaction: vi.fn(() => {
+          return Effect.die(unexpectedError);
         }),
       } as unknown as ReturnType<typeof dbQueueModule.getDBQueue>);
 
       // 予期しないエラーはそのままthrowされる（Sentryに送信される）
       await expect(
-        rollbackService.rollbackToBackup(mockBackup),
+        Effect.runPromise(rollbackService.rollbackToBackup(mockBackup)),
       ).rejects.toThrow('Unexpected database error');
     });
   });
@@ -328,13 +354,18 @@ describe('rollbackService', () => {
         } as unknown as Dirent<Buffer>,
       ]);
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
+      const exit = await Effect.runPromiseExit(
+        rollbackService.rollbackToBackup(mockBackup),
+      );
 
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(getRollbackErrorMessage(result.error)).toContain(
-          'メタデータファイルが見つかりません',
-        );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failOpt)) {
+          expect(getRollbackErrorMessage(failOpt.value)).toContain(
+            'メタデータファイルが見つかりません',
+          );
+        }
       }
     });
   });
@@ -361,8 +392,8 @@ describe('rollbackService', () => {
       vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.cp).mockResolvedValue(undefined as unknown as never);
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.ok({
+      vi.mocked(logSyncModule.syncLogs).mockReturnValue(
+        Effect.succeed({
           createdWorldJoinLogModelList: [],
           createdPlayerJoinLogModelList: [],
           createdPlayerLeaveLogModelList: [],
@@ -371,11 +402,9 @@ describe('rollbackService', () => {
       );
       vi.mocked(
         backupServiceModule.backupService.updateBackupMetadata,
-      ).mockResolvedValue(neverthrow.ok(undefined));
+      ).mockReturnValue(Effect.succeed(undefined));
 
-      const result = await rollbackService.rollbackToBackup(mockBackup);
-
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(rollbackService.rollbackToBackup(mockBackup));
       // fs.rmがforce: trueで呼ばれることを確認
       expect(fs.rm).toHaveBeenCalledWith(expect.stringContaining('logStore'), {
         recursive: true,
@@ -410,7 +439,7 @@ describe('rollbackService', () => {
 
       // ファイルシステムエラーは予期しないエラーとしてthrowされる
       await expect(
-        rollbackService.rollbackToBackup(mockBackup),
+        Effect.runPromise(rollbackService.rollbackToBackup(mockBackup)),
       ).rejects.toThrow('Copy failed');
     });
   });

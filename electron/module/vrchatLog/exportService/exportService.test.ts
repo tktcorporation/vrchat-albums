@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type ExportLogStoreOptions,
@@ -108,12 +109,9 @@ describe('exportService', () => {
         },
       ]);
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
+      const result = await Effect.runPromise(
+        exportLogStoreFromDB(options, mockGetDBLogs),
+      );
       expect(result.exportedFiles).toHaveLength(1);
       // エクスポート日時フォルダが含まれることを確認
       expect(result.exportedFiles[0]).toMatch(
@@ -173,12 +171,9 @@ describe('exportService', () => {
         },
       ]);
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
+      const result = await Effect.runPromise(
+        exportLogStoreFromDB(options, mockGetDBLogs),
+      );
       expect(result.exportedFiles).toHaveLength(2);
       // エクスポート日時フォルダが含まれることを確認
       for (const filePath of result.exportedFiles) {
@@ -233,12 +228,9 @@ describe('exportService', () => {
 
       const mockGetDBLogs = vi.fn().mockResolvedValue([]);
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
+      const result = await Effect.runPromise(
+        exportLogStoreFromDB(options, mockGetDBLogs),
+      );
       expect(result.exportedFiles).toHaveLength(0);
       expect(result.totalLogLines).toBe(0);
 
@@ -278,12 +270,9 @@ describe('exportService', () => {
         },
       ]);
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
+      const result = await Effect.runPromise(
+        exportLogStoreFromDB(options, mockGetDBLogs),
+      );
       expect(result.exportedFiles).toHaveLength(1);
       expect(result.totalLogLines).toBe(3); // worldJoin=2行 + playerJoin=1行
 
@@ -323,12 +312,9 @@ describe('exportService', () => {
         },
       ]);
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
+      const result = await Effect.runPromise(
+        exportLogStoreFromDB(options, mockGetDBLogs),
+      );
       expect(result.exportedFiles).toHaveLength(1);
       expect(result.totalLogLines).toBe(2); // worldJoin=2行
 
@@ -349,10 +335,20 @@ describe('exportService', () => {
         .fn()
         .mockRejectedValue(new Error('Database error'));
 
-      // DBエラーはそのままthrowされる（予期しないエラー）
-      await expect(
+      // exportLogStoreFromDB は Effect を返すため、Effect.runPromise で実行
+      const { Effect, Exit, Cause, Option } = await import('effect');
+      const exit = await Effect.runPromiseExit(
         exportLogStoreFromDB(options, mockGetDBLogs),
-      ).rejects.toThrow('Database error');
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value._tag).toBe('ExportDbQueryFailed');
+          expect(failOpt.value.message).toContain('Database error');
+        }
+      }
     });
 
     it('書き込みエラーが発生した場合はエラー結果を返す', async () => {
@@ -379,13 +375,19 @@ describe('exportService', () => {
       // ファイル書き込みでエラーを発生させる
       vi.mocked(fs.writeFile).mockRejectedValue(new Error('Write error'));
 
-      const exportResult = await exportLogStoreFromDB(options, mockGetDBLogs);
+      const exit = await Effect.runPromiseExit(
+        exportLogStoreFromDB(options, mockGetDBLogs),
+      );
 
-      expect(exportResult.isErr()).toBe(true);
-      if (!exportResult.isErr()) return;
-
-      expect(exportResult.error.type).toBe('FILE_WRITE_FAILED');
-      expect(exportResult.error.message).toBe('Write error');
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value._tag).toBe('ExportFileWriteFailed');
+          expect(failOpt.value.message).toBe('Write error');
+        }
+      }
     });
   });
 });

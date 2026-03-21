@@ -1,6 +1,7 @@
-import { Result } from 'neverthrow';
+import { Effect } from 'effect';
 import { z } from 'zod';
 import { executeQuery } from '../../lib/dbHelper';
+import { runEffect } from '../../lib/effectTRPC';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -20,24 +21,20 @@ export const debugRouter = router({
         query: z.string(),
       }),
     )
-    .mutation(async ({ input }: { input: QueryInput }) => {
-      // DBQueueを使用してクエリを実行
-      // executeQuery は Result 型を返すため、try-catch は不要
-      // 予期しないエラーは自動的に throw されて Sentry に送信される
-      const result = await executeQuery(input.query);
-
-      if (result.isErr()) {
-        const error = result.error;
-        throw UserFacingError.withStructuredInfo({
-          code: ERROR_CODES.DATABASE_ERROR,
-          category: ERROR_CATEGORIES.DATABASE_ERROR,
-          message: 'SQL query execution failed',
-          userMessage: `SQLクエリの実行に失敗しました: ${error.message}`,
-          cause: new Error(error.message),
-        });
-      }
-
-      return result.value;
+    .mutation(({ input }: { input: QueryInput }) => {
+      return runEffect(
+        executeQuery(input.query).pipe(
+          Effect.mapError((error) =>
+            UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.DATABASE_ERROR,
+              category: ERROR_CATEGORIES.DATABASE_ERROR,
+              message: 'SQL query execution failed',
+              userMessage: `SQLクエリの実行に失敗しました: ${error.message}`,
+              cause: new Error(error.message),
+            }),
+          ),
+        ),
+      );
     }),
   setLogLevel: procedure
     .input(
@@ -45,32 +42,29 @@ export const debugRouter = router({
         level: z.union([z.literal('debug'), z.literal('info')]),
       }),
     )
-    .mutation(async ({ input }) => {
-      const result = Result.fromThrowable(
-        () => {
-          logger.setTransportsLevel(input.level);
-          logger.info(`Log level set to: ${input.level}`);
-          return { success: true };
-        },
-        (error) => error,
-      )();
-
-      if (result.isErr()) {
-        const error = result.error;
-        logger.error({
-          message: 'Failed to set log level',
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
-        throw UserFacingError.withStructuredInfo({
-          code: ERROR_CODES.UNKNOWN,
-          category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-          message: 'Failed to set log level',
-          userMessage: 'ログレベルの設定に失敗しました。',
-          cause: error instanceof Error ? error : new Error(String(error)),
-        });
-      }
-
-      return result.value;
+    .mutation(({ input }) => {
+      return runEffect(
+        Effect.try({
+          try: () => {
+            logger.setTransportsLevel(input.level);
+            logger.info(`Log level set to: ${input.level}`);
+            return { success: true };
+          },
+          catch: (error) => {
+            logger.error({
+              message: 'Failed to set log level',
+              stack: error instanceof Error ? error : new Error(String(error)),
+            });
+            return UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.UNKNOWN,
+              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+              message: 'Failed to set log level',
+              userMessage: 'ログレベルの設定に失敗しました。',
+              cause: error instanceof Error ? error : new Error(String(error)),
+            });
+          },
+        }),
+      );
     }),
   getLogLevel: procedure.query(() => {
     // 現在のファイルログレベルを返す (コンソールレベルも通常は同じはず)

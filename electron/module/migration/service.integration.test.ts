@@ -2,8 +2,8 @@ import * as nodeFs from 'node:fs';
 import * as nodeFsPromises from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
+import { Effect } from 'effect';
 import { app } from 'electron';
-import { err, ok } from 'neverthrow';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { importService } from '../vrchatLog/importService/importService';
 import * as migrationService from './service';
@@ -70,8 +70,10 @@ describe('migration service integration', () => {
       // Remove the old app directory
       await nodeFsPromises.rm(mockOldAppPath, { recursive: true, force: true });
 
-      const resultAsync = await migrationService.isMigrationNeeded();
-      expect(resultAsync._unsafeUnwrap()).toBe(false);
+      const value = await Effect.runPromise(
+        migrationService.isMigrationNeeded(),
+      );
+      expect(value).toBe(false);
     });
 
     it('should return false if migration marker already exists', async () => {
@@ -79,13 +81,17 @@ describe('migration service integration', () => {
       const markerPath = path.join(mockCurrentAppPath, '.migration-completed');
       await nodeFsPromises.writeFile(markerPath, '{}');
 
-      const resultAsync = await migrationService.isMigrationNeeded();
-      expect(resultAsync._unsafeUnwrap()).toBe(false);
+      const value = await Effect.runPromise(
+        migrationService.isMigrationNeeded(),
+      );
+      expect(value).toBe(false);
     });
 
     it('should return true if migration is needed', async () => {
-      const resultAsync = await migrationService.isMigrationNeeded();
-      expect(resultAsync._unsafeUnwrap()).toBe(true);
+      const value = await Effect.runPromise(
+        migrationService.isMigrationNeeded(),
+      );
+      expect(value).toBe(true);
     });
 
     it('should detect old app with alternate directory name (VRChatPhotoJourney)', async () => {
@@ -96,8 +102,10 @@ describe('migration service integration', () => {
       const alternateOldAppPath = path.join(testDir, 'VRChatPhotoJourney');
       await nodeFsPromises.mkdir(alternateOldAppPath, { recursive: true });
 
-      const resultAsync = await migrationService.isMigrationNeeded();
-      expect(resultAsync._unsafeUnwrap()).toBe(true);
+      const value = await Effect.runPromise(
+        migrationService.isMigrationNeeded(),
+      );
+      expect(value).toBe(true);
     });
   });
 
@@ -117,8 +125,8 @@ describe('migration service integration', () => {
       );
 
       // Mock successful import
-      vi.mocked(importService.importLogStoreFiles).mockResolvedValue(
-        ok({
+      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+        Effect.succeed({
           success: true,
           backup: {
             id: 'backup-123',
@@ -138,10 +146,11 @@ describe('migration service integration', () => {
         }),
       );
 
-      const result = await migrationService.performMigration();
+      const value = await Effect.runPromise(
+        migrationService.performMigration(),
+      );
 
-      expect(result.isOk()).toBe(true);
-      expect(result._unsafeUnwrap()).toEqual({
+      expect(value).toEqual({
         migrated: true,
         details: {
           database: false, // No longer migrating database
@@ -170,10 +179,11 @@ describe('migration service integration', () => {
         '{"key": "value"}',
       );
 
-      const result = await migrationService.performMigration();
+      const value = await Effect.runPromise(
+        migrationService.performMigration(),
+      );
 
-      expect(result.isOk()).toBe(true);
-      expect(result._unsafeUnwrap()).toEqual({
+      expect(value).toEqual({
         migrated: true,
         details: {
           database: false,
@@ -191,9 +201,7 @@ describe('migration service integration', () => {
         '{"key": "value"}',
       );
 
-      const result = await migrationService.performMigration();
-
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(migrationService.performMigration());
 
       const markerPath = path.join(mockCurrentAppPath, '.migration-completed');
       expect(nodeFs.existsSync(markerPath)).toBe(true);
@@ -214,16 +222,18 @@ describe('migration service integration', () => {
       );
 
       // Mock import failure with specific ImportError type
-      vi.mocked(importService.importLogStoreFiles).mockResolvedValue(
-        err({ type: 'DB_SYNC_FAILED', message: 'Import failed' }),
+      const { ImportDbSyncFailed } = await import(
+        '../vrchatLog/importService/errors'
+      );
+      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+        Effect.fail(new ImportDbSyncFailed({ message: 'Import failed' })),
       );
 
-      const result = await migrationService.performMigration();
-
-      expect(result.isOk()).toBe(true);
-      const migrationResult = result._unsafeUnwrap();
+      const migrationResult = await Effect.runPromise(
+        migrationService.performMigration(),
+      );
       expect(migrationResult.errors).toContain(
-        'LogStore import failed: DB_SYNC_FAILED',
+        'LogStore import failed: ImportDbSyncFailed',
       );
       expect(migrationResult.details.logStore).toBe(false);
     });
@@ -239,8 +249,8 @@ describe('migration service integration', () => {
       );
 
       // Mock successful import
-      vi.mocked(importService.importLogStoreFiles).mockResolvedValue(
-        ok({
+      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+        Effect.succeed({
           success: true,
           backup: {
             id: 'backup-123',
@@ -260,10 +270,11 @@ describe('migration service integration', () => {
         }),
       );
 
-      const result = await migrationService.performMigration();
+      const value = await Effect.runPromise(
+        migrationService.performMigration(),
+      );
 
-      expect(result.isOk()).toBe(true);
-      expect(result._unsafeUnwrap().details.logStore).toBe(true);
+      expect(value.details.logStore).toBe(true);
 
       // Verify importService was called with the logStore directory
       expect(importService.importLogStoreFiles).toHaveBeenCalledWith(
@@ -282,8 +293,8 @@ describe('migration service integration', () => {
       );
 
       // Mock successful import
-      vi.mocked(importService.importLogStoreFiles).mockResolvedValue(
-        ok({
+      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+        Effect.succeed({
           success: true,
           backup: {
             id: 'backup-123',
@@ -303,7 +314,7 @@ describe('migration service integration', () => {
         }),
       );
 
-      await migrationService.performMigrationIfNeeded();
+      await Effect.runPromise(migrationService.performMigrationIfNeeded());
 
       // Verify migration marker was created
       const markerPath = path.join(mockCurrentAppPath, '.migration-completed');
@@ -315,7 +326,7 @@ describe('migration service integration', () => {
       const markerPath = path.join(mockCurrentAppPath, '.migration-completed');
       await nodeFsPromises.writeFile(markerPath, '{}');
 
-      await migrationService.performMigrationIfNeeded();
+      await Effect.runPromise(migrationService.performMigrationIfNeeded());
 
       // Verify importService was not called
       expect(importService.importLogStoreFiles).not.toHaveBeenCalled();
@@ -327,13 +338,15 @@ describe('migration service integration', () => {
       await nodeFsPromises.mkdir(logStorePath, { recursive: true });
 
       // Mock import failure with specific ImportError type
-      vi.mocked(importService.importLogStoreFiles).mockResolvedValue(
-        err({ type: 'DB_SYNC_FAILED', message: 'Critical failure' }),
+      const { ImportDbSyncFailed } = await import(
+        '../vrchatLog/importService/errors'
+      );
+      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+        Effect.fail(new ImportDbSyncFailed({ message: 'Critical failure' })),
       );
 
       // Should succeed (Result type with void value)
-      const result = await migrationService.performMigrationIfNeeded();
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(migrationService.performMigrationIfNeeded());
     });
   });
 });

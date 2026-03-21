@@ -1,4 +1,4 @@
-import { ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import { type DBHelperError, enqueueTask } from '../../lib/dbHelper';
 import type { VRChatWorldJoinLog } from '../vrchatLog/service';
 import * as model from './VRChatWorldJoinLogModel/s_model';
@@ -9,35 +9,35 @@ import * as model from './VRChatWorldJoinLogModel/s_model';
  */
 export const createVRChatWorldJoinLogModel = (
   vrchatWorldJoinLogList: VRChatWorldJoinLog[],
-): ResultAsync<model.VRChatWorldJoinLogModel[], DBHelperError> => {
-  return ResultAsync.fromPromise(
-    model.createVRChatWorldJoinLog(vrchatWorldJoinLogList),
-    (error): DBHelperError => ({
+): Effect.Effect<model.VRChatWorldJoinLogModel[], DBHelperError> => {
+  return Effect.tryPromise({
+    try: () => model.createVRChatWorldJoinLog(vrchatWorldJoinLogList),
+    catch: (error): DBHelperError => ({
       type: 'BATCH_OPERATION_FAILED',
       message: `Failed to create world join logs: ${
         error instanceof Error ? error.message : String(error)
       }`,
     }),
-  );
+  });
 };
 
 /**
  * すべてのワールド参加ログを取得する
  * デバッグ用のAPIから参照される
  */
-export const findAllVRChatWorldJoinLogList = (): ResultAsync<
+export const findAllVRChatWorldJoinLogList = (): Effect.Effect<
   model.VRChatWorldJoinLogModel[],
   DBHelperError
 > => {
-  return ResultAsync.fromPromise(
-    model.findAllVRChatWorldJoinLogList(),
-    (error): DBHelperError => ({
+  return Effect.tryPromise({
+    try: () => model.findAllVRChatWorldJoinLogList(),
+    catch: (error): DBHelperError => ({
       type: 'BATCH_OPERATION_FAILED',
       message: `Failed to find all world join logs: ${
         error instanceof Error ? error.message : String(error)
       }`,
     }),
-  );
+  });
 };
 
 export const findVRChatWorldJoinLogList = async ({
@@ -69,35 +69,29 @@ export const findVRChatWorldJoinLogList = async ({
 
 export const findRecentVRChatWorldJoinLog = (
   joinDateTime: Date,
-): ResultAsync<model.VRChatWorldJoinLogModel | null, DBHelperError> => {
-  return ResultAsync.fromSafePromise(
-    enqueueTask(() =>
-      model.findRecentVRChatWorldJoinLog({
-        dateTime: joinDateTime,
-      }),
-    ),
-  ).andThen((result) => result);
+): Effect.Effect<model.VRChatWorldJoinLogModel | null, DBHelperError> => {
+  return enqueueTask(() =>
+    model.findRecentVRChatWorldJoinLog({
+      dateTime: joinDateTime,
+    }),
+  );
 };
 
 export const findNextVRChatWorldJoinLog = (
   joinDateTime: Date,
-): ResultAsync<model.VRChatWorldJoinLogModel | null, DBHelperError> => {
-  return ResultAsync.fromSafePromise(
-    enqueueTask(() => model.findNextVRChatWorldJoinLog(joinDateTime)),
-  ).andThen((result) => result);
+): Effect.Effect<model.VRChatWorldJoinLogModel | null, DBHelperError> => {
+  return enqueueTask(() => model.findNextVRChatWorldJoinLog(joinDateTime));
 };
 
 /**
  * 最も新しいワールド参加ログを取得する
  * ログ同期処理で基準日時を求める際に使用
  */
-export const findLatestWorldJoinLog = (): ResultAsync<
+export const findLatestWorldJoinLog = (): Effect.Effect<
   model.VRChatWorldJoinLogModel | null,
   DBHelperError
 > => {
-  return ResultAsync.fromSafePromise(
-    enqueueTask(() => model.findLatestWorldJoinLog()),
-  ).andThen((result) => result);
+  return enqueueTask(() => model.findLatestWorldJoinLog());
 };
 
 type VRChatWorldJoinLogWithSource = {

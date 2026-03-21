@@ -1,4 +1,4 @@
-import { type Result, ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import { ofetch } from 'ofetch';
 import { match, P } from 'ts-pattern';
 import type { QueryObject } from 'ufo';
@@ -48,49 +48,50 @@ export class FetchError extends Error {
 
 /**
  * ofetch を利用して HTTP リクエストを行うユーティリティ
- * getData からのみ呼ばれ、成功可否を Result 型で返す
+ * getData からのみ呼ばれ、成功可否を Effect 型で返す
  */
 const fetchWithResult = <T = unknown>(
   url: string,
   options?: RequestInit & { query?: QueryObject },
-): ResultAsync<T, FetchError> => {
+): Effect.Effect<T, FetchError> => {
   // ちゃんとした User-Agent を設定する
   const userAgent = `Electron ${process.versions.electron}; ${process.platform}; ${process.arch}`;
-  return ResultAsync.fromPromise(
-    ofetch<T>(url, {
-      headers: {
-        'User-Agent': userAgent,
-        ...options?.headers,
-      },
-      ...options,
-      onResponseError: async ({ response }) => {
-        throw new FetchError({
-          message: response.statusText || 'Unknown error',
-          status: response.status,
-          url: response.url,
-          method: options?.method,
-          headers: response.headers,
-          responseBody: response._data,
-        });
-      },
-    }),
-    (error): FetchError => {
+  return Effect.tryPromise({
+    try: () =>
+      ofetch<T>(url, {
+        headers: {
+          'User-Agent': userAgent,
+          ...options?.headers,
+        },
+        ...options,
+        onResponseError: async ({ response }) => {
+          throw new FetchError({
+            message: response.statusText || 'Unknown error',
+            status: response.status,
+            url: response.url,
+            method: options?.method,
+            headers: response.headers,
+            responseBody: response._data,
+          });
+        },
+      }),
+    catch: (error): FetchError => {
       return match(error)
         .with(P.instanceOf(FetchError), (e) => e)
         .otherwise((e) => {
           throw e; // FetchError でない場合はそのまま throw する
         });
     },
-  );
+  });
 };
 
 /**
  * fetchWithResult のラッパー関数
  * API サービス層から共通利用される
  */
-export const getData = async <T>(
+export const getData = <T>(
   url: string,
   options?: RequestInit & { query?: QueryObject },
-): Promise<Result<T, FetchError>> => {
+): Effect.Effect<T, FetchError> => {
   return fetchWithResult<T>(url, options);
 };

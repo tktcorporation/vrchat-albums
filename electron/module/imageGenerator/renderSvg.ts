@@ -1,9 +1,14 @@
 import * as fs from 'node:fs';
 import { Transformer } from '@napi-rs/image';
 import { Resvg } from '@resvg/resvg-js';
-import * as neverthrow from 'neverthrow';
+import { Effect } from 'effect';
 import * as path from 'pathe';
-import type { ImageGenerationError } from './error';
+import type { ImageGenerationError } from './errors';
+import {
+  FontLoadFailed,
+  ImageConversionFailed,
+  SvgRenderFailed,
+} from './errors';
 
 let fontsLoaded = false;
 let fontFilePaths: string[] = [];
@@ -19,8 +24,8 @@ let fontFilePaths: string[] = [];
  * 2. 開発環境: electron/resources/fonts/ (__dirname からの相対パス)
  * 3. テスト環境: 同じ相対パスで解決（Electron require が失敗するため catch で処理）
  */
-const loadFonts = (): neverthrow.Result<string[], ImageGenerationError> => {
-  if (fontsLoaded) return neverthrow.ok(fontFilePaths);
+const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
+  if (fontsLoaded) return Effect.succeed(fontFilePaths);
 
   const fontsDir = (() => {
     try {
@@ -53,20 +58,21 @@ const loadFonts = (): neverthrow.Result<string[], ImageGenerationError> => {
     'NotoSansJP-Bold.ttf',
   ];
 
-  try {
-    fontFilePaths = fontFileNames
-      .map((f) => path.join(fontsDir, f))
-      .filter((p) => fs.existsSync(p));
-    // フォントが0件でもスキャン済みとしてキャッシュし、毎回の再スキャンを防ぐ
-    fontsLoaded = true;
-    return neverthrow.ok(fontFilePaths);
-  } catch (e) {
-    return neverthrow.err({
-      type: 'FONT_LOAD_FAILED' as const,
-      fontPath: fontsDir,
-      message: e instanceof Error ? e.message : String(e),
-    });
-  }
+  return Effect.try({
+    try: () => {
+      fontFilePaths = fontFileNames
+        .map((f) => path.join(fontsDir, f))
+        .filter((p) => fs.existsSync(p));
+      // フォントが0件でもスキャン済みとしてキャッシュし、毎回の再スキャンを防ぐ
+      fontsLoaded = true;
+      return fontFilePaths;
+    },
+    catch: (e): FontLoadFailed =>
+      new FontLoadFailed({
+        fontPath: fontsDir,
+        message: e instanceof Error ? e.message : String(e),
+      }),
+  });
 };
 
 /** フォントキャッシュをリセットする（テスト用） */
@@ -84,29 +90,30 @@ export const _resetFontCache = (): void => {
  *
  * 呼び出し元: renderSvgToJpeg(), imageGenerator service
  */
-export const renderSvgToPng = async (
+export const renderSvgToPng = (
   svgString: string,
-): Promise<neverthrow.Result<Buffer, ImageGenerationError>> => {
-  const fontsResult = loadFonts();
-  if (fontsResult.isErr()) return neverthrow.err(fontsResult.error);
+): Effect.Effect<Buffer, ImageGenerationError> =>
+  Effect.gen(function* () {
+    const fonts = yield* loadFonts();
 
-  try {
-    const resvg = new Resvg(svgString, {
-      font: {
-        fontFiles: fontsResult.value,
-        loadSystemFonts: false,
+    return yield* Effect.try({
+      try: () => {
+        const resvg = new Resvg(svgString, {
+          font: {
+            fontFiles: fonts,
+            loadSystemFonts: false,
+          },
+          fitTo: { mode: 'width' as const, value: 1600 },
+        });
+        const pngData = resvg.render();
+        return Buffer.from(pngData.asPng());
       },
-      fitTo: { mode: 'width' as const, value: 1600 },
+      catch: (e): SvgRenderFailed =>
+        new SvgRenderFailed({
+          message: e instanceof Error ? e.message : String(e),
+        }),
     });
-    const pngData = resvg.render();
-    return neverthrow.ok(Buffer.from(pngData.asPng()));
-  } catch (e) {
-    return neverthrow.err({
-      type: 'SVG_RENDER_FAILED' as const,
-      message: e instanceof Error ? e.message : String(e),
-    });
-  }
-};
+  });
 
 /**
  * SVG 文字列を JPEG バッファに変換する（PNG 経由）
@@ -117,20 +124,21 @@ export const renderSvgToPng = async (
  * @param svgString - 変換対象の SVG 文字列
  * @param quality - JPEG 品質 (1-100)。デフォルト 85
  */
-export const renderSvgToJpeg = async (
+export const renderSvgToJpeg = (
   svgString: string,
   quality = 85,
-): Promise<neverthrow.Result<Buffer, ImageGenerationError>> => {
-  const pngResult = await renderSvgToPng(svgString);
-  if (pngResult.isErr()) return pngResult;
+): Effect.Effect<Buffer, ImageGenerationError> =>
+  Effect.gen(function* () {
+    const pngBuffer = yield* renderSvgToPng(svgString);
 
-  try {
-    const jpegBuf = await new Transformer(pngResult.value).jpeg(quality);
-    return neverthrow.ok(Buffer.from(jpegBuf));
-  } catch (e) {
-    return neverthrow.err({
-      type: 'IMAGE_CONVERSION_FAILED' as const,
-      message: e instanceof Error ? e.message : String(e),
+    return yield* Effect.tryPromise({
+      try: () =>
+        new Transformer(pngBuffer)
+          .jpeg(quality)
+          .then((buf) => Buffer.from(buf)),
+      catch: (e): ImageConversionFailed =>
+        new ImageConversionFailed({
+          message: e instanceof Error ? e.message : String(e),
+        }),
     });
-  }
-};
+  });

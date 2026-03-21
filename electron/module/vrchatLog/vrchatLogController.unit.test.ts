@@ -16,10 +16,10 @@ vi.mock('../../lib/wrappedApp', () => ({
 }));
 
 vi.mock('./exportService/exportService', () => {
-  const { ok } = require('neverthrow');
+  const { Effect } = require('effect');
   return {
-    exportLogStoreFromDB: vi.fn(async ({ outputBasePath }) =>
-      ok({
+    exportLogStoreFromDB: vi.fn(({ outputBasePath }) =>
+      Effect.succeed({
         totalLogLines: 0,
         exportedFiles: [
           `${outputBasePath}/vrchat-albums-export_2023-12-01_14-30-45/2023-11/logStore-2023-11.txt`,
@@ -32,14 +32,15 @@ vi.mock('./exportService/exportService', () => {
 });
 
 vi.mock('../logSync/service', () => {
-  const { ok } = require('neverthrow');
+  const { Effect } = require('effect');
   return {
     LOG_SYNC_MODE: {
       FULL: 'FULL',
       INCREMENTAL: 'INCREMENTAL',
     },
-    syncLogs: vi.fn(async () =>
-      ok({
+    // syncLogs returns Effect, not Promise
+    syncLogs: vi.fn(() =>
+      Effect.succeed({
         createdWorldJoinLogModelList: [],
         createdPlayerJoinLogModelList: [],
         createdPlayerLeaveLogModelList: [],
@@ -50,13 +51,10 @@ vi.mock('../logSync/service', () => {
 });
 
 vi.mock('../fileHandlers/logStorageManager', () => {
-  const { ok } = require('neverthrow');
+  const { Effect } = require('effect');
   return {
-    appendLoglinesToFile: vi.fn(async () =>
-      ok({
-        logStoreFilePath: '/path/to/logStore.txt',
-      }),
-    ),
+    // appendLoglinesToFile returns Effect<void, never>
+    appendLoglinesToFile: vi.fn(() => Effect.succeed(undefined)),
     getLogStoreDir: vi.fn(() => '/tmp/test-logStore'),
     initLogStoreDir: vi.fn(),
   };

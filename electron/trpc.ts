@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { initTRPC, TRPCError } from '@trpc/server';
-import { ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import superjson from 'superjson';
 import { match, P } from 'ts-pattern';
 import type { ZodError } from 'zod';
@@ -242,12 +242,11 @@ const errorHandler = t.middleware(async (opts) => {
     });
   };
 
-  return ResultAsync.fromPromise(executeMiddleware(), handleError).match(
-    (result) => result,
-    () => {
-      // error handler always throws, so this branch is unreachable
-      throw new Error('unreachable');
-    },
+  return Effect.runPromise(
+    Effect.tryPromise({
+      try: () => executeMiddleware(),
+      catch: handleError,
+    }),
   );
 });
 

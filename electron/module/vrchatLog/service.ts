@@ -1,5 +1,4 @@
-import * as neverthrow from 'neverthrow';
-import { ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 import type {
   VRChatLogFilePath,
@@ -7,7 +6,8 @@ import type {
 } from '../vrchatLogFileDir/model';
 import * as vrchatLogFileDirService from '../vrchatLogFileDir/service';
 import { FILTER_PATTERNS } from './constants/logPatterns';
-import { VRChatLogFileError } from './error';
+import type { VRChatLogFileError } from './error';
+import { LogFileDirNotFound, type VRChatLogError } from './errors';
 import type { VRChatLogStoreFilePath } from './model';
 
 // パーサー機能のインポート
@@ -49,81 +49,74 @@ import type { PartialSuccessResult } from './types/partialSuccess';
  * @param logFilesDir VRChatログファイルのディレクトリパス
  * @returns ワールド参加・プレイヤー参加/退出ログの配列
  */
-export const getVRChaLogInfoFromLogPath = async (
+export const getVRChaLogInfoFromLogPath = (
   logFilesDir: VRChatLogFilesDirPath,
-): Promise<
-  neverthrow.Result<
-    (
-      | VRChatWorldJoinLog
-      | VRChatWorldLeaveLog
-      | VRChatPlayerJoinLog
-      | VRChatPlayerLeaveLog
-    )[],
-    // TODO: アプリイベントの型は今後実装
-    // | VRChatAppStartLog
-    // | VRChatAppExitLog
-    VRChatLogFileError
-  >
-> => {
-  const logFilePathList =
-    await vrchatLogFileDirService.getVRChatLogFilePathList(logFilesDir);
+): Effect.Effect<
+  (
+    | VRChatWorldJoinLog
+    | VRChatWorldLeaveLog
+    | VRChatPlayerJoinLog
+    | VRChatPlayerLeaveLog
+  )[],
+  // TODO: アプリイベントの型は今後実装
+  // | VRChatAppStartLog
+  // | VRChatAppExitLog
+  VRChatLogFileError | VRChatLogError
+> =>
+  Effect.gen(function* () {
+    const logFilePathList = yield* vrchatLogFileDirService
+      .getVRChatLogFilePathList(logFilesDir)
+      .pipe(
+        Effect.mapError((fsError) =>
+          match(fsError)
+            .with(
+              'ENOENT',
+              () =>
+                new LogFileDirNotFound({
+                  message: 'VRChat log file directory not found',
+                }),
+            )
+            .exhaustive(),
+        ),
+      );
 
-  if (logFilePathList.isErr()) {
-    return neverthrow.err(
-      match(logFilePathList.error)
-        .with('ENOENT', () => new VRChatLogFileError('LOG_FILE_DIR_NOT_FOUND'))
-        .exhaustive(),
-    );
-  }
+    const logInfoList =
+      yield* getVRChaLogInfoByLogFilePathList(logFilePathList);
 
-  const logInfoList = await getVRChaLogInfoByLogFilePathList(
-    logFilePathList.value,
-  );
-
-  if (logInfoList.isErr()) {
-    return neverthrow.err(logInfoList.error);
-  }
-
-  return neverthrow.ok(logInfoList.value);
-};
+    return logInfoList;
+  });
 
 /**
  * ログファイルパスのリストからVRChatログ情報を取得
  * @param logFilePathList ログファイルパスの配列
  * @returns ワールド参加・プレイヤー参加/退出ログの配列
  */
-export const getVRChaLogInfoByLogFilePathList = async (
+export const getVRChaLogInfoByLogFilePathList = (
   logFilePathList: (VRChatLogFilePath | VRChatLogStoreFilePath)[],
-): Promise<
-  neverthrow.Result<
-    (
-      | VRChatWorldJoinLog
-      | VRChatWorldLeaveLog
-      | VRChatPlayerJoinLog
-      | VRChatPlayerLeaveLog
-    )[],
-    // TODO: アプリイベントの型は今後実装
-    // | VRChatAppStartLog
-    // | VRChatAppExitLog
-    VRChatLogFileError
-  >
-> => {
-  const logLineList = await getLogLinesByLogFilePathList({
-    logFilePathList,
-    includesList: [...FILTER_PATTERNS],
+): Effect.Effect<
+  (
+    | VRChatWorldJoinLog
+    | VRChatWorldLeaveLog
+    | VRChatPlayerJoinLog
+    | VRChatPlayerLeaveLog
+  )[],
+  // TODO: アプリイベントの型は今後実装
+  // | VRChatAppStartLog
+  // | VRChatAppExitLog
+  VRChatLogFileError | VRChatLogError
+> =>
+  Effect.gen(function* () {
+    const logLineList = yield* getLogLinesByLogFilePathList({
+      logFilePathList,
+      includesList: [...FILTER_PATTERNS],
+    });
+
+    const parseResult =
+      convertLogLinesToWorldAndPlayerJoinLogInfos(logLineList);
+
+    // エラーがあってもログ情報は返す（部分的な成功を許容）
+    return parseResult.logInfos;
   });
-
-  if (logLineList.isErr()) {
-    return neverthrow.err(logLineList.error);
-  }
-
-  const parseResult = convertLogLinesToWorldAndPlayerJoinLogInfos(
-    logLineList.value,
-  );
-
-  // エラーがあってもログ情報は返す（部分的な成功を許容）
-  return neverthrow.ok(parseResult.logInfos);
-};
 
 export type LogInfoPartialSuccessResult = PartialSuccessResult<
   (
@@ -132,7 +125,7 @@ export type LogInfoPartialSuccessResult = PartialSuccessResult<
     | VRChatPlayerJoinLog
     | VRChatPlayerLeaveLog
   )[],
-  { path: string; error: VRChatLogFileError }
+  { path: string; error: VRChatLogFileError | VRChatLogError }
 >;
 
 /**
@@ -143,9 +136,9 @@ export type LogInfoPartialSuccessResult = PartialSuccessResult<
  */
 export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
   logFilePathList: (VRChatLogFilePath | VRChatLogStoreFilePath)[],
-): ResultAsync<LogInfoPartialSuccessResult, never> => {
-  return ResultAsync.fromSafePromise(
-    (async (): Promise<LogInfoPartialSuccessResult> => {
+): Effect.Effect<LogInfoPartialSuccessResult, never> =>
+  Effect.tryPromise({
+    try: async (): Promise<LogInfoPartialSuccessResult> => {
       const logLineListResult =
         await getLogLinesByLogFilePathListWithPartialSuccess({
           logFilePathList,
@@ -163,9 +156,12 @@ export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
         successCount: logLineListResult.successCount,
         errorCount: logLineListResult.errorCount,
       };
-    })(),
-  );
-};
+    },
+    catch: (e) => {
+      // Error type is `never` - unexpected errors should propagate
+      throw e;
+    },
+  }) as Effect.Effect<LogInfoPartialSuccessResult, never>;
 
 // ファイルハンドラー機能の再エクスポート
 export {

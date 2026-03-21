@@ -1,4 +1,4 @@
-import { ok } from 'neverthrow';
+import { Effect } from 'effect';
 import {
   beforeEach,
   describe,
@@ -301,22 +301,24 @@ describe('logFileReader - Memory Management', () => {
       );
 
       // Mock the function to return success with warning
-      getLogLinesByLogFilePathList.mockImplementation(async () => {
+      getLogLinesByLogFilePathList.mockImplementation(() => {
         // Simulate the warning log that would be triggered
         mockLogger.warn(
           'Log lines in memory: 5000 (Memory: 300.00MB). Consider processing in smaller batches.',
         );
-        return ok(manyVRChatLogLines);
+        return Effect.succeed(manyVRChatLogLines);
       });
 
-      const result = await getLogLinesByLogFilePathList({
-        logFilePathList: mockLogFilePaths,
-        includesList: ['test'],
-        maxMemoryUsageMB: 100, // 低い制限値で警告をトリガー
-      });
+      const result = await Effect.runPromise(
+        getLogLinesByLogFilePathList({
+          logFilePathList: mockLogFilePaths,
+          includesList: ['test'],
+          maxMemoryUsageMB: 100, // 低い制限値で警告をトリガー
+        }),
+      );
 
       // 結果は成功するが、警告ログが出力されることを確認
-      expect(result.isOk()).toBe(true);
+      expect(result).toBeDefined();
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Consider processing in smaller batches'),
       );

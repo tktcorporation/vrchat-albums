@@ -2,6 +2,7 @@
 import EventEmitter from 'node:events';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import { Effect } from 'effect';
 // Packages
 import {
   app,
@@ -14,7 +15,6 @@ import {
   shell,
   Tray,
 } from 'electron';
-import { err, fromThrowable, Result, ResultAsync } from 'neverthrow';
 
 // electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
 // Electron ネイティブの app.isPackaged を使用
@@ -167,20 +167,20 @@ function createWindow(): BrowserWindow {
   });
 
   // ディスプレイ構成が変更された時のハンドリング
-  const displayMetricsChangedHandler = (): Result<
+  const displayMetricsChangedHandler = (): Effect.Effect<
     void,
     DisplayMetricsError
   > => {
     // ウィンドウが破棄されているかチェック
     if (!mainWindow || mainWindow.isDestroyed()) {
-      return err({
+      return Effect.fail({
         code: 'WINDOW_DESTROYED' as const,
         message: 'Window has been destroyed',
       });
     }
 
-    const adjustBounds = fromThrowable(
-      () => {
+    return Effect.try({
+      try: () => {
         const currentBounds = mainWindow.getBounds();
         const currentDisplay = screen.getDisplayNearestPoint({
           x: currentBounds.x,
@@ -219,27 +219,28 @@ function createWindow(): BrowserWindow {
 
         mainWindow.setBounds(adjustedBounds);
       },
-      (error): DisplayMetricsError => ({
+      catch: (error): DisplayMetricsError => ({
         code: 'BOUNDS_ADJUSTMENT_FAILED' as const,
         message: `Failed to adjust window bounds: ${
           error instanceof Error ? error.message : String(error)
         }`,
       }),
-    );
-
-    return adjustBounds();
+    });
   };
 
   const displayMetricsChangedWrapper = () => {
-    const result = displayMetricsChangedHandler();
-    if (result.isErr()) {
-      match(result.error.code)
+    const either = Effect.runSync(
+      Effect.either(displayMetricsChangedHandler()),
+    );
+    if (either._tag === 'Left') {
+      const error = either.left;
+      match(error.code)
         .with('WINDOW_DESTROYED', () => {
           // ウィンドウが破棄されている場合はログ出力しない（正常な状態）
         })
         .with('BOUNDS_ADJUSTMENT_FAILED', () => {
           logger.error({
-            message: `Display metrics changed handler error: ${result.error.message}`,
+            message: `Display metrics changed handler error: ${error.message}`,
           });
         })
         .exhaustive();
@@ -304,31 +305,35 @@ const setTray = () => {
     const iconPath = join(appPath, 'assets', 'icon.png');
 
     // アイコンパスの存在確認
-    const accessResult = await ResultAsync.fromPromise(
-      fs.access(iconPath),
-      () => ({ type: 'ICON_NOT_FOUND' as const, path: iconPath }),
+    const accessExit = await Effect.runPromiseExit(
+      Effect.tryPromise({
+        try: () => fs.access(iconPath),
+        catch: () => ({ type: 'ICON_NOT_FOUND' as const, path: iconPath }),
+      }),
     );
-    if (accessResult.isErr()) {
+    if (accessExit._tag === 'Failure') {
       logger.error({ message: `トレイアイコンが見つかりません: ${iconPath}` });
       return;
     }
     logger.info({ message: `トレイアイコンが見つかりました: ${iconPath}` });
 
     // トレイ作成（同期処理だがエラーの可能性あり）
-    const trayResult = Result.fromThrowable(
-      () => new Tray(iconPath),
-      (error) => ({
-        type: 'TRAY_CREATE_FAILED' as const,
-        message: JSON.stringify(error),
+    const trayExit = Effect.runSyncExit(
+      Effect.try({
+        try: () => new Tray(iconPath),
+        catch: (error) => ({
+          type: 'TRAY_CREATE_FAILED' as const,
+          message: JSON.stringify(error),
+        }),
       }),
-    )();
-    if (trayResult.isErr()) {
+    );
+    if (trayExit._tag === 'Failure') {
       logger.error({
-        message: `トレイの作成に失敗しました: ${trayResult.error.message}`,
+        message: 'トレイの作成に失敗しました',
       });
       return;
     }
-    tray = trayResult.value;
+    tray = trayExit.value;
     logger.info({ message: 'トレイの作成に成功しました' });
 
     const contextMenu = Menu.buildFromTemplate([
@@ -409,10 +414,12 @@ const setTimeEventEmitter = (
       return;
     }
 
-    const result = await syncLogsInBackground();
+    const either = await Effect.runPromise(
+      Effect.either(syncLogsInBackground()),
+    );
 
-    if (result.isErr()) {
-      const error = result.error;
+    if (either._tag === 'Left') {
+      const error = either.left;
       const errorMessage = match(error)
         .with(
           { code: 'LOG_FILE_NOT_FOUND' },
@@ -443,7 +450,7 @@ const setTimeEventEmitter = (
       createdVRChatPhotoPathModelList,
       createdWorldJoinLogModelList,
       createdPlayerJoinLogModelList,
-    } = result.value;
+    } = either.right;
     if (
       createdVRChatPhotoPathModelList.length === 0 &&
       createdWorldJoinLogModelList.length === 0 &&

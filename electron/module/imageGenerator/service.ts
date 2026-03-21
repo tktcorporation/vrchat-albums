@@ -1,7 +1,7 @@
-import type * as neverthrow from 'neverthrow';
+import { Effect } from 'effect';
 
 import { extractDominantColorsFromBuffer } from './colorExtractor';
-import type { ImageGenerationError } from './error';
+import type { ImageGenerationError } from './errors';
 import { renderSvgToJpeg, renderSvgToPng } from './renderSvg';
 import { generatePreviewSvg } from './svgTemplate';
 
@@ -16,23 +16,26 @@ import { generatePreviewSvg } from './svgTemplate';
  *
  * 呼び出し元: ShareDialog から tRPC 経由で呼ばれる
  */
-export const generateSharePreview = async (params: {
+export const generateSharePreview = (params: {
   worldName: string;
   imageBase64: string;
   players: { playerName: string }[] | null;
   showAllPlayers: boolean;
-}): Promise<neverthrow.Result<string, ImageGenerationError>> => {
-  const imageBuffer = Buffer.from(params.imageBase64, 'base64');
-  const colors = await extractDominantColorsFromBuffer(imageBuffer);
+}): Effect.Effect<string, ImageGenerationError> =>
+  Effect.gen(function* () {
+    const imageBuffer = Buffer.from(params.imageBase64, 'base64');
+    const colors = yield* Effect.promise(() =>
+      extractDominantColorsFromBuffer(imageBuffer),
+    );
 
-  const { svg } = generatePreviewSvg({
-    ...params,
-    colors,
+    const { svg } = generatePreviewSvg({
+      ...params,
+      colors,
+    });
+
+    const pngBuffer = yield* renderSvgToPng(svg);
+    return pngBuffer.toString('base64');
   });
-
-  const pngResult = await renderSvgToPng(svg);
-  return pngResult.map((buf) => buf.toString('base64'));
-};
 
 /**
  * World Join 画像を生成する（JPEG バッファ）
@@ -45,23 +48,26 @@ export const generateSharePreview = async (params: {
  *
  * 呼び出し元: worldJoinImage/service.ts から呼ばれる
  */
-export const generateWorldJoinImage = async (params: {
+export const generateWorldJoinImage = (params: {
   worldName: string;
   imageBase64: string;
   players: { playerName: string }[] | null;
   /** 現在は未使用。将来的に画像内に日時を表示する際に使用予定。 */
   joinDateTime: Date;
-}): Promise<neverthrow.Result<Buffer, ImageGenerationError>> => {
-  const imageBuffer = Buffer.from(params.imageBase64, 'base64');
-  const colors = await extractDominantColorsFromBuffer(imageBuffer);
+}): Effect.Effect<Buffer, ImageGenerationError> =>
+  Effect.gen(function* () {
+    const imageBuffer = Buffer.from(params.imageBase64, 'base64');
+    const colors = yield* Effect.promise(() =>
+      extractDominantColorsFromBuffer(imageBuffer),
+    );
 
-  const { svg } = generatePreviewSvg({
-    worldName: params.worldName,
-    imageBase64: params.imageBase64,
-    players: params.players,
-    showAllPlayers: true,
-    colors,
+    const { svg } = generatePreviewSvg({
+      worldName: params.worldName,
+      imageBase64: params.imageBase64,
+      players: params.players,
+      showAllPlayers: true,
+      colors,
+    });
+
+    return yield* renderSvgToJpeg(svg, 85);
   });
-
-  return renderSvgToJpeg(svg, 85);
-};

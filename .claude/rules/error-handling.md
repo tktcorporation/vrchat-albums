@@ -6,7 +6,7 @@
 
 ## 基本原則
 
-### try-catch を避け、neverthrow + ts-pattern を使用する
+### try-catch を避け、Effect TS + ts-pattern を使用する
 
 **このプロジェクトでは `try-catch` の使用を原則として避けます。**
 
@@ -14,46 +14,48 @@
 
 | 状況 | 使用するパターン |
 |------|-----------------|
-| 同期処理でエラーが発生しうる | `fromThrowable()` |
-| 非同期処理でエラーが発生しうる | `ResultAsync.fromPromise()` |
-| Result型のエラーを分岐処理 | `match(result).with(...).otherwise(...)` |
-| 複数のResult型を連結 | `result.andThen()`, `result.map()` |
+| 同期処理でエラーが発生しうる | `Effect.try()` |
+| 非同期処理でエラーが発生しうる | `Effect.tryPromise()` |
+| Effect のエラーを分岐処理 | `Effect.match` または ts-pattern |
+| 複数の Effect を連結 | `.pipe(Effect.flatMap())`, `.pipe(Effect.map())` |
 
 ```typescript
-// ✅ 推奨: neverthrow + ts-pattern
-import { ResultAsync, fromThrowable } from 'neverthrow';
+// ✅ 推奨: Effect TS + ts-pattern
+import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
 // 同期処理
-const safeParse = fromThrowable(
-  JSON.parse,
-  (e): ParseError => ({ type: 'PARSE_ERROR', message: String(e) })
-);
+const safeParse = (input: string) =>
+  Effect.try({
+    try: () => JSON.parse(input),
+    catch: (e): ParseError => ({ type: 'PARSE_ERROR', message: String(e) }),
+  });
 
 // 非同期処理
 const fetchData = (url: string) =>
-  ResultAsync.fromPromise(
-    fetch(url).then(r => r.json()),
-    (e): FetchError => ({ type: 'FETCH_ERROR', message: String(e) })
-  );
+  Effect.tryPromise({
+    try: () => fetch(url).then(r => r.json()),
+    catch: (e): FetchError => ({ type: 'FETCH_ERROR', message: String(e) }),
+  });
 
 // 結果のハンドリング
-const result = await fetchData('/api/data');
-match(result)
-  .with({ isOk: true }, ({ value }) => handleSuccess(value))
-  .with({ isErr: true }, ({ error }) =>
-    match(error)
-      .with({ type: 'FETCH_ERROR' }, (e) => showRetryDialog(e))
-      .exhaustive()
-  )
-  .exhaustive();
+const program = fetchData('/api/data').pipe(
+  Effect.match({
+    onSuccess: (value) => handleSuccess(value),
+    onFailure: (error) =>
+      match(error)
+        .with({ type: 'FETCH_ERROR' }, (e) => showRetryDialog(e))
+        .exhaustive(),
+  })
+);
+await Effect.runPromise(program);
 ```
 
 #### try-catch が許容されるケース
 
 以下の場合のみ `try-catch` の使用を許容します:
 
-1. **`finally` でリソースクリーンアップが必要な場合**
+1. **`finally` でリソースクリーンアップが必要な場合**（ただし `Effect.acquireRelease` の使用を優先検討）
 2. **Electron環境検出パターン** (`require('electron')` のtry-catch)
 3. **ts-patternでエラーを分類し、予期しないエラーを再スローする場合**
 
@@ -61,10 +63,10 @@ match(result)
 // 許容例: finally でクリーンアップ
 try {
   resource = await acquireResource();
-  return ok(await processResource(resource));
+  return Effect.succeed(await processResource(resource));
 } catch (error) {
   return match(error)
-    .with({ code: 'ETIMEDOUT' }, () => err({ type: 'TIMEOUT' }))
+    .with({ code: 'ETIMEDOUT' }, () => Effect.fail({ type: 'TIMEOUT' }))
     .otherwise((e) => { throw e; }); // 予期しないエラーは再スロー
 } finally {
   await resource?.release();
@@ -73,12 +75,12 @@ try {
 
 ---
 
-### neverthrow の使い分け
+### Effect TS の使い分け
 
 | エラー種別 | 処理方法 | 理由 |
 |-----------|---------|------|
-| 予期されたエラー | `Result<T, E>` で返す | ユーザーが対処可能、呼び出し側でハンドリング |
-| 予期しないエラー | `throw` で再スロー | Sentryで検知してバグを追跡 |
+| 予期されたエラー | `Effect.Effect<T, E>` で返す | ユーザーが対処可能、呼び出し側でハンドリング |
+| 予期しないエラー | `throw` で再スロー（または Effect の defect として扱う） | Sentryで検知してバグを追跡 |
 
 ### 予期されたエラーの例
 
@@ -149,7 +151,7 @@ try {
   // ✅ Sentryに送信
   logger.error('Operation failed', error);
 
-  // 予期されたエラーなら Result で返す
+  // 予期されたエラーなら Effect.fail() で返す
   // 予期しないエラーなら再スロー
   throw error;
 }
@@ -157,13 +159,13 @@ try {
 
 ### 3. 汎用Error型の使用
 
-`Result<T, Error>`, `Result<T, any>`, `Result<T, unknown>` は、呼び出し側でパターンマッチできません。
+`Effect.Effect<T, Error>`, `Effect.Effect<T, any>`, `Effect.Effect<T, unknown>` は、呼び出し側でパターンマッチできません。
 
 **❌ 禁止パターン:**
 
 ```typescript
 // ❌ 呼び出し側でパターンマッチできない
-function getData(): Result<Data, Error> {
+function getData(): Effect.Effect<Data, Error> {
   // ...
 }
 ```
@@ -176,26 +178,26 @@ type GetDataError =
   | { type: 'VALIDATION_ERROR'; message: string };
 
 // ✅ 呼び出し側でexhaustiveにハンドリング可能
-function getData(): Result<Data, GetDataError> {
+function getData(): Effect.Effect<Data, GetDataError> {
   // ...
 }
 ```
 
 **例外:** `logger.error()` でSentryに通知済みの場合は許容されます。
 
-### 4. catch内でerr()のみを返す
+### 4. catch内でEffect.fail()のみを返す
 
-catchブロックでエラーを分類せずにそのまま `err()` で返すと、予期しないエラーもラップされてしまいます。
+catchブロックでエラーを分類せずにそのまま `Effect.fail()` で返すと、予期しないエラーもラップされてしまいます。
 
 **❌ 禁止パターン:**
 
 ```typescript
 try {
   const result = await operation();
-  return ok(result);
+  return Effect.succeed(result);
 } catch (error) {
   // ❌ 全てのエラーをラップ（Sentryに送信されない）
-  return err(error instanceof Error ? error : new Error(String(error)));
+  return Effect.fail(error instanceof Error ? error : new Error(String(error)));
 }
 ```
 
@@ -204,14 +206,14 @@ try {
 ```typescript
 try {
   const result = await operation();
-  return ok(result);
+  return Effect.succeed(result);
 } catch (error) {
   return match(error)
     .with({ code: 'ENOENT' }, (e) =>
-      err({ type: 'FILE_NOT_FOUND', path: e.path })
+      Effect.fail({ type: 'FILE_NOT_FOUND', path: e.path })
     )
     .with({ code: 'EACCES' }, (e) =>
-      err({ type: 'PERMISSION_DENIED', path: e.path })
+      Effect.fail({ type: 'PERMISSION_DENIED', path: e.path })
     )
     .otherwise((e) => {
       // ✅ 予期しないエラーは再スロー（Sentryに送信される）
@@ -231,14 +233,14 @@ import { match } from 'ts-pattern';
 
 try {
   const result = await operation();
-  return ok(result);
+  return Effect.succeed(result);
 } catch (error) {
   return match(error)
     .with({ code: 'ENOENT' }, (e) =>
-      err({ type: 'FILE_NOT_FOUND', path: e.path })
+      Effect.fail({ type: 'FILE_NOT_FOUND', path: e.path })
     )
     .with({ code: 'EACCES' }, (e) =>
-      err({ type: 'PERMISSION_DENIED', path: e.path })
+      Effect.fail({ type: 'PERMISSION_DENIED', path: e.path })
     )
     .otherwise((e) => {
       // 予期しないエラーは再スロー
@@ -247,38 +249,51 @@ try {
 }
 ```
 
-### fromThrowable / ResultAsync.fromPromise を優先
+### Effect.try / Effect.tryPromise を優先
 
-`try-catch` よりも neverthrow のユーティリティを使用することを推奨します。
+`try-catch` よりも Effect TS のユーティリティを使用することを推奨します。
 
 ```typescript
-import { fromThrowable, ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 
 // 同期関数の場合
-const safeParse = fromThrowable(
-  (str: string) => JSON.parse(str),
-  (error): ParseError => ({ type: 'PARSE_ERROR', message: String(error) })
-);
+const safeParse = (str: string) =>
+  Effect.try({
+    try: () => JSON.parse(str),
+    catch: (error): ParseError => ({ type: 'PARSE_ERROR', message: String(error) }),
+  });
 
 // 非同期関数の場合
-function fetchData(url: string): ResultAsync<Data, FetchError> {
-  return ResultAsync.fromPromise(
-    fetch(url).then(r => r.json()),
-    (error): FetchError => ({ type: 'FETCH_ERROR', message: String(error) })
-  );
+function fetchData(url: string): Effect.Effect<Data, FetchError> {
+  return Effect.tryPromise({
+    try: () => fetch(url).then(r => r.json()),
+    catch: (error): FetchError => ({ type: 'FETCH_ERROR', message: String(error) }),
+  });
 }
 ```
 
-### tRPC層でのResult→UserFacingError変換
+### Effect の合成（pipe / flatMap / map）
 
 ```typescript
-import { handleResultError, fileOperationErrorMappings } from '../lib/errorHelpers';
+import { Effect, pipe } from 'effect';
+
+// 複数の Effect を連結
+const program = pipe(
+  fetchData('/api/user'),
+  Effect.flatMap((user) => fetchData(`/api/user/${user.id}/photos`)),
+  Effect.map((photos) => photos.filter(p => p.isPublic)),
+  Effect.mapError((error) => ({ ...error, context: 'photo-loading' })),
+);
+```
+
+### tRPC層でのEffect→UserFacingError変換
+
+```typescript
+import { runEffectForTRPC } from '../lib/effectHelpers';
 
 // tRPC procedure
 openFile: procedure.input(z.string()).mutation(async (ctx) => {
-  const result = await service.openFile(ctx.input);
-  handleResultError(result, fileOperationErrorMappings);
-  return true;
+  return await runEffectForTRPC(service.openFile(ctx.input));
 }),
 ```
 
@@ -288,8 +303,8 @@ openFile: procedure.input(z.string()).mutation(async (ctx) => {
 
 | レイヤー | 責務 | 使用パターン |
 |---------|------|-------------|
-| Service | エラー分類、予期されたエラーの返却 | `Result<T, E>` |
-| tRPC | Result→UserFacingError変換 | `handleResultError()` |
+| Service | エラー分類、予期されたエラーの返却 | `Effect.Effect<T, E>` |
+| tRPC | Effect→UserFacingError変換 | `runEffectForTRPC()` |
 | Frontend | ユーザー向けメッセージ表示 | Toast + `parseErrorFromTRPC()` |
 
 ---
@@ -298,18 +313,18 @@ openFile: procedure.input(z.string()).mutation(async (ctx) => {
 
 | コマンド | 説明 |
 |---------|------|
-| `pnpm lint:neverthrow` | Result型強制、catch-errパターン検出 |
+| `pnpm lint:effect` | Effect型強制、エラーハンドリングパターン検出 |
 | `pnpm lint:ts-pattern` | ts-patternの適切な使用をチェック |
 
 ### 設定ファイル
 
-- `.neverthrowlintrc.json` - neverthrowリンター設定
-- `docs/lint-neverthrow.md` - リンター詳細ドキュメント
+- `scripts/lint-effect.ts` - Effect リンタースクリプト
+- `docs/lint-effect.md` - リンター詳細ドキュメント
 
 ---
 
 ## 参考リンク
 
-- [neverthrow公式](https://github.com/supermacro/neverthrow)
+- [Effect TS 公式](https://effect.website/)
 - [ts-pattern公式](https://github.com/gvergnaud/ts-pattern)
 - [docs/error-handling.md](../../docs/error-handling.md) - エラーハンドリング戦略の詳細

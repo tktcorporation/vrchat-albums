@@ -1,5 +1,5 @@
 import type * as nodeFs from 'node:fs';
-import neverthrow from 'neverthrow';
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from '../../lib/wrappedFs';
 import { appendLoglinesToFile } from './fileHandlers/logStorageManager';
@@ -14,13 +14,13 @@ vi.mock('../../lib/wrappedApp', () => ({
 vi.mock('../../lib/wrappedFs', () => {
   return {
     existsSyncSafe: vi.fn().mockReturnValue(false),
-    mkdirSyncSafe: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
-    appendFileAsync: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
-    writeFileSyncSafe: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
-    unlinkAsync: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
+    mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    appendFileAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    unlinkAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
     readFileSyncSafe: vi
       .fn()
-      .mockReturnValue(neverthrow.ok(Buffer.from('test content'))),
+      .mockReturnValue(Effect.succeed(Buffer.from('test content'))),
     createReadStream: vi.fn().mockReturnValue({
       on: vi.fn().mockImplementation(function (
         this: NodeJS.ReadStream,
@@ -36,7 +36,7 @@ vi.mock('../../lib/wrappedFs', () => {
       }),
       pipe: vi.fn().mockReturnThis(),
     }),
-    readdirAsync: vi.fn().mockResolvedValue(neverthrow.ok([])),
+    readdirAsync: vi.fn().mockReturnValue(Effect.succeed([])),
   };
 });
 
@@ -78,16 +78,16 @@ describe('appendLoglinesToFile', () => {
     // ファイルが存在しないと仮定
     vi.mocked(fs.existsSyncSafe).mockReturnValue(false);
     vi.mocked(fs.readFileSyncSafe).mockReturnValue(
-      neverthrow.ok(Buffer.from('')),
+      Effect.succeed(Buffer.from('')),
     );
   });
 
   it('ログが空の場合は何もしない', async () => {
-    const result = await appendLoglinesToFile({
-      logLines: [],
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      appendLoglinesToFile({
+        logLines: [],
+      }),
+    );
     expect(fs.existsSyncSafe).not.toHaveBeenCalled();
     expect(fs.appendFileAsync).not.toHaveBeenCalled();
   });
@@ -97,11 +97,11 @@ describe('appendLoglinesToFile', () => {
       VRChatLogLineSchema.parse('2024.01.15 12:00:00 Log entry 1'),
     ];
 
-    const result = await appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      appendLoglinesToFile({
+        logLines,
+      }),
+    );
     expect(fs.writeFileSyncSafe).toHaveBeenCalledWith(
       expect.stringContaining('logStore-2024-01.txt'),
       '2024.01.15 12:00:00 Log entry 1\n',
@@ -112,18 +112,18 @@ describe('appendLoglinesToFile', () => {
     // ファイルが存在すると仮定
     vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
     vi.mocked(fs.readFileSyncSafe).mockReturnValue(
-      neverthrow.ok(Buffer.from('2024.01.14 11:00:00 Existing log\n')),
+      Effect.succeed(Buffer.from('2024.01.14 11:00:00 Existing log\n')),
     );
 
     const logLines = [
       VRChatLogLineSchema.parse('2024.01.15 12:00:00 New log entry'),
     ];
 
-    const result = await appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      appendLoglinesToFile({
+        logLines,
+      }),
+    );
     expect(fs.appendFileAsync).toHaveBeenCalledWith(
       expect.stringContaining('logStore-2024-01.txt'),
       '2024.01.15 12:00:00 New log entry\n',
@@ -134,18 +134,18 @@ describe('appendLoglinesToFile', () => {
     // ファイルが存在すると仮定
     vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
     vi.mocked(fs.readFileSyncSafe).mockReturnValue(
-      neverthrow.ok(Buffer.from('2024.01.15 12:00:00 Existing log\n')),
+      Effect.succeed(Buffer.from('2024.01.15 12:00:00 Existing log\n')),
     );
 
     const logLines = [
       VRChatLogLineSchema.parse('2024.01.15 12:00:00 Existing log'),
     ];
 
-    const result = await appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      appendLoglinesToFile({
+        logLines,
+      }),
+    );
     expect(fs.appendFileAsync).not.toHaveBeenCalled();
   });
 
@@ -153,7 +153,7 @@ describe('appendLoglinesToFile', () => {
     // ファイルが存在すると仮定
     vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
     vi.mocked(fs.readFileSyncSafe).mockReturnValue(
-      neverthrow.ok(
+      Effect.succeed(
         Buffer.from(
           '2024.01.14 11:00:00 Existing log 1\n2024.01.14 12:00:00 Existing log 2\n',
         ),
@@ -164,11 +164,11 @@ describe('appendLoglinesToFile', () => {
       VRChatLogLineSchema.parse('2024.01.15 12:00:00 New log entry'),
     ];
 
-    const result = await appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      appendLoglinesToFile({
+        logLines,
+      }),
+    );
 
     // writeFileSyncSafeが呼ばれていないことを確認（上書きしていない）
     expect(fs.writeFileSyncSafe).not.toHaveBeenCalled();
@@ -184,7 +184,7 @@ describe('appendLoglinesToFile', () => {
     // 複数の既存ログがあるファイル
     vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
     vi.mocked(fs.readFileSyncSafe).mockReturnValue(
-      neverthrow.ok(
+      Effect.succeed(
         Buffer.from(
           '2024.01.14 11:00:00 Existing log 1\n2024.01.14 12:00:00 Existing log 2\n',
         ),
@@ -197,11 +197,11 @@ describe('appendLoglinesToFile', () => {
       VRChatLogLineSchema.parse('2024.01.15 13:00:00 New log entry 2'), // 新規
     ];
 
-    const result = await appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      appendLoglinesToFile({
+        logLines,
+      }),
+    );
 
     // 上書きされていない
     expect(fs.writeFileSyncSafe).not.toHaveBeenCalled();

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { parseISO } from 'date-fns';
+import { Effect } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as client from '../../lib/sequelize';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
@@ -42,17 +43,19 @@ describe('SessionInfoBatch world change behavior', () => {
     const player3JoinTime = parseISO('2024-01-01T10:40:00Z');
 
     // World A に参加
-    await worldJoinLogService.createVRChatWorldJoinLogModel([
-      {
-        logType: 'worldJoin' as const,
-        worldId: VRChatWorldIdSchema.parse(
-          'wrld_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-        ),
-        worldName: VRChatWorldNameSchema.parse('World A'),
-        worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
-        joinDate: worldAJoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel([
+        {
+          logType: 'worldJoin' as const,
+          worldId: VRChatWorldIdSchema.parse(
+            'wrld_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          ),
+          worldName: VRChatWorldNameSchema.parse('World A'),
+          worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
+          joinDate: worldAJoinTime,
+        },
+      ]),
+    );
 
     // World A でプレイヤーが参加
     await playerJoinLogService.createVRChatPlayerJoinLogModel([
@@ -75,17 +78,19 @@ describe('SessionInfoBatch world change behavior', () => {
     ]);
 
     // World B に参加（World A から退出）
-    await worldJoinLogService.createVRChatWorldJoinLogModel([
-      {
-        logType: 'worldJoin' as const,
-        worldId: VRChatWorldIdSchema.parse(
-          'wrld_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-        ),
-        worldName: VRChatWorldNameSchema.parse('World B'),
-        worldInstanceId: VRChatWorldInstanceIdSchema.parse('67890'),
-        joinDate: worldBJoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel([
+        {
+          logType: 'worldJoin' as const,
+          worldId: VRChatWorldIdSchema.parse(
+            'wrld_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          ),
+          worldName: VRChatWorldNameSchema.parse('World B'),
+          worldInstanceId: VRChatWorldInstanceIdSchema.parse('67890'),
+          joinDate: worldBJoinTime,
+        },
+      ]),
+    );
 
     // World B でプレイヤーが参加
     await playerJoinLogService.createVRChatPlayerJoinLogModel([
@@ -144,17 +149,19 @@ describe('SessionInfoBatch world change behavior', () => {
     const playerZJoinTime = parseISO('2024-01-02T10:10:00Z');
 
     // 3つのワールドに順番に参加
-    await worldJoinLogService.createVRChatWorldJoinLogModel([
-      {
-        logType: 'worldJoin' as const,
-        worldId: VRChatWorldIdSchema.parse(
-          'wrld_12345678-1234-5678-abcd-123456789abc',
-        ),
-        worldName: VRChatWorldNameSchema.parse('World X'),
-        worldInstanceId: VRChatWorldInstanceIdSchema.parse('11111'),
-        joinDate: worldXJoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel([
+        {
+          logType: 'worldJoin' as const,
+          worldId: VRChatWorldIdSchema.parse(
+            'wrld_12345678-1234-5678-abcd-123456789abc',
+          ),
+          worldName: VRChatWorldNameSchema.parse('World X'),
+          worldInstanceId: VRChatWorldInstanceIdSchema.parse('11111'),
+          joinDate: worldXJoinTime,
+        },
+      ]),
+    );
 
     await playerJoinLogService.createVRChatPlayerJoinLogModel([
       {
@@ -167,17 +174,19 @@ describe('SessionInfoBatch world change behavior', () => {
       },
     ]);
 
-    await worldJoinLogService.createVRChatWorldJoinLogModel([
-      {
-        logType: 'worldJoin' as const,
-        worldId: VRChatWorldIdSchema.parse(
-          'wrld_87654321-4321-8765-dcba-987654321cba',
-        ),
-        worldName: VRChatWorldNameSchema.parse('World Y'),
-        worldInstanceId: VRChatWorldInstanceIdSchema.parse('22222'),
-        joinDate: worldYJoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel([
+        {
+          logType: 'worldJoin' as const,
+          worldId: VRChatWorldIdSchema.parse(
+            'wrld_87654321-4321-8765-dcba-987654321cba',
+          ),
+          worldName: VRChatWorldNameSchema.parse('World Y'),
+          worldInstanceId: VRChatWorldInstanceIdSchema.parse('22222'),
+          joinDate: worldYJoinTime,
+        },
+      ]),
+    );
 
     await playerJoinLogService.createVRChatPlayerJoinLogModel([
       {
@@ -190,17 +199,19 @@ describe('SessionInfoBatch world change behavior', () => {
       },
     ]);
 
-    await worldJoinLogService.createVRChatWorldJoinLogModel([
-      {
-        logType: 'worldJoin' as const,
-        worldId: VRChatWorldIdSchema.parse(
-          'wrld_abcdef12-3456-7890-abcd-ef1234567890',
-        ),
-        worldName: VRChatWorldNameSchema.parse('World Z'),
-        worldInstanceId: VRChatWorldInstanceIdSchema.parse('33333'),
-        joinDate: worldZJoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel([
+        {
+          logType: 'worldJoin' as const,
+          worldId: VRChatWorldIdSchema.parse(
+            'wrld_abcdef12-3456-7890-abcd-ef1234567890',
+          ),
+          worldName: VRChatWorldNameSchema.parse('World Z'),
+          worldInstanceId: VRChatWorldInstanceIdSchema.parse('33333'),
+          joinDate: worldZJoinTime,
+        },
+      ]),
+    );
 
     await playerJoinLogService.createVRChatPlayerJoinLogModel([
       {

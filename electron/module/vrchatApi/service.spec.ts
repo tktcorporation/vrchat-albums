@@ -1,4 +1,4 @@
-import { ok } from 'neverthrow';
+import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 import { getData } from '../../lib/getData';
 import { VRChatWorldIdSchema } from '../vrchatLog/model';
@@ -50,17 +50,16 @@ describe('vrchatApi/service', () => {
         created_at: '',
         updated_at: '',
       };
-      vi.mocked(getData).mockResolvedValueOnce(ok(mockWorldInfo));
+      vi.mocked(getData).mockReturnValueOnce(Effect.succeed(mockWorldInfo));
       // Act
-      const result = await vrchatApiService.getVrcWorldInfoByWorldId(
-        VRChatWorldIdSchema.parse(worldId),
+      const value = await Effect.runPromise(
+        vrchatApiService.getVrcWorldInfoByWorldId(
+          VRChatWorldIdSchema.parse(worldId),
+        ),
       );
       // Assert
-      expect(result).toBeDefined();
-      if (result.isErr()) {
-        throw result.error;
-      }
-      expect(result.value.id).toBe(worldId);
+      expect(value).toBeDefined();
+      expect(value.id).toBe(worldId);
     });
   });
 });

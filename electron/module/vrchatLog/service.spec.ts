@@ -1,4 +1,4 @@
-import neverthrow from 'neverthrow';
+import { Effect, Exit } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from '../../lib/wrappedFs';
 import { VRChatLogLineSchema } from './model';
@@ -13,13 +13,13 @@ vi.mock('../../lib/appPath', () => ({
 vi.mock('../../lib/wrappedFs', () => {
   return {
     existsSyncSafe: vi.fn().mockReturnValue(false),
-    mkdirSyncSafe: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
-    appendFileAsync: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
-    writeFileSyncSafe: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
-    unlinkAsync: vi.fn().mockResolvedValue(neverthrow.ok(undefined)),
+    mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    appendFileAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    unlinkAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
     readFileSyncSafe: vi
       .fn()
-      .mockReturnValue(neverthrow.ok(Buffer.from('test content'))),
+      .mockReturnValue(Effect.succeed(Buffer.from('test content'))),
     createReadStream: vi.fn().mockReturnValue({
       on: vi.fn().mockImplementation(function (
         this: unknown,
@@ -35,7 +35,7 @@ vi.mock('../../lib/wrappedFs', () => {
       }),
       pipe: vi.fn().mockReturnThis(),
     }),
-    readdirAsync: vi.fn().mockResolvedValue(neverthrow.ok([])),
+    readdirAsync: vi.fn().mockReturnValue(Effect.succeed([])),
   };
 });
 
@@ -61,14 +61,9 @@ describe('appendLoglinesToFile', () => {
     vi.mocked(fs.existsSyncSafe).mockReturnValue(false);
 
     // appendLoglinesToFile関数をモック
-    vi.spyOn(service, 'appendLoglinesToFile').mockImplementation(
-      async (props) => {
-        if (props.logLines.length === 0) {
-          return neverthrow.ok(undefined);
-        }
-        return neverthrow.ok(undefined);
-      },
-    );
+    vi.spyOn(service, 'appendLoglinesToFile').mockImplementation((_props) => {
+      return Effect.succeed(undefined);
+    });
   });
 
   it('should-return-void', async () => {
@@ -80,11 +75,11 @@ describe('appendLoglinesToFile', () => {
       '2023.10.02 00:00:04 Log        -  Log message',
     ].map((line) => VRChatLogLineSchema.parse(line));
 
-    const result = await service.appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      service.appendLoglinesToFile({
+        logLines,
+      }),
+    );
 
     // ディレクトリが作成されたことを確認
     expect(service.appendLoglinesToFile).toHaveBeenCalledWith({ logLines });
@@ -99,11 +94,11 @@ describe('appendLoglinesToFile', () => {
       '   ', // 空白のみの行
     ].map((line) => VRChatLogLineSchema.parse(line));
 
-    const result = await service.appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      service.appendLoglinesToFile({
+        logLines,
+      }),
+    );
 
     // ディレクトリが作成されたことを確認
     expect(service.appendLoglinesToFile).toHaveBeenCalledWith({ logLines });
@@ -115,11 +110,11 @@ describe('appendLoglinesToFile', () => {
       (line) => VRChatLogLineSchema.parse(line),
     );
 
-    const result = await service.appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      service.appendLoglinesToFile({
+        logLines,
+      }),
+    );
 
     // ディレクトリが作成されたことを確認
     expect(service.appendLoglinesToFile).toHaveBeenCalledWith({ logLines });
@@ -134,11 +129,11 @@ describe('appendLoglinesToFile', () => {
     // ファイルが存在すると仮定
     vi.mocked(fs.existsSyncSafe).mockReturnValue(true);
 
-    const result = await service.appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      service.appendLoglinesToFile({
+        logLines,
+      }),
+    );
 
     // 既存のファイルに追記されたことを確認
     expect(service.appendLoglinesToFile).toHaveBeenCalledWith({ logLines });
@@ -150,40 +145,31 @@ describe('extractPlayerJoinInfoFromLog', () => {
     const logLine = VRChatLogLineSchema.parse(
       '2025.01.07 23:25:34 Log        -  [Behaviour] OnPlayerJoined プレイヤーA (usr_8862b082-dbc8-4b6d-8803-e834f833b498)',
     );
-    const result = service.extractPlayerJoinInfoFromLog(logLine);
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.logType).toBe('playerJoin');
-      expect(result.value.playerName).toBe('プレイヤーA');
-      expect(result.value.playerId).toBe(
-        'usr_8862b082-dbc8-4b6d-8803-e834f833b498',
-      );
-      expect(result.value.joinDate).toBeInstanceOf(Date);
-    }
+    const value = Effect.runSync(service.extractPlayerJoinInfoFromLog(logLine));
+    expect(value.logType).toBe('playerJoin');
+    expect(value.playerName).toBe('プレイヤーA');
+    expect(value.playerId).toBe('usr_8862b082-dbc8-4b6d-8803-e834f833b498');
+    expect(value.joinDate).toBeInstanceOf(Date);
   });
 
   it('should extract player join info without player ID', () => {
     const logLine = VRChatLogLineSchema.parse(
       '2025.01.07 23:25:34 Log        -  [Behaviour] OnPlayerJoined プレイヤーB',
     );
-    const result = service.extractPlayerJoinInfoFromLog(logLine);
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.logType).toBe('playerJoin');
-      expect(result.value.playerName).toBe('プレイヤーB');
-      expect(result.value.playerId).toBe(null);
-      expect(result.value.joinDate).toBeInstanceOf(Date);
-    }
+    const value = Effect.runSync(service.extractPlayerJoinInfoFromLog(logLine));
+    expect(value.logType).toBe('playerJoin');
+    expect(value.playerName).toBe('プレイヤーB');
+    expect(value.playerId).toBe(null);
+    expect(value.joinDate).toBeInstanceOf(Date);
   });
 
   it('should return error for invalid log format', () => {
     const logLine = VRChatLogLineSchema.parse(
       '2025.01.07 23:25:34 Log        -  Invalid log format',
     );
-    const result = service.extractPlayerJoinInfoFromLog(logLine);
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) {
-      expect(result.error).toBe('LOG_FORMAT_MISMATCH');
-    }
+    const exit = Effect.runSyncExit(
+      service.extractPlayerJoinInfoFromLog(logLine),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
   });
 });

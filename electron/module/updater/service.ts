@@ -1,21 +1,12 @@
+import { Effect } from 'effect';
 import { autoUpdater } from 'electron-updater';
-import { ResultAsync } from 'neverthrow';
 import { BehaviorSubject } from 'rxjs';
 import { logger } from '../../lib/logger';
-
-/**
- * アップデートチェックのエラー型
- */
-export type UpdateCheckError = {
-  type: 'UPDATE_CHECK_FAILED';
-  message: string;
-  cause: unknown;
-};
+import { UpdateCheckFailed } from './errors';
 
 /**
  * Electron自動アップデート機能を管理するサービス。
  *
-
  * @see docs/error-handling.md - エラーハンドリング設計
  * @see electron/module/updater/router.ts - tRPCルーター
  */
@@ -36,16 +27,15 @@ export class UpdaterService {
     });
   }
 
-  public checkForUpdates(): ResultAsync<void, UpdateCheckError> {
-    return ResultAsync.fromPromise(autoUpdater.checkForUpdates(), (error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn(`アップデートの確認中にエラーが発生しました: ${message}`);
-      return {
-        type: 'UPDATE_CHECK_FAILED' as const,
-        message,
-        cause: error,
-      };
-    }).map(() => undefined);
+  public checkForUpdates(): Effect.Effect<void, UpdateCheckFailed> {
+    return Effect.tryPromise({
+      try: () => autoUpdater.checkForUpdates(),
+      catch: (error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(`アップデートの確認中にエラーが発生しました: ${message}`);
+        return new UpdateCheckFailed({ message, cause: error });
+      },
+    }).pipe(Effect.map(() => undefined));
   }
 
   public async quitAndInstall() {

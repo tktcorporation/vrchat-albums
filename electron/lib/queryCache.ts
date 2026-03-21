@@ -1,4 +1,4 @@
-import { ok, type Result } from 'neverthrow';
+import { Effect } from 'effect';
 import { logger } from './logger';
 
 interface CacheEntry<T> {
@@ -32,38 +32,38 @@ export class QueryCache {
     this.onEvict = options.onEvict;
   }
 
-  async getOrFetch<T, E = unknown>(
+  getOrFetch<T, E = unknown>(
     key: string,
-    fetcher: () => Promise<Result<T, E>>,
+    fetcher: () => Effect.Effect<T, E>,
     options?: { ttl?: number },
-  ): Promise<Result<T, E>> {
-    // Check if cached and not expired
-    const cached = this.cache.get(key);
-    const ttl = options?.ttl ?? this.ttl;
+  ): Effect.Effect<T, E> {
+    return Effect.gen(this, function* () {
+      // Check if cached and not expired
+      const cached = this.cache.get(key);
+      const ttl = options?.ttl ?? this.ttl;
 
-    if (cached && Date.now() - cached.timestamp < ttl) {
-      cached.hits++;
-      this.updateAccessOrder(key);
-      logger.debug(`Cache hit for key: ${key} (hits: ${cached.hits})`);
-      return ok(cached.data as T);
-    }
+      if (cached && Date.now() - cached.timestamp < ttl) {
+        cached.hits++;
+        this.updateAccessOrder(key);
+        logger.debug(`Cache hit for key: ${key} (hits: ${cached.hits})`);
+        return cached.data as T;
+      }
 
-    // Remove expired entry
-    if (cached) {
-      this.cache.delete(key);
-      this.removeFromAccessOrder(key);
-    }
+      // Remove expired entry
+      if (cached) {
+        this.cache.delete(key);
+        this.removeFromAccessOrder(key);
+      }
 
-    // Fetch new data
-    // Note: fetcher() should return Result, not throw.
-    // Any unexpected exceptions will propagate to Sentry.
-    const result = await fetcher();
+      // Fetch new data
+      // Note: fetcher() should return Effect, not throw.
+      // Any unexpected exceptions will propagate to Sentry.
+      const value = yield* fetcher();
 
-    if (result.isOk()) {
-      this.set(key, result.value);
-    }
+      this.set(key, value);
 
-    return result;
+      return value;
+    });
   }
 
   set<T>(key: string, data: T): void {

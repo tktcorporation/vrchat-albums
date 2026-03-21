@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { Effect } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as client from '../../../lib/sequelize';
 import {
@@ -30,17 +31,13 @@ describe('module/logInfo/s_model', () => {
     initSettingStoreForTest({
       getLogFilesDir: () => storedVRChatLogFilesDirPath.value,
     } as unknown as ReturnType<typeof getSettingStore>);
-    const logFilesDirPath = await getValidVRChatLogFileDir();
-    if (logFilesDirPath.isErr()) {
-      throw new Error('Unexpected error');
-    }
-    const logInfoList = await getVRChaLogInfoFromLogPath(
-      logFilesDirPath.value.path,
+    const logFilesDirPath = await Effect.runPromise(getValidVRChatLogFileDir());
+
+    const logInfoList = await Effect.runPromise(
+      getVRChaLogInfoFromLogPath(logFilesDirPath.path),
     );
-    if (logInfoList.isErr()) {
-      throw new Error('Unexpected error');
-    }
-    const worldJoinLogList = logInfoList.value.filter(
+
+    const worldJoinLogList = logInfoList.filter(
       (logInfo): logInfo is VRChatWorldJoinLog =>
         logInfo.logType === 'worldJoin',
     );

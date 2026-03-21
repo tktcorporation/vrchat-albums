@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Effect } from 'effect';
 import { uuidv7 } from 'uuidv7';
 import {
   afterAll,
@@ -25,32 +26,32 @@ vi.mock('../../lib/wrappedApp', () => ({
 
 // Mock VRChat log directory (since we don't have actual VRChat logs in test)
 vi.mock('../vrchatLogFileDirService/vrchatLogFileDirService', async () => {
-  const { ok } = await import('neverthrow');
+  const { Effect } = await import('effect');
   return {
-    getValidVRChatLogFileDir: vi.fn(async () =>
-      ok({ path: '/tmp/mock-vrchat-logs' }),
+    getValidVRChatLogFileDir: vi.fn(() =>
+      Effect.succeed({ path: '/tmp/mock-vrchat-logs' }),
     ),
-    getVRChatLogFilePathList: vi.fn(async () => ok([])),
+    getVRChatLogFilePathList: vi.fn(() => Effect.succeed([])),
   };
 });
 
 // Mock only the VRChat log file reading part
 vi.mock('./service', async (importOriginal) => {
   const original = await importOriginal();
-  const { ok } = await import('neverthrow');
   return {
     ...(original as object),
-    getLogLinesByLogFilePathList: vi.fn(async () => ok([])),
+    getLogLinesByLogFilePathList: vi.fn(async () => []),
     filterLogLinesByDate: vi.fn(() => []),
-    getVRChatLogFilePaths: vi.fn(async () => ok([])),
+    getVRChatLogFilePaths: vi.fn(async () => []),
   };
 });
 
 // Mock the log sync service to avoid LOG_FILE_WRITE_FAILED error
 vi.mock('../logSync/service', async () => {
-  const { ok } = await import('neverthrow');
+  const { Effect } = await import('effect');
   return {
-    syncLogs: vi.fn(async () => ok({ success: true })),
+    // syncLogs returns Effect, not Promise
+    syncLogs: vi.fn(() => Effect.succeed({ success: true })),
     LOG_SYNC_MODE: {
       FULL: 'FULL',
       INCREMENTAL: 'INCREMENTAL',
@@ -124,21 +125,18 @@ describe('vrchatLogController integration test with minimal mocks', () => {
   // };
 
   const createTestWorldJoinLog = async (joinDateTime: Date) => {
-    const logsResult = await worldJoinLogService.createVRChatWorldJoinLogModel([
-      {
-        logType: 'worldJoin' as const,
-        joinDate: joinDateTime,
-        worldId: VRChatWorldIdSchema.parse(`wrld_${uuidv7()}`),
-        worldName: VRChatWorldNameSchema.parse('Test World'),
-        worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
-      },
-    ]);
-    if (logsResult.isErr()) {
-      throw new Error(
-        `Failed to create world join log: ${logsResult.error.message}`,
-      );
-    }
-    return logsResult.value[0];
+    const logs = await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel([
+        {
+          logType: 'worldJoin' as const,
+          joinDate: joinDateTime,
+          worldId: VRChatWorldIdSchema.parse(`wrld_${uuidv7()}`),
+          worldName: VRChatWorldNameSchema.parse('Test World'),
+          worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
+        },
+      ]),
+    );
+    return logs[0];
   };
 
   const createTestPlayerJoinLog = async (joinDateTime: Date) => {

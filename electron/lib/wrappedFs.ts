@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import { promisify } from 'node:util';
 import typeUtils from 'node:util/types';
-import { fromThrowable, type Result, ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 
 /**
@@ -19,13 +19,13 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 export const readFileSyncSafe = (
   filePath: string,
   options?: { encoding?: null; flag?: string } | null,
-): Result<
+): Effect.Effect<
   Buffer,
   { code: 'ENOENT' | string; message: string; error: Error }
 > => {
-  const safeRead = fromThrowable(
-    () => fs.readFileSync(filePath, options),
-    (e): { code: 'ENOENT' | string; message: string; error: Error } => {
+  return Effect.try({
+    try: () => fs.readFileSync(filePath, options),
+    catch: (e): { code: 'ENOENT' | string; message: string; error: Error } => {
       if (!isNodeError(e)) {
         throw e; // 予期しないエラーをre-throw
       }
@@ -39,8 +39,7 @@ export const readFileSyncSafe = (
           throw ee; // 分類できないエラーをre-throw
         });
     },
-  );
-  return safeRead();
+  });
 };
 
 export type FSError = 'ENOENT';
@@ -53,13 +52,13 @@ type ReaddirReturn = PromiseType<ReturnType<typeof readdirPromisified>>;
  */
 export const readdirAsync = (
   ...args: Parameters<typeof readdirPromisified>
-): ResultAsync<
+): Effect.Effect<
   ReaddirReturn,
   { code: 'ENOENT'; error: NodeJS.ErrnoException }
 > =>
-  ResultAsync.fromPromise(
-    readdirPromisified(...args),
-    (e): { code: 'ENOENT'; error: NodeJS.ErrnoException } => {
+  Effect.tryPromise({
+    try: () => readdirPromisified(...args),
+    catch: (e): { code: 'ENOENT'; error: NodeJS.ErrnoException } => {
       if (!isNodeError(e)) {
         throw e; // 予期しないエラーをre-throw
       }
@@ -69,7 +68,7 @@ export const readdirAsync = (
           throw ee; // 分類できないエラーをre-throw
         });
     },
-  );
+  });
 
 /**
  * ファイル書き込みエラー型
@@ -87,10 +86,10 @@ export type WriteFileError =
 export const writeFileSyncSafe = (
   path: string,
   data: string | Uint8Array,
-): Result<void, WriteFileError> => {
-  const safeWrite = fromThrowable(
-    () => fs.writeFileSync(path, data),
-    (e): WriteFileError => {
+): Effect.Effect<void, WriteFileError> => {
+  return Effect.try({
+    try: () => fs.writeFileSync(path, data),
+    catch: (e): WriteFileError => {
       if (!isNodeError(e)) {
         throw e; // 予期しないエラーはre-throw（Sentry通知）
       }
@@ -113,8 +112,7 @@ export const writeFileSyncSafe = (
           code: ee.code,
         }));
     },
-  );
-  return safeWrite();
+  });
 };
 
 /**
@@ -136,13 +134,13 @@ type AppendFileReturn = PromiseType<ReturnType<typeof appendFilePromisified>>;
  */
 export const appendFileAsync = (
   ...args: Parameters<typeof appendFilePromisified>
-): ResultAsync<
+): Effect.Effect<
   AppendFileReturn,
   { code: 'ENOENT'; error: NodeJS.ErrnoException }
 > =>
-  ResultAsync.fromPromise(
-    appendFilePromisified(...args),
-    (e): { code: 'ENOENT'; error: NodeJS.ErrnoException } => {
+  Effect.tryPromise({
+    try: () => appendFilePromisified(...args),
+    catch: (e): { code: 'ENOENT'; error: NodeJS.ErrnoException } => {
       if (!isNodeError(e)) {
         throw e; // 予期しないエラーをre-throw
       }
@@ -152,7 +150,7 @@ export const appendFileAsync = (
           throw ee; // 分類できないエラーをre-throw
         });
     },
-  );
+  });
 
 /**
  * fs.createReadStream をラップしたユーティリティ。
