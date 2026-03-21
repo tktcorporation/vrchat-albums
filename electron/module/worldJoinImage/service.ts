@@ -1,6 +1,7 @@
 import * as fsPromises from 'node:fs/promises';
 import * as neverthrow from 'neverthrow';
 import * as path from 'pathe';
+import { match, P } from 'ts-pattern';
 import { VRChatWorldIdSchema } from '../../lib/brandedTypes';
 import { logger } from '../../lib/logger';
 import type { ImageGenerationError } from '../imageGenerator/error';
@@ -188,25 +189,27 @@ const generateMissingWorldJoinImagesInternal = async (params: {
       });
     } catch (error) {
       // エラー分類: 予期されたエラー（ネットワーク/ファイルI/O）はログして続行
-      // 予期しないエラー（TypeError 等）は Sentry に送信
-      const isExpectedNetworkOrIoError =
-        error instanceof Error &&
-        ('code' in error ||
-          error.name === 'FetchError' ||
-          error.name === 'AbortError');
-
-      if (isExpectedNetworkOrIoError) {
-        logger.warn({
-          message: `Expected error generating world join image for ${join.worldId}: ${(error as Error).message}`,
-          stack: error as Error,
+      // 予期しないエラー（TypeError 等）は re-throw して Sentry に送信
+      match(error)
+        .with(
+          P.instanceOf(Error).and(
+            P.union(
+              { name: 'FetchError' },
+              { name: 'AbortError' },
+              { code: P.union('ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT') },
+            ),
+          ),
+          (e) => {
+            logger.warn({
+              message: `Expected error generating world join image for ${join.worldId}: ${e.message}`,
+              stack: e,
+            });
+            errors++;
+          },
+        )
+        .otherwise((e) => {
+          throw e;
         });
-      } else {
-        logger.error({
-          message: `Unexpected error generating world join image for ${join.worldId}`,
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
-      }
-      errors++;
     }
   }
 

@@ -18,8 +18,7 @@ export const downloadOrCopyImageAsPng = async ({
   downloadOrCopyMutation,
 }: ShareImageOptions): Promise<void> => {
   if (!pngBase64) {
-    console.error('Failed to convert to PNG:', 'No PNG base64 data');
-    throw new Error('Failed to convert to PNG');
+    throw new Error('Failed to convert to PNG: No PNG base64 data');
   }
 
   try {
@@ -28,7 +27,6 @@ export const downloadOrCopyImageAsPng = async ({
       filenameWithoutExt,
     });
   } catch (error) {
-    console.error('Failed to convert to PNG:', error);
-    throw new Error('Failed to convert to PNG');
+    throw new Error('Failed to convert to PNG', { cause: error });
   }
 };

@@ -18,7 +18,10 @@ const config = {
       to: 'fonts',
     },
   ],
-  asarUnpack: ['node_modules/@resvg/resvg-js*/**'],
+  asarUnpack: [
+    'node_modules/@resvg/resvg-js*/**',
+    'node_modules/@napi-rs/image*/**',
+  ],
   publish: [
     {
       provider: 'github',

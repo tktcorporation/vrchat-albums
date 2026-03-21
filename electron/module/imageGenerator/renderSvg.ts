@@ -57,7 +57,8 @@ const loadFonts = (): neverthrow.Result<string[], ImageGenerationError> => {
     fontFilePaths = fontFileNames
       .map((f) => path.join(fontsDir, f))
       .filter((p) => fs.existsSync(p));
-    fontsLoaded = fontFilePaths.length > 0;
+    // フォントが0件でもスキャン済みとしてキャッシュし、毎回の再スキャンを防ぐ
+    fontsLoaded = true;
     return neverthrow.ok(fontFilePaths);
   } catch (e) {
     return neverthrow.err({

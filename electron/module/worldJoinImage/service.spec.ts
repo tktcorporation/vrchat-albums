@@ -190,7 +190,7 @@ describe('generateMissingWorldJoinImages', () => {
     }
   });
 
-  it('should count error when image download fails', async () => {
+  it('should count error when image download fails with FetchError', async () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
@@ -200,7 +200,9 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
       neverthrow.ok(makeWorldInfo()),
     );
-    vi.mocked(ofetch).mockRejectedValue(new Error('Network error'));
+    const fetchError = new Error('Network error');
+    fetchError.name = 'FetchError';
+    vi.mocked(ofetch).mockRejectedValue(fetchError);
 
     const result = await generateMissingWorldJoinImages({
       photoDirPath: '/photos',
@@ -211,6 +213,30 @@ describe('generateMissingWorldJoinImages', () => {
       expect(result.value.generated).toBe(0);
       expect(result.value.errors).toBe(1);
     }
+  });
+
+  it('should re-throw unexpected errors instead of swallowing them', async () => {
+    vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
+      makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
+    ]);
+    vi.mocked(fsPromises.access).mockRejectedValue(
+      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+    );
+    vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
+      neverthrow.ok(makeWorldInfo()),
+    );
+    vi.mocked(ofetch).mockResolvedValue(new ArrayBuffer(8));
+    vi.mocked(generateWorldJoinImage).mockResolvedValue(
+      neverthrow.ok(Buffer.from('fake-jpeg')),
+    );
+    // mkdir で TypeError が発生 → 予期しないエラーなので re-throw されるべき
+    vi.mocked(fsPromises.mkdir).mockRejectedValue(
+      new TypeError('Cannot read properties of undefined'),
+    );
+
+    await expect(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    ).rejects.toThrow(TypeError);
   });
 
   it('should skip when already generating (mutex)', async () => {
