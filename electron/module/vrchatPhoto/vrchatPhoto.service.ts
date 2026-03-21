@@ -38,6 +38,17 @@ import {
   VRChatPhotoDirPathSchema,
 } from './valueObjects';
 
+/**
+ * VRChat 写真として認識するファイルかどうか判定する
+ *
+ * 背景: VRChat が生成する .png 写真に加え、
+ * World Join 画像（.jpeg）もスキャン対象とする。
+ * 3箇所のフィルタで使用される共通関数。
+ */
+export const isVRChatPhotoFile = (filename: string): boolean =>
+  filename.startsWith('VRChat_') &&
+  (filename.endsWith('.png') || filename.endsWith('.jpeg'));
+
 // サムネイルキャッシュの設定
 const THUMBNAIL_CACHE_DIR_NAME = 'vrchat-albums-thumbnails';
 const MAX_CACHE_SIZE_MB = 500; // キャッシュの最大サイズ
@@ -652,9 +663,7 @@ const computeFolderDigest = (
     },
   ).andThen((files) => {
     // VRChat写真ファイルのみをフィルタリングしてソート
-    const pngFiles = files
-      .filter((f) => f.startsWith('VRChat_') && f.endsWith('.png'))
-      .sort();
+    const pngFiles = files.filter((f) => isVRChatPhotoFile(f)).sort();
 
     // ファイル名リストをハッシュ化（ファイル内容は読まない）
     return neverthrow.ResultAsync.fromPromise(
@@ -721,8 +730,7 @@ const getPhotoFolders = async (
 
     // VRChat写真があるかチェック
     const hasVRChatPhotos = entries.some(
-      (e) =>
-        e.isFile() && e.name.startsWith('VRChat_') && e.name.endsWith('.png'),
+      (e) => e.isFile() && isVRChatPhotoFile(e.name),
     );
 
     // Simple boolean check → if文が適切（CLAUDE.md例外）
@@ -913,7 +921,7 @@ const filterNewFilesByMtime = async (
 
   for (const fileName of fileNames) {
     // VRChat写真のみ対象
-    if (!fileName.startsWith('VRChat_') || !fileName.endsWith('.png')) {
+    if (!isVRChatPhotoFile(fileName)) {
       continue;
     }
 
