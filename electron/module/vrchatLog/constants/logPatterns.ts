@@ -27,9 +27,13 @@ export const LOG_PATTERNS = {
 } as const;
 
 // フィルタで使用されるパターンのリスト
+// パフォーマンスのため具体的なパターンのみ指定し、パーサーに不要な行を渡さない。
+// [Behaviour] タグの広範囲フィルタは使わないこと（未知パターン検出は別経路で行う）。
 export const FILTER_PATTERNS = [
-  LOG_PATTERNS.BEHAVIOUR_TAG,
   LOG_PATTERNS.APP_START,
+  LOG_PATTERNS.WORLD_JOIN,
+  LOG_PATTERNS.PLAYER_JOIN,
+  LOG_PATTERNS.PLAYER_LEAVE,
   LOG_PATTERNS.APP_EXIT,
 ] as const;
 

@@ -1,9 +1,5 @@
 import { match } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
-import {
-  KNOWN_BEHAVIOUR_PATTERNS,
-  LOG_PATTERNS,
-} from '../constants/logPatterns';
 import type { VRChatLogLine } from '../model';
 import {
   extractPlayerJoinInfoFromLog,
@@ -46,16 +42,6 @@ export interface ParseResult {
   )[];
   errors: ParseErrorInfo[];
 }
-
-/**
- * [Behaviour] タグを含む行が既知のパターンに該当するかを判定
- *
- * KNOWN_BEHAVIOUR_PATTERNS のいずれかを含む場合は既知と判定する。
- * 新しいパーサーを追加した場合は constants/logPatterns.ts の
- * KNOWN_BEHAVIOUR_PATTERNS にもパターンを追加すること。
- */
-const isKnownBehaviourPattern = (logLine: VRChatLogLine): boolean =>
-  KNOWN_BEHAVIOUR_PATTERNS.some((pattern) => logLine.includes(pattern));
 
 /**
  * ログ行の配列をワールド参加・退出・プレイヤー参加/退出情報に変換
@@ -266,18 +252,6 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
           },
         });
       }
-    }
-
-    // 未知の [Behaviour] パターン検出
-    // VRChat の仕様変更で新しいイベント種別が追加された場合に早期検出するため、
-    // 既知パターンに該当しない [Behaviour] 行を Sentry に送信する。
-    if (l.includes(LOG_PATTERNS.BEHAVIOUR_TAG) && !isKnownBehaviourPattern(l)) {
-      logger.error({
-        message: 'Unrecognized VRChat log pattern detected',
-        details: {
-          logLine: l,
-        },
-      });
     }
   }
 

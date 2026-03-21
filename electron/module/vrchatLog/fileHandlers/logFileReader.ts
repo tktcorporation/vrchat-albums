@@ -5,11 +5,24 @@ import { match } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import * as fs from '../../../lib/wrappedFs';
 import type { VRChatLogFilePath } from '../../vrchatLogFileDir/model';
+import {
+  KNOWN_BEHAVIOUR_PATTERNS,
+  LOG_PATTERNS,
+} from '../constants/logPatterns';
 import type { VRChatLogFileError } from '../error';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../model';
 import { VRChatLogLineSchema } from '../model';
 import type { PartialSuccessResult } from '../types/partialSuccess';
 import { createPartialSuccessResult } from '../types/partialSuccess';
+
+/**
+ * [Behaviour] タグを含む行が既知のパターンに該当するかを判定
+ *
+ * string.includes のみで判定するため正規表現のコストがない。
+ * ファイル読み込みの行イベント内で呼ばれるため、軽量であることが重要。
+ */
+const isKnownBehaviourPattern = (line: string): boolean =>
+  KNOWN_BEHAVIOUR_PATTERNS.some((pattern) => line.includes(pattern));
 
 /**
  * VRChatログファイルの読み込み機能
@@ -97,6 +110,19 @@ export const getLogLinesFromLogFile = async (props: {
         // includesList の配列の中のどれかと一致したら追加
         if (props.includesList.some((include) => line.includes(include))) {
           lines.push(line);
+        }
+        // 未知の [Behaviour] パターン検出（string.includes のみ、正規表現なし）
+        // includesList にマッチしなくても [Behaviour] を含む行は仕様変更の可能性があるため、
+        // 既知パターンに該当しない場合は Sentry に送信する。
+        // メモリに行を蓄積せず直接送信するためパフォーマンス影響は最小限。
+        else if (
+          line.includes(LOG_PATTERNS.BEHAVIOUR_TAG) &&
+          !isKnownBehaviourPattern(line)
+        ) {
+          logger.error({
+            message: 'Unrecognized VRChat log pattern detected',
+            details: { logLine: line },
+          });
         }
       });
 
@@ -274,12 +300,10 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
 
   return match(errors.length > 0)
     .with(true, () => {
-      logger.warnWithSentry({
-        message: `Failed to process ${errors.length} log files`,
-        details: {
-          errors: errors.map((e) => ({ path: e.path, code: e.error.code })),
-        },
-      });
+      logger.warn(
+        `Failed to process ${errors.length} log files:`,
+        errors.map((e) => ({ path: e.path, code: e.error.code })),
+      );
       return createPartialSuccessResult(logLineList, errors, totalFiles);
     })
     .with(false, () =>
