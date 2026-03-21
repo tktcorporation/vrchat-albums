@@ -150,6 +150,28 @@ describe('vrchatPhoto.service', () => {
         }
       });
 
+      // readFileがENOENTエラー（ファイルが存在しない）をスローする場合のテスト
+      // ユーザーが写真を削除・移動した場合に発生する予期されたエラー
+      it('should return "InputFileIsMissing" error when file read throws ENOENT', async () => {
+        const enoentError = Object.assign(
+          new Error(
+            "ENOENT: no such file or directory, open '/path/to/deleted/photo.png'",
+          ),
+          { code: 'ENOENT' },
+        );
+        vi.mocked(fsPromises.readFile).mockRejectedValueOnce(enoentError);
+
+        const result = await getVRChatPhotoItemData({
+          photoPath: mockInputPhotoPath,
+          width: mockResizeWidth,
+        });
+
+        expect(result.isErr()).toBe(true);
+        if (result.isErr()) {
+          expect(result.error).toBe('InputFileIsMissing');
+        }
+      });
+
       // 「Input file is missing」以外のエラーをスローする場合のテスト
       // この場合、発生したエラーがそのままスローされることを期待する。
       it('should throw error for other errors', async () => {

@@ -1520,6 +1520,7 @@ export const getVRChatPhotoItemData = async ({
           }),
           () => 'InputFileIsMissing' as const,
         )
+        .with({ code: 'ENOENT' }, () => 'InputFileIsMissing' as const)
         .otherwise((e) => {
           // 予期しないエラーはre-throw（Sentryに送信）
           throw e instanceof Error ? e : new Error(JSON.stringify(e));
