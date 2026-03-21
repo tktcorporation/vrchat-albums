@@ -1,4 +1,13 @@
 {
+  "@napi-rs/image@1.12.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Brooooooklyn/Image",
+    "publisher": "LongYinan",
+    "email": "github@lyn.one",
+    "url": "https://lyn.one",
+    "path": "node_modules/@napi-rs/image",
+    "licenseFile": "node_modules/@napi-rs/image/LICENSE"
+  },
   "@radix-ui/react-checkbox@1.3.3": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
@@ -46,6 +55,12 @@
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-toast",
     "licenseFile": "node_modules/@radix-ui/react-toast/LICENSE"
+  },
+  "@resvg/resvg-js@2.6.2": {
+    "licenses": "MPL-2.0",
+    "repository": "https://github.com/yisibl/resvg-js",
+    "path": "node_modules/@resvg/resvg-js",
+    "licenseFile": "node_modules/@resvg/resvg-js/LICENSE"
   },
   "@sentry/cli@3.0.3": {
     "licenses": "FSL-1.1-MIT",
@@ -314,14 +329,6 @@
     "path": "node_modules/rxjs",
     "licenseFile": "node_modules/rxjs/LICENSE.txt"
   },
-  "sharp@0.34.5": {
-    "licenses": "Apache-2.0",
-    "repository": "https://github.com/lovell/sharp",
-    "publisher": "Lovell Fuller",
-    "email": "npm@lovell.info",
-    "path": "node_modules/sharp",
-    "licenseFile": "node_modules/sharp/LICENSE"
-  },
   "superjson@2.2.6": {
     "licenses": "MIT",
     "repository": "https://github.com/blitz-js/superjson",
@@ -386,7 +393,7 @@
     "path": "node_modules/vite",
     "licenseFile": "node_modules/vite/LICENSE.md"
   },
-  "vrchat-albums@0.25.1": {
+  "vrchat-albums@0.26.0": {
     "licenses": "Custom: https://github.com/tktcorporation/vrchat-albums/releases",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",

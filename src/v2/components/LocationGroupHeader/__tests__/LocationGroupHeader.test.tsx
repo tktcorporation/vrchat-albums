@@ -61,6 +61,14 @@ vi.mock('@/trpc', () => ({
         }),
       },
     },
+    imageGenerator: {
+      generateSharePreview: {
+        useMutation: vi.fn().mockReturnValue({
+          mutateAsync: vi.fn().mockResolvedValue('fake-base64'),
+          isPending: false,
+        }),
+      },
+    },
   },
   trpcClient: {
     logInfo: {

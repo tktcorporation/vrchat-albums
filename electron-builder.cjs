@@ -13,6 +13,14 @@ const config = {
       from: './assets/',
       to: 'assets',
     },
+    {
+      from: './electron/resources/fonts/',
+      to: 'fonts',
+    },
+  ],
+  asarUnpack: [
+    'node_modules/@resvg/resvg-js*/**',
+    'node_modules/@napi-rs/image*/**',
   ],
   publish: [
     {

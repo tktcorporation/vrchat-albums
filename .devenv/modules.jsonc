@@ -47,7 +47,8 @@
         ".claude/rules/*.md",
         ".claude/rules/jujutsu.md",
         ".claude/skills/upstream-fix/SKILL.md",
-        ".claude/skills/ui-craft"
+        ".claude/skills/ui-craft",
+        ".claude/skills/autonomous-dev/SKILL.md"
       ]
     }
   ]

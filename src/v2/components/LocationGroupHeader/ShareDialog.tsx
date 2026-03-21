@@ -1,5 +1,5 @@
 import { Copy, Download, LoaderCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { trpcReact } from '@/trpc';
 import {
   ContextMenu,
@@ -17,8 +17,8 @@ import {
 import { Label } from '../../../components/ui/label';
 import { Switch } from '../../../components/ui/switch';
 import { ICON_SIZE } from '../../constants/ui';
+import { useToast } from '../../hooks/use-toast';
 import { useI18n } from '../../i18n/store';
-import { generatePreviewPng } from '../../utils/previewGenerator';
 import { downloadOrCopyImageAsPng } from '../../utils/shareUtils';
 
 interface Player {
@@ -54,6 +54,7 @@ export const ShareDialog = ({
   players,
 }: ShareDialogProps) => {
   const { t } = useI18n();
+  const { toast } = useToast();
   const [showAllPlayers, setShowAllPlayers] = useState(false);
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
@@ -66,39 +67,55 @@ export const ShareDialog = ({
       gcTime: 1000 * 60 * 30, // 30分間キャッシュを保持
     });
 
+  const generatePreviewMutation =
+    trpcReact.imageGenerator.generateSharePreview.useMutation();
   const copyImageMutation =
     trpcReact.electronUtil.copyImageDataByBase64.useMutation();
   const downloadImageMutation =
     trpcReact.electronUtil.downloadImageAsPhotoLogPng.useMutation();
 
-  // プレビュー画像を生成する関数
   /**
-   * 共有用のプレビュー画像を生成して state に保存する。
+   * 共有用のプレビュー画像を Main プロセスで生成して state に保存する。
+   *
+   * 背景: Canvas API への依存を排除するため、画像生成を tRPC 経由で
+   * Main プロセスの resvg-js ベースパイプラインに委譲する。
    */
-  const generatePreview = async () => {
+  const generatePreview = useCallback(async () => {
     if (!base64Data || !worldName) return;
     setIsGeneratingPreview(true);
     try {
-      const pngBase64 = await generatePreviewPng({
+      const pngBase64 = await generatePreviewMutation.mutateAsync({
         worldName,
         imageBase64: base64Data,
-        players,
+        players: players?.map((p) => ({ playerName: p.playerName })) ?? null,
         showAllPlayers,
       });
       setPreviewBase64(pngBase64);
-    } catch (error) {
-      console.error('Failed to generate preview:', error);
+    } catch {
+      toast({
+        title: t('locationHeader.share'),
+        description: t('locationHeader.previewGenerationFailed'),
+        variant: 'destructive',
+      });
     } finally {
       setIsGeneratingPreview(false);
     }
-  };
+  }, [
+    base64Data,
+    worldName,
+    players,
+    showAllPlayers,
+    generatePreviewMutation,
+    toast,
+    t,
+  ]);
 
   // base64Dataが変更されたら、プレビューを生成
   useEffect(() => {
     if (base64Data) {
       generatePreview();
     }
-  }, [base64Data, worldName, players, showAllPlayers]);
+  }, [generatePreview, base64Data]);
 
   /** 生成済みの画像をクリップボードへコピーする */
   const handleCopyShareImageToClipboard = async () => {

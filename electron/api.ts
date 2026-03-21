@@ -13,6 +13,7 @@ import { backgroundSettingsRouter } from './module/backgroundSettings/controller
 import { debugRouter } from './module/debug/debugController';
 import { electronUtilRouter } from './module/electronUtil/controller/electronUtilController';
 import { openGetFileDialog } from './module/electronUtil/service';
+import { imageGeneratorRouter } from './module/imageGenerator/imageGeneratorController';
 import {
   type InitProgressPayload,
   InitProgressPayloadSchema,
@@ -40,6 +41,7 @@ export const router = trpcRouter({
   backgroundSettings: backgroundSettingsRouter(settingStore),
   settings: settingsRouter(),
   electronUtil: electronUtilRouter(),
+  imageGenerator: imageGeneratorRouter,
   vrchatPhoto: vrchatPhotoRouter(),
   vrchatPhotoMetadata: vrchatPhotoMetadataRouter(),
   vrchatLog: vrchatLogRouter(),

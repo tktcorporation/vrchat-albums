@@ -13,7 +13,6 @@ const getIsBackgroundFileCreationEnabled =
   async (): Promise<boolean> => {
     const flag = settingStore.getBackgroundFileCreateFlag();
     // デフォルトは true にする
-    console.log('flag', flag);
     return flag ?? true;
   };
 
@@ -25,10 +24,6 @@ const setIsBackgroundFileCreationEnabled =
   (settingStore: ReturnType<typeof getSettingStore>) =>
   async (isEnabled: boolean) => {
     settingStore.setBackgroundFileCreateFlag(isEnabled);
-    console.log(
-      'settingStore.getBackgroundFileCreateFlag()',
-      settingStore.getBackgroundFileCreateFlag(),
-    );
   };
 
 /**
@@ -37,7 +32,6 @@ const setIsBackgroundFileCreationEnabled =
  */
 const getIsAppAutoStartEnabled = async (): Promise<boolean> => {
   const loginItemSettings = app.getLoginItemSettings();
-  console.log('loginItemSettings', loginItemSettings);
   return loginItemSettings.openAtLogin;
 };
 
@@ -46,8 +40,6 @@ const getIsAppAutoStartEnabled = async (): Promise<boolean> => {
  * SystemSettings からの更新操作に用いられる。
  */
 const setIsAppAutoStartEnabled = async (isEnabled: boolean) => {
-  console.log('setIsAppAutoStartEnabled: before', app.getLoginItemSettings());
-
   // macOSの場合、openAsHiddenをtrueに設定することで、バックグラウンドで起動するように
   app.setLoginItemSettings({
     openAtLogin: isEnabled,
@@ -59,13 +51,8 @@ const setIsAppAutoStartEnabled = async (isEnabled: boolean) => {
 
   // 設定が反映されたか確認
   const newSettings = app.getLoginItemSettings();
-  console.log('setIsAppAutoStartEnabled: after', newSettings);
 
   if (newSettings.openAtLogin !== isEnabled) {
-    console.error('Failed to update login item settings', {
-      expected: isEnabled,
-      actual: newSettings,
-    });
     throw new UserFacingError('自動起動設定の更新に失敗しました。');
   }
 
@@ -94,5 +81,13 @@ export const backgroundSettingsRouter = (
       .mutation(async (ctx) => {
         const result = await setIsAppAutoStartEnabled(ctx.input);
         return result;
+      }),
+    getWorldJoinImageGenerationEnabled: procedure.query(() => {
+      return settingStore.getWorldJoinImageGenerationEnabled();
+    }),
+    setWorldJoinImageGenerationEnabled: procedure
+      .input(z.boolean())
+      .mutation((ctx) => {
+        settingStore.setWorldJoinImageGenerationEnabled(ctx.input);
       }),
   });
