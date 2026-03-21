@@ -92,43 +92,46 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
         logInfos.push(result.value);
         worldJoinIndices.push(index);
       } else {
-        // LOG_FORMAT_MISMATCH は単にこの行がワールド参加ログでないことを意味する
-        // （他のログ行パーサーで処理される可能性がある）ためスキップ
-        if (result.error.type !== 'LOG_FORMAT_MISMATCH') {
-          const errorMessage = match(result.error)
-            .with(
-              { type: 'INVALID_WORLD_ID' },
-              (e) => `Invalid world ID format: "${e.worldId}"`,
-            )
-            .with(
-              { type: 'INVALID_INSTANCE_ID' },
-              (e) =>
-                `Invalid instance ID format: "${e.instanceId}" for world "${e.worldId}". ` +
-                'VRChat log may contain a world ID without an instance ID (e.g. local world).',
-            )
-            .with(
-              { type: 'WORLD_NAME_NOT_FOUND' },
-              () => 'Failed to extract world name from subsequent log entries',
-            )
-            .exhaustive();
+        const errorMessage = match(result.error)
+          .with(
+            { type: 'LOG_FORMAT_MISMATCH' },
+            () =>
+              'Log format mismatch for world join (line contains "Joining wrld_" but does not match expected regex)',
+          )
+          .with(
+            { type: 'INVALID_WORLD_ID' },
+            (e) => `Invalid world ID format: "${e.worldId}"`,
+          )
+          .with(
+            { type: 'INVALID_INSTANCE_ID' },
+            (e) =>
+              `Invalid instance ID format: "${e.instanceId}" for world "${e.worldId}". ` +
+              'VRChat log may contain a world ID without an instance ID (e.g. local world).',
+          )
+          .with(
+            { type: 'WORLD_NAME_NOT_FOUND' },
+            () => 'Failed to extract world name from subsequent log entries',
+          )
+          .exhaustive();
 
-          errors.push({
-            line: l,
-            error: errorMessage,
-            type: 'world_join',
-          });
+        errors.push({
+          line: l,
+          error: errorMessage,
+          type: 'world_join',
+        });
 
-          // Sentry に送信して、どのパターンで例外が起きているか追跡可能にする。
-          // 将来的にデータモデルを拡張（Instance ID オプショナル化等）する際の判断材料となる。
-          logger.error({
-            message: `World join parse error: ${errorMessage}`,
-            details: {
-              logLine: l,
-              errorType: result.error.type,
-              ...result.error,
-            },
-          });
-        }
+        // Sentry に送信して、どのパターンで例外が起きているか追跡可能にする。
+        // LOG_FORMAT_MISMATCH は VRChat のログ形式変更の可能性があるため、
+        // 早期検出のために送信する。
+        // new Error() で stack trace を保持（Player Join/Leave と同じパターン）。
+        logger.error({
+          message: new Error(`World join parse error: ${errorMessage}`),
+          details: {
+            logLine: l,
+            errorType: result.error.type,
+            ...result.error,
+          },
+        });
       }
     }
 
