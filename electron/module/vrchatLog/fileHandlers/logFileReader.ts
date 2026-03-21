@@ -25,6 +25,19 @@ const isKnownBehaviourPattern = (line: string): boolean =>
   KNOWN_BEHAVIOUR_PATTERNS.some((pattern) => line.includes(pattern));
 
 /**
+ * ログ行から [Behaviour] 以降の部分を抽出する
+ *
+ * 重複排除に使用: タイムスタンプを除外することで、同一パターンが
+ * 異なるタイムスタンプで出現しても1回だけ Sentry に送信される。
+ * 例: "2024.01.15 12:00:00 Log - [Behaviour] NewEvent foo"
+ *   → "[Behaviour] NewEvent foo"
+ */
+const extractBehaviourPattern = (line: string): string => {
+  const idx = line.indexOf(LOG_PATTERNS.BEHAVIOUR_TAG);
+  return idx >= 0 ? line.slice(idx) : line;
+};
+
+/**
  * VRChatログファイルの読み込み機能
  */
 
@@ -116,13 +129,15 @@ export const getLogLinesFromLogFile = async (props: {
         // 未知の [Behaviour] パターン検出（string.includes のみ、正規表現なし）
         // includesList にマッチしなくても [Behaviour] を含む行は仕様変更の可能性があるため、
         // 既知パターンに該当しない場合は Sentry に送信する。
-        // 同一ファイル内で同じ行は1回のみ送信し、Sentry の flooding を防ぐ。
+        // タイムスタンプを除外した [Behaviour] 以降の部分で重複判定し、
+        // 同一パターンはファイル内で1回のみ送信する（Sentry flooding 防止）。
         else if (
           line.includes(LOG_PATTERNS.BEHAVIOUR_TAG) &&
-          !isKnownBehaviourPattern(line) &&
-          !reportedUnknownPatterns.has(line)
+          !isKnownBehaviourPattern(line)
         ) {
-          reportedUnknownPatterns.add(line);
+          const pattern = extractBehaviourPattern(line);
+          if (reportedUnknownPatterns.has(pattern)) return;
+          reportedUnknownPatterns.add(pattern);
           logger.error({
             message: 'Unrecognized VRChat log pattern detected',
             details: { logLine: line },

@@ -123,8 +123,9 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
         // Sentry に送信して、どのパターンで例外が起きているか追跡可能にする。
         // LOG_FORMAT_MISMATCH は VRChat のログ形式変更の可能性があるため、
         // 早期検出のために送信する。
+        // new Error() で stack trace を保持（Player Join/Leave と同じパターン）。
         logger.error({
-          message: `World join parse error: ${errorMessage}`,
+          message: new Error(`World join parse error: ${errorMessage}`),
           details: {
             logLine: l,
             errorType: result.error.type,

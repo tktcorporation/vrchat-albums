@@ -28,7 +28,8 @@ export const LOG_PATTERNS = {
 
 // フィルタで使用されるパターンのリスト
 // パフォーマンスのため具体的なパターンのみ指定し、パーサーに不要な行を渡さない。
-// [Behaviour] タグの広範囲フィルタは使わないこと（未知パターン検出は別経路で行う）。
+// [Behaviour] タグの広範囲フィルタは使わないこと。
+// 未知パターン検出は logFileReader.ts で KNOWN_BEHAVIOUR_PATTERNS を使って別経路で行う。
 export const FILTER_PATTERNS = [
   LOG_PATTERNS.APP_START,
   LOG_PATTERNS.WORLD_JOIN,
