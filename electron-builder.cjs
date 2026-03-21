@@ -13,7 +13,12 @@ const config = {
       from: './assets/',
       to: 'assets',
     },
+    {
+      from: './electron/resources/fonts/',
+      to: 'fonts',
+    },
   ],
+  asarUnpack: ['node_modules/@resvg/resvg-js*/**'],
   publish: [
     {
       provider: 'github',
