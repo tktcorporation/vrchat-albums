@@ -6,6 +6,7 @@ import type {
   VRChatLogFilesDirPath,
 } from '../vrchatLogFileDir/model';
 import * as vrchatLogFileDirService from '../vrchatLogFileDir/service';
+import { FILTER_PATTERNS } from './constants/logPatterns';
 import { VRChatLogFileError } from './error';
 import type { VRChatLogStoreFilePath } from './model';
 
@@ -109,13 +110,7 @@ export const getVRChaLogInfoByLogFilePathList = async (
 > => {
   const logLineList = await getLogLinesByLogFilePathList({
     logFilePathList,
-    includesList: [
-      'VRC Analytics Initialized', // TODO: 今後実装
-      '[Behaviour] Joining ',
-      '[Behaviour] OnPlayerJoined ',
-      '[Behaviour] OnPlayerLeft ',
-      'VRCApplication: HandleApplicationQuit', // worldLeaveParserで処理
-    ],
+    includesList: [...FILTER_PATTERNS],
   });
 
   if (logLineList.isErr()) {
@@ -154,13 +149,7 @@ export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
       const logLineListResult =
         await getLogLinesByLogFilePathListWithPartialSuccess({
           logFilePathList,
-          includesList: [
-            'VRC Analytics Initialized', // TODO: 今後実装
-            '[Behaviour] Joining ',
-            '[Behaviour] OnPlayerJoined ',
-            '[Behaviour] OnPlayerLeft ',
-            'VRCApplication: HandleApplicationQuit', // worldLeaveParserで処理
-          ],
+          includesList: [...FILTER_PATTERNS],
         });
 
       const parseResult = convertLogLinesToWorldAndPlayerJoinLogInfos(

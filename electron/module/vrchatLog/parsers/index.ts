@@ -1,5 +1,9 @@
 import { match } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
+import {
+  KNOWN_BEHAVIOUR_PATTERNS,
+  LOG_PATTERNS,
+} from '../constants/logPatterns';
 import type { VRChatLogLine } from '../model';
 import {
   extractPlayerJoinInfoFromLog,
@@ -42,6 +46,16 @@ export interface ParseResult {
   )[];
   errors: ParseErrorInfo[];
 }
+
+/**
+ * [Behaviour] タグを含む行が既知のパターンに該当するかを判定
+ *
+ * KNOWN_BEHAVIOUR_PATTERNS のいずれかを含む場合は既知と判定する。
+ * 新しいパーサーを追加した場合は constants/logPatterns.ts の
+ * KNOWN_BEHAVIOUR_PATTERNS にもパターンを追加すること。
+ */
+const isKnownBehaviourPattern = (logLine: VRChatLogLine): boolean =>
+  KNOWN_BEHAVIOUR_PATTERNS.some((pattern) => logLine.includes(pattern));
 
 /**
  * ログ行の配列をワールド参加・退出・プレイヤー参加/退出情報に変換
@@ -92,43 +106,45 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
         logInfos.push(result.value);
         worldJoinIndices.push(index);
       } else {
-        // LOG_FORMAT_MISMATCH は単にこの行がワールド参加ログでないことを意味する
-        // （他のログ行パーサーで処理される可能性がある）ためスキップ
-        if (result.error.type !== 'LOG_FORMAT_MISMATCH') {
-          const errorMessage = match(result.error)
-            .with(
-              { type: 'INVALID_WORLD_ID' },
-              (e) => `Invalid world ID format: "${e.worldId}"`,
-            )
-            .with(
-              { type: 'INVALID_INSTANCE_ID' },
-              (e) =>
-                `Invalid instance ID format: "${e.instanceId}" for world "${e.worldId}". ` +
-                'VRChat log may contain a world ID without an instance ID (e.g. local world).',
-            )
-            .with(
-              { type: 'WORLD_NAME_NOT_FOUND' },
-              () => 'Failed to extract world name from subsequent log entries',
-            )
-            .exhaustive();
+        const errorMessage = match(result.error)
+          .with(
+            { type: 'LOG_FORMAT_MISMATCH' },
+            () =>
+              'Log format mismatch for world join (line contains "Joining wrld_" but does not match expected regex)',
+          )
+          .with(
+            { type: 'INVALID_WORLD_ID' },
+            (e) => `Invalid world ID format: "${e.worldId}"`,
+          )
+          .with(
+            { type: 'INVALID_INSTANCE_ID' },
+            (e) =>
+              `Invalid instance ID format: "${e.instanceId}" for world "${e.worldId}". ` +
+              'VRChat log may contain a world ID without an instance ID (e.g. local world).',
+          )
+          .with(
+            { type: 'WORLD_NAME_NOT_FOUND' },
+            () => 'Failed to extract world name from subsequent log entries',
+          )
+          .exhaustive();
 
-          errors.push({
-            line: l,
-            error: errorMessage,
-            type: 'world_join',
-          });
+        errors.push({
+          line: l,
+          error: errorMessage,
+          type: 'world_join',
+        });
 
-          // Sentry に送信して、どのパターンで例外が起きているか追跡可能にする。
-          // 将来的にデータモデルを拡張（Instance ID オプショナル化等）する際の判断材料となる。
-          logger.error({
-            message: `World join parse error: ${errorMessage}`,
-            details: {
-              logLine: l,
-              errorType: result.error.type,
-              ...result.error,
-            },
-          });
-        }
+        // Sentry に送信して、どのパターンで例外が起きているか追跡可能にする。
+        // LOG_FORMAT_MISMATCH は VRChat のログ形式変更の可能性があるため、
+        // 早期検出のために送信する。
+        logger.error({
+          message: `World join parse error: ${errorMessage}`,
+          details: {
+            logLine: l,
+            errorType: result.error.type,
+            ...result.error,
+          },
+        });
       }
     }
 
@@ -250,6 +266,18 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
           },
         });
       }
+    }
+
+    // 未知の [Behaviour] パターン検出
+    // VRChat の仕様変更で新しいイベント種別が追加された場合に早期検出するため、
+    // 既知パターンに該当しない [Behaviour] 行を Sentry に送信する。
+    if (l.includes(LOG_PATTERNS.BEHAVIOUR_TAG) && !isKnownBehaviourPattern(l)) {
+      logger.error({
+        message: 'Unrecognized VRChat log pattern detected',
+        details: {
+          logLine: l,
+        },
+      });
     }
   }
 
