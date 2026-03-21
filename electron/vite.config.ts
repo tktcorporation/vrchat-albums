@@ -41,6 +41,7 @@ export default defineConfig({
         'electron-updater',
         'exiftool-vendored',
         '@napi-rs/image',
+        '@resvg/resvg-js',
         'clip-filepaths',
         // Sequelize 関連のモジュール
         '@sequelize/core',
