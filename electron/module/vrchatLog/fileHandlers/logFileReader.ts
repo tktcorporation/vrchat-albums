@@ -106,6 +106,8 @@ export const getLogLinesFromLogFile = async (props: {
       });
 
       const lines: string[] = [];
+      // ファイル単位で同一パターンの重複送信を防ぐ
+      const reportedUnknownPatterns = new Set<string>();
       reader.on('line', (line) => {
         // includesList の配列の中のどれかと一致したら追加
         if (props.includesList.some((include) => line.includes(include))) {
@@ -114,11 +116,13 @@ export const getLogLinesFromLogFile = async (props: {
         // 未知の [Behaviour] パターン検出（string.includes のみ、正規表現なし）
         // includesList にマッチしなくても [Behaviour] を含む行は仕様変更の可能性があるため、
         // 既知パターンに該当しない場合は Sentry に送信する。
-        // メモリに行を蓄積せず直接送信するためパフォーマンス影響は最小限。
+        // 同一ファイル内で同じ行は1回のみ送信し、Sentry の flooding を防ぐ。
         else if (
           line.includes(LOG_PATTERNS.BEHAVIOUR_TAG) &&
-          !isKnownBehaviourPattern(line)
+          !isKnownBehaviourPattern(line) &&
+          !reportedUnknownPatterns.has(line)
         ) {
+          reportedUnknownPatterns.add(line);
           logger.error({
             message: 'Unrecognized VRChat log pattern detected',
             details: { logLine: line },
@@ -300,10 +304,12 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
 
   return match(errors.length > 0)
     .with(true, () => {
-      logger.warn(
-        `Failed to process ${errors.length} log files:`,
-        errors.map((e) => ({ path: e.path, code: e.error.code })),
-      );
+      logger.warnWithSentry({
+        message: `Failed to process ${errors.length} log files`,
+        details: {
+          errors: errors.map((e) => ({ path: e.path, code: e.error.code })),
+        },
+      });
       return createPartialSuccessResult(logLineList, errors, totalFiles);
     })
     .with(false, () =>

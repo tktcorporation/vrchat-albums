@@ -43,10 +43,14 @@ export const FILTER_PATTERNS = [
  * 未知パターン検出で使用: この一覧のどれにもマッチしない [Behaviour] 行は
  * VRChat の仕様変更の可能性があるため Sentry に送信される。
  * 新しいパーサーを追加した場合はここにもパターンを追加すること。
+ *
+ * 注: 'OnPlayerLeft' は 'OnPlayerLeftRoom' にもマッチする（substring matching）。
+ * OnPlayerLeftRoom はパーサーで明示的に除外されるが、既知パターンとして
+ * Sentry への未知パターン通知を抑制する（意図的な動作）。
  */
 export const KNOWN_BEHAVIOUR_PATTERNS = [
   'Joining wrld_',
   'Joining or Creating Room:',
   'OnPlayerJoined',
-  'OnPlayerLeft',
+  'OnPlayerLeft', // OnPlayerLeftRoom も包含する（意図的）
 ] as const;
