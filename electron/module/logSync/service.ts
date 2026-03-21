@@ -3,12 +3,14 @@ import { logger } from '../../lib/logger';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import type { LogInfoError } from '../logInfo/error';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
+import { getSettingStore } from '../settingStore';
 import type { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
 import type { VRChatLogFileError } from '../vrchatLog/error';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import type { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
+import { generateMissingWorldJoinImages } from '../worldJoinImage/service';
 
 interface LogSyncResults {
   createdWorldJoinLogModelList: VRChatWorldJoinLogModel[];
@@ -96,7 +98,45 @@ export async function syncLogs(
   });
 
   logger.info(`Log sync completed successfully with mode: ${mode}`);
+
+  // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
+  triggerWorldJoinImageGeneration();
+
   return neverthrow.ok(loadResult.value);
+}
+
+/**
+ * 設定が有効な場合、未生成の World Join 画像を生成する
+ *
+ * 背景: syncLogs 完了後に非同期で実行される。
+ * syncLogs の結果には影響しないため fire-and-forget で呼び出す。
+ * エラーはログに記録するのみ（Sentry 経由で検知可能）。
+ */
+function triggerWorldJoinImageGeneration(): void {
+  try {
+    const settingStore = getSettingStore();
+    if (!settingStore.getWorldJoinImageGenerationEnabled()) {
+      return;
+    }
+
+    const photoDirPath = settingStore.getVRChatPhotoDir();
+    if (!photoDirPath) {
+      return;
+    }
+
+    void generateMissingWorldJoinImages({ photoDirPath }).catch((error) => {
+      logger.error({
+        message: 'Failed to generate world join images',
+        stack: error instanceof Error ? error : new Error(String(error)),
+      });
+    });
+  } catch (error) {
+    // getSettingStore() が初期化前に呼ばれた場合など
+    logger.error({
+      message: 'Failed to trigger world join image generation',
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+  }
 }
 
 /**
