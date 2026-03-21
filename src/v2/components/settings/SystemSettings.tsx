@@ -64,6 +64,17 @@ const SystemSettings = memo(() => {
       },
     );
 
+  const { data: worldJoinImageGeneration } =
+    trpcReact.backgroundSettings.getWorldJoinImageGenerationEnabled.useQuery();
+  const { mutate: setWorldJoinImageGeneration } =
+    trpcReact.backgroundSettings.setWorldJoinImageGenerationEnabled.useMutation(
+      {
+        onSuccess: () => {
+          utils.backgroundSettings.getWorldJoinImageGenerationEnabled.invalidate();
+        },
+      },
+    );
+
   return (
     <SettingsSection icon={Settings} title={t('settings.system.title')}>
       <div className="space-y-4">
@@ -88,6 +99,17 @@ const SystemSettings = memo(() => {
             checked={backgroundUpdate ?? false}
             onCheckedChange={setBackgroundUpdate}
             aria-label={t('settings.system.backgroundUpdate')}
+          />
+        </SettingsItem>
+
+        <SettingsItem
+          label={t('settings.system.worldJoinImageGeneration')}
+          description={t('settings.system.worldJoinImageGenerationDescription')}
+        >
+          <Switch
+            checked={worldJoinImageGeneration ?? false}
+            onCheckedChange={setWorldJoinImageGeneration}
+            aria-label={t('settings.system.worldJoinImageGeneration')}
           />
         </SettingsItem>
       </div>

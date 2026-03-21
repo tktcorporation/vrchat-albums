@@ -95,4 +95,12 @@ export const backgroundSettingsRouter = (
         const result = await setIsAppAutoStartEnabled(ctx.input);
         return result;
       }),
+    getWorldJoinImageGenerationEnabled: procedure.query(() => {
+      return settingStore.getWorldJoinImageGenerationEnabled();
+    }),
+    setWorldJoinImageGenerationEnabled: procedure
+      .input(z.boolean())
+      .mutation((ctx) => {
+        settingStore.setWorldJoinImageGenerationEnabled(ctx.input);
+      }),
   });
