@@ -1,4 +1,4 @@
-import { captureException } from '@sentry/electron/main';
+import { captureException, captureMessage } from '@sentry/electron/main';
 import * as log from 'electron-log';
 import { Result } from 'neverthrow';
 import path from 'pathe';
@@ -87,6 +87,73 @@ const buildErrorInfo = ({ message, stack }: ErrorLogParams): Error => {
 const info = log.info;
 const debug = log.debug;
 const warn = log.warn;
+
+/**
+ * ローカルログ出力に加え、Sentry に warning レベルで送信するラッパー関数。
+ *
+ * 背景: logger.warn はローカルログのみだが、一部の警告はプロダクション環境で
+ * Sentry 追跡が必要。logger.error ほど深刻ではないが監視したいイベント向け。
+ * 不要になれば個別の呼び出し元を logger.warn に戻して削除可能。
+ *
+ * 呼び出し元: VRChat API失敗、ログ処理の部分的失敗、ディレクトリ読み取り失敗など
+ */
+const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
+  const messageString = match(message)
+    .with(P.instanceOf(Error), (e) => e.message)
+    .otherwise((m) => String(m));
+
+  // ローカルログ出力
+  log.warn(
+    messageString,
+    ...(stack ? [stackWithCauses(stack)] : []),
+    ...(details ? [details] : []),
+  );
+
+  // 規約同意済みかどうかを確認
+  const termsAccepted = Result.fromThrowable(
+    () => {
+      const settingStore = getSettingStore();
+      return settingStore.getTermsAccepted();
+    },
+    (error) => error,
+  )().match(
+    (accepted) => accepted,
+    (error) => {
+      log.warn('Failed to get terms accepted:', error);
+      return false;
+    },
+  );
+
+  match(termsAccepted)
+    .with(true, () => {
+      log.debug('Attempting to send warning to Sentry...');
+      const sendResult = Result.fromThrowable(
+        () => {
+          captureMessage(messageString, {
+            level: 'warning',
+            extra: {
+              ...(stack ? { stack: stackWithCauses(stack) } : {}),
+              ...(details ? { details } : {}),
+            },
+            tags: {
+              source: 'electron-main',
+            },
+          });
+        },
+        (error) => error,
+      )();
+      sendResult.match(
+        () => log.debug('Warning sent to Sentry successfully'),
+        (sentryError) =>
+          log.debug('Failed to send warning to Sentry:', sentryError),
+      );
+    })
+    .with(false, () => {
+      log.debug('Terms not accepted, skipping Sentry warning');
+    })
+    .exhaustive();
+};
+
 /**
  * Sentry への送信も行うエラー出力用ラッパー関数。
  */
@@ -187,6 +254,7 @@ const logger = {
   debug,
   error,
   warn,
+  warnWithSentry,
   transports: {
     file: log.transports.file,
     console: log.transports.console,

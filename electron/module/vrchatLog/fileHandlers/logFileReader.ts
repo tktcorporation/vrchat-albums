@@ -274,10 +274,12 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
 
   return match(errors.length > 0)
     .with(true, () => {
-      logger.warn(
-        `Failed to process ${errors.length} log files:`,
-        errors.map((e) => ({ path: e.path, code: e.error.code })),
-      );
+      logger.warnWithSentry({
+        message: `Failed to process ${errors.length} log files`,
+        details: {
+          errors: errors.map((e) => ({ path: e.path, code: e.error.code })),
+        },
+      });
       return createPartialSuccessResult(logLineList, errors, totalFiles);
     })
     .with(false, () =>

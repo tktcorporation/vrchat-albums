@@ -251,23 +251,9 @@ export async function loadLogInfoIndexFromVRChatLog({
       code: e.error.code,
     }));
 
-    logger.warn(errorSummary, errorDetails);
-
-    // 部分的な失敗もSentryに送信（エラーレベルで記録）
-    // カスタムエラークラスを定義して型安全にする
-    interface PartialLogLoadFailureError extends Error {
-      errorDetails: Array<{ path: string; code: string }>;
-    }
-
-    const partialFailureError = new Error(
-      errorSummary,
-    ) as PartialLogLoadFailureError;
-    partialFailureError.name = 'PartialLogLoadFailure';
-    partialFailureError.errorDetails = errorDetails;
-
-    logger.error({
-      message: partialFailureError,
-      stack: partialFailureError,
+    logger.warnWithSentry({
+      message: errorSummary,
+      details: { errorDetails },
     });
   }
 
@@ -546,8 +532,9 @@ export async function loadLogInfoIndexFromVRChatLog({
           });
         })
         .with({ type: P.union('NO_METADATA_FOUND', 'PARSE_ERROR') }, (e) => {
-          logger.warn({
+          logger.warnWithSentry({
             message: `Photo metadata extraction issue: ${e.message}`,
+            details: { errorType: e.type },
           });
         })
         .exhaustive();

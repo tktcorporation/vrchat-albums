@@ -131,9 +131,10 @@ export class RollbackService {
       backup.status = 'rolled_back';
       const updateResult = await backupService.updateBackupMetadata(backup);
       if (updateResult.isErr()) {
-        logger.warn(
-          `Failed to update backup metadata after rollback: ${getBackupErrorMessage(updateResult.error)}`,
-        );
+        logger.warnWithSentry({
+          message: `Failed to update backup metadata after rollback: ${getBackupErrorMessage(updateResult.error)}`,
+          details: { backupId: backup.id, errorType: updateResult.error.type },
+        });
         // ロールバック自体は成功しているので警告のみ
       }
 
