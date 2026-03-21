@@ -19,6 +19,7 @@ const settingStoreKey = [
   'termsVersion',
   'migrationNoticeShown',
   'photoFolderScanStates',
+  'worldJoinImageGenerationEnabled',
 ] as const;
 type SettingStoreKey = (typeof settingStoreKey)[number];
 
@@ -189,6 +190,21 @@ const setMigrationNoticeShown =
   };
 
 /**
+ * ワールド参加時に画像を自動生成するかどうか
+ * デフォルトは無効（false）
+ */
+const getWorldJoinImageGenerationEnabled =
+  (getB: (key: SettingStoreKey) => boolean | null) => (): boolean => {
+    const value = getB('worldJoinImageGenerationEnabled');
+    return value ?? false;
+  };
+
+const setWorldJoinImageGenerationEnabled =
+  (set: (key: SettingStoreKey, value: unknown) => void) => (flag: boolean) => {
+    set('worldJoinImageGenerationEnabled', flag);
+  };
+
+/**
  * Clear all settings
  */
 const clearAllStoredSettings = (settingsStore: Store) => () => {
@@ -300,6 +316,9 @@ const setSettingStore = (name: StoreName) => {
     setTermsVersion: setTermsVersion(set),
     getMigrationNoticeShown: getMigrationNoticeShown(getB),
     setMigrationNoticeShown: setMigrationNoticeShown(set),
+    getWorldJoinImageGenerationEnabled:
+      getWorldJoinImageGenerationEnabled(getB),
+    setWorldJoinImageGenerationEnabled: setWorldJoinImageGenerationEnabled(set),
     getPhotoFolderScanStates: (): PhotoFolderScanStates => {
       const value = get('photoFolderScanStates');
       const result = PhotoFolderScanStatesSchema.safeParse(value);
@@ -393,6 +412,8 @@ export interface SettingStore {
   setTermsVersion: (version: string) => void;
   getMigrationNoticeShown: () => boolean;
   setMigrationNoticeShown: (shown: boolean) => void;
+  getWorldJoinImageGenerationEnabled: () => boolean;
+  setWorldJoinImageGenerationEnabled: (flag: boolean) => void;
   getPhotoFolderScanStates: () => PhotoFolderScanStates;
   setPhotoFolderScanStates: (states: PhotoFolderScanStates) => void;
   clearPhotoFolderScanStates: () => void;

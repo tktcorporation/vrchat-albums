@@ -63,6 +63,9 @@ const en: Translations = {
       updateIntervalDescription: 'Frequency of checking for new photos',
       notifications: 'Show Notifications',
       notificationsDescription: 'Show notifications when new photos are found',
+      worldJoinImageGeneration: 'Auto-generate world join images',
+      worldJoinImageGenerationDescription:
+        'Automatically generate images with world info and player list when joining a world',
       interval: {
         '5min': '5 minutes',
         '15min': '15 minutes',

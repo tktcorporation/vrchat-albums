@@ -90,6 +90,8 @@ export interface Translations {
       updateIntervalDescription: string;
       notifications: string;
       notificationsDescription: string;
+      worldJoinImageGeneration: string;
+      worldJoinImageGenerationDescription: string;
       interval: {
         '5min': string;
         '15min': string;

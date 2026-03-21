@@ -63,6 +63,9 @@ const ja: Translations = {
       updateIntervalDescription: '新しい写真を確認する頻度を設定します',
       notifications: '通知',
       notificationsDescription: '新しい写真が見つかった時に通知を表示します',
+      worldJoinImageGeneration: 'ワールド参加画像の自動生成',
+      worldJoinImageGenerationDescription:
+        'ワールドに参加した際、ワールド情報とプレイヤー一覧を含む画像を自動生成します',
       interval: {
         '5min': '5分',
         '15min': '15分',
