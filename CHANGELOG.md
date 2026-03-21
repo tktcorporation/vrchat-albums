@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.28.0
+
+### Minor Changes
+
+- [#731](https://github.com/tktcorporation/vrchat-albums/pull/731) [`3a38917`](https://github.com/tktcorporation/vrchat-albums/commit/3a389171ba14a7808856b07b9ee8cce144c31a38) Thanks [@tktcorporation](https://github.com/tktcorporation)! - World Join 画像自動生成機能を追加。ワールド参加時にワールド情報とプレイヤー一覧を含む画像を自動生成し、VRChat 写真フォルダに保存します。resvg-js による画像生成パイプラインの統一も含みます。
+
 ## 0.27.0
 
 ### Minor Changes
