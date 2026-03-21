@@ -1,5 +1,5 @@
 import * as neverthrow from 'neverthrow';
-import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:fs');
 vi.mock('node:fs/promises');
@@ -148,7 +148,10 @@ describe('generateMissingWorldJoinImages', () => {
     ]);
     vi.mocked(fs.existsSync).mockReturnValue(false);
     vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
-      neverthrow.err({ type: 'WORLD_NOT_FOUND' as const, worldId: 'wrld_test' }),
+      neverthrow.err({
+        type: 'WORLD_NOT_FOUND' as const,
+        worldId: 'wrld_test',
+      }),
     );
 
     const result = await generateMissingWorldJoinImages({

@@ -18,7 +18,6 @@ import { Label } from '../../../components/ui/label';
 import { Switch } from '../../../components/ui/switch';
 import { ICON_SIZE } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
-import { generatePreviewPng } from '../../utils/previewGenerator';
 import { downloadOrCopyImageAsPng } from '../../utils/shareUtils';
 
 interface Player {
@@ -66,23 +65,27 @@ export const ShareDialog = ({
       gcTime: 1000 * 60 * 30, // 30分間キャッシュを保持
     });
 
+  const generatePreviewMutation =
+    trpcReact.imageGenerator.generateSharePreview.useMutation();
   const copyImageMutation =
     trpcReact.electronUtil.copyImageDataByBase64.useMutation();
   const downloadImageMutation =
     trpcReact.electronUtil.downloadImageAsPhotoLogPng.useMutation();
 
-  // プレビュー画像を生成する関数
   /**
-   * 共有用のプレビュー画像を生成して state に保存する。
+   * 共有用のプレビュー画像を Main プロセスで生成して state に保存する。
+   *
+   * 背景: Canvas API への依存を排除するため、画像生成を tRPC 経由で
+   * Main プロセスの resvg-js ベースパイプラインに委譲する。
    */
   const generatePreview = async () => {
     if (!base64Data || !worldName) return;
     setIsGeneratingPreview(true);
     try {
-      const pngBase64 = await generatePreviewPng({
+      const pngBase64 = await generatePreviewMutation.mutateAsync({
         worldName,
         imageBase64: base64Data,
-        players,
+        players: players?.map((p) => ({ playerName: p.playerName })) ?? null,
         showAllPlayers,
       });
       setPreviewBase64(pngBase64);
