@@ -820,8 +820,9 @@ export const logInfoRouter = () =>
                   )}ms (${totalPlayersFound} total players)`,
                 );
               } else {
-                logger.warn({
+                logger.warnWithSentry({
                   message: `プレイヤー情報の取得に失敗しましたが、ワールド情報は返します: ${playerBatchResult.error.message}`,
+                  details: { errorType: playerBatchResult.error.type },
                 });
                 logger.debug(
                   `[SessionInfoBatch] Player query failed in ${playerQueryTime.toFixed(

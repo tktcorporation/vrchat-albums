@@ -28,6 +28,7 @@ const mockLogger = logger as unknown as {
   info: ReturnType<typeof vi.fn>;
   debug: ReturnType<typeof vi.fn>;
   warn: ReturnType<typeof vi.fn>;
+  warnWithSentry: ReturnType<typeof vi.fn>;
   error: ReturnType<typeof vi.fn>;
 };
 
@@ -75,6 +76,7 @@ describe('settingsController.initializeAppData', () => {
     mockLogger.info = vi.fn();
     mockLogger.debug = vi.fn();
     mockLogger.warn = vi.fn();
+    mockLogger.warnWithSentry = vi.fn();
     mockLogger.error = vi.fn();
 
     mockSequelizeClient.syncRDBClient = vi.fn().mockResolvedValue(undefined);
@@ -259,9 +261,10 @@ describe('settingsController.initializeAppData', () => {
     const result = await initializeAppData();
 
     expect(result).toEqual({ success: true });
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      'Log sync failed: Some other error. This is normal in development environments without VRChat logs.',
-    );
+    expect(mockLogger.warnWithSentry).toHaveBeenCalledWith({
+      message: 'Log sync failed: Some other error',
+      details: { errorCode: 'OTHER_ERROR' },
+    });
     expect(mockLogger.info).toHaveBeenCalledWith(
       '=== Application data initialization completed ===',
     );

@@ -17,8 +17,11 @@ const getVrcWorldInfoByWorldId = async (
         return null;
       })
       .with({ type: 'API_REQUEST_FAILED' }, (error) => {
-        // API リクエストエラーはログに残して null を返す
-        logger.warn(`VRChat API request failed: ${error.message}`);
+        // API リクエストエラーはログに残して null を返す（Sentry で追跡）
+        logger.warnWithSentry({
+          message: `VRChat API request failed: ${error.message}`,
+          details: { worldId },
+        });
         return null;
       })
       .with({ type: 'PARSE_ERROR' }, (error) => {

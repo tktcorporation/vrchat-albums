@@ -212,8 +212,9 @@ export class ImportService {
 
     if (readResult.isErr()) {
       // ディレクトリ読み取り失敗は警告のみ（部分的成功を許容）
-      logger.warn({
+      logger.warnWithSentry({
         message: `Failed to read directory ${dirPath}: ${String(readResult.error)}`,
+        details: { dirPath },
       });
       return [];
     }

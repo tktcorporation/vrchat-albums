@@ -320,12 +320,13 @@ export const settingsRouter = () =>
             throw setupError;
           }
 
-          // その他のエラーは警告として記録（開発環境での一時的なエラーなど）
-          logger.warn(
-            `Log sync failed: ${
+          // その他のエラーは警告として記録（Sentry で追跡）
+          logger.warnWithSentry({
+            message: `Log sync failed: ${
               logSyncResult.error.message || 'Unknown error'
-            }. This is normal in development environments without VRChat logs.`,
-          );
+            }`,
+            details: { errorCode: logSyncResult.error.code },
+          });
         } else {
           logger.info('Log sync completed successfully');
         }
