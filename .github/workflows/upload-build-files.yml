@@ -58,14 +58,42 @@ jobs:
         id: get-version
         uses: battila7/get-version-action@v2
 
-      - name: Generate a changelog
-        uses: orhun/git-cliff-action@v4
-        id: git-cliff
-        with:
-          config: cliff.toml
-          args: --strip header ${{ needs.vars.outputs.is-semver-tag == 'true' && '--current' || '--unreleased' }}
+      - name: Extract release notes from CHANGELOG.md
+        id: release-notes
         env:
-          OUTPUT: CHANGELOG.md
+          TAG_NAME: ${{ github.ref_name }}
+          IS_SEMVER: ${{ needs.vars.outputs.is-semver-tag }}
+        run: |
+          # タグ名からバージョンを取得（v0.26.0 → 0.26.0）
+          APP_VERSION="${TAG_NAME#v}"
+
+          # CHANGELOG.md から該当バージョンのセクションを抽出
+          # changesets 形式: "## X.Y.Z" / git-cliff 形式: "## [X.Y.Z]"
+          # 両方に対応し、次の "## " の手前までを取得
+          NOTES=$(awk -v ver="$APP_VERSION" '
+            /^## / {
+              if (found) exit
+              if ($0 == "## " ver || $0 == "## [" ver "]" || index($0, "## [" ver "]") == 1) {
+                found=1
+                next
+              }
+            }
+            found { print }
+          ' CHANGELOG.md)
+
+          # semver タグ（正式リリース）ではリリースノート必須
+          # 非 semver タグ（build-* 等のドラフトビルド）では空でも許容
+          if [[ -z "$NOTES" && "$IS_SEMVER" == "true" ]]; then
+            echo "::error::No release notes found in CHANGELOG.md for version: $APP_VERSION"
+            exit 1
+          fi
+
+          # マルチライン出力を GITHUB_OUTPUT に書き込む
+          {
+            echo "notes<<RELEASE_NOTES_EOF"
+            echo "$NOTES"
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Delete drafts
         uses: hugo19941994/delete-draft-releases@v1.0.0
@@ -79,7 +107,7 @@ jobs:
           draft: true
           # v0.0.0 or ref
           name: ${{ needs.vars.outputs.is-semver-tag == 'true' && steps.get-version.outputs.version || github.ref }}
-          body: ${{ steps.git-cliff.outputs.content }}
+          body: ${{ steps.release-notes.outputs.notes }}
 
   electron-build:
     name: Build on ${{ matrix.os }}
