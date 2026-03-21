@@ -106,4 +106,32 @@ describe('generatePreviewSvg', () => {
     });
     expect(result.svg).not.toContain('PLAYERS');
   });
+
+  it('should reject invalid color format (SVG injection prevention)', () => {
+    expect(() =>
+      generatePreviewSvg({
+        worldName: 'Test',
+        imageBase64: 'dGVzdA==',
+        players: null,
+        showAllPlayers: false,
+        colors: {
+          primary: 'rgb(0, 0, 0)" onload="alert(1)',
+          secondary: 'rgb(255, 255, 255)',
+          accent: 'rgb(128, 128, 128)',
+        },
+      }),
+    ).toThrow('Invalid color format');
+  });
+
+  it('should reject invalid base64 (data URI injection prevention)', () => {
+    expect(() =>
+      generatePreviewSvg({
+        worldName: 'Test',
+        imageBase64: '"><script>alert(1)</script>',
+        players: null,
+        showAllPlayers: false,
+        colors: defaultColors,
+      }),
+    ).toThrow('Invalid base64 string');
+  });
 });

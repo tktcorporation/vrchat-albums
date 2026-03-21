@@ -1,8 +1,6 @@
-import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as neverthrow from 'neverthrow';
 import * as path from 'pathe';
-import { match } from 'ts-pattern';
 import { VRChatWorldIdSchema } from '../../lib/brandedTypes';
 import { logger } from '../../lib/logger';
 import type { ImageGenerationError } from '../imageGenerator/error';
@@ -73,15 +71,25 @@ const generateMissingWorldJoinImagesInternal = async (params: {
     orderByJoinDateTime: 'desc',
   });
 
-  // 2. 未生成のものをフィルタ（ファイル存在チェック）
-  const missingJoins = joins.filter((join) => {
-    const imagePath = generateWorldJoinImagePath(
-      photoDirPath,
-      join.joinDateTime,
-      join.worldId,
-    );
-    return !fs.existsSync(imagePath);
-  });
+  // 2. 未生成のものをフィルタ（非同期ファイル存在チェック）
+  const existenceChecks = await Promise.all(
+    joins.map(async (join) => {
+      const imagePath = generateWorldJoinImagePath(
+        photoDirPath,
+        join.joinDateTime,
+        join.worldId,
+      );
+      try {
+        await fsPromises.access(imagePath);
+        return { join, exists: true };
+      } catch {
+        return { join, exists: false };
+      }
+    }),
+  );
+  const missingJoins = existenceChecks
+    .filter((check) => !check.exists)
+    .map((check) => check.join);
 
   if (missingJoins.length === 0) {
     return neverthrow.ok({ generated: 0, skipped: joins.length, errors: 0 });
@@ -181,26 +189,23 @@ const generateMissingWorldJoinImagesInternal = async (params: {
     } catch (error) {
       // エラー分類: 予期されたエラー（ネットワーク/ファイルI/O）はログして続行
       // 予期しないエラー（TypeError 等）は Sentry に送信
-      const isExpectedError =
+      const isExpectedNetworkOrIoError =
         error instanceof Error &&
         ('code' in error ||
           error.name === 'FetchError' ||
           error.name === 'AbortError');
 
-      match(isExpectedError)
-        .with(true, () => {
-          logger.warn({
-            message: `Expected error generating world join image for ${join.worldId}: ${error instanceof Error ? error.message : String(error)}`,
-            stack: error instanceof Error ? error : new Error(String(error)),
-          });
-        })
-        .with(false, () => {
-          logger.error({
-            message: `Unexpected error generating world join image for ${join.worldId}`,
-            stack: error instanceof Error ? error : new Error(String(error)),
-          });
-        })
-        .exhaustive();
+      if (isExpectedNetworkOrIoError) {
+        logger.warn({
+          message: `Expected error generating world join image for ${join.worldId}: ${(error as Error).message}`,
+          stack: error as Error,
+        });
+      } else {
+        logger.error({
+          message: `Unexpected error generating world join image for ${join.worldId}`,
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
+      }
       errors++;
     }
   }

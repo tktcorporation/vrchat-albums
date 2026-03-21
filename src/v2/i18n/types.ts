@@ -69,6 +69,7 @@ export interface Translations {
     clickToCopy: string;
     copied: string;
     noPlayerInfo: string;
+    previewGenerationFailed: string;
   };
   settings: {
     tabs: {

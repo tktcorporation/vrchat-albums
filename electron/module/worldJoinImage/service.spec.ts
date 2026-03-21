@@ -1,7 +1,6 @@
 import * as neverthrow from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('node:fs');
 vi.mock('node:fs/promises');
 vi.mock('../imageGenerator/service');
 vi.mock('../vrchatApi/service');
@@ -17,7 +16,6 @@ vi.mock('ofetch', () => ({
   ofetch: vi.fn(),
 }));
 
-import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import { ofetch } from 'ofetch';
 import { generateWorldJoinImage } from '../imageGenerator/service';
@@ -34,6 +32,38 @@ describe('generateMissingWorldJoinImages', () => {
     _resetGeneratingFlag();
   });
 
+  const makeWorldInfo = () => ({
+    id: 'wrld_12345678-1234-1234-1234-123456789abc',
+    name: 'Test World',
+    imageUrl: 'https://example.com/image.png',
+    description: '',
+    authorId: '',
+    authorName: '',
+    releaseStatus: 'public',
+    featured: false,
+    capacity: 20,
+    recommendedCapacity: 20,
+    thumbnailImageUrl: '',
+    version: 1,
+    organization: 'vrchat',
+    previewYoutubeId: null,
+    udonProducts: [],
+    favorites: 0,
+    visits: 0,
+    popularity: 0,
+    heat: 0,
+    publicationDate: '',
+    labsPublicationDate: '',
+    instances: [],
+    publicOccupants: 0,
+    privateOccupants: 0,
+    occupants: 0,
+    unityPackages: [],
+    tags: [],
+    created_at: '',
+    updated_at: '',
+  });
+
   const makeJoinLog = (worldId: string) => ({
     id: '1',
     worldId,
@@ -48,7 +78,7 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fsPromises.access).mockResolvedValue(undefined);
 
     const result = await generateMissingWorldJoinImages({
       photoDirPath: '/photos',
@@ -88,39 +118,11 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fsPromises.access).mockRejectedValue(
+      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+    );
     vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
-      neverthrow.ok({
-        id: 'wrld_12345678-1234-1234-1234-123456789abc',
-        name: 'Test World',
-        imageUrl: 'https://example.com/image.png',
-        description: '',
-        authorId: '',
-        authorName: '',
-        releaseStatus: 'public',
-        featured: false,
-        capacity: 20,
-        recommendedCapacity: 20,
-        thumbnailImageUrl: '',
-        version: 1,
-        organization: 'vrchat',
-        previewYoutubeId: null,
-        udonProducts: [],
-        favorites: 0,
-        visits: 0,
-        popularity: 0,
-        heat: 0,
-        publicationDate: '',
-        labsPublicationDate: '',
-        instances: [],
-        publicOccupants: 0,
-        privateOccupants: 0,
-        occupants: 0,
-        unityPackages: [],
-        tags: [],
-        created_at: '',
-        updated_at: '',
-      }),
+      neverthrow.ok(makeWorldInfo()),
     );
     vi.mocked(ofetch).mockResolvedValue(new ArrayBuffer(8));
     vi.mocked(generateWorldJoinImage).mockResolvedValue(
@@ -167,7 +169,9 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fsPromises.access).mockRejectedValue(
+      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+    );
     vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
       neverthrow.err({
         type: 'WORLD_NOT_FOUND' as const,
@@ -190,39 +194,11 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fsPromises.access).mockRejectedValue(
+      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+    );
     vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
-      neverthrow.ok({
-        id: 'wrld_12345678-1234-1234-1234-123456789abc',
-        name: 'Test World',
-        imageUrl: 'https://example.com/image.png',
-        description: '',
-        authorId: '',
-        authorName: '',
-        releaseStatus: 'public',
-        featured: false,
-        capacity: 20,
-        recommendedCapacity: 20,
-        thumbnailImageUrl: '',
-        version: 1,
-        organization: 'vrchat',
-        previewYoutubeId: null,
-        udonProducts: [],
-        favorites: 0,
-        visits: 0,
-        popularity: 0,
-        heat: 0,
-        publicationDate: '',
-        labsPublicationDate: '',
-        instances: [],
-        publicOccupants: 0,
-        privateOccupants: 0,
-        occupants: 0,
-        unityPackages: [],
-        tags: [],
-        created_at: '',
-        updated_at: '',
-      }),
+      neverthrow.ok(makeWorldInfo()),
     );
     vi.mocked(ofetch).mockRejectedValue(new Error('Network error'));
 

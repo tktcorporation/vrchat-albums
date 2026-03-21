@@ -42,6 +42,7 @@ const ja: Translations = {
     clickToCopy: 'クリックでプレイヤー名一覧をコピー',
     copied: 'コピーしました',
     noPlayerInfo: 'プレイヤー情報なし',
+    previewGenerationFailed: 'プレビュー画像の生成に失敗しました',
   },
   settings: {
     tabs: {

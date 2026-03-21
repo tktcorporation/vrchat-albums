@@ -42,6 +42,7 @@ const en: Translations = {
     clickToCopy: 'Click to copy',
     copied: 'Copied',
     noPlayerInfo: 'No player info',
+    previewGenerationFailed: 'Failed to generate preview image',
   },
   settings: {
     tabs: {

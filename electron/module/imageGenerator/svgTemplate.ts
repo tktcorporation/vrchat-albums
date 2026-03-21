@@ -10,6 +10,37 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+/** rgb(N, N, N) 形式の色文字列であることを検証する（SVG 属性インジェクション防止） */
+const RGB_COLOR_PATTERN = /^rgb\(\d{1,3}, \d{1,3}, \d{1,3}\)$/;
+
+function assertValidRgbColor(color: string): string {
+  if (!RGB_COLOR_PATTERN.test(color)) {
+    throw new Error(`Invalid color format: ${color}`);
+  }
+  return color;
+}
+
+/** base64 文字列であることを検証する（data URI インジェクション防止） */
+const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
+
+function assertValidBase64(value: string): string {
+  if (!BASE64_PATTERN.test(value)) {
+    throw new Error('Invalid base64 string');
+  }
+  return value;
+}
+
+/**
+ * プレイヤー名の表示幅を推定する。
+ * CJK 文字は 14px 幅、ASCII 文字は 7px 幅として計算し、パディング 20px を加算。
+ */
+function estimatePlayerNameWidth(playerName: string): number {
+  const nameWidth = [...playerName].reduce((width, char) => {
+    return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
+  }, 0);
+  return nameWidth + 20;
+}
+
 /**
  * SVG テンプレート生成に必要なパラメータ。
  *
@@ -76,12 +107,9 @@ function generatePlayerElements(
    * プレイヤー名の表示幅を推定する。
    * CJK文字は14px幅、ASCII文字は7px幅として計算し、パディング20pxを加算。
    */
-  const playerWidths = players.map((player) => {
-    const nameWidth = [...player.playerName].reduce((width, char) => {
-      return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
-    }, 0);
-    return nameWidth + 20;
-  });
+  const playerWidths = players.map((player) =>
+    estimatePlayerNameWidth(player.playerName),
+  );
 
   // 表示するプレイヤーを決定
   const { displayPlayers, remainingCount } = match(showAllPlayers)
@@ -125,10 +153,7 @@ function generatePlayerElements(
 
   // プレイヤー名を描画
   for (const player of displayPlayers) {
-    const playerWidth =
-      [...player.playerName].reduce((width, char) => {
-        return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
-      }, 0) + 20;
+    const playerWidth = estimatePlayerNameWidth(player.playerName);
 
     const lineWrapping = match(currentLineWidth + playerWidth > maxLineWidth)
       .with(true, () => ({
@@ -235,6 +260,12 @@ export function generatePreviewSvg({
   showAllPlayers,
   colors,
 }: GeneratePreviewSvgParams): { svg: string; height: number } {
+  // SVG 属性インジェクション防止: 外部由来の値をバリデーション
+  const safePrimary = assertValidRgbColor(colors.primary);
+  const safeSecondary = assertValidRgbColor(colors.secondary);
+  const safeAccent = assertValidRgbColor(colors.accent);
+  const safeImageBase64 = assertValidBase64(imageBase64);
+
   const headerFontSize = '20px';
   const subHeaderFontSize = '14px';
 
@@ -277,7 +308,7 @@ export function generatePreviewSvg({
           height="${totalHeight}"
         >
           <image
-            href="data:image/png;base64,${imageBase64}"
+            href="data:image/png;base64,${safeImageBase64}"
             x="-200"
             y="0"
             width="1200"
@@ -295,7 +326,7 @@ export function generatePreviewSvg({
           height="${imageHeight}"
         >
           <image
-            href="data:image/png;base64,${imageBase64}"
+            href="data:image/png;base64,${safeImageBase64}"
             x="0"
             y="0"
             width="${imageWidth}"
@@ -312,8 +343,8 @@ export function generatePreviewSvg({
           y2="${totalHeight}"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0%" stop-color="${colors.primary}" stop-opacity="0.4" />
-          <stop offset="100%" stop-color="${colors.secondary}" stop-opacity="0.4" />
+          <stop offset="0%" stop-color="${safePrimary}" stop-opacity="0.4" />
+          <stop offset="100%" stop-color="${safeSecondary}" stop-opacity="0.4" />
         </linearGradient>
       </defs>
 
@@ -358,7 +389,7 @@ export function generatePreviewSvg({
           width="200"
           height="3"
           rx="1.5"
-          fill="${colors.accent}"
+          fill="${safeAccent}"
         />
       </g>
 

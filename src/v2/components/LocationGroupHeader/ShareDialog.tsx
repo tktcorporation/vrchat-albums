@@ -1,5 +1,5 @@
 import { Copy, Download, LoaderCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { trpcReact } from '@/trpc';
 import {
   ContextMenu,
@@ -17,6 +17,7 @@ import {
 import { Label } from '../../../components/ui/label';
 import { Switch } from '../../../components/ui/switch';
 import { ICON_SIZE } from '../../constants/ui';
+import { useToast } from '../../hooks/use-toast';
 import { useI18n } from '../../i18n/store';
 import { downloadOrCopyImageAsPng } from '../../utils/shareUtils';
 
@@ -53,6 +54,7 @@ export const ShareDialog = ({
   players,
 }: ShareDialogProps) => {
   const { t } = useI18n();
+  const { toast } = useToast();
   const [showAllPlayers, setShowAllPlayers] = useState(false);
   const [previewBase64, setPreviewBase64] = useState<string | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
@@ -78,7 +80,7 @@ export const ShareDialog = ({
    * 背景: Canvas API への依存を排除するため、画像生成を tRPC 経由で
    * Main プロセスの resvg-js ベースパイプラインに委譲する。
    */
-  const generatePreview = async () => {
+  const generatePreview = useCallback(async () => {
     if (!base64Data || !worldName) return;
     setIsGeneratingPreview(true);
     try {
@@ -89,19 +91,31 @@ export const ShareDialog = ({
         showAllPlayers,
       });
       setPreviewBase64(pngBase64);
-    } catch (error) {
-      console.error('Failed to generate preview:', error);
+    } catch {
+      toast({
+        title: t('locationHeader.share'),
+        description: t('locationHeader.previewGenerationFailed'),
+        variant: 'destructive',
+      });
     } finally {
       setIsGeneratingPreview(false);
     }
-  };
+  }, [
+    base64Data,
+    worldName,
+    players,
+    showAllPlayers,
+    generatePreviewMutation,
+    toast,
+    t,
+  ]);
 
   // base64Dataが変更されたら、プレビューを生成
   useEffect(() => {
     if (base64Data) {
       generatePreview();
     }
-  }, [base64Data, worldName, players, showAllPlayers]);
+  }, [generatePreview, base64Data]);
 
   /** 生成済みの画像をクリップボードへコピーする */
   const handleCopyShareImageToClipboard = async () => {

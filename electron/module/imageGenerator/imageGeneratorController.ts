@@ -56,7 +56,8 @@ export const imageGeneratorRouter = trpcRouter({
     .input(
       z.object({
         worldName: z.string(),
-        imageBase64: z.string(),
+        /** VRChat ワールド画像の base64。10MB 上限（元画像 ~7.5MB 相当） */
+        imageBase64: z.string().max(10_000_000),
         players: z.array(z.object({ playerName: z.string() })).nullable(),
         showAllPlayers: z.boolean(),
       }),
