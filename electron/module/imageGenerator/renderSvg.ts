@@ -76,12 +76,6 @@ const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
   });
 };
 
-/** フォントキャッシュをリセットする（テスト用） */
-export const _resetFontCache = (): void => {
-  fontsLoaded = false;
-  fontFilePaths = [];
-};
-
 /**
  * SVG 文字列を PNG バッファに変換する
  *

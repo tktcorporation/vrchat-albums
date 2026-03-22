@@ -28,6 +28,8 @@ const config: KnipConfig = {
     '@antfu/ni',
     // CSS-only import in src/index.css (not detected by knip)
     'tw-animate-css',
+    // Used in scripts/ which is ignored by knip
+    'minimatch',
   ],
   ignore: [
     // shadcn/ui components
