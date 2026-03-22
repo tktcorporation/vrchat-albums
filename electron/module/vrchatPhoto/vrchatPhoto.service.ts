@@ -78,6 +78,7 @@ const getElectronApp = (): typeof import('electron').app | null => {
     return null;
   }
 
+  // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { app } = require('electron') as typeof import('electron');
@@ -107,6 +108,7 @@ const getElectronApp = (): typeof import('electron').app | null => {
 const getThumbnailCacheDir = (): string => {
   const app = getElectronApp();
   if (app) {
+    // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
     try {
       return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
     } catch (error) {
@@ -341,6 +343,7 @@ const saveThumbnailToCache = async (
   }
   pendingCacheWrites.add(cacheKey);
 
+  // effect-lint-allow-try-catch: finally でリソースクリーンアップ（pendingCacheWrites.delete）
   try {
     const cacheDirEither = await Effect.runPromise(
       Effect.either(ensureCacheDir()),
@@ -709,6 +712,7 @@ const getPhotoFolders = async (
 
   const scanDir = async (dirPath: string): Promise<void> => {
     let entries: Dirent[];
+    // effect-lint-allow-try-catch: ts-patternでエラー分類し予期しないエラーを再スロー
     try {
       entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
     } catch (error) {
@@ -1232,6 +1236,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
     `Starting photo index creation with ${allDirs.length} directories (mode: ${isIncremental ? 'incremental' : 'full'})`,
   );
 
+  // effect-lint-allow-try-catch: finally でリソースクリーンアップ（スキャン状態の永続化）
   try {
     // 各ディレクトリを順番に処理
     for (const dir of allDirs) {
@@ -1320,6 +1325,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
             // DBエラーは予期しないエラーとしてSentryに送信
             // batch情報をログに記録してから再スロー
             let createdModels: model.VRChatPhotoPathModel[];
+            // effect-lint-allow-try-catch: エラー情報補強してから再スロー（Sentry送信用）
             try {
               createdModels = await model.createOrUpdateListVRChatPhotoPath(
                 processedBatch.map((photo) => ({
@@ -1377,6 +1383,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   } finally {
     // エラー発生時も途中経過を保存（次回スキャンで未処理分が再処理される）
     // このtry-catchはオリジナルエラーを隠さないために内部で処理
+    // effect-lint-allow-try-catch: finally内のクリーンアップ（オリジナルエラーを隠さない）
     try {
       settingStore.setPhotoFolderScanStates(updatedStates);
     } catch (stateError) {
@@ -1647,6 +1654,7 @@ export const getBatchThumbnails = async (
     const thumbnailPromises = batch.map(async (photoPath) => {
       // getVRChatPhotoItemData は予期しないエラーを throw するため
       // エラーをキャッチして photoPath と共に返す
+      // effect-lint-allow-try-catch: Effect.runPromise の defect をキャッチしてバッチ処理を継続
       try {
         const either = await Effect.runPromise(
           Effect.either(getVRChatPhotoItemData({ photoPath, width })),

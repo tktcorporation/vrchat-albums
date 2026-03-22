@@ -226,6 +226,7 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
 
       const joinDateTimes = pendingRequests.map((req) => req.joinDateTime);
 
+      // effect-lint-allow-try-catch: React フロントエンド境界
       try {
         const startTime = performance.now();
         console.debug(

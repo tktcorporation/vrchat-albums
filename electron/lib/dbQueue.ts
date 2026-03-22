@@ -92,6 +92,7 @@ class DBQueue {
       await this.waitForSpace();
     }
 
+    // effect-lint-allow-try-catch: ts-pattern でエラー分類し予期しないエラーを再スローするパターン
     try {
       const result = await this.queue.add(task).then((r) => r as T);
       return result;

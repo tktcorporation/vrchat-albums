@@ -61,6 +61,7 @@ function AppContent() {
             source: 'electron-renderer',
           },
           beforeSend: async (event: ErrorEvent, _hint: EventHint) => {
+            // effect-lint-allow-try-catch: React フロントエンド境界
             try {
               // 開発環境でも規約同意をチェックする
               const currentTermsStatus =

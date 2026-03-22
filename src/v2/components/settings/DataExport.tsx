@@ -32,6 +32,7 @@ const DataExport = memo(() => {
   // コンポーネント初期化時にデフォルトパスを設定
   useEffect(() => {
     const setDefaultOutputPath = async () => {
+      // effect-lint-allow-try-catch: React フロントエンド境界
       try {
         const downloadsPath =
           await trpcClient.electronUtil.getDownloadsPath.query();
@@ -44,6 +45,7 @@ const DataExport = memo(() => {
   }, []);
 
   const selectOutputDir = async () => {
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       const dirPath = await trpcClient.electronUtil.openGetDirDialog.query();
       if (dirPath) {

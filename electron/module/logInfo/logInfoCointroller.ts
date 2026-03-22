@@ -111,6 +111,7 @@ const findRecentMergedWorldJoinLog = async (datetime: Date) => {
     searchEndTime: searchEndTime.toISOString(),
   });
 
+  // effect-lint-allow-try-catch: ts-pattern でエラー分類し UserFacingError として再スロー
   try {
     const sortedLogs = await fetchAndMergeSortedWorldJoinLogs(
       {
@@ -149,6 +150,7 @@ const findNextMergedWorldJoinLog = async (datetime: Date) => {
     startDateTime: datetime.toISOString(),
   });
 
+  // effect-lint-allow-try-catch: ts-pattern でエラー分類し UserFacingError として再スロー
   try {
     const sortedLogs = await fetchAndMergeSortedWorldJoinLogs(
       {
@@ -323,6 +325,7 @@ const getPlayerJoinListInSameWorldCore = async (
     }[]
   | null
 > => {
+  // effect-lint-allow-try-catch: ts-pattern でエラー分類し UserFacingError として再スロー
   try {
     logger.debug({
       message: 'Starting getPlayerJoinListInSameWorldCore',
@@ -615,6 +618,7 @@ export const logInfoRouter = () =>
           worldInstanceId: string;
         }> = [];
 
+        // effect-lint-allow-try-catch: tRPC procedure 境界
         try {
           const startTime = performance.now();
           logger.debug(

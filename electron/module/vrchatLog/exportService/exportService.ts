@@ -64,6 +64,7 @@ const getElectronDownloadsPath = (): string | null => {
   // Playwright テスト互換性のため遅延評価
   // @see CLAUDE.md Electron Module Import パターン
   const electronApp = (() => {
+    // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
     try {
       return require('electron').app;
     } catch {
@@ -73,6 +74,7 @@ const getElectronDownloadsPath = (): string | null => {
 
   if (!electronApp) return null;
 
+  // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
   try {
     return electronApp.getPath('downloads');
   } catch {

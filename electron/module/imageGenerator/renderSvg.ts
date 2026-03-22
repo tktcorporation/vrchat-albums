@@ -28,6 +28,7 @@ const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
   if (fontsLoaded) return Effect.succeed(fontFilePaths);
 
   const fontsDir = (() => {
+    // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
     try {
       const { app } = require('electron');
       return path.join(

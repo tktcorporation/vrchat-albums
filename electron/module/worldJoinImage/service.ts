@@ -85,6 +85,7 @@ const generateMissingWorldJoinImagesInternal = (params: {
           join.joinDateTime,
           join.worldId,
         );
+        // effect-lint-allow-try-catch: ファイル存在チェック（access は ENOENT で throw する仕様）
         try {
           await fsPromises.access(imagePath);
           return { join, exists: true };
@@ -116,6 +117,7 @@ const generateMissingWorldJoinImagesInternal = (params: {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
+      // effect-lint-allow-try-catch: ts-patternでエラー分類し予期しないエラーを再スロー
       try {
         // 3. VRChat API でワールド情報取得
         // DB の worldId は string 型だが、API は VRChatWorldId (branded type) を要求する
@@ -139,6 +141,7 @@ const generateMissingWorldJoinImagesInternal = (params: {
         // 4. ワールド画像をダウンロード → base64
         const { ofetch } = await import('ofetch');
         let imageResponse: ArrayBuffer;
+        // effect-lint-allow-try-catch: ダウンロードエラーをログして続行（ループ内部分的成功）
         try {
           imageResponse = await ofetch(worldInfo.imageUrl, {
             responseType: 'arrayBuffer',

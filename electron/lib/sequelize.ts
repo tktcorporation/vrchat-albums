@@ -163,6 +163,7 @@ const executeSyncRDB = async (options: { force: boolean }) => {
 
   migrationProgeress = true;
   const appVersion = settingService.getAppVersion();
+  // effect-lint-allow-try-catch: finally でマイグレーション進行フラグをリセットするため必要
   try {
     // モデルごとに分割して sync を実行
     for (const model of SYNC_MODELS) {

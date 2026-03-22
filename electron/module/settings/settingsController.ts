@@ -226,6 +226,7 @@ export const settingsRouter = () =>
 
       isInitializing = true;
 
+      // effect-lint-allow-try-catch: finally でリソースクリーンアップ
       try {
         logger.info('=== Starting application data initialization ===');
 

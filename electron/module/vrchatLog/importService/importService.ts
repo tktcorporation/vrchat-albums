@@ -216,6 +216,7 @@ export class ImportService {
     dirPath: string,
   ): Promise<string[]> {
     let entries: NodeDirent[];
+    // effect-lint-allow-try-catch: 非Effectプレーン関数、部分的成功パターンで読み取りエラーをスキップ
     try {
       entries = (await fs.readdir(dirPath, {
         withFileTypes: true,

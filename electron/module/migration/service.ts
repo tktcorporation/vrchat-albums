@@ -44,6 +44,7 @@ export const isMigrationNeeded = (): Effect.Effect<boolean, never> => {
         }
       }
 
+      // effect-lint-allow-try-catch: Electron 環境検出パターン
       try {
         const { app } = await import('electron');
         const oldAppPathResult = await Effect.runPromise(
@@ -132,6 +133,7 @@ export const isMigrationNeeded = (): Effect.Effect<boolean, never> => {
 const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
   return Effect.tryPromise({
     try: async (): Promise<string> => {
+      // effect-lint-allow-try-catch: Electron 環境検出パターン
       try {
         const { app } = await import('electron');
         const currentUserDataPath = app.getPath('userData');
@@ -145,6 +147,7 @@ const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
 
         for (const appName of possibleOldAppNames) {
           const possiblePath = path.join(parentDir, appName);
+          // effect-lint-allow-try-catch: ファイル存在チェックで catch は意図的に無視
           try {
             await nodeFsPromises.access(possiblePath);
             return possiblePath;
@@ -177,6 +180,7 @@ const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
 export const performMigrationIfNeeded = (): Effect.Effect<void, never> => {
   return Effect.tryPromise({
     try: async (): Promise<void> => {
+      // effect-lint-allow-try-catch: Effect.tryPromise 内部で全エラーをログ記録して正常終了させるため
       try {
         const needsMigration = await Effect.runPromise(isMigrationNeeded());
 

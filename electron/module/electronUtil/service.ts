@@ -230,6 +230,7 @@ export const handlePngBase64WithCallback = (
   return Effect.tryPromise({
     try: async () => {
       let tempDir = '';
+      // effect-lint-allow-try-catch: finally でリソースクリーンアップ（一時ディレクトリ削除）
       try {
         const base64Data = options.pngBase64.replace(
           /^data:image\/[^;]+;base64,/,
@@ -245,6 +246,7 @@ export const handlePngBase64WithCallback = (
         await callback(tempFilePath);
       } finally {
         if (tempDir) {
+          // effect-lint-allow-try-catch: finally内のクリーンアップ（一時ディレクトリ削除失敗を握りつぶさない）
           try {
             await fs.rm(tempDir, { recursive: true, force: true });
           } catch (cleanupError) {

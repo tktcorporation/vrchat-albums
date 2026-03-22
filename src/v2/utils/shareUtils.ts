@@ -21,6 +21,7 @@ export const downloadOrCopyImageAsPng = async ({
     throw new Error('Failed to convert to PNG: No PNG base64 data');
   }
 
+  // effect-lint-allow-try-catch: React フロントエンド境界
   try {
     await downloadOrCopyMutation.mutateAsync({
       pngBase64,

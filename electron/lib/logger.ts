@@ -9,6 +9,7 @@ import { UserFacingError } from './errors';
 
 // ログファイルパスを遅延評価する
 const getLogFilePath = (): string => {
+  // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
     const { app } = require('electron');
     return path.join(app.getPath('logs'), 'app.log');
@@ -27,6 +28,7 @@ log.transports.file.maxSize = 5 * 1024 * 1024;
 
 // ログレベルの設定
 const getIsProduction = (): boolean => {
+  // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
     const { app } = require('electron');
     return app.isPackaged;

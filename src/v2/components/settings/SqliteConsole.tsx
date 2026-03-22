@@ -72,6 +72,7 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
   const handleExecute = async () => {
     if (!query.trim()) return;
 
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       const result = await executeQuery({ query });
       setResult(JSON.stringify(result, null, 2));
@@ -103,6 +104,7 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
    * Sentry 連携をテストするため意図的にエラーを投げる関数。
    */
   const handleThrowError = async () => {
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       await throwErrorForSentryTest();
       setResult(t('debug.sqliteConsole.errorThrownSuccess'));

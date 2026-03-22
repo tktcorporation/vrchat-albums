@@ -116,6 +116,7 @@ export function syncLogs(
  * エラーはログに記録するのみ（Sentry 経由で検知可能）。
  */
 function triggerWorldJoinImageGeneration(): void {
+  // effect-lint-allow-try-catch: getSettingStore() が初期化前に呼ばれた場合のエラーハンドリング
   try {
     const settingStore = getSettingStore();
     if (!settingStore.getWorldJoinImageGenerationEnabled()) {

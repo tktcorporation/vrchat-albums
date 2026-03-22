@@ -87,6 +87,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
   >(null);
 
   const handleBrowsePhotoDirectory = async () => {
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       const result = await setPhotoDirectoryMutation.mutateAsync();
       if (result) {
@@ -98,6 +99,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
   };
 
   const handleBrowseLogFile = async () => {
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       const result = await setLogPathMutation.mutateAsync();
       if (result) {
@@ -115,6 +117,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
   };
 
   const handleLogPathSave = async () => {
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       await setLogPathDirectlyMutation.mutateAsync(logInputValue, {
         onSuccess: async () => {
@@ -136,6 +139,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
   };
 
   const handlePhotoPathSave = async () => {
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       await setPhotoPathDirectlyMutation.mutateAsync(photoInputValue, {
         onSuccess: async () => {
