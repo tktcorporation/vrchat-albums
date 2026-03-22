@@ -133,31 +133,10 @@ export const isMigrationNeeded = (): Effect.Effect<boolean, never> => {
 const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
   return Effect.tryPromise({
     try: async (): Promise<string> => {
-      // effect-lint-allow-try-catch: Electron 環境検出パターン
+      // effect-lint-allow-try-catch: Electron 環境検出パターン（動的 import('electron') の失敗をキャッチ）
       try {
         const { app } = await import('electron');
-        const currentUserDataPath = app.getPath('userData');
-        const parentDir = path.dirname(currentUserDataPath);
-
-        // Check for different variations of the old app name
-        const possibleOldAppNames = [
-          'vrchat-photo-journey',
-          'VRChatPhotoJourney',
-        ];
-
-        for (const appName of possibleOldAppNames) {
-          const possiblePath = path.join(parentDir, appName);
-          // effect-lint-allow-try-catch: ファイル存在チェックで catch は意図的に無視
-          try {
-            await nodeFsPromises.access(possiblePath);
-            return possiblePath;
-          } catch {
-            // Continue to next possible name
-          }
-        }
-
-        // Return default if none exist
-        return path.join(parentDir, 'vrchat-photo-journey');
+        return app.getPath('userData');
       } catch (error) {
         logger.error({
           message: 'Failed to get old app path',
@@ -166,11 +145,36 @@ const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
         return '';
       }
     },
-    catch: () => {
-      // This should never happen since the inner try-catch handles all errors
-      return undefined as never;
-    },
-  });
+    catch: () => undefined as never,
+  }).pipe(
+    Effect.flatMap((currentUserDataPath) => {
+      if (currentUserDataPath === '') {
+        return Effect.succeed('');
+      }
+      const parentDir = path.dirname(currentUserDataPath);
+      const possibleOldAppNames = [
+        'vrchat-photo-journey',
+        'VRChatPhotoJourney',
+      ];
+      return Effect.tryPromise({
+        try: async () => {
+          for (const appName of possibleOldAppNames) {
+            const possiblePath = path.join(parentDir, appName);
+            const accessible = await nodeFsPromises
+              .access(possiblePath)
+              .then(() => true)
+              .catch(() => false);
+            if (accessible) {
+              return possiblePath;
+            }
+          }
+          // Return default if none exist
+          return path.join(parentDir, 'vrchat-photo-journey');
+        },
+        catch: () => undefined as never,
+      });
+    }),
+  );
 };
 
 /**
@@ -178,32 +182,30 @@ const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
  * エラー時もログ記録後に正常終了（起動を妨げない）
  */
 export const performMigrationIfNeeded = (): Effect.Effect<void, never> => {
-  return Effect.tryPromise({
-    try: async (): Promise<void> => {
-      // effect-lint-allow-try-catch: Effect.tryPromise 内部で全エラーをログ記録して正常終了させるため
-      try {
-        const needsMigration = await Effect.runPromise(isMigrationNeeded());
-
-        if (!needsMigration) {
-          logger.info('Migration not needed');
-          return;
-        }
-
-        logger.info('Migration needed, starting migration process...');
-        const result = await Effect.runPromise(performMigration());
-        logger.info('Migration completed successfully', result);
-      } catch (error) {
-        logger.error({
-          message: 'Error during migration check',
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
+  return isMigrationNeeded().pipe(
+    Effect.flatMap((needsMigration) => {
+      if (!needsMigration) {
+        logger.info('Migration not needed');
+        return Effect.void;
       }
-    },
-    catch: () => {
-      // This should never happen since the inner try-catch handles all errors
-      return undefined as never;
-    },
-  });
+      logger.info('Migration needed, starting migration process...');
+      return performMigration().pipe(
+        Effect.tap((result) =>
+          Effect.sync(() =>
+            logger.info('Migration completed successfully', result),
+          ),
+        ),
+        Effect.asVoid,
+      );
+    }),
+    Effect.catchAllDefect((defect) => {
+      logger.error({
+        message: 'Error during migration check',
+        stack: defect instanceof Error ? defect : new Error(String(defect)),
+      });
+      return Effect.void;
+    }),
+  );
 };
 
 /**

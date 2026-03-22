@@ -111,33 +111,39 @@ const findRecentMergedWorldJoinLog = async (datetime: Date) => {
     searchEndTime: searchEndTime.toISOString(),
   });
 
-  // effect-lint-allow-try-catch: ts-pattern でエラー分類し UserFacingError として再スロー
-  try {
-    const sortedLogs = await fetchAndMergeSortedWorldJoinLogs(
-      {
-        ltJoinDateTime: searchEndTime,
-        orderByJoinDateTime: 'desc',
+  const result = await runEffectExit(
+    Effect.tryPromise({
+      try: () =>
+        fetchAndMergeSortedWorldJoinLogs(
+          {
+            ltJoinDateTime: searchEndTime,
+            orderByJoinDateTime: 'desc',
+          },
+          'desc',
+        ),
+      catch: (error) => {
+        logger.error({
+          message: `Error in findRecentMergedWorldJoinLog for datetime ${datetime.toISOString()}: ${error}`,
+          stack: match(error)
+            .with(P.instanceOf(Error), (err) => err)
+            .otherwise((err) => new Error(String(err))),
+        });
+        return UserFacingError.withStructuredInfo({
+          code: ERROR_CODES.DATABASE_ERROR,
+          category: ERROR_CATEGORIES.DATABASE_ERROR,
+          message: `Failed to find recent world join log: ${error}`,
+          userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
+          cause: match(error)
+            .with(P.instanceOf(Error), (err) => err)
+            .otherwise((err) => new Error(String(err))),
+        });
       },
-      'desc',
-    );
-    return sortedLogs[0] ?? null;
-  } catch (error) {
-    logger.error({
-      message: `Error in findRecentMergedWorldJoinLog for datetime ${datetime.toISOString()}: ${error}`,
-      stack: match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise((err) => new Error(String(err))),
-    });
-    throw UserFacingError.withStructuredInfo({
-      code: ERROR_CODES.DATABASE_ERROR,
-      category: ERROR_CATEGORIES.DATABASE_ERROR,
-      message: `Failed to find recent world join log: ${error}`,
-      userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
-      cause: match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise((err) => new Error(String(err))),
-    });
+    }),
+  );
+  if (!result.success) {
+    throw result.error;
   }
+  return result.value[0] ?? null;
 };
 
 /**
@@ -150,33 +156,39 @@ const findNextMergedWorldJoinLog = async (datetime: Date) => {
     startDateTime: datetime.toISOString(),
   });
 
-  // effect-lint-allow-try-catch: ts-pattern でエラー分類し UserFacingError として再スロー
-  try {
-    const sortedLogs = await fetchAndMergeSortedWorldJoinLogs(
-      {
-        gtJoinDateTime: datetime,
-        orderByJoinDateTime: 'asc',
+  const result = await runEffectExit(
+    Effect.tryPromise({
+      try: () =>
+        fetchAndMergeSortedWorldJoinLogs(
+          {
+            gtJoinDateTime: datetime,
+            orderByJoinDateTime: 'asc',
+          },
+          'asc',
+        ),
+      catch: (error) => {
+        logger.error({
+          message: `Error in findNextMergedWorldJoinLog for datetime ${datetime.toISOString()}: ${error}`,
+          stack: match(error)
+            .with(P.instanceOf(Error), (err) => err)
+            .otherwise((err) => new Error(String(err))),
+        });
+        return UserFacingError.withStructuredInfo({
+          code: ERROR_CODES.DATABASE_ERROR,
+          category: ERROR_CATEGORIES.DATABASE_ERROR,
+          message: `Failed to find next world join log: ${error}`,
+          userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
+          cause: match(error)
+            .with(P.instanceOf(Error), (err) => err)
+            .otherwise((err) => new Error(String(err))),
+        });
       },
-      'asc',
-    );
-    return sortedLogs[0] ?? null;
-  } catch (error) {
-    logger.error({
-      message: `Error in findNextMergedWorldJoinLog for datetime ${datetime.toISOString()}: ${error}`,
-      stack: match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise((err) => new Error(String(err))),
-    });
-    throw UserFacingError.withStructuredInfo({
-      code: ERROR_CODES.DATABASE_ERROR,
-      category: ERROR_CATEGORIES.DATABASE_ERROR,
-      message: `Failed to find next world join log: ${error}`,
-      userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
-      cause: match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise((err) => new Error(String(err))),
-    });
+    }),
+  );
+  if (!result.success) {
+    throw result.error;
   }
+  return result.value[0] ?? null;
 };
 
 const getRecentVRChatWorldJoinLogByVRChatPhotoName = async (
@@ -325,120 +337,130 @@ const getPlayerJoinListInSameWorldCore = async (
     }[]
   | null
 > => {
-  // effect-lint-allow-try-catch: ts-pattern でエラー分類し UserFacingError として再スロー
-  try {
-    logger.debug({
-      message: 'Starting getPlayerJoinListInSameWorldCore',
-      datetime: datetime.toISOString(),
-    });
-
-    // ワールド情報が渡されていない場合は取得する（後方互換性のため）
-    let worldJoinLog = recentWorldJoin;
-    if (!worldJoinLog) {
-      logger.debug('Finding recent merged world join log');
-      const foundWorldJoinLog = await findRecentMergedWorldJoinLog(datetime);
-      if (foundWorldJoinLog === null) {
-        logger.debug('No recent world join log found');
-        return null;
-      }
-      worldJoinLog = foundWorldJoinLog;
-    }
-
-    logger.debug({
-      message: 'Found recent world join log',
-      recentJoinDateTime: worldJoinLog.joinDateTime.toISOString(),
-      worldName: worldJoinLog.worldName,
-    });
-
-    // 統合されたログから次のワールド参加ログを取得
-    logger.debug('Finding next merged world join log');
-    const nextWorldJoin = await findNextMergedWorldJoinLog(
-      worldJoinLog.joinDateTime,
-    );
-
-    const endDateTime = nextWorldJoin?.joinDateTime;
-
-    logger.debug({
-      message: 'Query time range determined',
-      startDateTime: worldJoinLog.joinDateTime.toISOString(),
-      endDateTime: endDateTime?.toISOString() ?? 'unlimited',
-      hasNextWorldJoin: nextWorldJoin !== null,
-    });
-
-    logger.debug('Querying player join logs');
-    const playerJoinLogResult = await runEffectExit(
-      playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: worldJoinLog.joinDateTime,
-        endJoinDateTime: endDateTime ?? null,
-      }),
-    );
-
-    if (!playerJoinLogResult.success) {
-      const error = playerJoinLogResult.error;
-      logger.error({
-        message: `プレイヤー参加ログの取得に失敗しました: ${
-          error.message
-        } (errorType: ${
-          error._tag
-        }, startDateTime: ${worldJoinLog.joinDateTime.toISOString()}, endDateTime: ${endDateTime?.toISOString() ?? 'null'}, searchRange: ${
-          endDateTime
-            ? Math.round(
-                (endDateTime.getTime() - worldJoinLog.joinDateTime.getTime()) /
-                  (1000 * 60 * 60),
-              )
-            : 'unlimited'
-        } hours, worldId: ${worldJoinLog.worldId}, worldName: ${
-          worldJoinLog.worldName
-        })`,
-        stack: new Error(`プレイヤー参加ログエラー: ${error._tag}`),
-      });
-
-      return match(error._tag)
-        .with(
-          P.union(
-            'PlayerJoinLogDatabaseError',
-            'PlayerJoinLogInvalidDateRange',
-            'PlayerJoinLogNotFound',
-          ),
-          () => null,
-        )
-        .otherwise(() => {
-          // 型安全のためのケース（実際には到達しない）
-          throw new Error(`未知のエラータイプ: ${JSON.stringify(error)}`);
+  const result = await runEffectExit(
+    Effect.tryPromise({
+      try: async () => {
+        logger.debug({
+          message: 'Starting getPlayerJoinListInSameWorldCore',
+          datetime: datetime.toISOString(),
         });
-    }
 
-    const playerJoinLogList = playerJoinLogResult.value;
-    if (playerJoinLogList.length === 0) {
-      logger.debug('No player join logs found in time range');
-      return null;
-    }
+        // ワールド情報が渡されていない場合は取得する（後方互換性のため）
+        let worldJoinLog = recentWorldJoin;
+        if (!worldJoinLog) {
+          logger.debug('Finding recent merged world join log');
+          const foundWorldJoinLog =
+            await findRecentMergedWorldJoinLog(datetime);
+          if (foundWorldJoinLog === null) {
+            logger.debug('No recent world join log found');
+            return null;
+          }
+          worldJoinLog = foundWorldJoinLog;
+        }
 
-    logger.debug({
-      message: 'Successfully retrieved player join logs',
-      count: playerJoinLogList.length,
-    });
+        logger.debug({
+          message: 'Found recent world join log',
+          recentJoinDateTime: worldJoinLog.joinDateTime.toISOString(),
+          worldName: worldJoinLog.worldName,
+        });
 
-    return playerJoinLogList;
-  } catch (error) {
-    logger.error({
-      message: `Unexpected error in getPlayerJoinListInSameWorldCore for datetime ${datetime.toISOString()}: ${error}`,
-      stack: match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise((err) => new Error(String(err))),
-    });
+        // 統合されたログから次のワールド参加ログを取得
+        logger.debug('Finding next merged world join log');
+        const nextWorldJoin = await findNextMergedWorldJoinLog(
+          worldJoinLog.joinDateTime,
+        );
 
-    // Re-throw the error to be caught by the cache layer
-    throw UserFacingError.withStructuredInfo({
-      code: ERROR_CODES.DATABASE_ERROR,
-      category: ERROR_CATEGORIES.DATABASE_ERROR,
-      message: `Failed to get player join list: ${error}`,
-      userMessage: 'プレイヤー情報の取得中にエラーが発生しました。',
-      cause: match(error)
-        .with(P.instanceOf(Error), (err) => err)
-        .otherwise((err) => new Error(String(err))),
-    });
+        const endDateTime = nextWorldJoin?.joinDateTime;
+
+        logger.debug({
+          message: 'Query time range determined',
+          startDateTime: worldJoinLog.joinDateTime.toISOString(),
+          endDateTime: endDateTime?.toISOString() ?? 'unlimited',
+          hasNextWorldJoin: nextWorldJoin !== null,
+        });
+
+        logger.debug('Querying player join logs');
+        const playerJoinLogResult = await runEffectExit(
+          playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
+            startJoinDateTime: worldJoinLog.joinDateTime,
+            endJoinDateTime: endDateTime ?? null,
+          }),
+        );
+
+        if (!playerJoinLogResult.success) {
+          const error = playerJoinLogResult.error;
+          logger.error({
+            message: `プレイヤー参加ログの取得に失敗しました: ${
+              error.message
+            } (errorType: ${
+              error._tag
+            }, startDateTime: ${worldJoinLog.joinDateTime.toISOString()}, endDateTime: ${endDateTime?.toISOString() ?? 'null'}, searchRange: ${
+              endDateTime
+                ? Math.round(
+                    (endDateTime.getTime() -
+                      worldJoinLog.joinDateTime.getTime()) /
+                      (1000 * 60 * 60),
+                  )
+                : 'unlimited'
+            } hours, worldId: ${worldJoinLog.worldId}, worldName: ${
+              worldJoinLog.worldName
+            })`,
+            stack: new Error(`プレイヤー参加ログエラー: ${error._tag}`),
+          });
+
+          return match(error._tag)
+            .with(
+              P.union(
+                'PlayerJoinLogDatabaseError',
+                'PlayerJoinLogInvalidDateRange',
+                'PlayerJoinLogNotFound',
+              ),
+              () => null,
+            )
+            .otherwise(() => {
+              // 型安全のためのケース（実際には到達しない）
+              throw new Error(`未知のエラータイプ: ${JSON.stringify(error)}`);
+            });
+        }
+
+        const playerJoinLogList = playerJoinLogResult.value;
+        if (playerJoinLogList.length === 0) {
+          logger.debug('No player join logs found in time range');
+          return null;
+        }
+
+        logger.debug({
+          message: 'Successfully retrieved player join logs',
+          count: playerJoinLogList.length,
+        });
+
+        return playerJoinLogList;
+      },
+      catch: (error) => {
+        logger.error({
+          message: `Unexpected error in getPlayerJoinListInSameWorldCore for datetime ${datetime.toISOString()}: ${error}`,
+          stack: match(error)
+            .with(P.instanceOf(Error), (err) => err)
+            .otherwise((err) => new Error(String(err))),
+        });
+
+        // Re-throw the error to be caught by the cache layer
+        return UserFacingError.withStructuredInfo({
+          code: ERROR_CODES.DATABASE_ERROR,
+          category: ERROR_CATEGORIES.DATABASE_ERROR,
+          message: `Failed to get player join list: ${error}`,
+          userMessage: 'プレイヤー情報の取得中にエラーが発生しました。',
+          cause: match(error)
+            .with(P.instanceOf(Error), (err) => err)
+            .otherwise((err) => new Error(String(err))),
+        });
+      },
+    }),
+  );
+  if (!result.success) {
+    throw result.error;
   }
+  return result.value;
 };
 
 export const logInfoRouter = () =>

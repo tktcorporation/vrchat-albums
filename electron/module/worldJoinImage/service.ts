@@ -85,13 +85,11 @@ const generateMissingWorldJoinImagesInternal = (params: {
           join.joinDateTime,
           join.worldId,
         );
-        // effect-lint-allow-try-catch: ファイル存在チェック（access は ENOENT で throw する仕様）
-        try {
-          await fsPromises.access(imagePath);
-          return { join, exists: true };
-        } catch {
-          return { join, exists: false };
-        }
+        const exists = await fsPromises
+          .access(imagePath)
+          .then(() => true)
+          .catch(() => false);
+        return { join, exists };
       }),
     );
     const missingJoins = existenceChecks
@@ -117,7 +115,7 @@ const generateMissingWorldJoinImagesInternal = (params: {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
-      // effect-lint-allow-try-catch: ts-patternでエラー分類し予期しないエラーを再スロー
+      // effect-lint-allow-try-catch: ループ内の部分的成功パターン（個別失敗をスキップして継続）
       try {
         // 3. VRChat API でワールド情報取得
         // DB の worldId は string 型だが、API は VRChatWorldId (branded type) を要求する
@@ -140,24 +138,28 @@ const generateMissingWorldJoinImagesInternal = (params: {
 
         // 4. ワールド画像をダウンロード → base64
         const { ofetch } = await import('ofetch');
-        let imageResponse: ArrayBuffer;
-        // effect-lint-allow-try-catch: ダウンロードエラーをログして続行（ループ内部分的成功）
-        try {
-          imageResponse = await ofetch(worldInfo.imageUrl, {
-            responseType: 'arrayBuffer',
-            timeout: 30_000,
-          });
-        } catch (downloadError) {
+        const downloadExit = await Effect.runPromiseExit(
+          Effect.tryPromise({
+            try: () =>
+              ofetch(worldInfo.imageUrl, {
+                responseType: 'arrayBuffer',
+                timeout: 30_000,
+              }) as Promise<ArrayBuffer>,
+            catch: (_e): { type: 'DOWNLOAD_ERROR'; worldId: string } => ({
+              type: 'DOWNLOAD_ERROR',
+              worldId: join.worldId,
+            }),
+          }),
+        );
+        if (downloadExit._tag === 'Failure') {
           logger.warn({
             message: `Failed to download world image for ${join.worldId}`,
-            stack:
-              downloadError instanceof Error
-                ? downloadError
-                : new Error(String(downloadError)),
+            stack: new Error(`Download failed for world ${join.worldId}`),
           });
           errors++;
           continue;
         }
+        const imageResponse = downloadExit.value;
 
         const imageBase64 = Buffer.from(imageResponse).toString('base64');
 

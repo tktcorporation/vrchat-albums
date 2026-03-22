@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
 import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
-import { Effect } from 'effect';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { xxhash128 } from 'hash-wasm';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
@@ -1652,50 +1652,47 @@ export const getBatchThumbnails = async (
     const batch = photoPaths.slice(i, i + thumbnailParallelLimit);
 
     const thumbnailPromises = batch.map(async (photoPath) => {
-      // getVRChatPhotoItemData は予期しないエラーを throw するため
-      // エラーをキャッチして photoPath と共に返す
-      // effect-lint-allow-try-catch: Effect.runPromise の defect をキャッチしてバッチ処理を継続
-      try {
-        const either = await Effect.runPromise(
-          Effect.either(getVRChatPhotoItemData({ photoPath, width })),
-        );
-        return { photoPath, either, unexpectedError: null as Error | null };
-      } catch (error) {
-        // 予期しないエラー（画像処理内部エラー等）はここでキャッチ
-        return {
-          photoPath,
-          either: null,
-          unexpectedError:
-            error instanceof Error ? error : new Error(String(error)),
-        };
-      }
+      // Effect.runPromiseExit で defect も含めた全結果を安全に取得
+      const exit = await Effect.runPromiseExit(
+        getVRChatPhotoItemData({ photoPath, width }),
+      );
+      return { photoPath, exit };
     });
 
     // 全てのPromiseが成功するため Promise.all を使用
     const results = await Promise.all(thumbnailPromises);
 
-    for (const item of results) {
-      if (item.unexpectedError) {
-        // 予期しないエラー（画像処理内部エラー等）をログ出力
-        // Sentryに送信されるのは logger.error() 経由
-        logger.error({
-          message: 'Unexpected error during batch thumbnail fetch',
-          stack: item.unexpectedError,
-          details: { photoPath: item.photoPath },
-        });
-        failed.push({
-          photoPath: item.photoPath,
-          reason: 'unexpected_error',
-          message: item.unexpectedError.message,
-        });
-      } else if (item.either) {
-        if (item.either._tag === 'Right') {
-          success.set(item.photoPath, item.either.right);
-        } else {
+    for (const { photoPath, exit } of results) {
+      if (Exit.isSuccess(exit)) {
+        success.set(photoPath, exit.value);
+      } else {
+        // 予期されたエラー（InputFileIsMissing）かdefect（予期しないエラー）かを判別
+        const failureOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failureOpt)) {
+          // 予期されたエラー: ファイルが見つからない
           failed.push({
-            photoPath: item.photoPath,
+            photoPath,
             reason: 'file_not_found',
-            message: item.either.left,
+            message: failureOpt.value,
+          });
+        } else {
+          // 予期しないエラー（画像処理内部エラー等）
+          const dieOpt = Cause.dieOption(exit.cause);
+          const unexpectedError = Option.isSome(dieOpt)
+            ? dieOpt.value instanceof Error
+              ? dieOpt.value
+              : new Error(String(dieOpt.value))
+            : new Error('Unknown error');
+          // Sentryに送信されるのは logger.error() 経由
+          logger.error({
+            message: 'Unexpected error during batch thumbnail fetch',
+            stack: unexpectedError,
+            details: { photoPath },
+          });
+          failed.push({
+            photoPath,
+            reason: 'unexpected_error',
+            message: unexpectedError.message,
           });
         }
       }
