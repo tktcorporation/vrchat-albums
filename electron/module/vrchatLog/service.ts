@@ -5,7 +5,10 @@ import type {
   VRChatLogFilesDirPath,
 } from '../vrchatLogFileDir/model';
 import * as vrchatLogFileDirService from '../vrchatLogFileDir/service';
-import { FILTER_PATTERNS } from './constants/logPatterns';
+import {
+  DETECTION_BROAD_PATTERNS,
+  FILTER_PATTERNS,
+} from './constants/logPatterns';
 import type { VRChatLogFileError } from './error';
 import { LogFileDirNotFound, type VRChatLogError } from './errors';
 import type { VRChatLogStoreFilePath } from './model';
@@ -20,6 +23,7 @@ import {
   type VRChatWorldJoinLog,
   type VRChatWorldLeaveLog,
 } from './parsers';
+import { detectAndReportUnknownPatterns } from './parsers/unknownPatternDetector';
 // TODO: アプリイベントの型は今後実装
 // import type {
 //   VRChatAppExitLog,
@@ -107,13 +111,21 @@ export const getVRChaLogInfoByLogFilePathList = (
   VRChatLogFileError | VRChatLogError
 > =>
   Effect.gen(function* () {
+    // FILTER_PATTERNS（パース対象）に加え、DETECTION_BROAD_PATTERNS（[Behaviour] 等）も
+    // 含めて読み込む。パーサーはマッチしない行をスキップするため既存動作に影響しない。
+    // 広域フィルタの行は未知パターン検知に使われる。
     const logLineList = yield* getLogLinesByLogFilePathList({
       logFilePathList,
-      includesList: [...FILTER_PATTERNS],
+      includesList: [
+        ...new Set([...FILTER_PATTERNS, ...DETECTION_BROAD_PATTERNS]),
+      ],
     });
 
     const parseResult =
       convertLogLinesToWorldAndPlayerJoinLogInfos(logLineList);
+
+    // 未知の [Behaviour] パターンがあれば Sentry に送信して早期検出する
+    detectAndReportUnknownPatterns(logLineList);
 
     // エラーがあってもログ情報は返す（部分的な成功を許容）
     return parseResult.logInfos;
@@ -143,12 +155,16 @@ export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
       const logLineListResult =
         await getLogLinesByLogFilePathListWithPartialSuccess({
           logFilePathList,
-          includesList: [...FILTER_PATTERNS],
+          includesList: [
+            ...new Set([...FILTER_PATTERNS, ...DETECTION_BROAD_PATTERNS]),
+          ],
         });
 
       const parseResult = convertLogLinesToWorldAndPlayerJoinLogInfos(
         logLineListResult.data,
       );
+
+      detectAndReportUnknownPatterns(logLineListResult.data);
 
       return {
         data: parseResult.logInfos,
