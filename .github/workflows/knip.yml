@@ -21,24 +21,22 @@ jobs:
 
       - name: Run knip
         id: knip
-        continue-on-error: true
         env:
           NO_COLOR: 1
         run: |
           set +e
           OUTPUT=$(pnpm knip --no-config-hints 2>&1)
           EXIT_CODE=$?
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
 
-          # Save output to file for multiline handling (strip any remaining ANSI codes)
           echo "$OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' > knip-output.txt
 
-          # Check if there are any issues
           if [ $EXIT_CODE -eq 0 ]; then
-            echo "has_issues=false" >> $GITHUB_OUTPUT
+            echo "has_issues=false" >> "$GITHUB_OUTPUT"
           else
-            echo "has_issues=true" >> $GITHUB_OUTPUT
+            echo "has_issues=true" >> "$GITHUB_OUTPUT"
           fi
+
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
 
       - name: Create comment body
         id: comment
@@ -48,7 +46,7 @@ jobs:
           if [ "$HAS_ISSUES" = "true" ]; then
             {
               echo 'body<<EOF'
-              echo '## 🔍 Knip - Unused Code Detection'
+              echo '## Knip - Unused Code Detection'
               echo ''
               echo '以下の未使用コードが検出されました：'
               echo ''
@@ -64,23 +62,27 @@ jobs:
               echo '- **未使用の型**: 型定義を削除するか、将来使用予定なら `knip.config.ts` で除外'
               echo ''
               echo '</details>'
-              echo ''
-              echo '---'
-              echo '*このチェックは警告のみで、マージをブロックしません。*'
               echo 'EOF'
-            } >> $GITHUB_OUTPUT
+            } >> "$GITHUB_OUTPUT"
           else
             {
               echo 'body<<EOF'
-              echo '## 🔍 Knip - Unused Code Detection'
+              echo '## Knip - Unused Code Detection'
               echo ''
-              echo '✅ 未使用コードは検出されませんでした。'
+              echo 'No unused code detected.'
               echo 'EOF'
-            } >> $GITHUB_OUTPUT
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Comment on PR
         uses: marocchino/sticky-pull-request-comment@v2
+        if: always()
         with:
           header: knip-report
           message: ${{ steps.comment.outputs.body }}
+
+      - name: Fail if unused code detected
+        if: steps.knip.outputs.has_issues == 'true'
+        run: |
+          echo "Unused code detected. See PR comment for details."
+          exit 1

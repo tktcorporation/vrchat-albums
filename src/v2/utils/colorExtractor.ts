@@ -118,23 +118,3 @@ export function extractDominantColors(img: HTMLImageElement) {
   const imageData = getPixelData(img);
   return calcColors(imageData.data, 4);
 }
-
-/**
- * Base64エンコードされた画像から主要な色を抽出する関数。
- *
- * @param imageBase64 - Base64エンコードされた画像データ
- * @returns primary, secondary, accent の色を含むオブジェクト
- *
- * @see extractDominantColors - 通常の画像要素から色を抽出する関数
- */
-export async function extractDominantColorsFromBase64(imageBase64: string) {
-  const img = new Image();
-  img.src = `data:image/png;base64,${imageBase64}`;
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error('Failed to load image'));
-  });
-
-  const imageData = getPixelData(img);
-  return calcColors(imageData.data, 20);
-}
