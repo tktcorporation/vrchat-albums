@@ -1,0 +1,18 @@
+id: no-hardcoded-indigo
+language: TypeScript
+severity: warning
+message: |
+  ハードコードされた indigo カラーの使用を避けてください。
+  TEXT_COLOR.accent や text-primary を使用してください。
+note: |
+  マッピング:
+  - text-indigo-600 → TEXT_COLOR.accent (text-primary)
+  参照: .claude/rules/ui-ux-design.md
+rule:
+  kind: string_fragment
+  regex: (text|bg|border)-indigo-\d+
+files:
+  - src/**/*.tsx
+  - src/**/*.ts
+ignores:
+  - src/v2/constants/**

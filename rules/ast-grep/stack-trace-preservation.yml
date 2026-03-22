@@ -1,0 +1,18 @@
+id: stack-trace-preservation
+language: TypeScript
+severity: error
+message: |
+  catch 内で throw new Error() するとスタックトレースが消失します。
+  { cause: error } で元エラーを保持するか、元のエラーをそのまま re-throw してください。
+note: |
+  参照: .claude/rules/error-handling.md
+rule:
+  pattern: throw new Error($MSG)
+  inside:
+    kind: catch_clause
+    stopBy: end
+constraints:
+  MSG:
+    regex: \.message
+files:
+  - electron/**/*.ts

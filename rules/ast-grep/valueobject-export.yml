@@ -1,0 +1,16 @@
+id: valueobject-export
+language: TypeScript
+severity: error
+message: |
+  ValueObject クラスは直接エクスポートしてはいけません。
+  型としてのみエクスポートしてください: export type { $CLASS }
+note: |
+  直接 export すると外部から new でインスタンス生成でき、
+  Zod バリデーションをバイパスされます。
+  参照: .claude/rules/valueobject.md
+rule:
+  pattern: export class $CLASS extends BaseValueObject<$A, $B> { $$$BODY }
+ignores:
+  - scripts/test-fixtures/**
+  - "**/*.test.ts"
+  - "**/*.spec.ts"

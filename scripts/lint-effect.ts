@@ -349,9 +349,9 @@ function checkNoTryCatch(filePath: string, content: string) {
       !line.startsWith('//') &&
       !line.startsWith('*')
     ) {
-      // 前の行に許可コメントがあるかチェック
-      const prevLine = i > 0 ? lines[i - 1] : '';
-      if (prevLine.includes('effect-lint-allow-try-catch')) {
+      // 前の行（複数行コメント対応で2行前まで）に許可コメントがあるかチェック
+      const prevLines = [i > 0 ? lines[i - 1] : '', i > 1 ? lines[i - 2] : ''];
+      if (prevLines.some((l) => l.includes('effect-lint-allow-try-catch'))) {
         continue;
       }
 

@@ -227,53 +227,72 @@ export const handlePngBase64WithCallback = (
   options: SavePngFileOptions,
   callback: (tempPngPath: string) => Promise<void>,
 ): Effect.Effect<void, FileIOError> => {
-  return Effect.tryPromise({
-    try: async () => {
-      let tempDir = '';
-      // effect-lint-allow-try-catch: finally でリソースクリーンアップ（一時ディレクトリ削除）
-      try {
-        const base64Data = options.pngBase64.replace(
-          /^data:image\/[^;]+;base64,/,
-          '',
-        );
-        tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-'));
-        const tempFilePath = path.join(
-          tempDir,
-          `${options.filenameWithoutExt}.png`,
-        );
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        await fs.writeFile(tempFilePath, new Uint8Array(imageBuffer));
-        await callback(tempFilePath);
-      } finally {
-        if (tempDir) {
-          // effect-lint-allow-try-catch: finally内のクリーンアップ（一時ディレクトリ削除失敗を握りつぶさない）
-          try {
-            await fs.rm(tempDir, { recursive: true, force: true });
-          } catch (cleanupError) {
+  const base64Data = options.pngBase64.replace(
+    /^data:image\/[^;]+;base64,/,
+    '',
+  );
+
+  return Effect.acquireUseRelease(
+    // acquire: 一時ディレクトリを作成
+    Effect.tryPromise({
+      try: () => fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-')),
+      catch: (error) =>
+        match(error)
+          .with(
+            { code: P.union('EACCES', 'EPERM') },
+            (e) =>
+              new PermissionDenied({
+                message: e instanceof Error ? e.message : String(e),
+              }),
+          )
+          .otherwise(
+            (e) =>
+              new FileCreateFailed({
+                message: e instanceof Error ? e.message : String(e),
+              }),
+          ),
+    }),
+    // use: ファイル書き込み → コールバック実行
+    (tempDir) =>
+      Effect.tryPromise({
+        try: async () => {
+          const tempFilePath = path.join(
+            tempDir,
+            `${options.filenameWithoutExt}.png`,
+          );
+          const imageBuffer = Buffer.from(base64Data, 'base64');
+          await fs.writeFile(tempFilePath, new Uint8Array(imageBuffer));
+          await callback(tempFilePath);
+        },
+        catch: (error) =>
+          match(error)
+            .with(
+              { code: P.union('EACCES', 'EPERM') },
+              (e) =>
+                new PermissionDenied({
+                  message: e instanceof Error ? e.message : String(e),
+                }),
+            )
+            .otherwise(
+              (e) =>
+                new FileCreateFailed({
+                  message: e instanceof Error ? e.message : String(e),
+                }),
+            ),
+      }),
+    // release: 一時ディレクトリ削除（成功・失敗問わず必ず実行）
+    (tempDir) =>
+      Effect.promise(async () => {
+        await fs
+          .rm(tempDir, { recursive: true, force: true })
+          .catch((cleanupError) => {
             console.error(
               'Failed to cleanup temporary directory:',
               cleanupError,
             );
-          }
-        }
-      }
-    },
-    catch: (error) =>
-      match(error)
-        .with(
-          { code: P.union('EACCES', 'EPERM') },
-          (e) =>
-            new PermissionDenied({
-              message: e instanceof Error ? e.message : String(e),
-            }),
-        )
-        .otherwise(
-          (e) =>
-            new FileCreateFailed({
-              message: e instanceof Error ? e.message : String(e),
-            }),
-        ),
-  });
+          });
+      }),
+  );
 };
 
 /**

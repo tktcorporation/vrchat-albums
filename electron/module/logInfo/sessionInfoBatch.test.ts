@@ -32,9 +32,10 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
 
   /**
    * 元のgetPlayerJoinListInSameWorldロジックをテスト用に再現
+   * getPlayerJoinListInSameWorld は Effect を返すので Effect.runPromise で実行
    */
   const getPlayerJoinListInSameWorldOriginal = async (datetime: Date) => {
-    return await getPlayerJoinListInSameWorld(datetime);
+    return await Effect.runPromise(getPlayerJoinListInSameWorld(datetime));
   };
 
   /**

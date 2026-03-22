@@ -343,11 +343,8 @@ const saveThumbnailToCache = async (
   }
   pendingCacheWrites.add(cacheKey);
 
-  // effect-lint-allow-try-catch: finally でリソースクリーンアップ（pendingCacheWrites.delete）
-  try {
-    const cacheDirEither = await Effect.runPromise(
-      Effect.either(ensureCacheDir()),
-    );
+  const program = Effect.gen(function* () {
+    const cacheDirEither = yield* Effect.either(ensureCacheDir());
     if (cacheDirEither._tag === 'Left') {
       // キャッシュディレクトリが利用不可の場合は書き込みをスキップ
       logger.debug({
@@ -361,35 +358,52 @@ const saveThumbnailToCache = async (
     const tempPath = `${cachePath}.tmp`;
 
     // アトミック書き込み: tmp -> rename
-    await fsPromises.writeFile(tempPath, buffer);
-    await fsPromises.rename(tempPath, cachePath);
+    yield* Effect.tryPromise({
+      try: async () => {
+        await fsPromises.writeFile(tempPath, buffer);
+        await fsPromises.rename(tempPath, cachePath);
+      },
+      catch: (error) => error,
+    }).pipe(
+      Effect.tap(() => {
+        // 書き込み成功: 連続失敗カウンターをリセット
+        consecutiveCacheFailures = 0;
+        return Effect.void;
+      }),
+      Effect.catchAll((error) => {
+        // 失敗カウントをインクリメント
+        consecutiveCacheFailures++;
 
-    // 書き込み成功: 連続失敗カウンターをリセット
-    consecutiveCacheFailures = 0;
-  } catch (error) {
-    // 失敗カウントをインクリメント
-    consecutiveCacheFailures++;
+        logger.error({
+          message: `Failed to save thumbnail to cache: ${cacheKey}`,
+          stack: error instanceof Error ? error : new Error(String(error)),
+        });
 
-    logger.error({
-      message: `Failed to save thumbnail to cache: ${cacheKey}`,
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
+        // 連続失敗が閾値を超えた場合、ユーザーに通知できるレベルで警告
+        if (consecutiveCacheFailures >= CACHE_FAILURE_THRESHOLD) {
+          logger.warn({
+            message: `Thumbnail cache has failed ${consecutiveCacheFailures} times consecutively. Cache may be unavailable (disk full, permission issues, etc.)`,
+            details: {
+              consecutiveFailures: consecutiveCacheFailures,
+              lastError: error instanceof Error ? error.message : String(error),
+            },
+          });
+          // リセットしてログスパムを防ぐ
+          consecutiveCacheFailures = 0;
+        }
+        return Effect.void;
+      }),
+    );
+  }).pipe(
+    // pendingCacheWrites のクリーンアップは成功・失敗問わず必ず実行
+    Effect.ensuring(
+      Effect.sync(() => {
+        pendingCacheWrites.delete(cacheKey);
+      }),
+    ),
+  );
 
-    // 連続失敗が閾値を超えた場合、ユーザーに通知できるレベルで警告
-    if (consecutiveCacheFailures >= CACHE_FAILURE_THRESHOLD) {
-      logger.warn({
-        message: `Thumbnail cache has failed ${consecutiveCacheFailures} times consecutively. Cache may be unavailable (disk full, permission issues, etc.)`,
-        details: {
-          consecutiveFailures: consecutiveCacheFailures,
-          lastError: error instanceof Error ? error.message : String(error),
-        },
-      });
-      // リセットしてログスパムを防ぐ
-      consecutiveCacheFailures = 0;
-    }
-  } finally {
-    pendingCacheWrites.delete(cacheKey);
-  }
+  await Effect.runPromise(program);
 };
 
 /**
@@ -1236,7 +1250,8 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
     `Starting photo index creation with ${allDirs.length} directories (mode: ${isIncremental ? 'incremental' : 'full'})`,
   );
 
-  // effect-lint-allow-try-catch: finally でリソースクリーンアップ（スキャン状態の永続化）
+  // effect-lint-allow-try-catch: 140行超のループ処理（continue/mutable state多用）を Effect.gen に変換するのは
+  // 大規模リファクタリングが必要。finally はスキャン状態の永続化のみ。
   try {
     // 各ディレクトリを順番に処理
     for (const dir of allDirs) {
@@ -1382,8 +1397,8 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
     }
   } finally {
     // エラー発生時も途中経過を保存（次回スキャンで未処理分が再処理される）
-    // このtry-catchはオリジナルエラーを隠さないために内部で処理
-    // effect-lint-allow-try-catch: finally内のクリーンアップ（オリジナルエラーを隠さない）
+    // effect-lint-allow-try-catch: finally 内の try-catch はオリジナルエラーを隠さないための防御的パターン。
+    // 外側の try-finally と一体で機能するため個別変換は不可。
     try {
       settingStore.setPhotoFolderScanStates(updatedStates);
     } catch (stateError) {

@@ -61,36 +61,153 @@ export const generateMissingWorldJoinImages = (params: {
 };
 
 /**
+ * ループ1回分の画像生成処理
+ *
+ * 背景: 個別の World Join に対して API 取得 → 画像ダウンロード → 画像生成 → ファイル保存を行う。
+ * 各ステップの失敗は Effect.either で検出し、呼び出し側でスキップ判断する。
+ * ファイル I/O エラー（ENOENT, EACCES 等）は ts-pattern で分類し、
+ * 予期しないエラー（TypeError 等）は defect として再スローする。
+ */
+const generateSingleWorldJoinImage = (
+  join: { worldId: string; joinDateTime: Date },
+  photoDirPath: string,
+): Effect.Effect<
+  void,
+  { type: 'SKIPPABLE_ERROR'; worldId: string; message: string }
+> =>
+  Effect.gen(function* () {
+    // 3. VRChat API でワールド情報取得
+    // DB の worldId は string 型だが、API は VRChatWorldId (branded type) を要求する
+    const parsedWorldId = VRChatWorldIdSchema.safeParse(join.worldId);
+    if (!parsedWorldId.success) {
+      return yield* Effect.fail({
+        type: 'SKIPPABLE_ERROR' as const,
+        worldId: join.worldId,
+        message: `Invalid world ID format: ${join.worldId}`,
+      });
+    }
+
+    const worldInfo = yield* getVrcWorldInfoByWorldId(parsedWorldId.data).pipe(
+      Effect.mapError(
+        () =>
+          ({
+            type: 'SKIPPABLE_ERROR' as const,
+            worldId: join.worldId,
+            message: `Failed to get world info for ${join.worldId}`,
+          }) as const,
+      ),
+    );
+
+    // 4. ワールド画像をダウンロード → base64
+    const { ofetch } = yield* Effect.promise(() => import('ofetch'));
+    const imageResponse = yield* Effect.tryPromise({
+      try: () =>
+        ofetch(worldInfo.imageUrl, {
+          responseType: 'arrayBuffer',
+          timeout: 30_000,
+        }) as Promise<ArrayBuffer>,
+      catch: () =>
+        ({
+          type: 'SKIPPABLE_ERROR' as const,
+          worldId: join.worldId,
+          message: `Failed to download world image for ${join.worldId}`,
+        }) as const,
+    });
+
+    const imageBase64 = Buffer.from(imageResponse).toString('base64');
+
+    // 5. 画像生成（プレイヤー一覧は将来的に対応予定）
+    const imageBuffer = yield* generateWorldJoinImage({
+      worldName: worldInfo.name,
+      imageBase64,
+      players: null,
+      joinDateTime: join.joinDateTime,
+    }).pipe(
+      Effect.mapError(
+        () =>
+          ({
+            type: 'SKIPPABLE_ERROR' as const,
+            worldId: join.worldId,
+            message: `Failed to generate image for ${join.worldId}`,
+          }) as const,
+      ),
+    );
+
+    // 6. ファイル保存
+    // ファイル I/O エラーは ts-pattern で分類し、予期されたエラーのみスキップ対象にする
+    const outputPath = generateWorldJoinImagePath(
+      photoDirPath,
+      join.joinDateTime,
+      join.worldId,
+    );
+    const outputDir = path.dirname(outputPath);
+    yield* Effect.tryPromise({
+      try: async () => {
+        await fsPromises.mkdir(outputDir, { recursive: true });
+        await fsPromises.writeFile(outputPath, imageBuffer);
+      },
+      catch: (error) =>
+        match(error)
+          .with(
+            P.instanceOf(Error).and(
+              P.union(
+                { name: 'FetchError' },
+                { name: 'AbortError' },
+                {
+                  code: P.union('ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT'),
+                },
+              ),
+            ),
+            (e) =>
+              ({
+                type: 'SKIPPABLE_ERROR' as const,
+                worldId: join.worldId,
+                message: `Expected error generating world join image for ${join.worldId}: ${e.message}`,
+              }) as const,
+          )
+          .otherwise((e) => {
+            // 予期しないエラー（TypeError 等）は defect として再スロー → Sentry 送信
+            throw e;
+          }),
+    });
+  });
+
+/**
  * 内部実装: ミューテックスで保護された画像生成処理
  *
- * 内部でエラーをハンドリングして continue するため、
- * Effect.promise で全体をラップする。予期しないエラーは throw で Sentry 送信。
+ * 各 World Join の画像生成を Effect.either で個別にハンドリングし、
+ * 予期されたエラーはスキップして次の Join に進む（部分的成功パターン）。
+ * 予期しないエラーは generateSingleWorldJoinImage 内で defect として再スローされる。
  */
 const generateMissingWorldJoinImagesInternal = (params: {
   photoDirPath: string;
 }): Effect.Effect<GenerationResult, ImageGenerationError> =>
-  Effect.promise(async (): Promise<GenerationResult> => {
+  Effect.gen(function* () {
     const { photoDirPath } = params;
 
     // 1. DB から World Join ログを取得
-    const joins = await findVRChatWorldJoinLogList({
-      orderByJoinDateTime: 'desc',
-    });
+    const joins = yield* Effect.promise(() =>
+      findVRChatWorldJoinLogList({
+        orderByJoinDateTime: 'desc',
+      }),
+    );
 
     // 2. 未生成のものをフィルタ（非同期ファイル存在チェック）
-    const existenceChecks = await Promise.all(
-      joins.map(async (join) => {
-        const imagePath = generateWorldJoinImagePath(
-          photoDirPath,
-          join.joinDateTime,
-          join.worldId,
-        );
-        const exists = await fsPromises
-          .access(imagePath)
-          .then(() => true)
-          .catch(() => false);
-        return { join, exists };
-      }),
+    const existenceChecks = yield* Effect.promise(() =>
+      Promise.all(
+        joins.map(async (join) => {
+          const imagePath = generateWorldJoinImagePath(
+            photoDirPath,
+            join.joinDateTime,
+            join.worldId,
+          );
+          const exists = await fsPromises
+            .access(imagePath)
+            .then(() => true)
+            .catch(() => false);
+          return { join, exists };
+        }),
+      ),
     );
     const missingJoins = existenceChecks
       .filter((check) => !check.exists)
@@ -112,113 +229,28 @@ const generateMissingWorldJoinImagesInternal = (params: {
     for (const [index, join] of missingJoins.entries()) {
       // API レート制限回避: 1 秒間隔でリクエスト
       if (index > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        yield* Effect.promise(
+          () => new Promise((resolve) => setTimeout(resolve, 1000)),
+        );
       }
 
-      // effect-lint-allow-try-catch: ループ内の部分的成功パターン（個別失敗をスキップして継続）
-      try {
-        // 3. VRChat API でワールド情報取得
-        // DB の worldId は string 型だが、API は VRChatWorldId (branded type) を要求する
-        const parsedWorldId = VRChatWorldIdSchema.safeParse(join.worldId);
-        if (!parsedWorldId.success) {
-          logger.warn(`Invalid world ID format: ${join.worldId}`);
-          errors++;
-          continue;
-        }
-        const worldInfoExit = await Effect.runPromiseExit(
-          getVrcWorldInfoByWorldId(parsedWorldId.data),
-        );
-        if (worldInfoExit._tag === 'Failure') {
-          logger.warn(`Failed to get world info for ${join.worldId}`);
-          errors++;
-          continue;
-        }
+      // 部分的成功パターン: Effect.either で個別エラーをハンドリング
+      const result = yield* Effect.either(
+        generateSingleWorldJoinImage(join, photoDirPath),
+      );
 
-        const worldInfo = worldInfoExit.value;
-
-        // 4. ワールド画像をダウンロード → base64
-        const { ofetch } = await import('ofetch');
-        const downloadExit = await Effect.runPromiseExit(
-          Effect.tryPromise({
-            try: () =>
-              ofetch(worldInfo.imageUrl, {
-                responseType: 'arrayBuffer',
-                timeout: 30_000,
-              }) as Promise<ArrayBuffer>,
-            catch: (_e): { type: 'DOWNLOAD_ERROR'; worldId: string } => ({
-              type: 'DOWNLOAD_ERROR',
-              worldId: join.worldId,
-            }),
-          }),
-        );
-        if (downloadExit._tag === 'Failure') {
-          logger.warn({
-            message: `Failed to download world image for ${join.worldId}`,
-            stack: new Error(`Download failed for world ${join.worldId}`),
-          });
-          errors++;
-          continue;
-        }
-        const imageResponse = downloadExit.value;
-
-        const imageBase64 = Buffer.from(imageResponse).toString('base64');
-
-        // 5. 画像生成（プレイヤー一覧は将来的に対応予定）
-        const imageExit = await Effect.runPromiseExit(
-          generateWorldJoinImage({
-            worldName: worldInfo.name,
-            imageBase64,
-            players: null,
-            joinDateTime: join.joinDateTime,
-          }),
-        );
-
-        if (imageExit._tag === 'Failure') {
-          logger.warn(`Failed to generate image for ${join.worldId}`);
-          errors++;
-          continue;
-        }
-
-        // 6. ファイル保存
-        const outputPath = generateWorldJoinImagePath(
-          photoDirPath,
-          join.joinDateTime,
-          join.worldId,
-        );
-        const outputDir = path.dirname(outputPath);
-        await fsPromises.mkdir(outputDir, { recursive: true });
-        await fsPromises.writeFile(outputPath, imageExit.value);
-
-        generated++;
-        emitProgress({
-          stage: 'world_join_image',
-          progress: Math.round(((index + 1) / missingJoins.length) * 100),
-          message: `Generated ${generated}/${missingJoins.length} images`,
-        });
-      } catch (error) {
-        // エラー分類: 予期されたエラー（ネットワーク/ファイルI/O）はログして続行
-        // 予期しないエラー（TypeError 等）は re-throw して Sentry に送信
-        match(error)
-          .with(
-            P.instanceOf(Error).and(
-              P.union(
-                { name: 'FetchError' },
-                { name: 'AbortError' },
-                { code: P.union('ENOENT', 'EACCES', 'EPERM', 'ETIMEDOUT') },
-              ),
-            ),
-            (e) => {
-              logger.warn({
-                message: `Expected error generating world join image for ${join.worldId}: ${e.message}`,
-                stack: e,
-              });
-              errors++;
-            },
-          )
-          .otherwise((e) => {
-            throw e;
-          });
+      if (result._tag === 'Left') {
+        logger.warn(result.left.message);
+        errors++;
+        continue;
       }
+
+      generated++;
+      emitProgress({
+        stage: 'world_join_image',
+        progress: Math.round(((index + 1) / missingJoins.length) * 100),
+        message: `Generated ${generated}/${missingJoins.length} images`,
+      });
     }
 
     logger.info(

@@ -153,12 +153,12 @@ import { Text, Heading } from '@/components/ui/text';
 
 ## Lintルール
 
-### GritQLパターン
+### ast-grep ルール
 
-`.grit/patterns/` に定義されたパターンでドリフトを検出：
+`rules/ast-grep/` に定義されたルールでドリフトを検出：
 
-- `no_hardcoded_gray.md` - gray-XXXの直接使用を検出
-- `no_hardcoded_indigo.md` - indigo-XXXの直接使用を検出
+- `no-hardcoded-gray.yml` - gray-XXXの直接使用を検出
+- `no-hardcoded-indigo.yml` - indigo-XXXの直接使用を検出
 
 ## 移行ガイド
 
@@ -185,4 +185,4 @@ import { Text, Heading } from '@/components/ui/text';
 1. **新規コードではトークンを使用** - gray/indigoなどの直接指定を避ける
 2. **コンポーネントを活用** - Badge, Card, Textなどの共通コンポーネントを使う
 3. **段階的移行** - 既存コードは優先度順に移行
-4. **Lintで検証** - `pnpm lint` でGritQLパターン違反をチェック
+4. **Lintで検証** - `pnpm lint` でast-grepルール違反をチェック

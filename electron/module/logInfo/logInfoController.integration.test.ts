@@ -90,8 +90,10 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
 
     await playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs);
 
-    // 関数を実行（直接配列または null を返す）
-    const result = await getPlayerJoinListInSameWorld(baseDate);
+    // 関数を実行（Effect を返すので Effect.runPromise で実行）
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(baseDate),
+    );
 
     // 期待される結果
     expect(result).not.toBeNull();
@@ -206,7 +208,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
     await playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs);
 
     // 基準時刻で関数を実行（Afternoon World のセッション中）
-    const result = await getPlayerJoinListInSameWorld(baseDate);
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(baseDate),
+    );
 
     // 期待される結果
     expect(result).not.toBeNull();
@@ -286,9 +290,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
 
     await playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs);
 
-    // 関数を実行
-    const result = await getPlayerJoinListInSameWorld(
-      datefns.addMinutes(baseDate, 15), // 基準時刻を少し未来に設定
+    // 関数を実行（Effect を返すので Effect.runPromise で実行）
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(datefns.addMinutes(baseDate, 15)),
     );
 
     // 期待される結果
@@ -310,7 +314,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
     const baseDate = datefns.parseISO('2023-01-01T00:00:00Z');
 
     // 関数を実行（ワールド参加ログがない場合は null を返す）
-    const result = await getPlayerJoinListInSameWorld(baseDate);
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(baseDate),
+    );
 
     // 期待される結果：null が返される
     expect(result).toBeNull();

@@ -174,6 +174,6 @@ git push -u origin feat/xxx
 
 **実装オプション**:
 - TypeScript Compiler API: `scripts/lint-*.ts`
-- GritQL: `.grit/patterns/*.md`
+- ast-grep: `rules/ast-grep/*.yml`
 
 ※ ESLint は使わない（Biome 移行済み）
