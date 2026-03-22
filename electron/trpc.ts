@@ -211,6 +211,7 @@ const logError = (
 
 const errorHandler = t.middleware(async (opts) => {
   // tRPC ミドルウェアのエラーハンドリングを統一
+  // effect-lint-allow-try-catch: tRPC フレームワーク境界（opts.next() が throw する）
   try {
     const result = await opts.next(opts);
     if (!result.ok) {

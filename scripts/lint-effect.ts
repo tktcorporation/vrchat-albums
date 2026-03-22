@@ -12,6 +12,7 @@
  * - no-mock-resolved-effect: mockResolvedValue(Effect.succeed/fail) パターンを検出
  * - no-run-effect-for-trpc: 旧 runEffectForTRPC の使用を検出
  * - require-cause-in-mapError: mapError/catchTag 内の withStructuredInfo に cause がないケースを警告
+ * - no-try-catch: try-catch の使用を検出（Effect.try / Effect.tryPromise を使用すべき）
  *
  * @see docs/superpowers/specs/2026-03-22-effect-native-error-handling-design.md
  */
@@ -318,6 +319,53 @@ function checkCauseInErrorHandler(filePath: string, content: string) {
   }
 }
 
+/**
+ * try-catch の使用を検出
+ *
+ * 背景: try-catch は予期しないエラーも含めて全てキャッチしてしまい、
+ * Sentry に送信されるべきエラーが握りつぶされるリスクがある。
+ * Effect.try / Effect.tryPromise を使用し、エラーを型安全に分類すべき。
+ *
+ * 許容ケース（// effect-lint-allow-try-catch コメントで明示）:
+ * - finally でリソースクリーンアップが必要な場合
+ * - Electron 環境検出パターン（require('electron') の try-catch）
+ * - ts-pattern でエラーを分類し、予期しないエラーを再スローする場合
+ *
+ * @see .claude/rules/error-handling.md
+ */
+function checkNoTryCatch(filePath: string, content: string) {
+  // テストファイルは除外
+  if (filePath.includes('.test.') || filePath.includes('.spec.')) return;
+  // lint スクリプト自体は除外
+  if (filePath.includes('scripts/lint-')) return;
+
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trimStart();
+
+    // try { を検出（コメント行は除外）
+    if (
+      /^try\s*\{/.test(line) &&
+      !line.startsWith('//') &&
+      !line.startsWith('*')
+    ) {
+      // 前の行に許可コメントがあるかチェック
+      const prevLine = i > 0 ? lines[i - 1] : '';
+      if (prevLine.includes('effect-lint-allow-try-catch')) {
+        continue;
+      }
+
+      addIssue(
+        filePath,
+        i + 1,
+        'no-try-catch',
+        'try-catch は Effect.try / Effect.tryPromise に置き換えてください。許容する場合は前の行に // effect-lint-allow-try-catch を追加してください。',
+        'warning',
+      );
+    }
+  }
+}
+
 async function main() {
   const targetPaths = NormalizedPathArraySchema.parse(
     await glob('electron/**/*.ts', {
@@ -343,6 +391,7 @@ async function main() {
     checkNoMockResolvedEffect(normalizedPath, content);
     checkNoRunEffectForTRPC(normalizedPath, content);
     checkCauseInErrorHandler(normalizedPath, content);
+    checkNoTryCatch(normalizedPath, content);
   }
 
   const errorIssues = issues.filter((i) => i.severity === 'error');
