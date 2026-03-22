@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+
 import { enqueueTask } from '../../lib/dbHelper';
 import type { VRChatPlayerJoinLog } from '../vrchatLog/service';
 import {
@@ -124,12 +125,7 @@ export const getLatestDetectedDate = (): Effect.Effect<
           message: `最新の検出日時の取得に失敗しました: ${e.message}`,
         }),
     ),
-    Effect.map(
-      (latestLog) =>
-        (
-          latestLog as model.VRChatPlayerJoinLogModel | null
-        )?.joinDateTime.toISOString() ?? null,
-    ),
+    Effect.map((latestLog) => latestLog?.joinDateTime.toISOString() ?? null),
   );
 };
 

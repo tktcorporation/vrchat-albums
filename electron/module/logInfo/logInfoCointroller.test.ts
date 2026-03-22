@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { clearAllCaches } from '../../lib/queryCache';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 // import { VRChatPlayerNameSchema } from '../vrchatLog/model';
@@ -115,9 +116,8 @@ describe('getPlayerJoinListInSameWorld', () => {
       updatedAt: new Date(),
     };
 
-    const { PlayerJoinLogDatabaseError } = await import(
-      '../VRChatPlayerJoinLogModel/errors'
-    );
+    const { PlayerJoinLogDatabaseError } =
+      await import('../VRChatPlayerJoinLogModel/errors');
     const mockError = new PlayerJoinLogDatabaseError({
       message: 'データベースエラー',
     });

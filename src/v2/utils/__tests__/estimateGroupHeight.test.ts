@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { VRChatPhotoPathSchema } from '../../../valueObjects';
 import { LAYOUT_CONSTANTS } from '../../constants/layoutConstants';
 import type { Photo } from '../../types/photo';

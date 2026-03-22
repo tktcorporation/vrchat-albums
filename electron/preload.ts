@@ -1,5 +1,4 @@
 import '@sentry/electron/preload';
-
 import type { Operation } from '@trpc/client';
 import type { TRPCResponseMessage } from '@trpc/server/rpc';
 /**

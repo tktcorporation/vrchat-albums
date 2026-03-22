@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
+
 import { extractDominantColors } from '../utils/colorExtractor';
 
 interface Player {

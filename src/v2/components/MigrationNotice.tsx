@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+
 import { trpcReact } from '@/trpc';
 import { useToast } from '@/v2/hooks/use-toast';
+
 import { MigrationDialog } from './MigrationDialog';
 
 /**
@@ -46,7 +48,7 @@ export const useMigrationNotice = () => {
 
     // 移行が必要で、まだ通知を表示していない場合
     const shouldShowDialog =
-      migrationStatus.migrationNeeded === true && !migrationNoticeShown;
+      migrationStatus.migrationNeeded && !migrationNoticeShown;
 
     if (shouldShowDialog) {
       setShowMigrationDialog(true);

@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { autoUpdater } from 'electron-updater';
 import { BehaviorSubject } from 'rxjs';
+
 import { logger } from '../../lib/logger';
 import { UpdateCheckFailed } from './errors';
 

@@ -4,6 +4,7 @@ import consola from 'consola';
 import { glob } from 'glob';
 import path from 'pathe';
 import * as ts from 'typescript';
+
 import { type NormalizedPath, NormalizedPathArraySchema } from './lib/paths';
 
 interface ValueObjectIssue {
@@ -218,7 +219,7 @@ export class ValueObjectLinter {
 
     // If this is a class type, check its base types
     if (type.isClass()) {
-      const baseTypes = this.checker.getBaseTypes(type as ts.InterfaceType);
+      const baseTypes = this.checker.getBaseTypes(type);
 
       // Recursively check each base type
       for (const baseType of baseTypes) {

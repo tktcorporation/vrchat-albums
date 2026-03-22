@@ -402,9 +402,8 @@ describe('useHybridPhotoLoading', () => {
     });
 
     it('メタデータがnullの場合は空配列を返す', async () => {
-      const { useHybridPhotoLoading } = await import(
-        '../useHybridPhotoLoading'
-      );
+      const { useHybridPhotoLoading } =
+        await import('../useHybridPhotoLoading');
 
       const { result } = renderHook(() => useHybridPhotoLoading());
 
@@ -420,9 +419,8 @@ describe('useHybridPhotoLoading', () => {
         isLoading: true,
       });
 
-      const { useHybridPhotoLoading } = await import(
-        '../useHybridPhotoLoading'
-      );
+      const { useHybridPhotoLoading } =
+        await import('../useHybridPhotoLoading');
 
       const { result } = renderHook(() => useHybridPhotoLoading());
 
@@ -430,9 +428,8 @@ describe('useHybridPhotoLoading', () => {
     });
 
     it('getPhotoPathがキャッシュされていないIDに対してundefinedを返す', async () => {
-      const { useHybridPhotoLoading } = await import(
-        '../useHybridPhotoLoading'
-      );
+      const { useHybridPhotoLoading } =
+        await import('../useHybridPhotoLoading');
 
       const { result } = renderHook(() => useHybridPhotoLoading());
 

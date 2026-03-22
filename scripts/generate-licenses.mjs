@@ -9,6 +9,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+
 import licenseChecker from 'license-checker';
 
 const rootDir = process.cwd();

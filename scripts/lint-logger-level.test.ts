@@ -1,5 +1,7 @@
 import * as path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
 import { LoggerLevelLinter } from './lint-logger-level.js';
 
 describe('Logger Level Linter', () => {

@@ -57,18 +57,18 @@ jj config set --user user.email "your.email@example.com"
 
 ## 基本コマンド（Git との対応表）
 
-| Git | Jujutsu | 説明 |
-|-----|---------|------|
-| `git status` | `jj status` / `jj st` | 作業状態の確認 |
-| `git diff` | `jj diff` | 差分表示 |
-| `git log` | `jj log` | 履歴表示 |
-| `git add` | （自動） | jj は自動的に変更を追跡 |
-| `git commit` | `jj commit -m "..."` | コミット作成 |
-| `git branch` | `jj bookmark list` | ブランチ一覧 |
-| `git checkout -b` | `jj bookmark create` | ブランチ作成 |
-| `git push` | `jj git push` | リモートへプッシュ |
-| `git pull` | `jj git fetch` | リモートから取得 |
-| `git rebase -i` | `jj rebase` | リベース |
+| Git               | Jujutsu               | 説明                    |
+| ----------------- | --------------------- | ----------------------- |
+| `git status`      | `jj status` / `jj st` | 作業状態の確認          |
+| `git diff`        | `jj diff`             | 差分表示                |
+| `git log`         | `jj log`              | 履歴表示                |
+| `git add`         | （自動）              | jj は自動的に変更を追跡 |
+| `git commit`      | `jj commit -m "..."`  | コミット作成            |
+| `git branch`      | `jj bookmark list`    | ブランチ一覧            |
+| `git checkout -b` | `jj bookmark create`  | ブランチ作成            |
+| `git push`        | `jj git push`         | リモートへプッシュ      |
+| `git pull`        | `jj git fetch`        | リモートから取得        |
+| `git rebase -i`   | `jj rebase`           | リベース                |
 
 ---
 

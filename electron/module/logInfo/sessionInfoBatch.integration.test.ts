@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events';
+
 import { parseISO } from 'date-fns';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
 import * as client from '../../lib/sequelize';
-import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import {
   OptionalVRChatPlayerIdSchema,
   VRChatPlayerNameSchema,
@@ -11,6 +12,7 @@ import {
   VRChatWorldInstanceIdSchema,
   VRChatWorldNameSchema,
 } from '../vrchatLog/model';
+import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 import { logInfoRouter } from './logInfoCointroller';
 

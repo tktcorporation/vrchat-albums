@@ -12,5 +12,5 @@ rule:
   pattern: export class $CLASS extends BaseValueObject<$A, $B> { $$$BODY }
 ignores:
   - scripts/test-fixtures/**
-  - "**/*.test.ts"
-  - "**/*.spec.ts"
+  - '**/*.test.ts'
+  - '**/*.spec.ts'

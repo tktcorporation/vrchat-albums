@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { FloatingPromiseLinter } from './lint-floating-promises';
 
 describe('FloatingPromiseLinter', () => {

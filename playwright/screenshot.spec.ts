@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { _electron, expect, type Page, test } from '@playwright/test';
 import consola from 'consola';
 
@@ -42,7 +43,7 @@ const launchElectronApp = async () => {
           console.log('Development server is ready');
           return true;
         }
-      } catch (_error) {
+      } catch {
         // サーバーがまだ起動していない
         console.log(`Waiting for server... (attempt ${i + 1}/${maxAttempts})`);
       }
@@ -135,7 +136,7 @@ const screenshot = async (page: Page, title: string, suffix: string) => {
     screenshotsTaken.add(suffix);
   } catch (error) {
     console.error(`Failed to take screenshot ${suffix}:`, error);
-    throw new Error(`Screenshot failed: ${suffix}`);
+    throw new Error(`Screenshot failed: ${suffix}`, { cause: error });
   }
 };
 
@@ -326,11 +327,13 @@ test('各画面でスクショ', async () => {
       // ページがクローズされるのは異常
       throw new Error(
         'Page was unexpectedly closed during test execution (possibly due to memory issues)',
+        { cause: error },
       );
     }
     // ページが開いているのにセレクタが見つからない場合もエラー
     throw new Error(
       `Failed to find main content selector after setup: ${error}`,
+      { cause: error },
     );
   }
 

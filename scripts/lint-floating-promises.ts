@@ -15,6 +15,7 @@
 import consola from 'consola';
 import { glob } from 'glob';
 import * as ts from 'typescript';
+
 import {
   type NormalizedPath,
   NormalizedPathArraySchema,

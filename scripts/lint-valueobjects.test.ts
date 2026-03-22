@@ -1,5 +1,7 @@
 import * as path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
 import { lintValueObjects } from './lint-valueobjects.js';
 
 describe('ValueObject Linter', () => {

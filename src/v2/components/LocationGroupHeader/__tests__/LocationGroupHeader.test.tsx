@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { createQueryStub } from '@/v2/helpers/testing/createQueryStub';
+
 import { LocationGroupHeader } from '../index';
 
 // バックエンドサービスのモック
@@ -153,9 +155,8 @@ describe('LocationGroupHeader - Player Uniqueness', () => {
 
   it('rejoinしたプレイヤーの重複を除去する', async () => {
     const { trpcReact, trpcClient } = await import('@/trpc');
-    const { useSessionInfoBatch } = await import(
-      '../hooks/useSessionInfoBatch'
-    );
+    const { useSessionInfoBatch } =
+      await import('../hooks/useSessionInfoBatch');
 
     // 同じプレイヤーが複数回joinしたデータをモック
     const duplicatePlayersData = [
@@ -235,9 +236,8 @@ describe('LocationGroupHeader - Player Uniqueness', () => {
 
   it('異なるプレイヤー名は正常に表示される', async () => {
     const { trpcReact, trpcClient } = await import('@/trpc');
-    const { useSessionInfoBatch } = await import(
-      '../hooks/useSessionInfoBatch'
-    );
+    const { useSessionInfoBatch } =
+      await import('../hooks/useSessionInfoBatch');
 
     const uniquePlayersData = [
       {
@@ -312,9 +312,8 @@ describe('LocationGroupHeader - Player Uniqueness', () => {
 
   it('空のプレイヤーリストを正しく処理する', async () => {
     const { trpcReact, trpcClient } = await import('@/trpc');
-    const { useSessionInfoBatch } = await import(
-      '../hooks/useSessionInfoBatch'
-    );
+    const { useSessionInfoBatch } =
+      await import('../hooks/useSessionInfoBatch');
 
     // サービスレイヤーのモック設定（空のプレイヤーリスト）
     mockPlayerJoinLogService.getVRChatPlayerJoinLogListByMultipleDateRanges.mockResolvedValue(
@@ -375,9 +374,8 @@ describe('LocationGroupHeader - Query Optimization', () => {
 
   it('should setup IntersectionObserver on mount', async () => {
     const { trpcReact } = await import('@/trpc');
-    const { useSessionInfoBatch } = await import(
-      '../hooks/useSessionInfoBatch'
-    );
+    const { useSessionInfoBatch } =
+      await import('../hooks/useSessionInfoBatch');
 
     vi.mocked(
       trpcReact.vrchatApi.getVrcWorldInfoByWorldId.useQuery,
@@ -411,9 +409,8 @@ describe('LocationGroupHeader - Query Optimization', () => {
 
   it('should enable queries when element becomes visible', async () => {
     const { trpcReact } = await import('@/trpc');
-    const { useSessionInfoBatch } = await import(
-      '../hooks/useSessionInfoBatch'
-    );
+    const { useSessionInfoBatch } =
+      await import('../hooks/useSessionInfoBatch');
 
     const mockWorldQuery = vi.fn().mockReturnValue(
       createQueryStub({
@@ -460,9 +457,8 @@ describe('LocationGroupHeader - Query Optimization', () => {
 
   it('should disable queries when element becomes invisible', async () => {
     const { trpcReact } = await import('@/trpc');
-    const { useSessionInfoBatch } = await import(
-      '../hooks/useSessionInfoBatch'
-    );
+    const { useSessionInfoBatch } =
+      await import('../hooks/useSessionInfoBatch');
 
     vi.mocked(
       trpcReact.vrchatApi.getVrcWorldInfoByWorldId.useQuery,
@@ -500,9 +496,8 @@ describe('LocationGroupHeader - Query Optimization', () => {
 
   it('should cleanup IntersectionObserver on unmount', async () => {
     const { trpcReact } = await import('@/trpc');
-    const { useSessionInfoBatch } = await import(
-      '../hooks/useSessionInfoBatch'
-    );
+    const { useSessionInfoBatch } =
+      await import('../hooks/useSessionInfoBatch');
 
     vi.mocked(
       trpcReact.vrchatApi.getVrcWorldInfoByWorldId.useQuery,
@@ -530,9 +525,8 @@ describe('LocationGroupHeader - Query Optimization', () => {
 
   it('should apply query optimization settings', async () => {
     const { trpcReact } = await import('@/trpc');
-    const { useSessionInfoBatch } = await import(
-      '../hooks/useSessionInfoBatch'
-    );
+    const { useSessionInfoBatch } =
+      await import('../hooks/useSessionInfoBatch');
 
     const mockWorldQuery = vi.fn().mockReturnValue(
       createQueryStub({

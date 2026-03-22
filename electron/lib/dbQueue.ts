@@ -2,6 +2,7 @@ import type { Transaction } from '@sequelize/core';
 import { Effect } from 'effect';
 import PQueue from 'p-queue';
 import { match, P } from 'ts-pattern';
+
 import { logger } from './logger';
 import { getRDBClient } from './sequelize';
 
@@ -94,7 +95,7 @@ class DBQueue {
 
     // effect-lint-allow-try-catch: ts-pattern でエラー分類し予期しないエラーを再スローするパターン
     try {
-      const result = await this.queue.add(task).then((r) => r as T);
+      const result = await this.queue.add(task).then((r) => r);
       return result;
     } catch (error) {
       match(error)
@@ -136,7 +137,7 @@ class DBQueue {
       }
 
       return yield* Effect.tryPromise({
-        try: () => this.queue.add(task).then((r) => r as T),
+        try: () => this.queue.add(task).then((r) => r),
         catch: (error): DBQueueError => {
           return match(error)
             .with(

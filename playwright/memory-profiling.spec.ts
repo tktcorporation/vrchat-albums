@@ -15,6 +15,7 @@ import * as childProcess from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { _electron, expect, test } from '@playwright/test';
 
 const __filename = fileURLToPath(import.meta.url);

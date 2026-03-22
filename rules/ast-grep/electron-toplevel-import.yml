@@ -16,6 +16,6 @@ rule:
 files:
   - electron/module/**/*.ts
 ignores:
-  - "**/*.test.ts"
-  - "**/*.spec.ts"
-  - "**/__tests__/**"
+  - '**/*.test.ts'
+  - '**/*.spec.ts'
+  - '**/__tests__/**'

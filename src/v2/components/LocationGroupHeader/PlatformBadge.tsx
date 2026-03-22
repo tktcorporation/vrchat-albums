@@ -1,5 +1,6 @@
 import { Laptop } from 'lucide-react';
 import { memo } from 'react';
+
 import { ICON_SIZE } from '../../constants/ui';
 
 interface PlatformBadgeProps {

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+
 import type { Photo } from '../types/photo';
 import { JustifiedLayoutCalculator } from '../utils/justifiedLayoutCalculator';
 import PhotoCard from './PhotoCard';

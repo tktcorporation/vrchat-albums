@@ -1,4 +1,5 @@
 import { match } from 'ts-pattern';
+
 import type { VRChatLogLine } from '../model';
 import { parseLogDateTime } from './baseParser';
 

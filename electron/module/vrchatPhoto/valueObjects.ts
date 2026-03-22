@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { BaseValueObject } from '../../lib/baseValueObject.js';
 
 /**

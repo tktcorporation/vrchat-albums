@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
   __eventEmitterTestHelpers,
   clearAllListenersForTesting,
@@ -293,9 +294,8 @@ describe('useThumbnail', () => {
   });
 
   it('キャッシュ更新イベントを受け取るとstateが更新される', async () => {
-    const { useThumbnail, useThumbnailCache } = await import(
-      '../useThumbnailCache'
-    );
+    const { useThumbnail, useThumbnailCache } =
+      await import('../useThumbnailCache');
 
     // First, clear the cache
     const { result: cacheResult } = renderHook(() => useThumbnailCache());

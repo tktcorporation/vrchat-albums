@@ -31,13 +31,15 @@
    - `GalleryContent.tsx:402` (生のクエリ)
 
 2. **`useGroupPhotos` の `useMemo` に `onGroupingEnd` が依存配列に含まれている**
+
    ```typescript
    const groupedPhotos = useMemo(() => {
      // ...
-     onGroupingEnd?.();  // 副作用
+     onGroupingEnd?.(); // 副作用
      return result;
-   }, [photos, joinLogs, isLoadingLogs, onGroupingEnd]);  // ← onGroupingEnd
+   }, [photos, joinLogs, isLoadingLogs, onGroupingEnd]); // ← onGroupingEnd
    ```
+
    親の再レンダリングで `onGroupingEnd` の参照が変わり、useMemo が再計算される。
 
 3. **`groupPhotosBySession` が O(n×m) の計算量**

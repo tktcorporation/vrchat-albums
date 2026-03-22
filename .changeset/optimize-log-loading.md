@@ -1,5 +1,5 @@
 ---
-"vrchat-albums": patch
+'vrchat-albums': patch
 ---
 
 ログ同期の起動時パフォーマンスを最適化: 重複判定キャッシュ導入、ホットパスの Zod オーバーヘッド除去、INCREMENTAL モードでのファイル二重読み込み回避

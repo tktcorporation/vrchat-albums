@@ -37,7 +37,7 @@ export function createQueryStub<TData = unknown, TError = unknown>(
   // 基本的なプロパティ
   const baseResult = {
     data: data as TData | undefined,
-    error: error as TError | null,
+    error: error,
     // biome-ignore lint/suspicious/noExplicitAny: refetch function has complex overloads that are difficult to type
     refetch: refetch as any,
     isFetching,
@@ -54,7 +54,7 @@ export function createQueryStub<TData = unknown, TError = unknown>(
     dataUpdatedAt: data ? Date.now() : 0,
     errorUpdatedAt: error ? Date.now() : 0,
     failureCount: error ? 1 : 0,
-    failureReason: error as TError | null,
+    failureReason: error,
     errorUpdateCount: error ? 1 : 0,
     remove: vi.fn(),
     // tRPC specific properties

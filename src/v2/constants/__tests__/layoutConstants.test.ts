@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { LAYOUT_CONSTANTS } from '../layoutConstants';
 
 describe('LAYOUT_CONSTANTS', () => {

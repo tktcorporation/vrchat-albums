@@ -7,6 +7,7 @@ import {
   type MockedFunction,
   vi,
 } from 'vitest';
+
 import { logger } from '../../../lib/logger';
 import { VRChatLogFilePathSchema } from '../../vrchatLogFileDir/model';
 import { VRChatLogLineSchema } from '../model';

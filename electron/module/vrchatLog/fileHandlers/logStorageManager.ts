@@ -1,7 +1,9 @@
 import * as nodeFs from 'node:fs';
 import path from 'node:path';
+
 import * as datefns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
+
 import { logger } from '../../../lib/logger';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import * as fs from '../../../lib/wrappedFs';

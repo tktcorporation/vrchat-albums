@@ -3,6 +3,7 @@ import { LoaderCircle } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { match } from 'ts-pattern';
+
 import { LAYOUT_CONSTANTS } from '../../constants/layoutConstants';
 import { useContainerWidth } from '../../hooks/useContainerWidth';
 import type { UseLoadingStateResult } from '../../hooks/useLoadingState';
@@ -23,11 +24,10 @@ import type { GroupedPhoto, GroupedPhotos } from './useGroupPhotos';
 /**
  * ギャラリーコンテンツコンポーネントのプロパティ定義
  */
-interface GalleryContentProps
-  extends Pick<
-    UseLoadingStateResult,
-    'isLoadingStartupSync' | 'isLoadingGrouping'
-  > {
+interface GalleryContentProps extends Pick<
+  UseLoadingStateResult,
+  'isLoadingStartupSync' | 'isLoadingGrouping'
+> {
   /** グループ化された写真データ（親から渡される） */
   groupedPhotos: GroupedPhotos;
   /** 選択された写真のID配列 */

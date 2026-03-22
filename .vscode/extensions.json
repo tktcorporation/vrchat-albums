@@ -13,6 +13,7 @@
     "github.vscode-github-actions",
     "vivaxy.vscode-conventional-commits",
     "github.vscode-github-actions",
-    "biomejs.biome"
+    "nicolo-ribaudo.vscode-oxfmt",
+    "nicolo-ribaudo.vscode-oxlint"
   ]
 }

@@ -3,6 +3,7 @@ import type React from 'react';
 import { memo, useState } from 'react';
 
 import { trpcReact } from '@/trpc';
+
 import packageJson from '../../../../package.json';
 import { Button } from '../../../components/ui/button';
 import { SPACING, SURFACE_COLOR, TEXT_COLOR } from '../../constants/ui';

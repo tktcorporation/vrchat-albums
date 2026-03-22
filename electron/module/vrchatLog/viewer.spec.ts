@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
+
 import { getData } from '../../lib/getData';
 import type { VRChatWorldInfoFromApi } from '../vrchatApi/service';
 

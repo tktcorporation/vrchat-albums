@@ -7,6 +7,7 @@
  */
 import { TRPCClientError } from '@trpc/client';
 import { match, P } from 'ts-pattern';
+
 import { logger } from './logger';
 
 interface TRPCErrorLogContext {

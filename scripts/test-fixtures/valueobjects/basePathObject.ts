@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { BaseValueObject } from '../../../electron/lib/baseValueObject.js';
 
 // This is a base class for testing inheritance - NOT a ValueObject pattern

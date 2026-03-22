@@ -1,4 +1,5 @@
 import path from 'node:path';
+
 /// <reference types="vitest" />
 import { defaultExclude, defineConfig } from 'vitest/config';
 

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+
 import { VRChatPhotoPathSchema } from '../../../../valueObjects';
 
 // Mock trpc to prevent ipcLink from being evaluated in non-electron environment

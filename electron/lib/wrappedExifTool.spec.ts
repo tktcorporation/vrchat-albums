@@ -1,10 +1,12 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
 import { Transformer } from '@napi-rs/image';
 import { Effect } from 'effect';
 import type { ExifDateTime } from 'exiftool-vendored';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+
 import * as wrappedExiftool from './wrappedExifTool';
 
 describe('wrappedExifTool', () => {
@@ -28,12 +30,12 @@ describe('wrappedExifTool', () => {
     // テストファイルとディレクトリを削除
     try {
       await fs.promises.unlink(testImagePath);
-    } catch (_error) {
+    } catch {
       // ファイルが既に削除されている場合は無視
     }
     try {
       await fs.promises.rmdir(tempDir);
-    } catch (_error) {
+    } catch {
       // ディレクトリが削除できない場合は無視
     }
   });

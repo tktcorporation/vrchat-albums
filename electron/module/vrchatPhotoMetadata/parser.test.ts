@@ -7,6 +7,7 @@
 
 import { Cause, Effect, Exit, Option } from 'effect';
 import { describe, expect, it } from 'vitest';
+
 import { extractOfficialMetadata, parsePhotoMetadata } from './parser';
 
 // ============================================================================

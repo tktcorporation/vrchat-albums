@@ -14,7 +14,9 @@ import { match, P } from 'ts-pattern';
 // ✅ Good: ts-pattern による型安全なマッチング
 return match(error)
   .with(P.instanceOf(Error), (err) => handleError(err))
-  .otherwise((err) => { throw err; });
+  .otherwise((err) => {
+    throw err;
+  });
 
 // ❌ Bad: if文による条件分岐
 if (error instanceof Error) return handleError(error);
@@ -24,12 +26,12 @@ if (error instanceof Error) return handleError(error);
 
 ## 優先的に使用すべき場面
 
-| 場面 | 説明 |
-|------|------|
-| エラーハンドリング | エラー種別による分岐処理 |
-| Enum/リテラル比較 | 文字列リテラル型やEnumの分岐 |
-| 型ガード | `instanceof` や型チェック |
-| ネストしたif-else | 複数条件の組み合わせ |
+| 場面               | 説明                         |
+| ------------------ | ---------------------------- |
+| エラーハンドリング | エラー種別による分岐処理     |
+| Enum/リテラル比較  | 文字列リテラル型やEnumの分岐 |
+| 型ガード           | `instanceof` や型チェック    |
+| ネストしたif-else  | 複数条件の組み合わせ         |
 
 ---
 
@@ -94,7 +96,9 @@ match(stage)
 match(error)
   .with(P.instanceOf(ValidationError), (e) => handleValidation(e))
   .with(P.instanceOf(NetworkError), (e) => handleNetwork(e))
-  .otherwise((e) => { throw e; });
+  .otherwise((e) => {
+    throw e;
+  });
 ```
 
 ---

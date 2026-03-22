@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { BasePathObject } from './basePathObject.js';
 
 const _opaqueSymbol: unique symbol = Symbol('opaqueSymbol');

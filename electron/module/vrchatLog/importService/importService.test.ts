@@ -1,7 +1,9 @@
 import type { Dirent, Stats } from 'node:fs';
 import { promises as fs } from 'node:fs';
+
 import { Cause, Effect, Exit, Option } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import * as logSyncModule from '../../logSync/service';
 import type { DBLogProvider } from '../backupService/backupService';
 import * as backupServiceModule from '../backupService/backupService';

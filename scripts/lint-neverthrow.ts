@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 import * as fs from 'node:fs';
+
 import consola from 'consola';
 import { glob } from 'glob';
 import { minimatch } from 'minimatch';
 import path from 'pathe';
 import * as ts from 'typescript';
+
 import {
   type NormalizedPath,
   NormalizedPathArraySchema,
@@ -69,7 +71,13 @@ const RESULT_PROPERTIES = [
 ];
 
 // Methods that properly handle/consume a Result
-const HANDLED_METHODS = ['match', 'unwrapOr', '_unsafeUnwrap', 'isErr', 'isOk'];
+const HANDLED_METHODS = new Set([
+  'match',
+  'unwrapOr',
+  '_unsafeUnwrap',
+  'isErr',
+  'isOk',
+]);
 
 export class NeverthrowLinter {
   private issues: NeverthrowIssue[] = [];
@@ -252,7 +260,7 @@ export class NeverthrowLinter {
       const methodName = parent.name.text;
 
       // Check if this is a handled method being called
-      if (HANDLED_METHODS.includes(methodName)) {
+      if (HANDLED_METHODS.has(methodName)) {
         const grandParent = parent.parent;
         if (
           ts.isCallExpression(grandParent) &&
@@ -377,7 +385,7 @@ export class NeverthrowLinter {
           parent.expression === node
         ) {
           const methodName = parent.name.text;
-          if (HANDLED_METHODS.includes(methodName)) {
+          if (HANDLED_METHODS.has(methodName)) {
             const grandParent = parent.parent;
             if (
               ts.isCallExpression(grandParent) &&
@@ -816,7 +824,7 @@ export class NeverthrowLinter {
           typeString.includes('neverthrow.ResultAsync')
         );
       }
-    } catch (_error) {
+    } catch {
       // Type inference failed, skip
     }
 

@@ -132,7 +132,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
     <CardTitle>タイトル</CardTitle>
   </CardHeader>
   <CardContent>コンテンツ</CardContent>
-</Card>
+</Card>;
 ```
 
 **Variants:** `default`, `glass`, `elevated`, `ghost`, `outline`

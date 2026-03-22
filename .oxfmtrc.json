@@ -1,0 +1,31 @@
+{
+  "$schema": "https://oxc.rs/schemas/oxfmt/latest.json",
+  "printWidth": 80,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "endOfLine": "lf",
+  "insertFinalNewline": true,
+  "sortImports": {},
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "main",
+    "out",
+    "coverage",
+    "build",
+    "playwright-report",
+    "test-results",
+    "blob-report",
+    "playwright/.cache",
+    ".grit",
+    "pnpm-lock.yaml",
+    "src/assets/licenses.json",
+    ".github/workflows",
+    "*.d.ts"
+  ]
+}

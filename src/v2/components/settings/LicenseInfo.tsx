@@ -2,6 +2,7 @@ import { Book } from 'lucide-react';
 import { memo } from 'react';
 
 import licenseJsonFile from '@/assets/licenses.json';
+
 import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import { SettingsSection } from './common';

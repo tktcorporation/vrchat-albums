@@ -1,5 +1,7 @@
 import * as path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
 import { JsDocSeeLinter } from './lint-jsdoc-see.js';
 
 describe('JSDoc @see Linter', () => {

@@ -4,6 +4,7 @@ import * as log from 'electron-log';
 import path from 'pathe';
 import { stackWithCauses } from 'pony-cause';
 import { match, P } from 'ts-pattern';
+
 import { getSettingStore } from '../module/settingStore';
 import { UserFacingError } from './errors';
 

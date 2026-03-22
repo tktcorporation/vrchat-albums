@@ -3,6 +3,7 @@ import type { Rectangle } from 'electron';
 import Store from 'electron-store';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
+
 import { FolderDigestSchema } from '../lib/brandedTypes';
 
 type TestPlaywrightStoreName = `test-playwright-settings-${string}`;
@@ -241,6 +242,7 @@ const clearStoredSetting =
   };
 
 import path from 'node:path';
+
 import { logger } from './../lib/logger';
 import {
   type VRChatPhotoDirPath,
@@ -394,7 +396,7 @@ const getSettingStore = () => {
 };
 
 export interface SettingStore {
-  __store: Store<Record<string, unknown>>;
+  __store: Store;
   getLogFilesDir: () => string | null;
   setLogFilesDir: (dirPath: string) => void;
   getVRChatPhotoDir: () => string | null;

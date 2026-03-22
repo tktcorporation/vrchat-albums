@@ -1,12 +1,13 @@
 import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
 import * as client from '../../lib/sequelize';
-import * as service from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import {
   OptionalVRChatPlayerIdSchema,
   VRChatPlayerNameSchema,
 } from '../vrchatLog/model';
+import * as service from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import { getFrequentPlayerNames } from './service';
 
 // Remove unused imports

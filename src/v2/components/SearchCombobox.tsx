@@ -1,5 +1,6 @@
 import { Search } from 'lucide-react';
 import { memo, useState } from 'react';
+
 import { useI18n } from '../i18n/store';
 import SearchOverlay from './SearchOverlay';
 

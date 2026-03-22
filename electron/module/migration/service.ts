@@ -1,6 +1,8 @@
 import * as nodeFsPromises from 'node:fs/promises';
 import * as path from 'node:path';
+
 import { Cause, Effect, Exit, Option } from 'effect';
+
 import { logger } from '../../lib/logger';
 
 export interface MigrationResult {
@@ -33,7 +35,7 @@ export const clearMigrationCache = (): void => {
  * エラーが発生した場合はfalseを返して正常に動作を継続（エラーはログに記録）
  * Result型で返すが、エラーは常にログ記録後にfalseとして成功扱い
  */
-export const isMigrationNeeded = (): Effect.Effect<boolean, never> => {
+export const isMigrationNeeded = (): Effect.Effect<boolean> => {
   return Effect.tryPromise({
     try: async (): Promise<boolean> => {
       // キャッシュチェック
@@ -130,7 +132,7 @@ export const isMigrationNeeded = (): Effect.Effect<boolean, never> => {
  * 同期的なファイルアクセスを避けて、パスのみ返す
  * エラー時はデフォルトパスを返す（エラーはログに記録）
  */
-const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
+const getOldAppUserDataPath = (): Effect.Effect<string> => {
   return Effect.tryPromise({
     try: async (): Promise<string> => {
       // effect-lint-allow-try-catch: Electron 環境検出パターン（動的 import('electron') の失敗をキャッチ）
@@ -181,7 +183,7 @@ const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
  * Perform the migration from old app to new app
  * エラー時もログ記録後に正常終了（起動を妨げない）
  */
-export const performMigrationIfNeeded = (): Effect.Effect<void, never> => {
+export const performMigrationIfNeeded = (): Effect.Effect<void> => {
   return isMigrationNeeded().pipe(
     Effect.flatMap((needsMigration) => {
       if (!needsMigration) {
@@ -212,7 +214,7 @@ export const performMigrationIfNeeded = (): Effect.Effect<void, never> => {
  * Perform the migration from old app to new app
  * Note: All errors are captured in result.errors array, function never throws
  */
-export const performMigration = (): Effect.Effect<MigrationResult, never> => {
+export const performMigration = (): Effect.Effect<MigrationResult> => {
   return Effect.tryPromise({
     try: async () => {
       const { app } = await import('electron');
@@ -253,9 +255,8 @@ export const performMigration = (): Effect.Effect<MigrationResult, never> => {
       // Check if logStore directory exists, then migrate
       await nodeFsPromises.access(oldLogStorePath).then(
         async () => {
-          const { importService } = await import(
-            '../vrchatLog/importService/importService'
-          );
+          const { importService } =
+            await import('../vrchatLog/importService/importService');
           const importExit = await Effect.runPromiseExit(
             importService.importLogStoreFiles([oldLogStorePath], async () => {
               // DBLogProvider is not needed for migration

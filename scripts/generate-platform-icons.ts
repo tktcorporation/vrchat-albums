@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { Transformer } from '@napi-rs/image';
 
 const __filename = fileURLToPath(import.meta.url);

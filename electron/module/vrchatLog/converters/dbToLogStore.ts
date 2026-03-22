@@ -1,5 +1,6 @@
 import * as datefns from 'date-fns';
 import { match } from 'ts-pattern';
+
 import type { VRChatLogLine } from '../model';
 import { VRChatLogLineSchema } from '../model';
 

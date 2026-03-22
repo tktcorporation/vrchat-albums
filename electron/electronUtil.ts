@@ -2,6 +2,7 @@
 import EventEmitter from 'node:events';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+
 import { Effect } from 'effect';
 // Packages
 import {
@@ -389,6 +390,7 @@ const setTray = () => {
 };
 
 import { match } from 'ts-pattern';
+
 import { syncLogsInBackground } from './module/logSync/service';
 
 /**

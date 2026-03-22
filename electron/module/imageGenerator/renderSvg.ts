@@ -1,8 +1,10 @@
 import * as fs from 'node:fs';
+
 import { Transformer } from '@napi-rs/image';
 import { Resvg } from '@resvg/resvg-js';
 import { Effect } from 'effect';
 import * as path from 'pathe';
+
 import type { ImageGenerationError } from './errors';
 import {
   FontLoadFailed,

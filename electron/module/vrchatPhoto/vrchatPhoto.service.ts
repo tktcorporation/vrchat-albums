@@ -3,12 +3,16 @@ import type { Dirent } from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
+
 import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
 import { xxhash128 } from 'hash-wasm';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
+
+import { emitProgress } from '../initProgress/emitter';
+import { getSettingStore, type PhotoFolderScanStates } from '../settingStore';
 import {
   type FolderDigest,
   FolderDigestSchema,
@@ -29,8 +33,6 @@ import {
   isSharpInitialized,
 } from './../../lib/sharpConfig';
 import * as fs from './../../lib/wrappedFs';
-import { emitProgress } from '../initProgress/emitter';
-import { getSettingStore, type PhotoFolderScanStates } from '../settingStore';
 import * as model from './model/vrchatPhotoPath.model';
 import {
   type VRChatPhotoDirPath,
@@ -80,7 +82,6 @@ const getElectronApp = (): typeof import('electron').app | null => {
 
   // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { app } = require('electron') as typeof import('electron');
     return app;
   } catch (error) {
@@ -419,7 +420,7 @@ type CacheFileStatResult = {
 
 const statCacheFileForCleanup = (
   filePath: string,
-): Effect.Effect<CacheFileStatResult, never> =>
+): Effect.Effect<CacheFileStatResult> =>
   Effect.promise(() =>
     fsPromises
       .stat(filePath)
@@ -451,7 +452,7 @@ const statCacheFileForCleanup = (
  * キャッシュファイル削除（クリーンアップ用）
  * 削除失敗は警告ログを出力して継続（致命的ではない）
  */
-const unlinkCacheFile = (filePath: string): Effect.Effect<boolean, never> =>
+const unlinkCacheFile = (filePath: string): Effect.Effect<boolean> =>
   Effect.promise(() =>
     fsPromises
       .unlink(filePath)

@@ -6,6 +6,7 @@ import {
   type MockedFunction,
   vi,
 } from 'vitest';
+
 import { VRChatLogFilePathSchema } from '../../vrchatLogFileDir/model';
 import type { getLogLinesByLogFilePathListStreaming as GetLogLinesByLogFilePathListStreamingType } from './logFileReader';
 

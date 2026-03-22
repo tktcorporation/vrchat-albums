@@ -1,4 +1,5 @@
 import { Op } from '@sequelize/core';
+
 import { VRChatPlayerLeaveLogModel } from './playerLeaveLog.model';
 
 export const createVRChatPlayerLeaveLogModel = async (
