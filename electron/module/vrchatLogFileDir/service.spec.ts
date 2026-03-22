@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { type getSettingStore, initSettingStoreForTest } from '../settingStore';
 import { getValidVRChatLogFileDir } from './service';
@@ -13,10 +14,7 @@ describe('vrchatLogFileDir service', () => {
       getLogFilesDir: () => storedVRChatLogFilesDirPath.value,
     } as unknown as ReturnType<typeof getSettingStore>);
 
-    const result = await getValidVRChatLogFileDir();
-    if (result.isErr()) {
-      throw new Error('Unexpected error');
-    }
-    expect(typeof result.value.path.value === 'string').toBe(true);
+    const value = await Effect.runPromise(getValidVRChatLogFileDir());
+    expect(typeof value.path.value === 'string').toBe(true);
   });
 });

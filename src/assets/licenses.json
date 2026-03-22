@@ -178,6 +178,12 @@
     "path": "node_modules/date-fns",
     "licenseFile": "node_modules/date-fns/LICENSE.md"
   },
+  "effect@3.21.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Effect-TS/effect",
+    "path": "node_modules/effect",
+    "licenseFile": "node_modules/effect/LICENSE"
+  },
   "electron-log@5.4.3": {
     "licenses": "MIT",
     "repository": "https://github.com/megahertz/electron-log",
@@ -249,13 +255,6 @@
     "publisher": "Eric Fennis",
     "path": "node_modules/lucide-react",
     "licenseFile": "node_modules/lucide-react/LICENSE"
-  },
-  "neverthrow@8.2.0": {
-    "licenses": "MIT",
-    "repository": "https://github.com/supermacro/neverthrow",
-    "publisher": "Giorgio Delgado",
-    "path": "node_modules/neverthrow",
-    "licenseFile": "node_modules/neverthrow/LICENSE"
   },
   "ofetch@1.5.1": {
     "licenses": "MIT",
@@ -393,7 +392,7 @@
     "path": "node_modules/vite",
     "licenseFile": "node_modules/vite/LICENSE.md"
   },
-  "vrchat-albums@0.26.0": {
+  "vrchat-albums@0.27.0": {
     "licenses": "Custom: https://github.com/tktcorporation/vrchat-albums/releases",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",

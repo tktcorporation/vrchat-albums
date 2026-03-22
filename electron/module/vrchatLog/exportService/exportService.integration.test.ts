@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Effect } from 'effect';
 import { uuidv7 } from 'uuidv7';
 import { describe, expect, it } from 'vitest';
 import type { LogRecord } from '../converters/dbToLogStore';
@@ -76,12 +77,9 @@ describe('exportService integration', () => {
         outputBasePath: tempDir,
       };
 
-      const exportResult = await exportLogStoreFromDB(options, getMockDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
+      const result = await Effect.runPromise(
+        exportLogStoreFromDB(options, getMockDBLogs),
+      );
 
       // 結果を検証
       expect(result.exportedFiles).toHaveLength(1);
@@ -141,16 +139,9 @@ describe('exportService integration', () => {
       };
 
       const outputFilePath = path.join(tempDir, 'single-export.txt');
-      const exportResult = await exportLogStoreToSingleFile(
-        options,
-        getMockDBLogs,
-        outputFilePath,
+      const result = await Effect.runPromise(
+        exportLogStoreToSingleFile(options, getMockDBLogs, outputFilePath),
       );
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
       expect(result.exportedFiles).toHaveLength(1);
       // 新しい実装では日時付きサブフォルダが作成されるため、パスが変わる
       const actualFilePath = result.exportedFiles[0];
@@ -186,12 +177,9 @@ describe('exportService integration', () => {
         outputBasePath: tempDir,
       };
 
-      const exportResult = await exportLogStoreFromDB(options, getMockDBLogs);
-
-      expect(exportResult.isOk()).toBe(true);
-      if (!exportResult.isOk()) return;
-
-      const result = exportResult.value;
+      const result = await Effect.runPromise(
+        exportLogStoreFromDB(options, getMockDBLogs),
+      );
       expect(result.exportedFiles).toHaveLength(0);
       expect(result.totalLogLines).toBe(0);
     } finally {

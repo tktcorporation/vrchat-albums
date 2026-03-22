@@ -7,14 +7,15 @@
  * 呼び出し元: 写真インデックス作成時、tRPC コントローラー
  */
 
-import { err, ok, type Result, ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import { logger } from '../../lib/logger';
 import { readExif } from '../../lib/wrappedExifTool';
 import {
+  MetadataDbError,
   type MetadataParseError,
-  parsePhotoMetadata,
-  parsePhotoMetadataBatch,
-} from './parser';
+  type NoMetadataFound,
+} from './errors';
+import { parsePhotoMetadata, parsePhotoMetadataBatch } from './parser';
 import type { VRChatPhotoMetadata } from './schema';
 import {
   createOrUpdatePhotoMetadataBatch,
@@ -24,14 +25,6 @@ import {
   getPhotoMetadataByWorldId,
   type VRChatPhotoMetadataCreationAttributes,
 } from './vrchatPhotoMetadata.model';
-
-// ============================================================================
-// エラー型
-// ============================================================================
-
-export type MetadataServiceError =
-  | MetadataParseError
-  | { type: 'DB_ERROR'; message: string };
 
 // ============================================================================
 // ExifTool アダプター
@@ -54,9 +47,9 @@ const exifTagReader = readExif as (
 /**
  * 単一の写真からメタデータを抽出する
  */
-export const extractMetadataFromPhoto = async (
+export const extractMetadataFromPhoto = (
   photoPath: string,
-): Promise<Result<VRChatPhotoMetadata, MetadataParseError>> => {
+): Effect.Effect<VRChatPhotoMetadata, NoMetadataFound | MetadataParseError> => {
   return parsePhotoMetadata(photoPath, exifTagReader);
 };
 
@@ -68,82 +61,75 @@ export const extractMetadataFromPhoto = async (
  *
  * @returns 新たに抽出・保存したメタデータの件数
  */
-export const extractAndSaveMetadataBatch = async (
+export const extractAndSaveMetadataBatch = (
   photoPaths: string[],
   concurrency = 5,
-): Promise<Result<number, MetadataServiceError>> => {
-  if (photoPaths.length === 0) {
-    return ok(0);
-  }
+): Effect.Effect<number, MetadataDbError> =>
+  Effect.gen(function* () {
+    if (photoPaths.length === 0) {
+      return 0;
+    }
 
-  // 既にメタデータがある写真をスキップ（SQL側でフィルタ、全件メモリロードを回避）
-  const newPathsResult = await ResultAsync.fromPromise(
-    filterPathsWithoutMetadata(photoPaths),
-    (e): MetadataServiceError => ({
-      type: 'DB_ERROR',
-      message: `Failed to filter existing metadata: ${e instanceof Error ? e.message : String(e)}`,
-    }),
-  );
-  if (newPathsResult.isErr()) {
-    return err(newPathsResult.error);
-  }
-
-  const newPaths = newPathsResult.value;
-  if (newPaths.length === 0) {
-    return ok(0);
-  }
-
-  logger.info(
-    `Extracting metadata from ${newPaths.length} photos (${photoPaths.length - newPaths.length} already processed)`,
-  );
-
-  // PNG/JPEGファイルのみフィルタ（XMPメタデータはPNG/JPEGどちらにも存在し得る）
-  const targetPaths = newPaths.filter(
-    (p) => p.toLowerCase().endsWith('.png') || p.toLowerCase().endsWith('.jpg'),
-  );
-
-  if (targetPaths.length === 0) {
-    return ok(0);
-  }
-
-  // バッチでメタデータ抽出
-  const metadataMap = await parsePhotoMetadataBatch(
-    targetPaths,
-    exifTagReader,
-    concurrency,
-  );
-
-  if (metadataMap.size === 0) {
-    return ok(0);
-  }
-
-  // DB保存用の属性リストを構築
-  const attributes: VRChatPhotoMetadataCreationAttributes[] = [];
-  for (const [photoPath, metadata] of metadataMap) {
-    attributes.push({
-      photoPath,
-      authorId: metadata.authorId,
-      authorDisplayName: metadata.authorDisplayName,
-      worldId: metadata.worldId,
-      worldDisplayName: metadata.worldDisplayName,
+    // 既にメタデータがある写真をスキップ（SQL側でフィルタ、全件メモリロードを回避）
+    const newPaths = yield* Effect.tryPromise({
+      try: () => filterPathsWithoutMetadata(photoPaths),
+      catch: (e) =>
+        new MetadataDbError({
+          message: `Failed to filter existing metadata: ${e instanceof Error ? e.message : String(e)}`,
+        }),
     });
-  }
 
-  // DBに保存
-  const saveResult = await ResultAsync.fromPromise(
-    createOrUpdatePhotoMetadataBatch(attributes),
-    (e): MetadataServiceError => ({
-      type: 'DB_ERROR',
-      message: `Failed to save metadata: ${e instanceof Error ? e.message : String(e)}`,
-    }),
-  );
-  if (saveResult.isErr()) {
-    return err(saveResult.error);
-  }
+    if (newPaths.length === 0) {
+      return 0;
+    }
 
-  logger.info(`Saved metadata for ${attributes.length} photos`);
-  return ok(attributes.length);
-};
+    logger.info(
+      `Extracting metadata from ${newPaths.length} photos (${photoPaths.length - newPaths.length} already processed)`,
+    );
+
+    // PNG/JPEGファイルのみフィルタ（XMPメタデータはPNG/JPEGどちらにも存在し得る）
+    const targetPaths = newPaths.filter(
+      (p) =>
+        p.toLowerCase().endsWith('.png') || p.toLowerCase().endsWith('.jpg'),
+    );
+
+    if (targetPaths.length === 0) {
+      return 0;
+    }
+
+    // バッチでメタデータ抽出
+    const metadataMap = yield* Effect.promise(() =>
+      parsePhotoMetadataBatch(targetPaths, exifTagReader, concurrency),
+    );
+
+    if (metadataMap.size === 0) {
+      return 0;
+    }
+
+    // DB保存用の属性リストを構築
+    const attributes: VRChatPhotoMetadataCreationAttributes[] = [];
+    for (const [photoPath, metadata] of metadataMap) {
+      attributes.push({
+        photoPath,
+        authorId: metadata.authorId,
+        authorDisplayName: metadata.authorDisplayName,
+        worldId: metadata.worldId,
+        worldDisplayName: metadata.worldDisplayName,
+      });
+    }
+
+    // DBに保存
+    yield* Effect.tryPromise({
+      try: () => createOrUpdatePhotoMetadataBatch(attributes),
+      catch: (e) =>
+        new MetadataDbError({
+          message: `Failed to save metadata: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+    });
+
+    logger.info(`Saved metadata for ${attributes.length} photos`);
+    return attributes.length;
+  });
 
 // ============================================================================
 // クエリ関数
@@ -154,64 +140,59 @@ export const extractAndSaveMetadataBatch = async (
  *
  * 呼び出し元: tRPC getPhotoMetadata エンドポイント
  */
-export const getMetadataForPhoto = async (
+export const getMetadataForPhoto = (
   photoPath: string,
-): Promise<Result<VRChatPhotoMetadata | null, MetadataServiceError>> => {
-  const result = await ResultAsync.fromPromise(
-    getPhotoMetadataByPhotoPath(photoPath),
-    (e): MetadataServiceError => ({
-      type: 'DB_ERROR',
-      message: `Failed to get metadata for photo: ${e instanceof Error ? e.message : String(e)}`,
-    }),
-  );
-  if (result.isErr()) {
-    return err(result.error);
-  }
+): Effect.Effect<VRChatPhotoMetadata | null, MetadataDbError> =>
+  Effect.gen(function* () {
+    const record = yield* Effect.tryPromise({
+      try: () => getPhotoMetadataByPhotoPath(photoPath),
+      catch: (e) =>
+        new MetadataDbError({
+          message: `Failed to get metadata for photo: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+    });
 
-  const record = result.value;
-  if (!record) {
-    return ok(null);
-  }
+    if (!record) {
+      return null;
+    }
 
-  return ok({
-    authorId: record.authorId,
-    authorDisplayName: record.authorDisplayName,
-    worldId: record.worldId,
-    worldDisplayName: record.worldDisplayName,
+    return {
+      authorId: record.authorId,
+      authorDisplayName: record.authorDisplayName,
+      worldId: record.worldId,
+      worldDisplayName: record.worldDisplayName,
+    };
   });
-};
 
 /**
  * 複数写真のメタデータをバッチ取得する
  *
  * 呼び出し元: tRPC getPhotoMetadataBatch エンドポイント
  */
-export const getMetadataForPhotos = async (
+export const getMetadataForPhotos = (
   photoPaths: string[],
-): Promise<Result<Map<string, VRChatPhotoMetadata>, MetadataServiceError>> => {
-  const result = await ResultAsync.fromPromise(
-    getPhotoMetadataByPhotoPaths(photoPaths),
-    (e): MetadataServiceError => ({
-      type: 'DB_ERROR',
-      message: `Failed to get metadata for photos: ${e instanceof Error ? e.message : String(e)}`,
-    }),
-  );
-  if (result.isErr()) {
-    return err(result.error);
-  }
-
-  const metadataMap = new Map<string, VRChatPhotoMetadata>();
-  for (const record of result.value) {
-    metadataMap.set(record.photoPath, {
-      authorId: record.authorId,
-      authorDisplayName: record.authorDisplayName,
-      worldId: record.worldId,
-      worldDisplayName: record.worldDisplayName,
+): Effect.Effect<Map<string, VRChatPhotoMetadata>, MetadataDbError> =>
+  Effect.gen(function* () {
+    const records = yield* Effect.tryPromise({
+      try: () => getPhotoMetadataByPhotoPaths(photoPaths),
+      catch: (e) =>
+        new MetadataDbError({
+          message: `Failed to get metadata for photos: ${e instanceof Error ? e.message : String(e)}`,
+        }),
     });
-  }
 
-  return ok(metadataMap);
-};
+    const metadataMap = new Map<string, VRChatPhotoMetadata>();
+    for (const record of records) {
+      metadataMap.set(record.photoPath, {
+        authorId: record.authorId,
+        authorDisplayName: record.authorDisplayName,
+        worldId: record.worldId,
+        worldDisplayName: record.worldDisplayName,
+      });
+    }
+
+    return metadataMap;
+  });
 
 /**
  * ワールドIDから写真メタデータを検索する
@@ -221,32 +202,26 @@ export const getMetadataForPhotos = async (
  *
  * 呼び出し元: tRPC getPhotosByWorldId エンドポイント
  */
-export const getPhotosByWorldId = async (
+export const getPhotosByWorldId = (
   worldId: string,
-): Promise<
-  Result<
-    Array<{
-      photoPath: string;
-      worldDisplayName: string | null;
-    }>,
-    MetadataServiceError
-  >
-> => {
-  const result = await ResultAsync.fromPromise(
-    getPhotoMetadataByWorldId(worldId),
-    (e): MetadataServiceError => ({
-      type: 'DB_ERROR',
-      message: `Failed to get photos by world ID: ${e instanceof Error ? e.message : String(e)}`,
-    }),
-  );
-  if (result.isErr()) {
-    return err(result.error);
-  }
+): Effect.Effect<
+  Array<{
+    photoPath: string;
+    worldDisplayName: string | null;
+  }>,
+  MetadataDbError
+> =>
+  Effect.gen(function* () {
+    const records = yield* Effect.tryPromise({
+      try: () => getPhotoMetadataByWorldId(worldId),
+      catch: (e) =>
+        new MetadataDbError({
+          message: `Failed to get photos by world ID: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+    });
 
-  return ok(
-    result.value.map((record) => ({
+    return records.map((record) => ({
       photoPath: record.photoPath,
       worldDisplayName: record.worldDisplayName,
-    })),
-  );
-};
+    }));
+  });

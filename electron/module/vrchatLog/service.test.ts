@@ -1,7 +1,7 @@
 import * as nodeFs from 'node:fs';
 import * as path from 'node:path';
 import * as datefns from 'date-fns';
-import neverthrow from 'neverthrow';
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, test, vi } from 'vitest';
 import { getAppUserDataPath } from '../../lib/wrappedApp';
 import * as fs from '../../lib/wrappedFs';
@@ -36,12 +36,12 @@ vi.mock('node:fs', () => ({
 // fs操作のモック
 vi.mock('../../lib/wrappedFs', () => ({
   existsSyncSafe: vi.fn().mockReturnValue(false),
-  mkdirSyncSafe: vi.fn().mockReturnValue(neverthrow.ok(undefined)),
-  appendFileAsync: vi.fn().mockReturnValue(neverthrow.ok(undefined)),
-  writeFileSyncSafe: vi.fn().mockReturnValue(neverthrow.ok(undefined)),
-  unlinkAsync: vi.fn().mockReturnValue(neverthrow.ok(undefined)),
+  mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+  appendFileAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+  writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+  unlinkAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
   readFileSyncSafe: vi.fn().mockImplementation(() => {
-    return neverthrow.ok(Buffer.from('test content'));
+    return Effect.succeed(Buffer.from('test content'));
   }),
   createReadStream: vi.fn().mockReturnValue({
     on: vi.fn().mockImplementation(function (
@@ -179,11 +179,11 @@ describe('appendLoglinesToFile', () => {
       VRChatLogLineSchema.parse('2024.02.10 18:45:00 Log entry 4'),
     ];
 
-    const result = await appendLoglinesToFile({
-      logLines,
-    });
-
-    expect(result.isOk()).toBe(true);
+    await Effect.runPromise(
+      appendLoglinesToFile({
+        logLines,
+      }),
+    );
 
     // 2つの異なるディレクトリが作成されたことを確認
     expect(nodeFs.mkdirSync).toHaveBeenCalledTimes(4); // ルートディレクトリと月別ディレクトリの2つずつ
@@ -233,11 +233,11 @@ describe('appendLoglinesToFile', () => {
     );
 
     try {
-      const result = await appendLoglinesToFile({
-        logLines,
-      });
-
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(
+        appendLoglinesToFile({
+          logLines,
+        }),
+      );
 
       // ディレクトリが作成されることを確認
       expect(nodeFs.mkdirSync).toHaveBeenCalledTimes(2); // ルートディレクトリと月別ディレクトリ

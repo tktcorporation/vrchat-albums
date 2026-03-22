@@ -1,12 +1,14 @@
-import * as neverthrow from 'neverthrow';
+import { Effect } from 'effect';
 import { logger } from '../../lib/logger';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import type { LogInfoError } from '../logInfo/error';
+import type { LogInfoServiceError } from '../logInfo/errors';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
 import { getSettingStore } from '../settingStore';
 import type { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
-import type { VRChatLogFileError } from '../vrchatLog/error';
+import { VRChatLogFileError } from '../vrchatLog/error';
+import type { VRChatLogError } from '../vrchatLog/errors';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import type { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
@@ -49,60 +51,61 @@ export type LogSyncMode = (typeof LOG_SYNC_MODE)[keyof typeof LOG_SYNC_MODE];
  * @param mode 同期モード (FULL: 全件処理, INCREMENTAL: 差分処理)
  * @returns 処理結果（作成されたログ情報を含む）
  */
-export async function syncLogs(
+export function syncLogs(
   mode: LogSyncMode,
-): Promise<
-  neverthrow.Result<LogSyncResults, VRChatLogFileError | LogInfoError>
+): Effect.Effect<
+  LogSyncResults,
+  VRChatLogFileError | VRChatLogError | LogInfoError | LogInfoServiceError
 > {
-  const isFullSync = mode === LOG_SYNC_MODE.FULL;
+  return Effect.gen(function* () {
+    const isFullSync = mode === LOG_SYNC_MODE.FULL;
 
-  logger.info(`Starting log sync with mode: ${mode}`);
+    logger.info(`Starting log sync with mode: ${mode}`);
 
-  // Step 1: VRChatログファイルから新しいログ行を抽出・保存
-  emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
-  const appendResult =
-    await appendLoglinesToFileFromLogFilePathList(isFullSync);
-
-  if (appendResult.isErr()) {
-    logger.error({
-      message: 'Failed to append log lines',
-      details: {
-        code: appendResult.error.code,
-        error: appendResult.error.message,
+    // Step 1: VRChatログファイルから新しいログ行を抽出・保存
+    emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
+    yield* Effect.tryPromise({
+      try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
+      catch: (error) => {
+        logger.error({
+          message: 'Failed to append log lines',
+          details: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+        if (error instanceof VRChatLogFileError) {
+          return error;
+        }
+        return new VRChatLogFileError({
+          code: 'UNKNOWN',
+          message: error instanceof Error ? error.message : String(error),
+        });
       },
     });
+    emitProgress({
+      stage: 'log_append',
+      progress: 100,
+      message: 'VRChatログファイルの読み込みが完了しました',
+    });
 
-    // VRChatLogFileError を直接返す
-    return neverthrow.err(appendResult.error);
-  }
-  emitProgress({
-    stage: 'log_append',
-    progress: 100,
-    message: 'VRChatログファイルの読み込みが完了しました',
+    // Step 2: 保存されたログをデータベースに読み込む
+    emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
+    const loadResult = yield* loadLogInfoIndexFromVRChatLog({
+      excludeOldLogLoad: !isFullSync,
+    });
+    emitProgress({
+      stage: 'log_load',
+      progress: 100,
+      message: 'ログデータの保存が完了しました',
+    });
+
+    logger.info(`Log sync completed successfully with mode: ${mode}`);
+
+    // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
+    triggerWorldJoinImageGeneration();
+
+    return loadResult;
   });
-
-  // Step 2: 保存されたログをデータベースに読み込む
-  emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
-  const loadResult = await loadLogInfoIndexFromVRChatLog({
-    excludeOldLogLoad: !isFullSync,
-  });
-
-  if (loadResult.isErr()) {
-    logger.error({ message: 'Failed to load log info' });
-    return neverthrow.err(loadResult.error);
-  }
-  emitProgress({
-    stage: 'log_load',
-    progress: 100,
-    message: 'ログデータの保存が完了しました',
-  });
-
-  logger.info(`Log sync completed successfully with mode: ${mode}`);
-
-  // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
-  triggerWorldJoinImageGeneration();
-
-  return neverthrow.ok(loadResult.value);
 }
 
 /**
@@ -124,7 +127,9 @@ function triggerWorldJoinImageGeneration(): void {
       return;
     }
 
-    void generateMissingWorldJoinImages({ photoDirPath }).catch((error) => {
+    void Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath }),
+    ).catch((error) => {
       logger.error({
         message: 'Failed to generate world join images',
         stack: error instanceof Error ? error : new Error(String(error)),
@@ -143,8 +148,9 @@ function triggerWorldJoinImageGeneration(): void {
  * バックグラウンド処理用のログ同期
  * 差分処理モードで実行される
  */
-export async function syncLogsInBackground(): Promise<
-  neverthrow.Result<LogSyncResults, VRChatLogFileError | LogInfoError>
+export function syncLogsInBackground(): Effect.Effect<
+  LogSyncResults,
+  VRChatLogFileError | VRChatLogError | LogInfoError | LogInfoServiceError
 > {
   return syncLogs(LOG_SYNC_MODE.INCREMENTAL);
 }

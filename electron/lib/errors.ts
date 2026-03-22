@@ -62,7 +62,7 @@ export interface StructuredErrorInfo {
  * ユーザー向けエラーの基底クラス
  *
  * @see docs/error-handling.md - 詳細なエラーハンドリング方針
- * @see electron/lib/errorHelpers.ts
+ * @see electron/lib/effectTRPC.ts - runEffect (tRPC 実行境界)
  * @see electron/lib/logger.ts
  */
 export class UserFacingError extends Error {

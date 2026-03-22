@@ -1,15 +1,13 @@
-import * as neverthrow from 'neverthrow';
+import { Effect } from 'effect';
 import { z } from 'zod';
 import { getData } from '../../lib/getData';
 import type { VRChatWorldId } from '../vrchatLog/model';
-
-/**
- * VRChat API エラー型
- */
-export type VRChatApiError =
-  | { type: 'WORLD_NOT_FOUND'; worldId: string }
-  | { type: 'API_REQUEST_FAILED'; message: string }
-  | { type: 'PARSE_ERROR'; issues: string };
+import {
+  VRChatApiParseError,
+  VRChatApiRequestFailed,
+  type VRChatApiServiceError,
+  VRChatApiWorldNotFound,
+} from './errors';
 
 /**
  * id: 'wrld_6fecf18a-ab96-43f2-82dc-ccf79f17c34f',
@@ -104,28 +102,34 @@ const VRChatWorldInfoFromApiSchema = z.object({
  * VRChat API からワールド情報を取得する
  * ワールドプレビュー生成などで使用される
  */
-export const getVrcWorldInfoByWorldId = async (
+export const getVrcWorldInfoByWorldId = (
   worldId: VRChatWorldId,
-): Promise<neverthrow.Result<VRChatWorldInfoFromApi, VRChatApiError>> => {
-  const reqUrl = `https://api.vrchat.cloud/api/1/worlds/${worldId}`;
-  const response = await getData(reqUrl);
-  if (!response.isOk()) {
-    if (response.error.status === 404) {
-      return neverthrow.err({ type: 'WORLD_NOT_FOUND', worldId });
+): Effect.Effect<VRChatWorldInfoFromApi, VRChatApiServiceError> => {
+  return Effect.gen(function* () {
+    const reqUrl = `https://api.vrchat.cloud/api/1/worlds/${worldId}`;
+    const responseResult = yield* Effect.either(
+      getData<unknown>(reqUrl).pipe(
+        Effect.mapError((fetchError): VRChatApiServiceError => {
+          if (fetchError.status === 404) {
+            return new VRChatApiWorldNotFound({ worldId });
+          }
+          return new VRChatApiRequestFailed({ message: fetchError.message });
+        }),
+      ),
+    );
+    if (responseResult._tag === 'Left') {
+      return yield* Effect.fail(responseResult.left);
     }
-    return neverthrow.err({
-      type: 'API_REQUEST_FAILED',
-      message: response.error.message,
-    });
-  }
-  const result = VRChatWorldInfoFromApiSchema.safeParse(response.value);
-  if (!result.success) {
-    return neverthrow.err({
-      type: 'PARSE_ERROR',
-      issues: JSON.stringify(result.error.issues),
-    });
-  }
-  return neverthrow.ok(result.data);
+    const result = VRChatWorldInfoFromApiSchema.safeParse(responseResult.right);
+    if (!result.success) {
+      return yield* Effect.fail(
+        new VRChatApiParseError({
+          issues: JSON.stringify(result.error.issues),
+        }),
+      );
+    }
+    return result.data;
+  });
 };
 
 export const UserSchema = z.object({
@@ -174,37 +178,43 @@ const processQueue = async () => {
  * ユーザー名からVRChatユーザー情報を取得する
  * 非公開APIのため一定間隔で processQueue 経由でリクエストされる
  */
-export const getVrcUserInfoByUserName = async (
+export const getVrcUserInfoByUserName = (
   userName: string,
-): Promise<
-  neverthrow.Result<z.infer<typeof UserSchema>, Error | 'USER_NOT_FOUND'>
-> => {
-  return new Promise((resolve) => {
-    requestQueue.push(async () => {
-      const reqUrl = `https://vrchat.com/api/1/users?sort=relevance&fuzzy=false&search=${userName}`;
-      const response = await fetch(reqUrl);
-      if (!response.ok) {
-        throw new Error(`getVrcUserInfoByUserName: ${response.statusText}`);
-        // resolve(neverthrow.err(new Error(`getVrcUserInfoByUserName: ${response.statusText}`)));
-        // return;
+): Effect.Effect<z.infer<typeof UserSchema>, Error | 'USER_NOT_FOUND'> => {
+  return Effect.tryPromise({
+    try: () =>
+      new Promise<z.infer<typeof UserSchema>>((resolve, reject) => {
+        requestQueue.push(async () => {
+          const reqUrl = `https://vrchat.com/api/1/users?sort=relevance&fuzzy=false&search=${userName}`;
+          const response = await fetch(reqUrl);
+          if (!response.ok) {
+            throw new Error(`getVrcUserInfoByUserName: ${response.statusText}`);
+          }
+          const json = await response.json();
+          const result = UsersSchema.safeParse(json);
+          if (!result.success) {
+            throw new Error(
+              `fail to parse UsersSchema: ${JSON.stringify(result.error.issues)}`,
+            );
+          }
+          if (
+            result.data.length === 0 ||
+            result.data[0].displayName !== userName
+          ) {
+            reject('USER_NOT_FOUND' as const);
+            return;
+          }
+          resolve(result.data[0]);
+        });
+        if (!isProcessingQueue) {
+          processQueue();
+        }
+      }),
+    catch: (error): Error | 'USER_NOT_FOUND' => {
+      if (error === 'USER_NOT_FOUND') {
+        return 'USER_NOT_FOUND';
       }
-      const json = await response.json();
-      const result = UsersSchema.safeParse(json);
-      if (!result.success) {
-        throw new Error(
-          `fail to parse UsersSchema: ${JSON.stringify(result.error.issues)}`,
-        );
-        // resolve(neverthrow.err(new Error(`fail to parse UsersSchema: ${result.error.errors}`)));
-        // return;
-      }
-      if (result.data.length === 0 || result.data[0].displayName !== userName) {
-        resolve(neverthrow.err('USER_NOT_FOUND' as const));
-        return;
-      }
-      resolve(neverthrow.ok(result.data[0]));
-    });
-    if (!isProcessingQueue) {
-      processQueue();
-    }
+      return error instanceof Error ? error : new Error(String(error));
+    },
   });
 };

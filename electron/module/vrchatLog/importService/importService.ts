@@ -1,51 +1,56 @@
+import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import * as neverthrow from 'neverthrow';
+
+type NodeDirent = Dirent;
+
+import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
 import {
-  type BackupError,
   backupService,
   type DBLogProvider,
-  getBackupErrorMessage,
   type ImportBackupMetadata,
 } from '../backupService/backupService';
 import { appendLoglinesToFile } from '../fileHandlers/logStorageManager';
 import { type VRChatLogLine, VRChatLogLineSchema } from '../model';
+import {
+  ImportBackupFailed,
+  ImportDbSyncFailed,
+  ImportFileNotFound,
+  ImportNoFilesFound,
+  type ImportServiceError,
+} from './errors';
 
 /**
- * インポートエラー型
- * 呼び出し側でパターンマッチできるように具体的な型を定義
- * 予期しないエラーはthrowしてSentryに送信（ここには含めない）
+ * @deprecated Use ImportServiceError tagged errors instead
  */
-export type ImportError =
-  | { type: 'NO_FILES_FOUND'; paths: string[] }
-  | { type: 'BACKUP_FAILED'; error: BackupError }
-  | { type: 'FILE_NOT_FOUND'; path: string }
-  | { type: 'DB_SYNC_FAILED'; message: string }
-  | { type: 'LOGSTORE_INTEGRATION_FAILED'; message: string };
+export type ImportError = ImportServiceError;
 
 /**
- * ImportError からユーザー向けメッセージを取得
+ * ImportServiceError からユーザー向けメッセージを取得
  */
-export const getImportErrorMessage = (error: ImportError): string =>
+export const getImportErrorMessage = (error: ImportServiceError): string =>
   match(error)
     .with(
-      { type: 'NO_FILES_FOUND' },
+      { _tag: 'ImportNoFilesFound' },
       () => 'インポート対象のlogStoreファイルが見つかりませんでした',
     )
-    .with({ type: 'BACKUP_FAILED' }, (e) => getBackupErrorMessage(e.error))
     .with(
-      { type: 'FILE_NOT_FOUND' },
+      { _tag: 'ImportBackupFailed' },
+      (e) => `バックアップに失敗しました: ${e.message}`,
+    )
+    .with(
+      { _tag: 'ImportFileNotFound' },
       (e) => `ファイルが見つかりません: ${e.path}`,
     )
     .with(
-      { type: 'DB_SYNC_FAILED' },
+      { _tag: 'ImportDbSyncFailed' },
       (e) => `DB同期に失敗しました: ${e.message}`,
     )
     .with(
-      { type: 'LOGSTORE_INTEGRATION_FAILED' },
+      { _tag: 'ImportLogstoreIntegrationFailed' },
       (e) => `logStore統合に失敗しました: ${e.message}`,
     )
     .exhaustive();
@@ -75,74 +80,84 @@ export class ImportService {
   /**
    * logStoreファイルまたはディレクトリをインポート
    */
-  async importLogStoreFiles(
+  importLogStoreFiles(
     paths: string[],
     getDBLogs: DBLogProvider,
-  ): Promise<neverthrow.Result<ImportResult, ImportError>> {
-    logger.info(`Starting import process for ${paths.length} paths`);
+  ): Effect.Effect<ImportResult, ImportServiceError> {
+    return Effect.gen(this, function* () {
+      logger.info(`Starting import process for ${paths.length} paths`);
 
-    // 1. パスからlogStoreファイルを収集（ディレクトリも対応）
-    const filePaths = await this.collectLogStoreFiles(paths);
+      // 1. パスからlogStoreファイルを収集（ディレクトリも対応）
+      const filePaths = yield* Effect.tryPromise({
+        try: () => this.collectLogStoreFiles(paths),
+        catch: (e) => {
+          // Unexpected errors should propagate
+          throw e;
+        },
+      }) as Effect.Effect<string[], ImportServiceError>;
 
-    if (filePaths.length === 0) {
-      return neverthrow.err({ type: 'NO_FILES_FOUND', paths });
-    }
+      if (filePaths.length === 0) {
+        return yield* Effect.fail(new ImportNoFilesFound({ paths }));
+      }
 
-    logger.info(`Found ${filePaths.length} logStore files to import`);
+      logger.info(`Found ${filePaths.length} logStore files to import`);
 
-    // 2. インポート前バックアップ作成（エクスポート機能活用）
-    const backupResult = await backupService.createPreImportBackup(getDBLogs);
-    if (backupResult.isErr()) {
-      return neverthrow.err({
-        type: 'BACKUP_FAILED',
-        error: backupResult.error,
+      // 2. インポート前バックアップ作成（エクスポート機能活用）
+      const backup = yield* backupService
+        .createPreImportBackup(getDBLogs)
+        .pipe(
+          Effect.mapError(
+            (backupError) =>
+              new ImportBackupFailed({ message: backupError.message }),
+          ),
+        );
+
+      // 3. バックアップにインポート情報を追加
+      backup.sourceFiles = paths; // 元の指定パスを記録
+      backup.importTimestamp = new Date();
+
+      yield* backupService
+        .updateBackupMetadata(backup)
+        .pipe(
+          Effect.mapError(
+            (updateError) =>
+              new ImportBackupFailed({ message: updateError.message }),
+          ),
+        );
+
+      // 4. ファイル検証
+      yield* Effect.tryPromise({
+        try: () => this.validateLogStoreFilesInternal(filePaths),
+        catch: (e) => {
+          // ImportServiceError thrown from validateLogStoreFilesInternal
+          if (typeof e === 'object' && e !== null && '_tag' in e) {
+            return e as ImportServiceError;
+          }
+          // Unexpected errors should propagate
+          throw e;
+        },
       });
-    }
-    const backup = backupResult.value;
 
-    // 3. バックアップにインポート情報を追加
-    backup.sourceFiles = paths; // 元の指定パスを記録
-    backup.importTimestamp = new Date();
+      // 5. logStoreファイル解析・統合（既存システム活用）
+      const importedData = yield* this.parseAndIntegrateLogStore(filePaths);
 
-    const updateResult = await backupService.updateBackupMetadata(backup);
-    if (updateResult.isErr()) {
-      return neverthrow.err({
-        type: 'BACKUP_FAILED',
-        error: updateResult.error,
-      });
-    }
+      // 6. DB同期（既存のsyncLogs使用）
+      // syncLogs returns Effect<LogSyncResults, VRChatLogFileError | LogInfoError>
+      yield* syncLogs(LOG_SYNC_MODE.INCREMENTAL).pipe(
+        Effect.mapError(
+          (syncError) => new ImportDbSyncFailed({ message: syncError.message }),
+        ),
+      );
 
-    // 4. ファイル検証
-    const validationResult = await this.validateLogStoreFiles(filePaths);
-    if (validationResult.isErr()) {
-      return neverthrow.err(validationResult.error);
-    }
+      logger.info(
+        `Import completed successfully: ${importedData.totalLines} lines from ${importedData.processedFiles.length} files`,
+      );
 
-    // 5. logStoreファイル解析・統合（既存システム活用）
-    const importDataResult = await this.parseAndIntegrateLogStore(filePaths);
-    if (importDataResult.isErr()) {
-      return neverthrow.err(importDataResult.error);
-    }
-
-    const importedData = importDataResult.value;
-
-    // 6. DB同期（既存のsyncLogs使用）
-    const syncResult = await syncLogs(LOG_SYNC_MODE.INCREMENTAL);
-    if (syncResult.isErr()) {
-      return neverthrow.err({
-        type: 'DB_SYNC_FAILED',
-        message: syncResult.error.message,
-      });
-    }
-
-    logger.info(
-      `Import completed successfully: ${importedData.totalLines} lines from ${importedData.processedFiles.length} files`,
-    );
-
-    return neverthrow.ok({
-      success: true,
-      backup,
-      importedData,
+      return {
+        success: true,
+        backup,
+        importedData,
+      };
     });
   }
 
@@ -155,11 +170,11 @@ export class ImportService {
 
     for (const targetPath of paths) {
       // パスの存在確認
-      const accessResult = await neverthrow.ResultAsync.fromPromise(
-        fs.access(targetPath),
-        () => 'NOT_FOUND' as const,
-      );
-      if (accessResult.isErr()) {
+      const accessExists = await fs
+        .access(targetPath)
+        .then(() => true)
+        .catch(() => false);
+      if (!accessExists) {
         logger.warn(`Path not found, skipping: ${targetPath}`);
         continue;
       }
@@ -205,22 +220,22 @@ export class ImportService {
   private async findLogStoreFilesInDirectory(
     dirPath: string,
   ): Promise<string[]> {
-    const readResult = await neverthrow.ResultAsync.fromPromise(
-      fs.readdir(dirPath, { withFileTypes: true }),
-      (error) => error,
-    );
-
-    if (readResult.isErr()) {
+    let entries: NodeDirent[];
+    try {
+      entries = (await fs.readdir(dirPath, {
+        withFileTypes: true,
+      })) as NodeDirent[];
+    } catch (error) {
       // ディレクトリ読み取り失敗は警告のみ（部分的成功を許容）
       logger.warnWithSentry({
-        message: `Failed to read directory ${dirPath}: ${String(readResult.error)}`,
+        message: `Failed to read directory ${dirPath}: ${String(error)}`,
         details: { dirPath },
       });
       return [];
     }
 
     const files: string[] = [];
-    for (const entry of readResult.value) {
+    for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);
 
       if (entry.isFile()) {
@@ -253,20 +268,20 @@ export class ImportService {
   }
 
   /**
-   * logStoreファイルの形式を検証
+   * logStoreファイルの形式を検証（内部実装 - Promise版）
    * 予期しないエラーはthrowされる（Sentryに送信）
    */
-  private async validateLogStoreFiles(
+  private async validateLogStoreFilesInternal(
     filePaths: string[],
-  ): Promise<neverthrow.Result<void, ImportError>> {
+  ): Promise<void> {
     for (const filePath of filePaths) {
       // ファイル存在確認
-      const accessResult = await neverthrow.ResultAsync.fromPromise(
-        fs.access(filePath),
-        () => 'NOT_FOUND' as const,
-      );
-      if (accessResult.isErr()) {
-        return neverthrow.err({ type: 'FILE_NOT_FOUND', path: filePath });
+      const accessExists = await fs
+        .access(filePath)
+        .then(() => true)
+        .catch(() => false);
+      if (!accessExists) {
+        throw new ImportFileNotFound({ path: filePath });
       }
 
       // ファイル名の形式確認（logStore-YYYY-MM.txt形式）
@@ -295,100 +310,100 @@ export class ImportService {
     }
 
     logger.info(`Validation completed for ${filePaths.length} files`);
-    return neverthrow.ok(undefined);
   }
 
   /**
    * logStoreファイルを解析して既存のlogStore階層に統合
    * 予期しないエラーはthrowされる（Sentryに送信）
    */
-  private async parseAndIntegrateLogStore(filePaths: string[]): Promise<
-    neverthrow.Result<
-      {
-        logLines: VRChatLogLine[];
-        totalLines: number;
-        processedFiles: string[];
-      },
-      ImportError
-    >
+  private parseAndIntegrateLogStore(filePaths: string[]): Effect.Effect<
+    {
+      logLines: VRChatLogLine[];
+      totalLines: number;
+      processedFiles: string[];
+    },
+    ImportServiceError
   > {
-    const allLogLines: VRChatLogLine[] = [];
-    const processedFiles: string[] = [];
+    return Effect.gen(this, function* () {
+      const allLogLines: VRChatLogLine[] = [];
+      const processedFiles: string[] = [];
 
-    for (const filePath of filePaths) {
-      logger.info(`Processing file: ${filePath}`);
+      for (const filePath of filePaths) {
+        logger.info(`Processing file: ${filePath}`);
 
-      // ファイル読み込み・解析（予期しないエラーは throw）
-      const content = await fs.readFile(filePath, 'utf-8');
-      const lines = content
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line !== ''); // 空行を除外
+        // ファイル読み込み・解析（予期しないエラーは throw）
+        const content = yield* Effect.tryPromise({
+          try: () => fs.readFile(filePath, 'utf-8'),
+          catch: (e) => {
+            throw e; // Unexpected error
+          },
+        }) as Effect.Effect<string, ImportServiceError>;
 
-      const validLogLines: VRChatLogLine[] = [];
-      let invalidLineCount = 0;
+        const lines = content
+          .split('\n')
+          .map((line) => line.trim())
+          .filter((line) => line !== ''); // 空行を除外
 
-      for (const line of lines) {
-        const parseResult = VRChatLogLineSchema.safeParse(line);
-        if (parseResult.success) {
-          validLogLines.push(parseResult.data);
-        } else {
-          invalidLineCount++;
-          // 無効な行は警告として記録し、スキップ
-          logger.warn(
-            `Skipping invalid log line: ${line.substring(0, 100)}...`,
-          );
+        const validLogLines: VRChatLogLine[] = [];
+        let invalidLineCount = 0;
+
+        for (const line of lines) {
+          const parseResult = VRChatLogLineSchema.safeParse(line);
+          if (parseResult.success) {
+            validLogLines.push(parseResult.data);
+          } else {
+            invalidLineCount++;
+            // 無効な行は警告として記録し、スキップ
+            logger.warn(
+              `Skipping invalid log line: ${line.substring(0, 100)}...`,
+            );
+          }
         }
+
+        allLogLines.push(...validLogLines);
+        processedFiles.push(filePath);
+
+        logger.info(
+          `Processed ${validLogLines.length} valid lines from ${path.basename(
+            filePath,
+          )} (${invalidLineCount} invalid lines skipped)`,
+        );
       }
 
-      allLogLines.push(...validLogLines);
-      processedFiles.push(filePath);
+      // 重複を確認（同一内容の行をカウント）
+      const uniqueLines = new Map<string, number>();
+      for (const logLine of allLogLines) {
+        const count = uniqueLines.get(logLine) || 0;
+        uniqueLines.set(logLine, count + 1);
+      }
 
-      logger.info(
-        `Processed ${validLogLines.length} valid lines from ${path.basename(
-          filePath,
-        )} (${invalidLineCount} invalid lines skipped)`,
+      const duplicateCount = Array.from(uniqueLines.values()).reduce(
+        (sum, count) => sum + (count > 1 ? count - 1 : 0),
+        0,
       );
-    }
 
-    // 重複を確認（同一内容の行をカウント）
-    const uniqueLines = new Map<string, number>();
-    for (const logLine of allLogLines) {
-      const count = uniqueLines.get(logLine) || 0;
-      uniqueLines.set(logLine, count + 1);
-    }
+      if (duplicateCount > 0) {
+        logger.info(
+          `Found ${duplicateCount} duplicate log lines (will be handled by logStorageManager)`,
+        );
+      }
 
-    const duplicateCount = Array.from(uniqueLines.values()).reduce(
-      (sum, count) => sum + (count > 1 ? count - 1 : 0),
-      0,
-    );
-
-    if (duplicateCount > 0) {
-      logger.info(
-        `Found ${duplicateCount} duplicate log lines (will be handled by logStorageManager)`,
-      );
-    }
-
-    // 既存のlogStorageManagerを活用して統合
-    // 重複除外、月別振り分け、10MB分割は自動実行
-    const integrationResult = await appendLoglinesToFile({
-      logLines: allLogLines,
-    });
-    if (integrationResult.isErr()) {
-      return neverthrow.err({
-        type: 'LOGSTORE_INTEGRATION_FAILED',
-        message: String(integrationResult.error),
+      // 既存のlogStorageManagerを活用して統合
+      // 重複除外、月別振り分け、10MB分割は自動実行
+      // appendLoglinesToFile returns Effect<void, never>, so no error mapping needed
+      yield* appendLoglinesToFile({
+        logLines: allLogLines,
       });
-    }
 
-    logger.info(
-      `Successfully integrated ${allLogLines.length} log lines into logStore`,
-    );
+      logger.info(
+        `Successfully integrated ${allLogLines.length} log lines into logStore`,
+      );
 
-    return neverthrow.ok({
-      logLines: allLogLines,
-      totalLines: allLogLines.length,
-      processedFiles,
+      return {
+        logLines: allLogLines,
+        totalLines: allLogLines.length,
+        processedFiles,
+      };
     });
   }
 }

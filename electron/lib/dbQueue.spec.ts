@@ -1,3 +1,4 @@
+import { Cause, Effect, Exit, Option } from 'effect';
 import {
   afterAll,
   beforeAll,
@@ -54,11 +55,10 @@ describe('DBQueue', () => {
     const queue = getDBQueue();
     const task = vi.fn().mockResolvedValue('result');
 
-    const result = await queue.addWithResult(task);
+    const value = await Effect.runPromise(queue.addWithResult(task));
 
     expect(task).toHaveBeenCalledTimes(1);
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toBe('result');
+    expect(value).toBe('result');
   });
 
   it('addWithResultでエラーが発生した場合にエラーをResult型で返すこと', async () => {
@@ -66,15 +66,10 @@ describe('DBQueue', () => {
     const error = new Error('Task error');
     const task = vi.fn().mockRejectedValue(error);
 
-    // addWithResultは予期せぬエラーをスローするため、try-catchで捕捉する
-    try {
-      await queue.addWithResult(task);
-      // エラーがスローされるはずなので、ここには到達しないはず
-      expect(false).toBe(true);
-    } catch (e) {
-      // エラーがスローされることを確認
-      expect(e).toBe(error);
-    }
+    // addWithResultは予期せぬエラーをスローするため、rejects.toThrowで検証
+    await expect(Effect.runPromise(queue.addWithResult(task))).rejects.toThrow(
+      'Task error',
+    );
 
     expect(task).toHaveBeenCalledTimes(1);
   });
@@ -122,7 +117,7 @@ describe('DBQueue', () => {
     await Promise.all([firstTaskPromise, secondTaskPromise]);
   });
 
-  it('キューが一杯の場合にaddWithResultでエラーをResult型で返すこと', async () => {
+  it('キューが一杯の場合にaddWithResultでエラーをEffect型で返すこと', async () => {
     resetDBQueue(); // テスト用にリセット
 
     // maxSize:2のキューを作成（実行中1つ + 待機中1つ = 合計2つまで）
@@ -138,35 +133,41 @@ describe('DBQueue', () => {
     const firstTaskPromise = queue.add(longRunningTask);
 
     // 2つ目のタスクを追加（待機中になる、こちらも長時間実行）
-    const secondTaskPromise = queue.addWithResult(longRunningTask);
+    const secondTaskEffect = queue.addWithResult(longRunningTask);
+    const secondTaskPromise = Effect.runPromise(secondTaskEffect).catch(
+      () => {},
+    );
 
     // 少し待機してキューの状態を安定させる
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // 3つ目のタスクを追加しようとすると、キューが一杯でエラー
-    const result = await queue.addWithResult(() =>
-      Promise.resolve('third task'),
+    const exit = await Effect.runPromiseExit(
+      queue.addWithResult(() => Promise.resolve('third task')),
     );
 
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().message).toContain('キューが一杯です');
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const failOpt = Cause.failureOption(exit.cause);
+      expect(Option.isSome(failOpt)).toBe(true);
+      if (Option.isSome(failOpt)) {
+        expect(failOpt.value.message).toContain('キューが一杯です');
+      }
+    }
 
     // タスクの完了を待つ（クリーンアップ）
     await firstTaskPromise;
-    if ((await secondTaskPromise).isOk()) {
-      // secondTaskPromiseも完了を待つ
-    }
+    await secondTaskPromise;
   });
 
   it('トランザクションを使用してタスクを実行できること', async () => {
     const queue = getDBQueue();
     const transactionTask = vi.fn().mockResolvedValue('transaction result');
 
-    const result = await queue.transaction(transactionTask);
+    const value = await Effect.runPromise(queue.transaction(transactionTask));
 
     expect(transactionTask).toHaveBeenCalledTimes(1);
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toBe('transaction result');
+    expect(value).toBe('transaction result');
   });
 
   it('トランザクションで予期しないエラーが発生した場合にエラーをthrowすること', async () => {
@@ -175,9 +176,9 @@ describe('DBQueue', () => {
     const transactionTask = vi.fn().mockRejectedValue(error);
 
     // 予期しないエラーはthrowされる（Sentryに送信される）
-    await expect(queue.transaction(transactionTask)).rejects.toThrow(
-      'Transaction error',
-    );
+    await expect(
+      Effect.runPromise(queue.transaction(transactionTask)),
+    ).rejects.toThrow('Transaction error');
 
     expect(transactionTask).toHaveBeenCalledTimes(1);
   });
@@ -202,7 +203,7 @@ describe('DBQueue', () => {
     getRDBClient().__client = originalClient;
   });
 
-  it('queryWithResultでクエリを実行してResult型で結果を返すこと', async () => {
+  it('queryWithResultでクエリを実行してEffect型で結果を返すこと', async () => {
     const queue = getDBQueue();
     const mockResult = [{ name: 'test_table' }];
 
@@ -211,13 +212,14 @@ describe('DBQueue', () => {
     const mockQuery = vi.fn().mockResolvedValue(mockResult);
     getRDBClient().__client.query = mockQuery;
 
-    const result = await queue.queryWithResult('SELECT * FROM test_table');
+    const value = await Effect.runPromise(
+      queue.queryWithResult('SELECT * FROM test_table'),
+    );
 
     expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM test_table', {
       type: 'SELECT',
     });
-    expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toEqual(mockResult);
+    expect(value).toEqual(mockResult);
 
     // モックをリストア
     getRDBClient().__client = originalClient;
@@ -234,7 +236,7 @@ describe('DBQueue', () => {
 
     // 予期しないエラーはthrowされる（Sentryに送信される）
     await expect(
-      queue.queryWithResult('SELECT * FROM test_table'),
+      Effect.runPromise(queue.queryWithResult('SELECT * FROM test_table')),
     ).rejects.toThrow('Query error');
 
     expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM test_table', {

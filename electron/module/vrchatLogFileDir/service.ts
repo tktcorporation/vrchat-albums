@@ -1,6 +1,5 @@
 import path from 'node:path';
-import * as neverthrow from 'neverthrow';
-import { ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 import { logger } from './../../lib/logger';
 // import type * as vrchatLogService from '../service/vrchatLog/vrchatLog';
@@ -21,19 +20,17 @@ type VRChatLogFileDirError = 'logFilesNotFound' | 'logFileDirNotFound';
  * 設定ストアに保存されているログディレクトリパスを取得する
  * getValidVRChatLogFileDir から呼び出される内部処理
  */
-const getStoredVRChatLogFilesDirPath = (): ResultAsync<
+const getStoredVRChatLogFilesDirPath = (): Effect.Effect<
   NotValidatedVRChatLogFilesDirPath | null,
   never
 > => {
-  return ResultAsync.fromSafePromise(
-    Promise.resolve(
-      match(getSettingStore().getLogFilesDir())
-        .with(null, () => null)
-        .with(P.string, (path) =>
-          NotValidatedVRChatLogFilesDirPathSchema.parse(path),
-        )
-        .exhaustive(),
-    ),
+  return Effect.succeed(
+    match(getSettingStore().getLogFilesDir())
+      .with(null, () => null)
+      .with(P.string, (path) =>
+        NotValidatedVRChatLogFilesDirPathSchema.parse(path),
+      )
+      .exhaustive(),
   );
 };
 
@@ -41,51 +38,49 @@ const getStoredVRChatLogFilesDirPath = (): ResultAsync<
  * 実際に存在するVRChatログディレクトリを検証して返す
  * getVRChatLogFileDir でエラーハンドリング付きの結果を生成するために使用
  */
-export const getValidVRChatLogFileDir = async (): Promise<
-  neverthrow.Result<
-    {
-      path: VRChatLogFilesDirPath;
-      storedPath: NotValidatedVRChatLogFilesDirPath | null;
-    },
-    {
-      error: 'logFilesNotFound' | 'logFileDirNotFound';
-      storedPath: NotValidatedVRChatLogFilesDirPath | null;
-      path: NotValidatedVRChatLogFilesDirPath;
-    }
-  >
+export const getValidVRChatLogFileDir = (): Effect.Effect<
+  {
+    path: VRChatLogFilesDirPath;
+    storedPath: NotValidatedVRChatLogFilesDirPath | null;
+  },
+  {
+    error: 'logFilesNotFound' | 'logFileDirNotFound';
+    storedPath: NotValidatedVRChatLogFilesDirPath | null;
+    path: NotValidatedVRChatLogFilesDirPath;
+  }
 > => {
-  const storedVRChatLogFilesDirPathResult =
-    await getStoredVRChatLogFilesDirPath();
-  // getStoredVRChatLogFilesDirPath は never エラーなので常に成功
-  const storedVRChatLogFilesDirPath =
-    storedVRChatLogFilesDirPathResult._unsafeUnwrap();
-  const vrChatlogFilesDir = match(storedVRChatLogFilesDirPath)
-    .with(null, () => getDefaultVRChatVRChatLogFilesDir())
-    .with(P.not(null), (path) => path)
-    .exhaustive();
-  const logFileNamesResult = await getVRChatLogFilePathList(vrChatlogFilesDir);
-  if (logFileNamesResult.isErr()) {
-    return neverthrow.err({
-      error: match(logFileNamesResult.error)
-        .with('ENOENT', () => 'logFileDirNotFound' as const)
-        .exhaustive(),
+  return Effect.gen(function* () {
+    const storedVRChatLogFilesDirPath = yield* getStoredVRChatLogFilesDirPath();
+    const vrChatlogFilesDir = match(storedVRChatLogFilesDirPath)
+      .with(null, () => getDefaultVRChatVRChatLogFilesDir())
+      .with(P.not(null), (path) => path)
+      .exhaustive();
+    const logFileNamesResult = yield* Effect.either(
+      getVRChatLogFilePathList(vrChatlogFilesDir),
+    );
+    if (logFileNamesResult._tag === 'Left') {
+      return yield* Effect.fail({
+        error: match(logFileNamesResult.left)
+          .with('ENOENT', () => 'logFileDirNotFound' as const)
+          .exhaustive(),
+        storedPath: storedVRChatLogFilesDirPath,
+        path: vrChatlogFilesDir,
+      });
+    }
+    if (logFileNamesResult.right.length === 0) {
+      return yield* Effect.fail({
+        error: 'logFilesNotFound' as const,
+        path: vrChatlogFilesDir,
+        storedPath: storedVRChatLogFilesDirPath,
+      });
+    }
+    const validatedVRChatLogFilesDirPath = VRChatLogFilesDirPathSchema.parse(
+      vrChatlogFilesDir.value,
+    );
+    return {
+      path: validatedVRChatLogFilesDirPath,
       storedPath: storedVRChatLogFilesDirPath,
-      path: vrChatlogFilesDir,
-    });
-  }
-  if (logFileNamesResult.value.length === 0) {
-    return neverthrow.err({
-      error: 'logFilesNotFound',
-      path: vrChatlogFilesDir,
-      storedPath: storedVRChatLogFilesDirPath,
-    });
-  }
-  const validatedVRChatLogFilesDirPath = VRChatLogFilesDirPathSchema.parse(
-    vrChatlogFilesDir.value,
-  );
-  return neverthrow.ok({
-    path: validatedVRChatLogFilesDirPath,
-    storedPath: storedVRChatLogFilesDirPath,
+    };
   });
 };
 
@@ -98,20 +93,16 @@ export type VRChatLogFileDirResult = {
  * ログディレクトリ検証結果を返す（Result型）
  * 設定画面や初期化処理から直接呼び出される
  */
-export const getVRChatLogFileDir = (): ResultAsync<
+export const getVRChatLogFileDir = (): Effect.Effect<
   VRChatLogFileDirResult,
   VRChatLogFileDirError
 > => {
-  return ResultAsync.fromSafePromise(getValidVRChatLogFileDir()).andThen(
-    (validatedResult) => {
-      if (validatedResult.isErr()) {
-        return neverthrow.err(validatedResult.error.error);
-      }
-      return neverthrow.ok({
-        storedPath: validatedResult.value.storedPath,
-        path: validatedResult.value.path,
-      });
-    },
+  return getValidVRChatLogFileDir().pipe(
+    Effect.map((result) => ({
+      storedPath: result.storedPath,
+      path: result.path,
+    })),
+    Effect.mapError((e) => e.error),
   );
 };
 
@@ -147,33 +138,30 @@ const getDefaultVRChatVRChatLogFilesDir =
 /**
  * VRChatのログファイルのパス一覧を取得する
  */
-export const getVRChatLogFilePathList = async (
+export const getVRChatLogFilePathList = (
   vrChatlogFilesDir: VRChatLogFilesDirPath | NotValidatedVRChatLogFilesDirPath,
-): Promise<neverthrow.Result<VRChatLogFilePath[], fs.FSError>> => {
-  const logFileNamesResult = await fs.readdirAsync(vrChatlogFilesDir.value, {
-    withFileTypes: true,
-    encoding: 'buffer',
-  });
-  if (logFileNamesResult.isErr()) {
-    return neverthrow.err(
-      match(logFileNamesResult.error)
-        .with({ code: 'ENOENT' }, () => 'ENOENT' as const)
-        .exhaustive(),
-    );
-  }
+): Effect.Effect<VRChatLogFilePath[], fs.FSError> => {
+  return Effect.gen(function* () {
+    const logFileNames = yield* fs
+      .readdirAsync(vrChatlogFilesDir.value, {
+        withFileTypes: true,
+        encoding: 'buffer',
+      })
+      .pipe(Effect.mapError(() => 'ENOENT' as const));
 
-  // output_log から始まるファイル名のみを取得
-  const logFilePathList = logFileNamesResult.value
-    .map((fileName) => {
-      const result = VRChatLogFilePathSchema.safeParse(
-        `${path.join(vrChatlogFilesDir.value, fileName.name.toString())}`,
-      );
-      if (!result.success) {
-        logger.debug('generally ignore this log', result.error);
-        return null;
-      }
-      return result.data;
-    })
-    .filter((fileName): fileName is VRChatLogFilePath => fileName !== null);
-  return neverthrow.ok(logFilePathList);
+    // output_log から始まるファイル名のみを取得
+    const logFilePathList = logFileNames
+      .map((fileName) => {
+        const result = VRChatLogFilePathSchema.safeParse(
+          `${path.join(vrChatlogFilesDir.value, fileName.name.toString())}`,
+        );
+        if (!result.success) {
+          logger.debug('generally ignore this log', result.error);
+          return null;
+        }
+        return result.data;
+      })
+      .filter((fileName): fileName is VRChatLogFilePath => fileName !== null);
+    return logFilePathList;
+  });
 };

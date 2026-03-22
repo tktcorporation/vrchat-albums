@@ -1,4 +1,5 @@
 import * as datefns from 'date-fns';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as client from '../../lib/sequelize';
 import { VRChatPlayerNameSchema } from '../vrchatLog/model';
@@ -31,14 +32,15 @@ describe('VRChatPlayerJoinLogModel', () => {
         },
       ];
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
-      const result = await service.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'),
-        endJoinDateTime: datefns.parseISO('2021-01-03T00:00:00Z'),
-      });
+      const logs = await Effect.runPromise(
+        service.getVRChatPlayerJoinLogListByJoinDateTime({
+          startJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'),
+          endJoinDateTime: datefns.parseISO('2021-01-03T00:00:00Z'),
+        }),
+      );
 
-      expect(result.isOk()).toBe(true);
       expect(
-        result._unsafeUnwrap().map((log) => ({
+        logs.map((log) => ({
           joinDateTime: log.joinDateTime,
           playerName: log.playerName,
         })),
@@ -55,13 +57,21 @@ describe('VRChatPlayerJoinLogModel', () => {
     });
 
     it('should return error for invalid date range', async () => {
-      const result = await service.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: datefns.parseISO('2021-01-03T00:00:00Z'),
-        endJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'), // 開始日時が終了日時より後
-      });
+      const exit = await Effect.runPromiseExit(
+        service.getVRChatPlayerJoinLogListByJoinDateTime({
+          startJoinDateTime: datefns.parseISO('2021-01-03T00:00:00Z'),
+          endJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'), // 開始日時が終了日時より後
+        }),
+      );
 
-      expect(result.isErr()).toBe(true);
-      expect(result._unsafeUnwrapErr().type).toBe('INVALID_DATE_RANGE');
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value._tag).toBe('PlayerJoinLogInvalidDateRange');
+        }
+      }
     });
 
     it('should handle create duplicated playerJoinLog', async () => {
@@ -98,14 +108,15 @@ describe('VRChatPlayerJoinLogModel', () => {
         },
       ];
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
-      const result = await service.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'),
-        endJoinDateTime: datefns.parseISO('2021-01-04T00:00:00Z'),
-      });
+      const logs = await Effect.runPromise(
+        service.getVRChatPlayerJoinLogListByJoinDateTime({
+          startJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'),
+          endJoinDateTime: datefns.parseISO('2021-01-04T00:00:00Z'),
+        }),
+      );
 
-      expect(result.isOk()).toBe(true);
       expect(
-        result._unsafeUnwrap().map((log) => ({
+        logs.map((log) => ({
           joinDateTime: log.joinDateTime,
           playerName: log.playerName,
         })),
@@ -157,14 +168,15 @@ describe('VRChatPlayerJoinLogModel', () => {
         })),
       ).toEqual([]);
 
-      const logs = await service.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'),
-        endJoinDateTime: datefns.parseISO('2021-01-04T00:00:00Z'),
-      });
+      const logs = await Effect.runPromise(
+        service.getVRChatPlayerJoinLogListByJoinDateTime({
+          startJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'),
+          endJoinDateTime: datefns.parseISO('2021-01-04T00:00:00Z'),
+        }),
+      );
 
-      expect(logs.isOk()).toBe(true);
       expect(
-        logs._unsafeUnwrap().map((log) => ({
+        logs.map((log) => ({
           joinDateTime: log.joinDateTime,
           playerName: log.playerName,
         })),
@@ -193,11 +205,10 @@ describe('VRChatPlayerJoinLogModel', () => {
       ];
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
-      const result = await service.getLatestDetectedDate();
+      const value = await Effect.runPromise(service.getLatestDetectedDate());
 
-      expect(result.isOk()).toBe(true);
       // 最新の日時（2021-01-02）が返されることを確認
-      expect(result._unsafeUnwrap()).toBe('2021-01-02T00:00:00.000Z');
+      expect(value).toBe('2021-01-02T00:00:00.000Z');
     });
 
     it('should find latest player join log', async () => {
@@ -217,11 +228,10 @@ describe('VRChatPlayerJoinLogModel', () => {
       ];
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
-      const result = await service.findLatestPlayerJoinLog();
+      const value = await Effect.runPromise(service.findLatestPlayerJoinLog());
 
-      expect(result.isOk()).toBe(true);
-      expect(result._unsafeUnwrap()?.playerName).toBe('player2');
-      expect(result._unsafeUnwrap()?.joinDateTime).toEqual(
+      expect(value?.playerName).toBe('player2');
+      expect(value?.joinDateTime).toEqual(
         datefns.parseISO('2021-01-02T00:00:00Z'),
       );
     });

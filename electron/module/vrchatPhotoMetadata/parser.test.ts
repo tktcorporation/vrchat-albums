@@ -5,6 +5,7 @@
  * parsePhotoMetadata: ファイルパスからメタデータを読み取る関数のテスト
  */
 
+import { Cause, Effect, Exit, Option } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { extractOfficialMetadata, parsePhotoMetadata } from './parser';
 
@@ -120,17 +121,13 @@ describe('parsePhotoMetadata', () => {
       WorldDisplayName: 'My World',
     });
 
-    const result = await parsePhotoMetadata(
-      '/path/to/photo.png',
-      mockReadExifTags,
+    const value = await Effect.runPromise(
+      parsePhotoMetadata('/path/to/photo.png', mockReadExifTags),
     );
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.authorId).toBe('usr_abc');
-      expect(result.value.authorDisplayName).toBe('Photographer');
-      expect(result.value.worldId).toBe('wrld_xyz');
-      expect(result.value.worldDisplayName).toBe('My World');
-    }
+    expect(value.authorId).toBe('usr_abc');
+    expect(value.authorDisplayName).toBe('Photographer');
+    expect(value.worldId).toBe('wrld_xyz');
+    expect(value.worldDisplayName).toBe('My World');
   });
 
   it('should return NO_METADATA_FOUND when no VRChat metadata exists', async () => {
@@ -139,29 +136,35 @@ describe('parsePhotoMetadata', () => {
       Model: 'EOS R5',
     });
 
-    const result = await parsePhotoMetadata(
-      '/path/to/photo.png',
-      mockReadExifTags,
+    const exit = await Effect.runPromiseExit(
+      parsePhotoMetadata('/path/to/photo.png', mockReadExifTags),
     );
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) {
-      expect(result.error.type).toBe('NO_METADATA_FOUND');
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const failOpt = Cause.failureOption(exit.cause);
+      expect(Option.isSome(failOpt)).toBe(true);
+      if (Option.isSome(failOpt)) {
+        expect(failOpt.value._tag).toBe('NoMetadataFound');
+      }
     }
   });
 
-  it('should return PARSE_ERROR when exif reading fails', async () => {
+  it('should return MetadataParseError when exif reading fails', async () => {
     const mockReadExifTags = async () => {
       throw new Error('File not found');
     };
 
-    const result = await parsePhotoMetadata(
-      '/nonexistent/photo.png',
-      mockReadExifTags,
+    const exit = await Effect.runPromiseExit(
+      parsePhotoMetadata('/nonexistent/photo.png', mockReadExifTags),
     );
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) {
-      expect(result.error.type).toBe('PARSE_ERROR');
-      expect(result.error.message).toContain('File not found');
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const failOpt = Cause.failureOption(exit.cause);
+      expect(Option.isSome(failOpt)).toBe(true);
+      if (Option.isSome(failOpt)) {
+        expect(failOpt.value._tag).toBe('MetadataParseError');
+        expect(failOpt.value.message).toContain('File not found');
+      }
     }
   });
 });

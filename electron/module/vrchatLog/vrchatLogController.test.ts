@@ -1,4 +1,4 @@
-import { ok } from 'neverthrow';
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   DBLogProvider,
@@ -14,9 +14,13 @@ const createMockContext = () => ({
 });
 
 // exportServiceをモック
-vi.mock('./exportService/exportService', () => ({
-  exportLogStoreFromDB: vi.fn(),
-}));
+vi.mock('./exportService/exportService', async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...(original as object),
+    exportLogStoreFromDB: vi.fn(),
+  };
+});
 
 // logger をモック
 vi.mock('./../../lib/logger', () => ({
@@ -67,8 +71,8 @@ describe('vrchatLogController', () => {
         exportEndTime: new Date('2023-10-08T10:05:00Z'),
       };
 
-      vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
-        ok(mockExportResult),
+      vi.mocked(exportService.exportLogStoreFromDB).mockReturnValue(
+        Effect.succeed(mockExportResult),
       );
 
       const router = vrchatLogRouter();
@@ -104,8 +108,8 @@ describe('vrchatLogController', () => {
         exportEndTime: new Date('2023-10-08T10:03:00Z'),
       };
 
-      vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
-        ok(mockExportResult),
+      vi.mocked(exportService.exportLogStoreFromDB).mockReturnValue(
+        Effect.succeed(mockExportResult),
       );
 
       const router = vrchatLogRouter();
@@ -144,9 +148,13 @@ describe('vrchatLogController', () => {
     });
 
     it('エクスポートエラー時に適切に例外がスローされる', async () => {
-      const exportError = new Error('Export failed: Database connection error');
-      vi.mocked(exportService.exportLogStoreFromDB).mockRejectedValue(
-        exportError,
+      const { ExportDbQueryFailed } = await import('./exportService/errors');
+      vi.mocked(exportService.exportLogStoreFromDB).mockReturnValue(
+        Effect.fail(
+          new ExportDbQueryFailed({
+            message: 'Database connection error',
+          }),
+        ),
       );
 
       const router = vrchatLogRouter();
@@ -167,7 +175,9 @@ describe('vrchatLogController', () => {
           }),
           signal: new AbortController().signal,
         }),
-      ).rejects.toThrow('Export failed: Database connection error');
+      ).rejects.toThrow(
+        'データベースクエリに失敗しました: Database connection error',
+      );
     });
   });
 
@@ -180,8 +190,8 @@ describe('vrchatLogController', () => {
         exportEndTime: new Date(),
       };
 
-      vi.mocked(exportService.exportLogStoreFromDB).mockResolvedValue(
-        ok(mockExportResult),
+      vi.mocked(exportService.exportLogStoreFromDB).mockReturnValue(
+        Effect.succeed(mockExportResult),
       );
 
       const router = vrchatLogRouter();
@@ -211,9 +221,9 @@ describe('vrchatLogController', () => {
       let capturedGetDBLogs: DBLogProvider | undefined;
 
       vi.mocked(exportService.exportLogStoreFromDB).mockImplementation(
-        async (_options, getDBLogs) => {
+        (_options, getDBLogs) => {
           capturedGetDBLogs = getDBLogs;
-          return ok({
+          return Effect.succeed({
             exportedFiles: [],
             totalLogLines: 0,
             exportStartTime: new Date(),

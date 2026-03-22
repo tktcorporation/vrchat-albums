@@ -1,4 +1,5 @@
 import * as datefns from 'date-fns';
+import { Effect } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { clearAllCaches } from '../../lib/queryCache';
 import * as initRDBClient from '../../lib/sequelize';
@@ -55,7 +56,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
       },
     ];
 
-    await worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogs);
+    await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogs),
+    );
 
     // プレイヤー参加ログを作成
     const playerJoinLogs = [
@@ -87,14 +90,14 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
 
     await playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs);
 
-    // 関数を実行
+    // 関数を実行（直接配列または null を返す）
     const result = await getPlayerJoinListInSameWorld(baseDate);
 
     // 期待される結果
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
+    expect(result).not.toBeNull();
+    if (result !== null) {
       // プレイヤー名を確認
-      const playerNames = result.value.map((player) => player.playerName);
+      const playerNames = result.map((player) => player.playerName);
       expect(playerNames.length).toBeGreaterThan(0);
 
       // 少なくとも1人のプレイヤーが含まれていることを確認
@@ -141,7 +144,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
       },
     ];
 
-    await worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogs);
+    await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogs),
+    );
 
     // 各セッションに対応するプレイヤー参加ログを作成
     const playerJoinLogs = [
@@ -204,9 +209,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
     const result = await getPlayerJoinListInSameWorld(baseDate);
 
     // 期待される結果
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      const playerNames = result.value.map((player) => player.playerName);
+    expect(result).not.toBeNull();
+    if (result !== null) {
+      const playerNames = result.map((player) => player.playerName);
 
       // Afternoon World のプレイヤーのみが取得されることを確認
       expect(playerNames).toContain('Afternoon Player 1');
@@ -239,7 +244,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
       },
     ];
 
-    await worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogs);
+    await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogs),
+    );
 
     // 現在のセッションのプレイヤー
     const playerJoinLogs = [
@@ -285,9 +292,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
     );
 
     // 期待される結果
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      const playerNames = result.value.map((player) => player.playerName);
+    expect(result).not.toBeNull();
+    if (result !== null) {
+      const playerNames = result.map((player) => player.playerName);
 
       // 全てのプレイヤーが取得されることを確認
       expect(playerNames).toContain('Current Player 1');
@@ -302,13 +309,10 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
     // データベースは空の状態（beforeEachでクリア済み）
     const baseDate = datefns.parseISO('2023-01-01T00:00:00Z');
 
-    // 関数を実行
+    // 関数を実行（ワールド参加ログがない場合は null を返す）
     const result = await getPlayerJoinListInSameWorld(baseDate);
 
-    // 期待される結果：エラーが返される
-    expect(result.isErr()).toBe(true);
-    if (result.isErr()) {
-      expect(result.error).toBe('RECENT_JOIN_LOG_NOT_FOUND');
-    }
+    // 期待される結果：null が返される
+    expect(result).toBeNull();
   });
 });

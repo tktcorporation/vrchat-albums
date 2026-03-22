@@ -7,16 +7,9 @@
  * @see electron/module/vrchatPhotoMetadata/schema.ts - メタデータの Zod スキーマ定義
  */
 
-import { err, ok, type Result, ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
+import { MetadataParseError, NoMetadataFound } from './errors';
 import { type VRChatPhotoMetadata, VRChatPhotoMetadataSchema } from './schema';
-
-// ============================================================================
-// エラー型
-// ============================================================================
-
-export type MetadataParseError =
-  | { type: 'NO_METADATA_FOUND'; message: string }
-  | { type: 'PARSE_ERROR'; message: string };
 
 // ============================================================================
 // VRChat公式メタデータ (XMP) パーサー
@@ -106,32 +99,28 @@ export const extractOfficialMetadata = (
  * これにより、複数ファイルの処理時にインスタンスを再利用でき、
  * テスト時にモック可能。
  */
-export const parsePhotoMetadata = async (
+export const parsePhotoMetadata = (
   filePath: string,
   // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
   readExifTags: (filePath: string) => Promise<Record<string, any>>,
-): Promise<Result<VRChatPhotoMetadata, MetadataParseError>> => {
-  const tagsResult = await ResultAsync.fromPromise(
-    readExifTags(filePath),
-    (e): MetadataParseError => ({
-      type: 'PARSE_ERROR',
-      message: `Failed to read EXIF/XMP from ${filePath}: ${e instanceof Error ? e.message : String(e)}`,
-    }),
-  );
-  if (tagsResult.isErr()) {
-    return err(tagsResult.error);
-  }
-
-  const metadata = extractOfficialMetadata(tagsResult.value);
-  if (metadata === null) {
-    return err({
-      type: 'NO_METADATA_FOUND',
-      message: 'No VRChat XMP metadata found in photo',
+): Effect.Effect<VRChatPhotoMetadata, NoMetadataFound | MetadataParseError> =>
+  Effect.gen(function* () {
+    const tags = yield* Effect.tryPromise({
+      try: () => readExifTags(filePath),
+      catch: (e) =>
+        new MetadataParseError({
+          photoPath: filePath,
+          message: `Failed to read EXIF/XMP from ${filePath}: ${e instanceof Error ? e.message : String(e)}`,
+        }),
     });
-  }
 
-  return ok(metadata);
-};
+    const metadata = extractOfficialMetadata(tags);
+    if (metadata === null) {
+      return yield* Effect.fail(new NoMetadataFound({ photoPath: filePath }));
+    }
+
+    return metadata;
+  });
 
 /**
  * 複数の写真からメタデータをバッチ抽出する
@@ -151,8 +140,10 @@ export const parsePhotoMetadataBatch = async (
   for (let i = 0; i < filePaths.length; i += concurrency) {
     const batch = filePaths.slice(i, i + concurrency);
     const promises = batch.map(async (filePath) => {
-      const result = await parsePhotoMetadata(filePath, readExifTags);
-      if (result.isOk()) {
+      const result = await Effect.runPromiseExit(
+        parsePhotoMetadata(filePath, readExifTags),
+      );
+      if (result._tag === 'Success') {
         results.set(filePath, result.value);
       }
     });

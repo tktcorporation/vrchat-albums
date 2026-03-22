@@ -1,6 +1,5 @@
 import type { Transaction } from '@sequelize/core';
-import type { Result } from 'neverthrow';
-import { err, ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import PQueue from 'p-queue';
 import { match, P } from 'ts-pattern';
 import { logger } from './logger';
@@ -93,73 +92,76 @@ class DBQueue {
       await this.waitForSpace();
     }
 
-    // ResultAsync.fromPromiseを使い、エラーハンドラ内でre-throw
-    // すべてのエラーはre-throwされるので、unwrapは安全
-    return ResultAsync.fromPromise(
-      this.queue.add(task).then((r) => r as T),
-      (error): never => {
-        match(error)
-          .with(
-            P.intersection(P.instanceOf(Error), { name: 'TimeoutError' }),
-            () => {
-              logger.error({
-                message: 'DBQueue: タスクがタイムアウトしました',
-              });
-            },
-          )
-          .otherwise(() => {});
-        // すべてのエラーをre-throw
-        throw error;
-      },
-    ).then((r) => r._unsafeUnwrap());
+    try {
+      const result = await this.queue.add(task).then((r) => r as T);
+      return result;
+    } catch (error) {
+      match(error)
+        .with(
+          P.intersection(P.instanceOf(Error), { name: 'TimeoutError' }),
+          () => {
+            logger.error({
+              message: 'DBQueue: タスクがタイムアウトしました',
+            });
+          },
+        )
+        .otherwise(() => {});
+      // すべてのエラーをre-throw
+      throw error;
+    }
   }
 
   /**
-   * キューにタスクを追加して実行する（Result型を返す）
+   * キューにタスクを追加して実行する（Effect型を返す）
    * @param task 実行するタスク関数
-   * @returns タスクの実行結果をResult型でラップ
+   * @returns タスクの実行結果をEffect型でラップ
    */
-  async addWithResult<T>(
-    task: () => Promise<T>,
-  ): Promise<Result<T, DBQueueError>> {
-    if (this.totalTasks >= this.options.maxSize) {
-      if (this.options.onFull === 'throw') {
-        return err({
-          type: 'QUEUE_FULL',
-          message: 'DBQueue: キューが一杯です',
+  addWithResult<T>(task: () => Promise<T>): Effect.Effect<T, DBQueueError> {
+    return Effect.gen(this, function* () {
+      if (this.totalTasks >= this.options.maxSize) {
+        if (this.options.onFull === 'throw') {
+          return yield* Effect.fail({
+            type: 'QUEUE_FULL' as const,
+            message: 'DBQueue: キューが一杯です',
+          });
+        }
+        // 'wait'の場合は空きができるまで待機する
+        yield* Effect.tryPromise({
+          try: () => this.waitForSpace(),
+          catch: (e) => {
+            throw e;
+          },
         });
       }
-      // 'wait'の場合は空きができるまで待機する
-      await this.waitForSpace();
-    }
 
-    return ResultAsync.fromPromise(
-      this.queue.add(task).then((r) => r as T),
-      (error): DBQueueError => {
-        return match(error)
-          .with(
-            P.intersection(P.instanceOf(Error), { name: 'TimeoutError' }),
-            (e) => {
+      return yield* Effect.tryPromise({
+        try: () => this.queue.add(task).then((r) => r as T),
+        catch: (error): DBQueueError => {
+          return match(error)
+            .with(
+              P.intersection(P.instanceOf(Error), { name: 'TimeoutError' }),
+              (e) => {
+                logger.error({
+                  message: 'DBQueue: タスクがタイムアウトしました',
+                  stack: e,
+                });
+                return {
+                  type: 'TASK_TIMEOUT' as const,
+                  message: `DBQueue: タスクがタイムアウトしました: ${e.message}`,
+                };
+              },
+            )
+            .otherwise((e) => {
+              // 予期せぬエラーの場合はログを出力して例外をスロー
               logger.error({
-                message: 'DBQueue: タスクがタイムアウトしました',
-                stack: e,
+                message: 'DBQueue: タスク実行中に予期せぬエラーが発生しました',
+                stack: e instanceof Error ? e : new Error(String(e)),
               });
-              return {
-                type: 'TASK_TIMEOUT' as const,
-                message: `DBQueue: タスクがタイムアウトしました: ${e.message}`,
-              };
-            },
-          )
-          .otherwise((e) => {
-            // 予期せぬエラーの場合はログを出力して例外をスロー
-            logger.error({
-              message: 'DBQueue: タスク実行中に予期せぬエラーが発生しました',
-              stack: e instanceof Error ? e : new Error(String(e)),
+              throw e; // 予期せぬエラーはそのままスロー
             });
-            throw e; // 予期せぬエラーはそのままスロー
-          });
-      },
-    );
+        },
+      });
+    });
   }
 
   /**
@@ -180,15 +182,13 @@ class DBQueue {
   }
 
   /**
-   * 読み取り専用のクエリを実行する（Result型を返す）
+   * 読み取り専用のクエリを実行する（Effect型を返す）
    * @param query 実行するSQLクエリ
-   * @returns クエリの実行結果をResult型でラップ
+   * @returns クエリの実行結果をEffect型でラップ
    *
    * Note: 予期しないエラーは addWithResult 内で throw され Sentry に送信される
    */
-  async queryWithResult(
-    query: string,
-  ): Promise<Result<unknown[], DBQueueError>> {
+  queryWithResult(query: string): Effect.Effect<unknown[], DBQueueError> {
     return this.addWithResult(async () => {
       const client = getRDBClient().__client;
       const result = await client.query(query, {
@@ -201,13 +201,13 @@ class DBQueue {
   /**
    * トランザクションを使用してタスクを実行する
    * @param task トランザクションを使用するタスク関数
-   * @returns タスクの実行結果をResult型でラップ
+   * @returns タスクの実行結果をEffect型でラップ
    *
    * Note: 予期しないエラーは addWithResult 内で throw され Sentry に送信される
    */
-  async transaction<T>(
+  transaction<T>(
     task: (transaction: Transaction) => Promise<T>,
-  ): Promise<Result<T, DBQueueError>> {
+  ): Effect.Effect<T, DBQueueError> {
     return this.addWithResult(async () => {
       const client = getRDBClient().__client;
       return await client.transaction(task);

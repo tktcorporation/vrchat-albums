@@ -1,4 +1,4 @@
-import type { Result } from 'neverthrow';
+import type { Effect } from 'effect';
 import { type DBQueueError, getDBQueue } from './dbQueue';
 
 /**
@@ -45,13 +45,14 @@ const READ_QUEUE_CONFIG = {
  * @param query 実行するSQLクエリ
  * @returns クエリの実行結果
  */
-export async function executeQuery(
+export function executeQuery(
   query: string,
-): Promise<Result<unknown[], DBHelperError>> {
+): Effect.Effect<unknown[], DBHelperError> {
   const dbQueue = getDBQueue(READ_QUEUE_CONFIG);
 
-  return dbQueue.queryWithResult(query) as Promise<
-    Result<unknown[], DBHelperError>
+  return dbQueue.queryWithResult(query) as Effect.Effect<
+    unknown[],
+    DBHelperError
   >;
 }
 
@@ -150,19 +151,13 @@ export async function executeQuery(
  * @param operation 実行する操作
  * @returns 操作の実行結果
  */
-export async function enqueueTask<T>(
+export function enqueueTask<T>(
   operation: () => Promise<T>,
-): Promise<Result<T, DBHelperError>> {
+): Effect.Effect<T, DBHelperError> {
   // 読み取り操作は同じ設定で並行実行
   const dbQueue = getDBQueue(READ_QUEUE_CONFIG);
 
-  const result = await dbQueue.addWithResult(operation);
-  if (result.isErr()) {
-    // DBQueueErrorをDBHelperErrorに変換する必要があるか確認
-    // 今回はDBHelperErrorがDBQueueErrorを包含しているのでそのままキャスト
-    return result as Result<T, DBHelperError>;
-  }
-  return result as Result<T, DBHelperError>;
+  return dbQueue.addWithResult(operation) as Effect.Effect<T, DBHelperError>;
 }
 
 // /**

@@ -1,6 +1,6 @@
 import * as nodeFs from 'node:fs';
 import readline from 'node:readline';
-import * as neverthrow from 'neverthrow';
+import { Cause, Effect, Option } from 'effect';
 import { match } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import * as fs from '../../../lib/wrappedFs';
@@ -104,57 +104,62 @@ const createMemoryMonitor = (): MemoryMonitor => {
  * @param props.includesList 抽出対象とする文字列のリスト
  * @returns 抽出されたログ行の配列
  */
-export const getLogLinesFromLogFile = async (props: {
+export const getLogLinesFromLogFile = (props: {
   logFilePath: VRChatLogFilePath | VRChatLogStoreFilePath;
   includesList: string[];
-}): Promise<neverthrow.Result<string[], VRChatLogFileError>> => {
+}): Effect.Effect<string[], VRChatLogFileError> => {
   // ファイルが存在するか確認
   return match(nodeFs.existsSync(props.logFilePath.value))
-    .with(false, () => neverthrow.ok<string[], VRChatLogFileError>([]))
-    .with(true, async () => {
-      const stream = fs.createReadStream(props.logFilePath.value);
-      const reader = readline.createInterface({
-        input: stream,
-        crlfDelay: Number.POSITIVE_INFINITY,
-      });
-
-      const lines: string[] = [];
-      // ファイル単位で同一パターンの重複送信を防ぐ
-      const reportedUnknownPatterns = new Set<string>();
-      reader.on('line', (line) => {
-        // includesList の配列の中のどれかと一致したら追加
-        if (props.includesList.some((include) => line.includes(include))) {
-          lines.push(line);
-        }
-        // 未知の [Behaviour] パターン検出（string.includes のみ、正規表現なし）
-        // includesList にマッチしなくても [Behaviour] を含む行は仕様変更の可能性があるため、
-        // 既知パターンに該当しない場合は Sentry に送信する。
-        // タイムスタンプを除外した [Behaviour] 以降の部分で重複判定し、
-        // 同一パターンはファイル内で1回のみ送信する（Sentry flooding 防止）。
-        else if (
-          line.includes(LOG_PATTERNS.BEHAVIOUR_TAG) &&
-          !isKnownBehaviourPattern(line)
-        ) {
-          const pattern = extractBehaviourPattern(line);
-          if (reportedUnknownPatterns.has(pattern)) return;
-          reportedUnknownPatterns.add(pattern);
-          logger.error({
-            message: 'Unrecognized VRChat log pattern detected',
-            details: { logLine: line },
+    .with(false, () => Effect.succeed<string[]>([]))
+    .with(true, () =>
+      Effect.tryPromise({
+        try: async () => {
+          const stream = fs.createReadStream(props.logFilePath.value);
+          const reader = readline.createInterface({
+            input: stream,
+            crlfDelay: Number.POSITIVE_INFINITY,
           });
-        }
-      });
 
-      await Promise.all([
-        new Promise((resolve) => {
-          stream.on('close', () => {
-            resolve(null);
+          const lines: string[] = [];
+          // ファイル単位で同一パターンの重複送信を防ぐ
+          const reportedUnknownPatterns = new Set<string>();
+          reader.on('line', (line) => {
+            // includesList の配列の中のどれかと一致したら追加
+            if (props.includesList.some((include) => line.includes(include))) {
+              lines.push(line);
+            }
+            // 未知の [Behaviour] パターン検出（string.includes のみ、正規表現なし）
+            // includesList にマッチしなくても [Behaviour] を含む行は仕様変更の可能性があるため、
+            // 既知パターンに該当しない場合は Sentry に送信する。
+            // タイムスタンプを除外した [Behaviour] 以降の部分で重複判定し、
+            // 同一パターンはファイル内で1回のみ送信する（Sentry flooding 防止）。
+            else if (
+              line.includes(LOG_PATTERNS.BEHAVIOUR_TAG) &&
+              !isKnownBehaviourPattern(line)
+            ) {
+              const pattern = extractBehaviourPattern(line);
+              if (reportedUnknownPatterns.has(pattern)) return;
+              reportedUnknownPatterns.add(pattern);
+              logger.error({
+                message: 'Unrecognized VRChat log pattern detected',
+                details: { logLine: line },
+              });
+            }
           });
-        }),
-      ]);
 
-      return neverthrow.ok(lines);
-    })
+          await Promise.all([
+            new Promise((resolve) => {
+              stream.on('close', () => {
+                resolve(null);
+              });
+            }),
+          ]);
+
+          return lines;
+        },
+        catch: (e) => e as VRChatLogFileError,
+      }),
+    )
     .exhaustive();
 };
 
@@ -165,75 +170,88 @@ export const getLogLinesFromLogFile = async (props: {
  * @param props.concurrency 並列処理数（デフォルト: 5）
  * @returns 抽出されたVRChatLogLineの配列
  */
-export const getLogLinesByLogFilePathList = async (props: {
+export const getLogLinesByLogFilePathList = (props: {
   logFilePathList: (VRChatLogFilePath | VRChatLogStoreFilePath)[];
   includesList: string[];
   concurrency?: number;
   maxMemoryUsageMB?: number; // メモリ使用量の上限（MB）
-}): Promise<neverthrow.Result<VRChatLogLine[], VRChatLogFileError>> => {
-  const config = createBatchConfig(props);
-  const memoryMonitor = createMemoryMonitor();
-  const logLineList: VRChatLogLine[] = [];
-  const errors: VRChatLogFileError[] = [];
+}): Effect.Effect<VRChatLogLine[], VRChatLogFileError> =>
+  Effect.tryPromise({
+    try: async () => {
+      const config = createBatchConfig(props);
+      const memoryMonitor = createMemoryMonitor();
+      const logLineList: VRChatLogLine[] = [];
+      const errors: VRChatLogFileError[] = [];
 
-  // バッチ処理で並列数を制限
-  for (let i = 0; i < props.logFilePathList.length; i += config.concurrency) {
-    const batch = props.logFilePathList.slice(i, i + config.concurrency);
-    const batchResults = await Promise.all(
-      batch.map(async (logFilePath) => {
-        const result = await getLogLinesFromLogFile({
-          logFilePath,
-          includesList: props.includesList,
-        });
-        if (result.isErr()) {
-          errors.push(result.error);
-          return [];
-        }
-        // 各行をパースし、失敗した行はスキップ
-        const validLines: VRChatLogLine[] = [];
-        for (const line of result.value) {
-          const parseResult = VRChatLogLineSchema.safeParse(line);
-          if (parseResult.success) {
-            validLines.push(parseResult.data);
-          } else {
+      // バッチ処理で並列数を制限
+      for (
+        let i = 0;
+        i < props.logFilePathList.length;
+        i += config.concurrency
+      ) {
+        const batch = props.logFilePathList.slice(i, i + config.concurrency);
+        const batchResults = await Promise.all(
+          batch.map(async (logFilePath) => {
+            const exit = await Effect.runPromiseExit(
+              getLogLinesFromLogFile({
+                logFilePath,
+                includesList: props.includesList,
+              }),
+            );
+            if (exit._tag === 'Failure') {
+              // Cause, Option already imported at top level
+              const failOpt = Cause.failureOption(exit.cause);
+              if (Option.isSome(failOpt)) {
+                errors.push(failOpt.value);
+              }
+              return [];
+            }
+            // 各行をパースし、失敗した行はスキップ
+            const validLines: VRChatLogLine[] = [];
+            for (const line of exit.value) {
+              const parseResult = VRChatLogLineSchema.safeParse(line);
+              if (parseResult.success) {
+                validLines.push(parseResult.data);
+              } else {
+                logger.warn(
+                  `Failed to parse log line in ${logFilePath.value}: ${parseResult.error.message}`,
+                );
+              }
+            }
+            return validLines;
+          }),
+        );
+
+        // バッチの結果を統合
+        for (const lines of batchResults) {
+          logLineList.push(...lines);
+
+          // メモリ使用量をチェックし、上限に近づいたら警告
+          if (logLineList.length > config.maxLinesInMemory) {
+            const usedMB = memoryMonitor.checkMemoryUsage();
             logger.warn(
-              `Failed to parse log line in ${logFilePath.value}: ${parseResult.error.message}`,
+              `Log lines in memory: ${logLineList.length} (Memory: ${usedMB.toFixed(
+                2,
+              )}MB). Consider processing in smaller batches.`,
             );
           }
         }
-        return validLines;
-      }),
-    );
-
-    // バッチの結果を統合
-    for (const lines of batchResults) {
-      logLineList.push(...lines);
-
-      // メモリ使用量をチェックし、上限に近づいたら警告
-      if (logLineList.length > config.maxLinesInMemory) {
-        const usedMB = memoryMonitor.checkMemoryUsage();
-        logger.warn(
-          `Log lines in memory: ${logLineList.length} (Memory: ${usedMB.toFixed(
-            2,
-          )}MB). Consider processing in smaller batches.`,
-        );
       }
-    }
-  }
 
-  logger.info(
-    `Loaded ${logLineList.length} log lines from ${
-      props.logFilePathList.length
-    } files (Memory: ${memoryMonitor.checkMemoryUsage().toFixed(2)}MB)`,
-  );
+      logger.info(
+        `Loaded ${logLineList.length} log lines from ${
+          props.logFilePathList.length
+        } files (Memory: ${memoryMonitor.checkMemoryUsage().toFixed(2)}MB)`,
+      );
 
-  return match(errors.length > 0)
-    .with(true, () =>
-      neverthrow.err<VRChatLogLine[], VRChatLogFileError>(errors[0]),
-    )
-    .with(false, () => neverthrow.ok(logLineList))
-    .exhaustive();
-};
+      if (errors.length > 0) {
+        throw errors[0];
+      }
+
+      return logLineList;
+    },
+    catch: (e) => e as VRChatLogFileError,
+  });
 
 /**
  * 複数のログファイルから指定された文字列を含む行を抽出（部分的な成功を許容）
@@ -265,18 +283,24 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
     const batch = props.logFilePathList.slice(i, i + config.concurrency);
     const batchResults = await Promise.all(
       batch.map(async (logFilePath) => {
-        const result = await getLogLinesFromLogFile({
-          logFilePath,
-          includesList: props.includesList,
-        });
-        if (result.isErr()) {
-          errors.push({ path: logFilePath.value, error: result.error });
+        const exit = await Effect.runPromiseExit(
+          getLogLinesFromLogFile({
+            logFilePath,
+            includesList: props.includesList,
+          }),
+        );
+        if (exit._tag === 'Failure') {
+          // Cause, Option already imported at top level
+          const failOpt = Cause.failureOption(exit.cause);
+          if (Option.isSome(failOpt)) {
+            errors.push({ path: logFilePath.value, error: failOpt.value });
+          }
           return [];
         }
 
         // 各行をパースし、失敗した行はスキップ
         const validLines: VRChatLogLine[] = [];
-        for (const line of result.value) {
+        for (const line of exit.value) {
           const parseResult = VRChatLogLineSchema.safeParse(line);
           if (parseResult.success) {
             validLines.push(parseResult.data);
@@ -370,16 +394,23 @@ export async function* getLogLinesByLogFilePathListStreaming(props: {
     const fileBatch = props.logFilePathList.slice(i, i + config.concurrency);
     const batchResults = await Promise.all(
       fileBatch.map(async (logFilePath) => {
-        const result = await getLogLinesFromLogFile({
-          logFilePath,
-          includesList: props.includesList,
-        });
-        if (result.isErr()) {
-          throw result.error;
+        const exit = await Effect.runPromiseExit(
+          getLogLinesFromLogFile({
+            logFilePath,
+            includesList: props.includesList,
+          }),
+        );
+        if (exit._tag === 'Failure') {
+          // Cause, Option already imported at top level
+          const failOpt = Cause.failureOption(exit.cause);
+          if (Option.isSome(failOpt)) {
+            throw failOpt.value;
+          }
+          throw new Error('Unknown effect failure');
         }
         // 各行をパースし、失敗した行はスキップ
         const validLines: VRChatLogLine[] = [];
-        for (const line of result.value) {
+        for (const line of exit.value) {
           const parseResult = VRChatLogLineSchema.safeParse(line);
           if (parseResult.success) {
             validLines.push(parseResult.data);

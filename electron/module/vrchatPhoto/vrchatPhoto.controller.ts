@@ -1,10 +1,11 @@
-import * as neverthrow from 'neverthrow';
+import { Cause, Effect, Exit, Option } from 'effect';
 import z from 'zod';
+import { runEffect } from '../../lib/effectTRPC';
 import {
-  handlePhotoOperationError,
-  handleResultError,
-  photoOperationErrorMappings,
-} from '../../lib/errorHelpers';
+  ERROR_CATEGORIES,
+  ERROR_CODES,
+  UserFacingError,
+} from '../../lib/errors';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
 import * as utilsService from './../electronUtil/service';
@@ -21,55 +22,34 @@ const getVRChatLogFilePathModelList = async (query?: {
   orderByPhotoTakenAt: 'asc' | 'desc';
   limit?: number;
   offset?: number;
-}): Promise<
-  neverthrow.Result<
-    {
-      id: string;
-      photoPath: string;
-      photoTakenAt: Date;
-      width: number;
-      height: number;
-    }[],
-    Error
-  >
-> => {
+}) => {
   const vrchatPhotoPathList =
     await vrchatPhotoService.getVRChatPhotoPathList(query);
-  return neverthrow.ok(
-    vrchatPhotoPathList.map((photoPathModel) => ({
-      id: photoPathModel.id,
-      photoPath: photoPathModel.photoPath,
-      width: photoPathModel.width,
-      height: photoPathModel.height,
-      photoTakenAt: photoPathModel.photoTakenAt,
-    })),
-  );
+  return vrchatPhotoPathList.map((photoPathModel) => ({
+    id: photoPathModel.id,
+    photoPath: photoPathModel.photoPath,
+    width: photoPathModel.width,
+    height: photoPathModel.height,
+    photoTakenAt: photoPathModel.photoTakenAt,
+  }));
 };
 
-const getCountByYearMonthList = async (): Promise<
-  neverthrow.Result<
-    {
-      photoTakenYear: number;
-      photoTakenMonth: number;
-      photoCount: number;
-    }[],
-    never
-  >
-> => {
+const getCountByYearMonthList = async () => {
   const countByYearMonthList =
     await vrchatPhotoService.getCountByYearMonthList();
-  return neverthrow.ok(countByYearMonthList);
+  return countByYearMonthList;
 };
 
-const setVRChatPhotoDirPathByDialog = async (): Promise<
-  neverthrow.Result<void, 'canceled'>
-> => {
-  return (await utilsService.openGetDirDialog()).map((dirPath) => {
+const setVRChatPhotoDirPathByDialog = async (): Promise<'ok' | 'canceled'> => {
+  const exit = await Effect.runPromiseExit(utilsService.openGetDirDialog());
+  if (Exit.isSuccess(exit)) {
     vrchatPhotoService.setVRChatPhotoDirPathToSettingStore(
-      VRChatPhotoDirPathSchema.parse(dirPath),
+      VRChatPhotoDirPathSchema.parse(exit.value),
     );
-    return undefined;
-  });
+    return 'ok';
+  }
+  // canceled
+  return 'canceled';
 };
 
 export const vrchatPhotoRouter = () =>
@@ -79,17 +59,13 @@ export const vrchatPhotoRouter = () =>
       return result;
     }),
     setVRChatPhotoDirPathToSettingStore: procedure.mutation(async () => {
-      const result = await setVRChatPhotoDirPathByDialog();
-      return result.match(
-        () => {
-          eventEmitter.emit('toast', 'VRChatの写真の保存先を設定しました');
-          return true;
-        },
-        (error) => {
-          eventEmitter.emit('toast', error);
-          return false;
-        },
-      );
+      const dialogResult = await setVRChatPhotoDirPathByDialog();
+      if (dialogResult === 'ok') {
+        eventEmitter.emit('toast', 'VRChatの写真の保存先を設定しました');
+        return true;
+      }
+      eventEmitter.emit('toast', 'canceled');
+      return false;
     }),
     clearVRChatPhotoDirPathInSettingStore: procedure.mutation(async () => {
       const result =
@@ -118,10 +94,7 @@ export const vrchatPhotoRouter = () =>
           .optional(),
       )
       .query(async (ctx) => {
-        const result = await getVRChatLogFilePathModelList(ctx.input);
-        return handleResultError(result, {
-          default: (error) => photoOperationErrorMappings.default(error),
-        });
+        return await getVRChatLogFilePathModelList(ctx.input);
       }),
     getVrchatPhotoPathCount: procedure
       .input(
@@ -138,32 +111,52 @@ export const vrchatPhotoRouter = () =>
         return vrchatPhotoService.getVRChatPhotoPathCount(ctx.input);
       }),
     getCountByYearMonthList: procedure.query(async () => {
-      const result = await getCountByYearMonthList();
-      return handleResultError(result, {
-        default: (error) => photoOperationErrorMappings.default(error),
-      });
+      return await getCountByYearMonthList();
     }),
     getVRChatPhotoItemDataMutation: procedure
       .input(z.object({ photoPath: z.string(), width: z.number().optional() }))
       .mutation(async (ctx) => {
-        const result = await vrchatPhotoService.getVRChatPhotoItemData(
-          ctx.input,
+        return await runEffect(
+          vrchatPhotoService.getVRChatPhotoItemData(ctx.input).pipe(
+            Effect.mapError((e) =>
+              UserFacingError.withStructuredInfo({
+                code: ERROR_CODES.FILE_NOT_FOUND,
+                category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+                message: `Photo file operation error: ${String(e)}`,
+                userMessage: '写真ファイルが見つかりません。',
+                cause: new Error(String(e)),
+              }),
+            ),
+          ),
         );
-        return handlePhotoOperationError(result);
       }),
     getVRChatPhotoItemData: procedure.input(z.string()).query(async (ctx) => {
-      const result = await vrchatPhotoService.getVRChatPhotoItemData({
-        photoPath: ctx.input,
-        width: 256,
-      });
-      if (result.isErr()) {
+      const exit = await Effect.runPromiseExit(
+        vrchatPhotoService.getVRChatPhotoItemData({
+          photoPath: ctx.input,
+          width: 256,
+        }),
+      );
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failOpt)) {
+          return {
+            data: null,
+            error: failOpt.value,
+          };
+        }
+        // Defect: re-throw
+        const dieOpt = Cause.dieOption(exit.cause);
+        if (Option.isSome(dieOpt)) {
+          throw dieOpt.value;
+        }
         return {
           data: null,
-          error: result.error,
+          error: 'unknown_error',
         };
       }
       return {
-        data: result.value,
+        data: exit.value,
         error: null,
       };
     }),

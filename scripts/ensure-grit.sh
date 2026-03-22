@@ -3,7 +3,7 @@
 # Installs via official installer since @getgrit/cli is not used
 # (the npm package fails in restricted network environments like Claude Code Web)
 
-set -e
+# set -e は使わない: grit は optional なので失敗しても全体を止めない
 
 # Check if grit is already in PATH
 if command -v grit &> /dev/null; then

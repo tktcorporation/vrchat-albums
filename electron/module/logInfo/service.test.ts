@@ -1,7 +1,7 @@
 import * as nodeFs from 'node:fs';
 import path from 'node:path';
 import * as datefns from 'date-fns';
-import * as neverthrow from 'neverthrow';
+import { Effect, Exit } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getAppUserDataPath } from '../../lib/wrappedApp';
 import type { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
@@ -42,12 +42,12 @@ vi.mock('../vrchatLog/service', () => ({
       return paths;
     }),
   getVRChaLogInfoByLogFilePathList: vi.fn().mockImplementation(() => {
-    return neverthrow.ok([]);
+    return Effect.succeed([]);
   }),
   getVRChaLogInfoByLogFilePathListWithPartialSuccess: vi
     .fn()
     .mockImplementation(() => {
-      return neverthrow.okAsync({
+      return Effect.succeed({
         data: [],
         errors: [],
         totalProcessed: 0,
@@ -67,14 +67,12 @@ vi.mock('../vrchatLog/service', () => ({
 }));
 
 vi.mock('../vrchatWorldJoinLog/service', () => ({
-  findLatestWorldJoinLog: vi.fn().mockReturnValue(neverthrow.okAsync(null)),
-  createVRChatWorldJoinLogModel: vi
-    .fn()
-    .mockReturnValue(neverthrow.okAsync([])),
+  findLatestWorldJoinLog: vi.fn().mockReturnValue(Effect.succeed(null)),
+  createVRChatWorldJoinLogModel: vi.fn().mockReturnValue(Effect.succeed([])),
 }));
 
 vi.mock('../VRChatPlayerJoinLogModel/playerJoinLog.service', () => ({
-  findLatestPlayerJoinLog: vi.fn().mockResolvedValue(neverthrow.ok(null)),
+  findLatestPlayerJoinLog: vi.fn().mockReturnValue(Effect.succeed(null)),
   createVRChatPlayerJoinLogModel: vi.fn().mockResolvedValue([]),
 }));
 
@@ -90,7 +88,7 @@ vi.mock('../vrchatPhoto/vrchatPhoto.service', () => ({
 }));
 
 vi.mock('../vrchatPhotoMetadata/service', () => ({
-  extractAndSaveMetadataBatch: vi.fn().mockResolvedValue(neverthrow.ok(0)),
+  extractAndSaveMetadataBatch: vi.fn().mockReturnValue(Effect.succeed(0)),
 }));
 
 // getAppUserDataPathのモック
@@ -121,11 +119,13 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     vi.setSystemTime(mockDate);
 
     try {
-      const result = await loadLogInfoIndexFromVRChatLog({
-        excludeOldLogLoad: true,
-      });
+      const exit = await Effect.runPromiseExit(
+        loadLogInfoIndexFromVRChatLog({
+          excludeOldLogLoad: true,
+        }),
+      );
 
-      expect(result.isOk()).toBe(true);
+      expect(Exit.isSuccess(exit)).toBe(true);
 
       // getLogStoreFilePathsInRangeが適切な引数で呼ばれたか確認
       // const _oneYearAgo = datefns.subYears(mockDate, 1);
@@ -153,11 +153,13 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     vi.setSystemTime(mockDate);
 
     try {
-      const result = await loadLogInfoIndexFromVRChatLog({
-        excludeOldLogLoad: false,
-      });
+      const exit = await Effect.runPromiseExit(
+        loadLogInfoIndexFromVRChatLog({
+          excludeOldLogLoad: false,
+        }),
+      );
 
-      expect(result.isOk()).toBe(true);
+      expect(Exit.isSuccess(exit)).toBe(true);
 
       // getLogStoreFilePathsInRangeが適切な引数で呼ばれたか確認
       expect(vrchatLogService.getLogStoreFilePathsInRange).toHaveBeenCalledWith(
@@ -200,7 +202,7 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     ).mockImplementation((paths) => {
       // パスにlegacyPathが含まれていることを確認するためのカスタムモック
       expect(paths.some((p) => p.value === legacyPath)).toBe(true);
-      return neverthrow.okAsync({
+      return Effect.succeed({
         data: [],
         errors: [],
         totalProcessed: paths.length,
@@ -210,11 +212,13 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     });
 
     try {
-      const result = await loadLogInfoIndexFromVRChatLog({
-        excludeOldLogLoad: false,
-      });
+      const exit = await Effect.runPromiseExit(
+        loadLogInfoIndexFromVRChatLog({
+          excludeOldLogLoad: false,
+        }),
+      );
 
-      expect(result.isOk()).toBe(true);
+      expect(Exit.isSuccess(exit)).toBe(true);
 
       // getLegacyLogStoreFilePathが呼ばれたか確認
       expect(vrchatLogService.getLegacyLogStoreFilePath).toHaveBeenCalled();
@@ -237,7 +241,7 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     vi.mocked(
       vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
     ).mockImplementation(() => {
-      return neverthrow.okAsync({
+      return Effect.succeed({
         data: [],
         errors: [],
         totalProcessed: 0,
@@ -273,11 +277,13 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     );
 
     try {
-      const result = await loadLogInfoIndexFromVRChatLog({
-        excludeOldLogLoad: true,
-      });
+      const exit = await Effect.runPromiseExit(
+        loadLogInfoIndexFromVRChatLog({
+          excludeOldLogLoad: true,
+        }),
+      );
 
-      expect(result.isOk()).toBe(true);
+      expect(Exit.isSuccess(exit)).toBe(true);
 
       // 生成されたパスが想定通りか検証
       expect(generatedPaths.length).toBeGreaterThan(0);
@@ -330,7 +336,7 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     vi.mocked(
       vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
     ).mockImplementation(() => {
-      return neverthrow.okAsync({
+      return Effect.succeed({
         data: [],
         errors: [],
         totalProcessed: 0,
@@ -369,11 +375,13 @@ describe('loadLogInfoIndexFromVRChatLog', () => {
     );
 
     try {
-      const result = await loadLogInfoIndexFromVRChatLog({
-        excludeOldLogLoad: false,
-      });
+      const exit = await Effect.runPromiseExit(
+        loadLogInfoIndexFromVRChatLog({
+          excludeOldLogLoad: false,
+        }),
+      );
 
-      expect(result.isOk()).toBe(true);
+      expect(Exit.isSuccess(exit)).toBe(true);
 
       // 生成されたパスが想定通りか検証
       expect(generatedPaths).toContain(
@@ -417,10 +425,10 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
 
     // _getLogStoreFilePaths の依存関係のモックを再設定
     vi.mocked(worldJoinLogService.findLatestWorldJoinLog).mockReturnValue(
-      neverthrow.okAsync(null),
+      Effect.succeed(null),
     );
-    vi.mocked(playerJoinLogService.findLatestPlayerJoinLog).mockResolvedValue(
-      neverthrow.ok(null),
+    vi.mocked(playerJoinLogService.findLatestPlayerJoinLog).mockReturnValue(
+      Effect.succeed(null),
     );
     vi.mocked(playerLeaveLogService.findLatestPlayerLeaveLog).mockResolvedValue(
       null,
@@ -436,7 +444,7 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     vi.mocked(
       vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
     ).mockImplementation(() =>
-      neverthrow.okAsync({
+      Effect.succeed({
         data: [],
         errors: [],
         totalProcessed: 0,
@@ -465,7 +473,9 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     const oneYearAgo = datefns.subYears(mockDate, 1);
 
     try {
-      await loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true });
+      await Effect.runPromise(
+        loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true }),
+      );
 
       expect(vrchatLogService.getLegacyLogStoreFilePath).not.toHaveBeenCalled();
       expect(vrchatLogService.getLogStoreFilePathsInRange).toHaveBeenCalledWith(
@@ -498,7 +508,9 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     );
 
     try {
-      await loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: false });
+      await Effect.runPromise(
+        loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: false }),
+      );
 
       expect(vrchatLogService.getLegacyLogStoreFilePath).toHaveBeenCalled();
       expect(vrchatLogService.getLogStoreFilePathsInRange).toHaveBeenCalledWith(
@@ -531,7 +543,9 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     ); // null を返すように設定
 
     try {
-      await loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: false });
+      await Effect.runPromise(
+        loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: false }),
+      );
 
       expect(vrchatLogService.getLegacyLogStoreFilePath).toHaveBeenCalled(); // 呼ばれるが null が返る
       expect(vrchatLogService.getLogStoreFilePathsInRange).toHaveBeenCalledWith(
@@ -563,14 +577,14 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
 
     // このテストケース用にモックを上書き
     vi.mocked(worldJoinLogService.findLatestWorldJoinLog).mockReturnValue(
-      neverthrow.okAsync({
+      Effect.succeed({
         joinDateTime: latestWorldJoinDate,
       } as VRChatWorldJoinLogModel),
     );
-    vi.mocked(playerJoinLogService.findLatestPlayerJoinLog).mockResolvedValue(
-      neverthrow.ok({
+    vi.mocked(playerJoinLogService.findLatestPlayerJoinLog).mockReturnValue(
+      Effect.succeed({
         joinDateTime: latestPlayerJoinDate,
-      } as VRChatPlayerJoinLogModel), // as any で型チェックを回避
+      } as VRChatPlayerJoinLogModel),
     );
     vi.mocked(playerLeaveLogService.findLatestPlayerLeaveLog).mockResolvedValue(
       {
@@ -579,7 +593,9 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     ); // as any で型チェックを回避
 
     try {
-      await loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true });
+      await Effect.runPromise(
+        loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true }),
+      );
 
       expect(vrchatLogService.getLegacyLogStoreFilePath).not.toHaveBeenCalled();
       expect(vrchatLogService.getLogStoreFilePathsInRange).toHaveBeenCalledWith(

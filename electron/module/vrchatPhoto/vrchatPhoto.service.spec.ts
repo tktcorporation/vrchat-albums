@@ -1,5 +1,6 @@
 import * as fsPromises from 'node:fs/promises';
 import { Transformer } from '@napi-rs/image';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   cleanupThumbnailCache,
@@ -107,17 +108,15 @@ describe('vrchatPhoto.service', () => {
       )}`;
       mockWebp.mockResolvedValue(mockThumbnailBuffer);
 
-      const result = await getVRChatPhotoItemData({
-        photoPath: mockInputPhotoPath,
-        width: mockResizeWidth,
-      });
+      const value = await Effect.runPromise(
+        getVRChatPhotoItemData({
+          photoPath: mockInputPhotoPath,
+          width: mockResizeWidth,
+        }),
+      );
 
-      // 結果がOkであることを確認
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        // 正常終了の場合、値が期待されるbase64文字列と一致することを確認
-        expect(result.value).toBe(expectedBase64String);
-      }
+      // 正常終了の場合、値が期待されるbase64文字列と一致することを確認
+      expect(value).toBe(expectedBase64String);
       // readFileが正しい引数で呼び出されたことを確認
       expect(fsPromises.readFile).toHaveBeenCalledWith(mockInputPhotoPath);
       // Transformerが呼び出されたことを確認
@@ -137,16 +136,21 @@ describe('vrchatPhoto.service', () => {
           new Error('Input file is missing'),
         );
 
-        const result = await getVRChatPhotoItemData({
-          photoPath: mockInputPhotoPath,
-          width: mockResizeWidth,
-        });
+        const exit = await Effect.runPromiseExit(
+          getVRChatPhotoItemData({
+            photoPath: mockInputPhotoPath,
+            width: mockResizeWidth,
+          }),
+        );
 
         // 結果がErrであることを確認
-        expect(result.isErr()).toBe(true);
-        if (result.isErr()) {
-          // エラーオブジェクトが期待されるものであることを確認
-          expect(result.error).toBe('InputFileIsMissing');
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (Exit.isFailure(exit)) {
+          const failOpt = Cause.failureOption(exit.cause);
+          expect(Option.isSome(failOpt)).toBe(true);
+          if (Option.isSome(failOpt)) {
+            expect(failOpt.value).toBe('InputFileIsMissing');
+          }
         }
       });
 
@@ -161,14 +165,20 @@ describe('vrchatPhoto.service', () => {
         );
         vi.mocked(fsPromises.readFile).mockRejectedValueOnce(enoentError);
 
-        const result = await getVRChatPhotoItemData({
-          photoPath: mockInputPhotoPath,
-          width: mockResizeWidth,
-        });
+        const exit = await Effect.runPromiseExit(
+          getVRChatPhotoItemData({
+            photoPath: mockInputPhotoPath,
+            width: mockResizeWidth,
+          }),
+        );
 
-        expect(result.isErr()).toBe(true);
-        if (result.isErr()) {
-          expect(result.error).toBe('InputFileIsMissing');
+        expect(Exit.isFailure(exit)).toBe(true);
+        if (Exit.isFailure(exit)) {
+          const failOpt = Cause.failureOption(exit.cause);
+          expect(Option.isSome(failOpt)).toBe(true);
+          if (Option.isSome(failOpt)) {
+            expect(failOpt.value).toBe('InputFileIsMissing');
+          }
         }
       });
 
@@ -182,9 +192,11 @@ describe('vrchatPhoto.service', () => {
 
         // getVRChatPhotoItemDataの呼び出しが特定のエラーメッセージで失敗することを期待
         await expect(
-          getVRChatPhotoItemData({
-            photoPath: mockInputPhotoPath,
-          }),
+          Effect.runPromise(
+            getVRChatPhotoItemData({
+              photoPath: mockInputPhotoPath,
+            }),
+          ),
         ).rejects.toThrow(errorMessage);
       });
 
@@ -197,10 +209,12 @@ describe('vrchatPhoto.service', () => {
         });
 
         await expect(
-          getVRChatPhotoItemData({
-            photoPath: mockInputPhotoPath,
-            width: mockResizeWidth,
-          }),
+          Effect.runPromise(
+            getVRChatPhotoItemData({
+              photoPath: mockInputPhotoPath,
+              width: mockResizeWidth,
+            }),
+          ),
         ).rejects.toThrow(errorMessage);
       });
     });
@@ -452,13 +466,12 @@ describe('vrchatPhoto.service', () => {
       } as unknown as Awaited<ReturnType<typeof fsPromises.stat>>);
       mockReadFile.mockResolvedValue(cachedData);
 
-      const result = await getVRChatPhotoItemData({
-        photoPath: mockPhotoPath,
-        width: 256,
-      });
-
-      // キャッシュからのデータが返される
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(
+        getVRChatPhotoItemData({
+          photoPath: mockPhotoPath,
+          width: 256,
+        }),
+      );
       // readFileが呼ばれる（キャッシュからデータを取得したため）
       expect(mockReadFile).toHaveBeenCalled();
     });
@@ -478,13 +491,12 @@ describe('vrchatPhoto.service', () => {
       // Transformerで新しいサムネイルを生成
       mockWebp.mockResolvedValue(newThumbnailData);
 
-      const result = await getVRChatPhotoItemData({
-        photoPath: mockPhotoPath,
-        width: 256,
-      });
-
-      // 新しく生成されたデータが返される
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(
+        getVRChatPhotoItemData({
+          photoPath: mockPhotoPath,
+          width: 256,
+        }),
+      );
       // Transformerが呼ばれる（キャッシュが期限切れなので再生成）
       expect(Transformer).toHaveBeenCalled();
     });
@@ -504,13 +516,12 @@ describe('vrchatPhoto.service', () => {
       // Transformerで新しいサムネイルを生成
       mockWebp.mockResolvedValue(newThumbnailData);
 
-      const result = await getVRChatPhotoItemData({
-        photoPath: mockPhotoPath,
-        width: 256,
-      });
-
-      // 新しく生成されたデータが返される
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(
+        getVRChatPhotoItemData({
+          photoPath: mockPhotoPath,
+          width: 256,
+        }),
+      );
       // Transformerが呼ばれる
       expect(Transformer).toHaveBeenCalled();
     });
@@ -562,14 +573,16 @@ describe('vrchatPhoto.service', () => {
 
       // 同じパスに対して並行でリクエスト
       const promises = Array.from({ length: 5 }, () =>
-        getVRChatPhotoItemData({ photoPath: mockPhotoPath, width: 256 }),
+        Effect.runPromise(
+          getVRChatPhotoItemData({ photoPath: mockPhotoPath, width: 256 }),
+        ),
       );
 
       const results = await Promise.all(promises);
 
       // 全てのリクエストが成功
       for (const result of results) {
-        expect(result.isOk()).toBe(true);
+        expect(result).toBeDefined();
       }
 
       // Transformerは各リクエストで呼ばれる（キャッシュミスなので）
@@ -587,14 +600,14 @@ describe('vrchatPhoto.service', () => {
       ];
 
       const promises = paths.map((photoPath) =>
-        getVRChatPhotoItemData({ photoPath, width: 256 }),
+        Effect.runPromise(getVRChatPhotoItemData({ photoPath, width: 256 })),
       );
 
       const results = await Promise.all(promises);
 
       // 全てのリクエストが成功
       for (const result of results) {
-        expect(result.isOk()).toBe(true);
+        expect(result).toBeDefined();
       }
 
       // 全ての異なるパスでTransformerが呼ばれる
@@ -652,7 +665,9 @@ describe('vrchatPhoto.service', () => {
       );
 
       for (const photoPath of paths) {
-        await getVRChatPhotoItemData({ photoPath, width: 256 });
+        await Effect.runPromise(
+          getVRChatPhotoItemData({ photoPath, width: 256 }),
+        );
         // キャッシュ書き込みは非同期で行われるので少し待つ
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
@@ -695,7 +710,9 @@ describe('vrchatPhoto.service', () => {
       );
 
       for (const photoPath of paths) {
-        await getVRChatPhotoItemData({ photoPath, width: 256 });
+        await Effect.runPromise(
+          getVRChatPhotoItemData({ photoPath, width: 256 }),
+        );
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
 

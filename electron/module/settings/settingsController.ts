@@ -1,7 +1,8 @@
+import { Cause, Effect, Exit, Option } from 'effect';
 import type { UpdateCheckResult } from 'electron-updater';
-import { ResultAsync } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 import { reloadMainWindow } from '../../electronUtil';
+import { runEffect } from '../../lib/effectTRPC';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -10,12 +11,52 @@ import {
 import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
 import { procedure, router as trpcRouter } from './../../trpc';
+import type { OpenPathFailed } from '../electronUtil/errors';
 import * as electronUtilService from '../electronUtil/service';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
+import type { UpdateError } from './errors';
 import * as settingService from './service';
+
+/**
+ * UpdateError → UserFacingError 変換ヘルパー（ネットワークエラーカテゴリ）
+ */
+const mapUpdateError = (e: UpdateError | UserFacingError): UserFacingError => {
+  if (e instanceof UserFacingError) return e;
+  return UserFacingError.withStructuredInfo({
+    code: ERROR_CODES.UNKNOWN,
+    category: ERROR_CATEGORIES.NETWORK_ERROR,
+    message: e.message,
+    userMessage: `アップデートに失敗しました: ${e.message}`,
+    cause: e,
+  });
+};
+
+/**
+ * UpdateError → UserFacingError 変換ヘルパー（汎用カテゴリ）
+ */
+const mapUpdateErrorGeneric = (e: UpdateError): UserFacingError =>
+  UserFacingError.withStructuredInfo({
+    code: ERROR_CODES.UNKNOWN,
+    category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+    message: e.message,
+    userMessage: `アップデートに失敗しました: ${e.message}`,
+    cause: e,
+  });
+
+/**
+ * OpenPathFailed → UserFacingError 変換ヘルパー
+ */
+const mapOpenPathErrorForSettings = (e: OpenPathFailed): UserFacingError =>
+  UserFacingError.withStructuredInfo({
+    code: ERROR_CODES.FILE_NOT_FOUND,
+    category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+    message: e.message,
+    userMessage: `ログフォルダを開けませんでした: ${e.message}`,
+    cause: e,
+  });
 
 // 初期化処理の重複実行を防ぐためのフラグ
 let isInitializing = false;
@@ -67,96 +108,89 @@ export const settingsRouter = () =>
       return sequelizeClient.checkMigrationRDBClient(appVersion);
     }),
     getAppUpdateInfo: procedure.query(async () => {
-      const result = await settingService.getElectronUpdaterInfo();
-      if (result.isErr()) {
+      const exit = await Effect.runPromiseExit(
+        settingService.getElectronUpdaterInfo(),
+      );
+      if (Exit.isFailure(exit)) {
         // ネットワークエラーなど。クライアントにはアップデートなしとして返す
         return { isUpdateAvailable: false, updateInfo: null };
       }
-      return result.value;
+      return exit.value;
     }),
-    installUpdate: procedure.mutation(async () => {
-      const result = await settingService.installUpdate();
-      if (result.isErr()) {
-        throw match(result.error.code)
-          .with('NO_UPDATE_AVAILABLE', () =>
-            UserFacingError.withStructuredInfo({
-              code: ERROR_CODES.VALIDATION_ERROR,
-              category: ERROR_CATEGORIES.VALIDATION_ERROR,
-              message: result.error.message,
-              userMessage: 'アップデートはありません。',
-            }),
-          )
-          .with(P.union('UPDATE_CHECK_FAILED', 'DOWNLOAD_FAILED'), () =>
-            UserFacingError.withStructuredInfo({
-              code: ERROR_CODES.UNKNOWN,
-              category: ERROR_CATEGORIES.NETWORK_ERROR,
-              message: result.error.message,
-              userMessage: `アップデートに失敗しました: ${result.error.message}`,
-            }),
-          )
-          .otherwise(() =>
-            UserFacingError.withStructuredInfo({
-              code: ERROR_CODES.UNKNOWN,
-              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-              message: result.error.message,
-              userMessage: `アップデートに失敗しました: ${result.error.message}`,
-            }),
-          );
-      }
-      reloadMainWindow();
-    }),
+    installUpdate: procedure.mutation(() =>
+      runEffect(
+        settingService.installUpdate().pipe(
+          Effect.map(() => {
+            reloadMainWindow();
+          }),
+          Effect.catchTag('NoUpdateAvailable', (e) =>
+            Effect.fail(
+              UserFacingError.withStructuredInfo({
+                code: ERROR_CODES.VALIDATION_ERROR,
+                category: ERROR_CATEGORIES.VALIDATION_ERROR,
+                message: e.message,
+                userMessage: 'アップデートはありません。',
+              }),
+            ),
+          ),
+          Effect.mapError(mapUpdateError),
+        ),
+      ),
+    ),
     checkForUpdates: procedure.query(async () => {
-      const result = await settingService.getElectronUpdaterInfo();
-      if (result.isErr()) {
+      const exit = await Effect.runPromiseExit(
+        settingService.getElectronUpdaterInfo(),
+      );
+      if (Exit.isFailure(exit)) {
         return { isUpdateAvailable: false, updateInfo: null };
       }
-      return result.value;
+      return exit.value;
     }),
-    installUpdatesAndReload: procedure.mutation(async () => {
-      const result = await settingService.installUpdate();
-      if (result.isErr()) {
-        throw new UserFacingError(
-          `アップデートに失敗しました: ${result.error.message}`,
-        );
-      }
-      reloadMainWindow();
-    }),
+    installUpdatesAndReload: procedure.mutation(() =>
+      runEffect(
+        settingService.installUpdate().pipe(
+          Effect.map(() => {
+            reloadMainWindow();
+          }),
+          Effect.mapError(mapUpdateErrorGeneric),
+        ),
+      ),
+    ),
     checkForUpdatesAndReturnResult: procedure.query(
       async (): Promise<{
         isUpdateAvailable: boolean;
         updateInfo: UpdateCheckResult | null;
       }> => {
-        const updateInfoResult = await settingService.getElectronUpdaterInfo();
-        if (updateInfoResult.isErr()) {
+        const exit = await Effect.runPromiseExit(
+          settingService.getElectronUpdaterInfo(),
+        );
+        if (Exit.isFailure(exit)) {
           return { isUpdateAvailable: false, updateInfo: null };
         }
         return {
-          isUpdateAvailable: updateInfoResult.value.isUpdateAvailable,
-          updateInfo: updateInfoResult.value.updateInfo,
+          isUpdateAvailable: exit.value.isUpdateAvailable,
+          updateInfo: exit.value.updateInfo,
         };
       },
     ),
-    installUpdatesAndReloadApp: procedure.mutation(async () => {
-      const result = await settingService.installUpdate();
-      if (result.isErr()) {
-        throw new UserFacingError(
-          `アップデートに失敗しました: ${result.error.message}`,
-        );
-      }
-      reloadMainWindow();
-    }),
-    openApplicationLogInExploler: procedure.mutation(async () => {
+    installUpdatesAndReloadApp: procedure.mutation(() =>
+      runEffect(
+        settingService.installUpdate().pipe(
+          Effect.map(() => {
+            reloadMainWindow();
+          }),
+          Effect.mapError(mapUpdateErrorGeneric),
+        ),
+      ),
+    ),
+    openApplicationLogInExploler: procedure.mutation(() => {
       const logPath = electronUtilService.getApplicationLogPath();
       logger.debug('openApplicationLogInExploler', logPath);
-      const result = await electronUtilService.openPathInExplorer(logPath);
-      if (result.isErr()) {
-        throw UserFacingError.withStructuredInfo({
-          code: ERROR_CODES.FILE_NOT_FOUND,
-          category: ERROR_CATEGORIES.FILE_NOT_FOUND,
-          message: result.error.message,
-          userMessage: `ログフォルダを開けませんでした: ${result.error.message}`,
-        });
-      }
+      return runEffect(
+        electronUtilService
+          .openPathInExplorer(logPath)
+          .pipe(Effect.mapError(mapOpenPathErrorForSettings)),
+      );
     }),
     throwErrorForSentryTest: procedure.mutation(async () => {
       logger.debug('Throwing test error for Sentry integration');
@@ -289,44 +323,62 @@ export const settingsRouter = () =>
         // Step 4: ログ同期実行
         // emitStageStart は syncLogs 内で行われる
         logger.info('Step 4: Starting log sync...');
-        const logSyncResult = await syncLogs(syncMode);
+        const logSyncExit = await Effect.runPromiseExit(syncLogs(syncMode));
 
-        if (logSyncResult.isErr()) {
-          // ログ同期エラーの場合、詳細なエラータイプを特定
-          const errorCode = logSyncResult.error.code;
+        if (Exit.isFailure(logSyncExit)) {
+          const failOpt = Cause.failureOption(logSyncExit.cause);
+          if (Option.isSome(failOpt)) {
+            const logSyncError = failOpt.value;
+            // ログ同期エラーの場合、詳細なエラータイプを特定
+            // Data.TaggedError は _tag、旧エラークラスは code を持つ
+            const errorTag =
+              '_tag' in logSyncError
+                ? logSyncError._tag
+                : 'code' in logSyncError
+                  ? (logSyncError as { code: string }).code
+                  : 'UNKNOWN';
 
-          // VRChatログディレクトリが見つからない場合は、設定が必要なエラーとして処理
-          const isSetupRequired = match(errorCode)
-            .with('LOG_FILE_DIR_NOT_FOUND', () => true)
-            .with('LOG_FILES_NOT_FOUND', () => true)
-            .otherwise(() => false);
+            // VRChatログディレクトリが見つからない場合は、設定が必要なエラーとして処理
+            const isSetupRequired = match(errorTag)
+              .with('LOG_FILE_DIR_NOT_FOUND', () => true)
+              .with('LOG_FILES_NOT_FOUND', () => true)
+              .with('LogFileDirNotFound', () => true)
+              .with('LogFilesNotFound', () => true)
+              .otherwise(() => false);
 
-          if (isSetupRequired) {
-            logger.info(
-              'VRChat directory setup required - throwing UserFacingError to trigger setup screen',
-            );
+            if (isSetupRequired) {
+              logger.info(
+                'VRChat directory setup required - throwing UserFacingError to trigger setup screen',
+              );
 
-            const setupError = UserFacingError.withStructuredInfo({
-              code: ERROR_CODES.VRCHAT_DIRECTORY_SETUP_REQUIRED,
-              category: ERROR_CATEGORIES.SETUP_REQUIRED,
-              message: 'VRChat directory not found',
-              userMessage:
-                'VRChatのログディレクトリが見つかりません。初期設定が必要です。',
-              details: {
-                syncError: logSyncResult.error,
-              },
+              const setupError = UserFacingError.withStructuredInfo({
+                code: ERROR_CODES.VRCHAT_DIRECTORY_SETUP_REQUIRED,
+                category: ERROR_CATEGORIES.SETUP_REQUIRED,
+                message: 'VRChat directory not found',
+                userMessage:
+                  'VRChatのログディレクトリが見つかりません。初期設定が必要です。',
+                details: {
+                  syncError: logSyncError,
+                },
+              });
+
+              throw setupError;
+            }
+
+            // その他のエラーは警告として記録（Sentry で追跡）
+            logger.warnWithSentry({
+              message: `Log sync failed: ${
+                logSyncError.message || 'Unknown error'
+              }`,
+              details: { errorTag },
             });
-
-            throw setupError;
+          } else {
+            // Defect: re-throw
+            const dieOpt = Cause.dieOption(logSyncExit.cause);
+            if (Option.isSome(dieOpt)) {
+              throw dieOpt.value;
+            }
           }
-
-          // その他のエラーは警告として記録（Sentry で追跡）
-          logger.warnWithSentry({
-            message: `Log sync failed: ${
-              logSyncResult.error.message || 'Unknown error'
-            }`,
-            details: { errorCode: logSyncResult.error.code },
-          });
         } else {
           logger.info('Log sync completed successfully');
         }
@@ -380,9 +432,7 @@ export const settingsRouter = () =>
     checkMigrationStatus: procedure.query(async () => {
       return import('../migration/service')
         .then(async ({ isMigrationNeeded }) => {
-          const neededResult = await isMigrationNeeded();
-          // isMigrationNeeded は never エラーなので常に成功
-          const needed = neededResult._unsafeUnwrap();
+          const needed = await Effect.runPromise(isMigrationNeeded());
 
           return {
             migrationNeeded: needed,
@@ -405,67 +455,22 @@ export const settingsRouter = () =>
      * ユーザーの承認を得て旧アプリからのデータ移行を実行する
      */
     performMigration: procedure.mutation(async () => {
-      // ResultAsync.fromPromise でエラーハンドリングを統一
-      return ResultAsync.fromPromise(
-        (async () => {
-          // 動的インポートで移行サービスを読み込む
-          const { performMigration } = await import('../migration/service');
-          const result = await performMigration();
+      // 動的インポートで移行サービスを読み込む
+      const { performMigration } = await import('../migration/service');
+      const migrationResult = await Effect.runPromise(performMigration());
 
-          // performMigration は Result<MigrationResult, never> を返すため、
-          // エラーは発生しない。neverthrow標準の.match()を使用
-          return result.match(
-            (migrationResult) => {
-              // エラーは MigrationResult.errors 配列に格納される
-              if (migrationResult.errors.length > 0) {
-                logger.error({
-                  message: `Migration failed with errors: ${migrationResult.errors.join(
-                    ', ',
-                  )}`,
-                });
-                throw new UserFacingError(
-                  `データ移行に失敗しました: ${migrationResult.errors.join(
-                    ', ',
-                  )}`,
-                );
-              }
-              return migrationResult;
-            },
-            // Result<T, never> のため、このブランチは型チェックのために必要だが実行されない
-            () => {
-              throw new Error(
-                'Unreachable: performMigration should never return an error',
-              );
-            },
-          );
-        })(),
-        (error): never => {
-          logger.error({
-            message: `Failed to perform migration: ${match(error)
-              .with(P.instanceOf(Error), (err) => err.message)
-              .otherwise(() => 'Unknown error')}`,
-            stack: match(error)
-              .with(P.instanceOf(Error), (err) => err)
-              .otherwise(() => undefined),
-          });
-
-          // UserFacingErrorの場合はそのまま再スロー
-          if (error instanceof UserFacingError) {
-            throw error;
-          }
-
-          // その他のエラーの場合
-          throw new UserFacingError(
-            'データ移行中に予期しないエラーが発生しました',
-          );
-        },
-      ).match(
-        (result) => result,
-        () => {
-          // error handler always throws, so this branch is unreachable
-          throw new Error('unreachable');
-        },
-      );
+      // エラーは MigrationResult.errors 配列に格納される
+      if (migrationResult.errors.length > 0) {
+        logger.error({
+          message: `Migration failed with errors: ${migrationResult.errors.join(
+            ', ',
+          )}`,
+        });
+        throw new UserFacingError(
+          `データ移行に失敗しました: ${migrationResult.errors.join(', ')}`,
+        );
+      }
+      return migrationResult;
     }),
 
     /**

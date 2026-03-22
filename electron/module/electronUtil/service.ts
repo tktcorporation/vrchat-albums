@@ -2,41 +2,40 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { writeClipboardFilePaths } from 'clip-filepaths';
+import { Effect } from 'effect';
 import { app, clipboard, dialog, nativeImage, shell } from 'electron';
-import * as neverthrow from 'neverthrow';
-import { ResultAsync } from 'neverthrow';
 import { match, P } from 'ts-pattern';
-import { FileIOError } from './error';
-
-// Error types for electronUtil operations
-type OpenPathError = { type: 'OPEN_PATH_FAILED'; message: string };
-
-/**
- * downloadImageAsPng のエラー型
- */
-export type DownloadImageError =
-  | { type: 'CANCELED' }
-  | { type: 'SAVE_FILE_FAILED'; message: string }
-  | { type: 'PNG_PROCESSING_FAILED'; message: string };
+import type { DownloadImageError, FileIOError } from './errors';
+import {
+  FileCopyFailed,
+  FileCreateFailed,
+  OpenPathFailed,
+  OperationCanceled,
+  PermissionDenied,
+  SaveFileFailed,
+} from './errors';
 
 /**
  * shell.openPath() をラップした共通ヘルパー関数。
  * エクスプローラー、フォトビューア、関連付けアプリでの開く操作で共通利用される。
  * shell.openPath() はエラー時に文字列を返し、成功時は空文字列を返す。
  */
-const openPathWithShell = async (
+const openPathWithShell = (
   targetPath: string,
-): Promise<neverthrow.Result<string, OpenPathError>> => {
-  // shell.openPath() returns error message string on failure, empty string on success
-  // Any exceptions thrown are unexpected and should propagate to Sentry
-  const errorMsg = await shell.openPath(targetPath);
-  if (errorMsg) {
-    return neverthrow.err({
-      type: 'OPEN_PATH_FAILED',
-      message: errorMsg,
-    });
-  }
-  return neverthrow.ok('');
+): Effect.Effect<string, OpenPathFailed> => {
+  return Effect.gen(function* () {
+    // shell.openPath() returns error message string on failure, empty string on success
+    // Any exceptions thrown are unexpected and should propagate to Sentry
+    const errorMsg = yield* Effect.promise(() => shell.openPath(targetPath));
+    if (errorMsg) {
+      return yield* Effect.fail(
+        new OpenPathFailed({
+          message: errorMsg,
+        }),
+      );
+    }
+    return '';
+  });
 };
 
 /**
@@ -65,16 +64,18 @@ const getDownloadsPath = (): string => {
  * ファイル/ディレクトリ選択ダイアログを表示する汎用関数。
  * VRChat ログフォルダなどの設定入力で利用される。
  */
-const openElectronDialog = async (
+const openElectronDialog = (
   properties: Array<'openDirectory' | 'openFile' | 'multiSelections'>,
-): Promise<neverthrow.Result<string[], 'canceled'>> => {
-  const result = await dialog.showOpenDialog({
-    properties,
+): Effect.Effect<string[], OperationCanceled> => {
+  return Effect.gen(function* () {
+    const result = yield* Effect.promise(() =>
+      dialog.showOpenDialog({ properties }),
+    );
+    if (result.canceled) {
+      return yield* Effect.fail(new OperationCanceled({}));
+    }
+    return result.filePaths;
   });
-  if (result.canceled) {
-    return neverthrow.err('canceled');
-  }
-  return neverthrow.ok(result.filePaths);
 };
 
 /**
@@ -82,11 +83,10 @@ const openElectronDialog = async (
  * 設定画面からフォルダ指定する際に使用される。
  * @deprecated Use openElectronDialog with ['openDirectory'] instead
  */
-const openGetDirDialog = async (): Promise<
-  neverthrow.Result<string, 'canceled'>
-> => {
-  const result = await openElectronDialog(['openDirectory']);
-  return result.map((paths) => paths[0]);
+const openGetDirDialog = (): Effect.Effect<string, OperationCanceled> => {
+  return openElectronDialog(['openDirectory']).pipe(
+    Effect.map((paths) => paths[0]),
+  );
 };
 
 /**
@@ -94,9 +94,9 @@ const openGetDirDialog = async (): Promise<
  * VRChat ログフォルダなどの設定入力で利用される。
  * @deprecated Use openElectronDialog instead
  */
-const openGetFileDialog = async (
+const openGetFileDialog = (
   properties: Array<'openDirectory' | 'openFile' | 'multiSelections'>,
-): Promise<neverthrow.Result<string[], 'canceled'>> => {
+): Effect.Effect<string[], OperationCanceled> => {
   return openElectronDialog(properties);
 };
 
@@ -124,16 +124,15 @@ const openPathWithAssociatedApp = openPathWithShell;
  * 画像ファイルを読み込み、クリップボードへ転送する。
  * ShareDialog からのコピー処理で利用される。
  */
-const copyImageDataByPath = async (
-  filePath: string,
-): Promise<neverthrow.Result<void, never>> => {
+const copyImageDataByPath = (filePath: string): Effect.Effect<void, never> => {
   // All errors from readFile and clipboard operations are unexpected
   // and should propagate to Sentry
-  const photoBuf = await fs.readFile(filePath);
-  const image = nativeImage.createFromBuffer(photoBuf);
-  clipboard.writeImage(image);
-  // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
-  return neverthrow.ok(undefined);
+  return Effect.promise(async () => {
+    const photoBuf = await fs.readFile(filePath);
+    const image = nativeImage.createFromBuffer(photoBuf);
+    clipboard.writeImage(image);
+    // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
+  });
 };
 
 /**
@@ -142,7 +141,7 @@ const copyImageDataByPath = async (
  */
 const copyImageByBase64 = (options: {
   pngBase64: string;
-}): ResultAsync<void, FileIOError> => {
+}): Effect.Effect<void, FileIOError> => {
   return handlePngBase64WithCallback(
     {
       filenameWithoutExt: 'clipboard_image', // 一時ファイル名
@@ -160,56 +159,59 @@ const copyImageByBase64 = (options: {
  * Base64 画像を一時ファイル化して PNG として保存する処理。
  * プレビュー画像のダウンロード機能から呼び出される。
  */
-const downloadImageAsPng = async (options: {
+const downloadImageAsPng = (options: {
   pngBase64: string;
   filenameWithoutExt: string;
-}): Promise<neverthrow.Result<void, DownloadImageError>> => {
-  let tempDir = '';
-  try {
-    const base64Data = options.pngBase64.replace(
-      /^data:image\/[^;]+;base64,/,
-      '',
-    );
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-'));
-    const tempFilePath = path.join(
-      tempDir,
-      `${options.filenameWithoutExt}.png`,
-    );
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    await fs.writeFile(tempFilePath, new Uint8Array(imageBuffer));
+}): Effect.Effect<void, DownloadImageError> => {
+  /**
+   * 一時ディレクトリを作成し、画像保存ダイアログを経由して PNG を保存する。
+   * Effect.acquireUseRelease で一時ディレクトリのクリーンアップを保証する。
+   */
+  return Effect.acquireUseRelease(
+    // acquire: 一時ディレクトリ作成
+    Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-'))),
+    // use: 画像保存処理
+    (tempDir) =>
+      Effect.gen(function* () {
+        const base64Data = options.pngBase64.replace(
+          /^data:image\/[^;]+;base64,/,
+          '',
+        );
+        const tempFilePath = path.join(
+          tempDir,
+          `${options.filenameWithoutExt}.png`,
+        );
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        yield* Effect.promise(() =>
+          fs.writeFile(tempFilePath, new Uint8Array(imageBuffer)),
+        );
 
-    const dialogResult = await showSavePngDialog(options.filenameWithoutExt);
+        const dialogResult = yield* Effect.promise(() =>
+          showSavePngDialog(options.filenameWithoutExt),
+        );
 
-    if (dialogResult.canceled || !dialogResult.filePath) {
-      await fs
-        .rm(tempDir, { recursive: true, force: true })
-        .catch(console.error);
-      return neverthrow.err({ type: 'CANCELED' });
-    }
+        if (dialogResult.canceled || !dialogResult.filePath) {
+          return yield* Effect.fail(new OperationCanceled({}));
+        }
 
-    const saveResult = await saveFileToPath(
-      tempFilePath,
-      dialogResult.filePath,
-    );
-    if (saveResult.isErr()) {
-      return neverthrow.err({
-        type: 'SAVE_FILE_FAILED',
-        message: saveResult.error.message,
-      });
-    }
+        const saveResult = yield* Effect.either(
+          saveFileToPath(tempFilePath, dialogResult.filePath),
+        );
 
-    return neverthrow.ok(undefined);
-  } catch (error) {
-    console.error('Error in downloadImageAsPng:', error);
-    // 予期しないエラーは Sentry に送信するために throw
-    throw error;
-  } finally {
-    if (tempDir) {
-      await fs
-        .rm(tempDir, { recursive: true, force: true })
-        .catch(console.error);
-    }
-  }
+        if (saveResult._tag === 'Left') {
+          return yield* Effect.fail(
+            new SaveFileFailed({
+              message: saveResult.left.message,
+            }),
+          );
+        }
+      }),
+    // release: 一時ディレクトリ削除（成功・失敗に関わらず実行）
+    (tempDir) =>
+      Effect.promise(() =>
+        fs.rm(tempDir, { recursive: true, force: true }).catch(console.error),
+      ),
+  );
 };
 
 interface SavePngFileOptions {
@@ -224,9 +226,9 @@ interface SavePngFileOptions {
 export const handlePngBase64WithCallback = (
   options: SavePngFileOptions,
   callback: (tempPngPath: string) => Promise<void>,
-): ResultAsync<void, FileIOError> => {
-  return ResultAsync.fromPromise(
-    (async () => {
+): Effect.Effect<void, FileIOError> => {
+  return Effect.tryPromise({
+    try: async () => {
       let tempDir = '';
       try {
         const base64Data = options.pngBase64.replace(
@@ -253,18 +255,23 @@ export const handlePngBase64WithCallback = (
           }
         }
       }
-    })(),
-    (error) =>
-      new FileIOError({
-        code: match(error)
-          .with(
-            { code: P.union('EACCES', 'EPERM') },
-            () => 'PERMISSION_DENIED' as const,
-          )
-          .otherwise(() => 'FILE_CREATE_FAILED' as const),
-        message: error instanceof Error ? error.message : String(error),
-      }),
-  );
+    },
+    catch: (error) =>
+      match(error)
+        .with(
+          { code: P.union('EACCES', 'EPERM') },
+          (e) =>
+            new PermissionDenied({
+              message: e instanceof Error ? e.message : String(e),
+            }),
+        )
+        .otherwise(
+          (e) =>
+            new FileCreateFailed({
+              message: e instanceof Error ? e.message : String(e),
+            }),
+        ),
+  });
 };
 
 /**
@@ -292,15 +299,14 @@ export const showSavePngDialog = async (filenameWithoutExt: string) => {
 export const saveFileToPath = (
   sourcePath: string,
   destinationPath: string,
-): ResultAsync<void, FileIOError> => {
-  return ResultAsync.fromPromise(
-    fs.copyFile(sourcePath, destinationPath),
-    (error) =>
-      new FileIOError({
-        code: 'FILE_COPY_FAILED',
+): Effect.Effect<void, FileCopyFailed> => {
+  return Effect.tryPromise({
+    try: () => fs.copyFile(sourcePath, destinationPath),
+    catch: (error) =>
+      new FileCopyFailed({
         message: error instanceof Error ? error.message : String(error),
       }),
-  );
+  });
 };
 
 // 複数ファイルをクリップボードにコピーする (クロスプラットフォーム対応)
@@ -308,16 +314,16 @@ export const saveFileToPath = (
  * 複数ファイルのパスをクリップボードにコピーするクロスプラットフォーム対応関数。
  * ファイル共有機能などで利用される。
  */
-const copyMultipleFilesToClipboard = async (
+const copyMultipleFilesToClipboard = (
   filePaths: string[],
-): Promise<neverthrow.Result<void, never>> => {
+): Effect.Effect<void, never> => {
   // All errors are unexpected and should propagate
   if (filePaths.length === 0) {
-    return neverthrow.ok(undefined);
+    return Effect.succeed(undefined);
   }
-  writeClipboardFilePaths(filePaths);
-
-  return neverthrow.ok(undefined);
+  return Effect.sync(() => {
+    writeClipboardFilePaths(filePaths);
+  });
 };
 
 export {

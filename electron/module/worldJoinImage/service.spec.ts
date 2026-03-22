@@ -1,4 +1,4 @@
-import * as neverthrow from 'neverthrow';
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:fs/promises');
@@ -19,6 +19,7 @@ vi.mock('ofetch', () => ({
 import * as fsPromises from 'node:fs/promises';
 import { ofetch } from 'ofetch';
 import { generateWorldJoinImage } from '../imageGenerator/service';
+import { VRChatApiWorldNotFound } from '../vrchatApi/errors';
 import { getVrcWorldInfoByWorldId } from '../vrchatApi/service';
 import { findVRChatWorldJoinLogList } from '../vrchatWorldJoinLog/service';
 import {
@@ -80,38 +81,31 @@ describe('generateMissingWorldJoinImages', () => {
     ]);
     vi.mocked(fsPromises.access).mockResolvedValue(undefined);
 
-    const result = await generateMissingWorldJoinImages({
-      photoDirPath: '/photos',
-    });
+    const result = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
 
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.generated).toBe(0);
-      expect(result.value.skipped).toBe(1);
-    }
+    expect(result.generated).toBe(0);
+    expect(result.skipped).toBe(1);
   });
 
   it('should return 0 when photoDirPath is empty', async () => {
-    const result = await generateMissingWorldJoinImages({ photoDirPath: '' });
+    const result = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '' }),
+    );
 
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.generated).toBe(0);
-    }
+    expect(result.generated).toBe(0);
   });
 
   it('should return 0 when no joins exist', async () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([]);
 
-    const result = await generateMissingWorldJoinImages({
-      photoDirPath: '/photos',
-    });
+    const result = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
 
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.generated).toBe(0);
-      expect(result.value.skipped).toBe(0);
-    }
+    expect(result.generated).toBe(0);
+    expect(result.skipped).toBe(0);
   });
 
   it('should generate image for missing join', async () => {
@@ -121,25 +115,23 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(fsPromises.access).mockRejectedValue(
       Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
     );
-    vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
-      neverthrow.ok(makeWorldInfo()),
+    vi.mocked(getVrcWorldInfoByWorldId).mockReturnValue(
+      Effect.succeed(makeWorldInfo()),
     );
     vi.mocked(ofetch).mockResolvedValue(new ArrayBuffer(8));
-    vi.mocked(generateWorldJoinImage).mockResolvedValue(
-      neverthrow.ok(Buffer.from('fake-jpeg')),
+    vi.mocked(generateWorldJoinImage).mockReturnValue(
+      Effect.succeed(Buffer.from('fake-jpeg')),
     );
     vi.mocked(fsPromises.mkdir).mockResolvedValue(undefined);
     vi.mocked(fsPromises.writeFile).mockResolvedValue(undefined);
 
-    const result = await generateMissingWorldJoinImages({
-      photoDirPath: '/photos',
-    });
+    const result = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
 
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.generated).toBe(1);
-      expect(result.value.errors).toBe(0);
-    }
+    expect(result.generated).toBe(1);
+    expect(result.errors).toBe(0);
+
     // Verify generateWorldJoinImage was called with correct arguments
     expect(generateWorldJoinImage).toHaveBeenCalledOnce();
     const genCall = vi.mocked(generateWorldJoinImage).mock.calls[0][0];
@@ -172,22 +164,20 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(fsPromises.access).mockRejectedValue(
       Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
     );
-    vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
-      neverthrow.err({
-        type: 'WORLD_NOT_FOUND' as const,
-        worldId: 'wrld_12345678-1234-1234-1234-123456789abc',
-      }),
+    vi.mocked(getVrcWorldInfoByWorldId).mockReturnValue(
+      Effect.fail(
+        new VRChatApiWorldNotFound({
+          worldId: 'wrld_12345678-1234-1234-1234-123456789abc',
+        }),
+      ),
     );
 
-    const result = await generateMissingWorldJoinImages({
-      photoDirPath: '/photos',
-    });
+    const result = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
 
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.generated).toBe(0);
-      expect(result.value.errors).toBe(1);
-    }
+    expect(result.generated).toBe(0);
+    expect(result.errors).toBe(1);
   });
 
   it('should count error when image download fails with FetchError', async () => {
@@ -197,22 +187,19 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(fsPromises.access).mockRejectedValue(
       Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
     );
-    vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
-      neverthrow.ok(makeWorldInfo()),
+    vi.mocked(getVrcWorldInfoByWorldId).mockReturnValue(
+      Effect.succeed(makeWorldInfo()),
     );
     const fetchError = new Error('Network error');
     fetchError.name = 'FetchError';
     vi.mocked(ofetch).mockRejectedValue(fetchError);
 
-    const result = await generateMissingWorldJoinImages({
-      photoDirPath: '/photos',
-    });
+    const result = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
 
-    expect(result.isOk()).toBe(true);
-    if (result.isOk()) {
-      expect(result.value.generated).toBe(0);
-      expect(result.value.errors).toBe(1);
-    }
+    expect(result.generated).toBe(0);
+    expect(result.errors).toBe(1);
   });
 
   it('should re-throw unexpected errors instead of swallowing them', async () => {
@@ -222,21 +209,25 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(fsPromises.access).mockRejectedValue(
       Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
     );
-    vi.mocked(getVrcWorldInfoByWorldId).mockResolvedValue(
-      neverthrow.ok(makeWorldInfo()),
+    vi.mocked(getVrcWorldInfoByWorldId).mockReturnValue(
+      Effect.succeed(makeWorldInfo()),
     );
     vi.mocked(ofetch).mockResolvedValue(new ArrayBuffer(8));
-    vi.mocked(generateWorldJoinImage).mockResolvedValue(
-      neverthrow.ok(Buffer.from('fake-jpeg')),
+    vi.mocked(generateWorldJoinImage).mockReturnValue(
+      Effect.succeed(Buffer.from('fake-jpeg')),
     );
     // mkdir で TypeError が発生 → 予期しないエラーなので re-throw されるべき
     vi.mocked(fsPromises.mkdir).mockRejectedValue(
       new TypeError('Cannot read properties of undefined'),
     );
 
+    // Effect.runPromise は予期しないエラー（die）を FiberFailure でラップするため、
+    // エラーメッセージでマッチする
     await expect(
-      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
-    ).rejects.toThrow(TypeError);
+      Effect.runPromise(
+        generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+      ),
+    ).rejects.toThrow('Cannot read properties of undefined');
   });
 
   it('should skip when already generating (mutex)', async () => {
@@ -249,21 +240,18 @@ describe('generateMissingWorldJoinImages', () => {
     );
 
     // Start first call (will be pending)
-    const promise1 = generateMissingWorldJoinImages({
-      photoDirPath: '/photos',
-    });
+    const promise1 = Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
     // Second call should skip immediately due to mutex
-    const result2 = await generateMissingWorldJoinImages({
-      photoDirPath: '/photos',
-    });
+    const result2 = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
     await promise1;
 
-    expect(result2.isOk()).toBe(true);
-    if (result2.isOk()) {
-      expect(result2.value.generated).toBe(0);
-      expect(result2.value.skipped).toBe(0);
-      expect(result2.value.errors).toBe(0);
-    }
+    expect(result2.generated).toBe(0);
+    expect(result2.skipped).toBe(0);
+    expect(result2.errors).toBe(0);
   });
 
   it('should reset mutex after error', async () => {
@@ -273,15 +261,17 @@ describe('generateMissingWorldJoinImages', () => {
 
     // First call throws
     await expect(
-      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+      Effect.runPromise(
+        generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+      ),
     ).rejects.toThrow('DB error');
 
     // Mutex should be reset, second call should work
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([]);
-    const result = await generateMissingWorldJoinImages({
-      photoDirPath: '/photos',
-    });
+    const result = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
 
-    expect(result.isOk()).toBe(true);
+    expect(result).toBeDefined();
   });
 });

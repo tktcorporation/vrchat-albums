@@ -1,19 +1,62 @@
 import { Transformer } from '@napi-rs/image';
 import consola from 'consola';
 import * as datefns from 'date-fns';
+import { Effect, Exit } from 'effect';
 import { clipboard } from 'electron';
 import * as path from 'pathe';
 import z from 'zod';
 import { reloadMainWindow } from '../../../electronUtil';
+import { runEffect } from '../../../lib/effectTRPC';
 import {
-  fileOperationErrorMappings,
-  handleResultError,
-  handleResultErrorWithSilent,
-} from '../../../lib/errorHelpers';
+  ERROR_CATEGORIES,
+  ERROR_CODES,
+  UserFacingError,
+} from '../../../lib/errors';
 import * as exiftool from '../../../lib/wrappedExifTool';
 import { eventEmitter, procedure, router as trpcRouter } from './../../../trpc';
 import { DirectoryPathSchema } from './../../../valueObjects/index';
+import type {
+  DownloadImageError,
+  FileIOError,
+  OpenPathFailed,
+} from '../errors';
 import * as utilsService from './../service';
+
+/**
+ * DownloadImageError → UserFacingError 変換ヘルパー
+ */
+const mapDownloadImageError = (e: DownloadImageError) =>
+  UserFacingError.withStructuredInfo({
+    code: ERROR_CODES.UNKNOWN,
+    category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+    message: `File operation failed: ${e.message}`,
+    userMessage: 'ファイル操作中にエラーが発生しました。',
+    cause: e,
+  });
+
+/**
+ * FileIOError → UserFacingError 変換ヘルパー
+ */
+const mapFileIOError = (e: FileIOError) =>
+  UserFacingError.withStructuredInfo({
+    code: ERROR_CODES.UNKNOWN,
+    category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+    message: `File operation failed: ${e.message}`,
+    userMessage: 'ファイル操作中にエラーが発生しました。',
+    cause: e,
+  });
+
+/**
+ * OpenPathFailed → UserFacingError 変換ヘルパー
+ */
+const mapOpenPathError = (e: OpenPathFailed) =>
+  UserFacingError.withStructuredInfo({
+    code: ERROR_CODES.FILE_NOT_FOUND,
+    category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+    message: `Failed to open path: ${e.message}`,
+    userMessage: 'ファイルを開けませんでした。',
+    cause: e,
+  });
 
 export const electronUtilRouter = () =>
   trpcRouter({
@@ -41,8 +84,7 @@ export const electronUtilRouter = () =>
       eventEmitter.emit('toast', 'copied');
     }),
     copyImageDataByPath: procedure.input(z.string()).mutation(async (ctx) => {
-      const result = await utilsService.copyImageDataByPath(ctx.input);
-      handleResultError(result, fileOperationErrorMappings);
+      await Effect.runPromise(utilsService.copyImageDataByPath(ctx.input));
       return true;
     }),
     /**
@@ -50,10 +92,9 @@ export const electronUtilRouter = () =>
      * 画像データではなく、ファイルパスそのものをコピーします
      */
     copySingleImagePath: procedure.input(z.string()).mutation(async (ctx) => {
-      const result = await utilsService.copyMultipleFilesToClipboard([
-        ctx.input,
-      ]);
-      handleResultError(result, fileOperationErrorMappings);
+      await Effect.runPromise(
+        utilsService.copyMultipleFilesToClipboard([ctx.input]),
+      );
       return true;
     }),
     downloadImageAsPng: procedure
@@ -63,15 +104,18 @@ export const electronUtilRouter = () =>
           filenameWithoutExt: z.string(),
         }),
       )
-      .mutation(async (ctx) => {
-        const result = await utilsService.downloadImageAsPng(ctx.input);
-        const downloadResult = handleResultErrorWithSilent(
-          result,
-          ['CANCELED'],
-          fileOperationErrorMappings,
-        );
-        return downloadResult !== null;
-      }),
+      .mutation(({ input }) =>
+        runEffect(
+          utilsService.downloadImageAsPng(input).pipe(
+            Effect.map(() => true as const),
+            // ユーザーキャンセルは silent → false を返す
+            Effect.catchTag('OperationCanceled', () =>
+              Effect.succeed(false as const),
+            ),
+            Effect.mapError(mapDownloadImageError),
+          ),
+        ),
+      ),
     downloadImageAsPhotoLogPng: procedure
       .input(
         z.object({
@@ -86,46 +130,40 @@ export const electronUtilRouter = () =>
           'yyyy-MM-dd_HH-mm-ss.SSS',
         )}_${ctx.input.worldId}`;
 
-        const result = await utilsService.handlePngBase64WithCallback(
-          {
-            filenameWithoutExt: filename,
-            pngBase64: ctx.input.imageBase64,
-          },
-          async (tempPngPath) => {
-            const dialogResult = await utilsService.showSavePngDialog(filename);
+        await Effect.runPromise(
+          utilsService.handlePngBase64WithCallback(
+            {
+              filenameWithoutExt: filename,
+              pngBase64: ctx.input.imageBase64,
+            },
+            async (tempPngPath) => {
+              const dialogResult =
+                await utilsService.showSavePngDialog(filename);
 
-            if (dialogResult.canceled || !dialogResult.filePath) {
-              return;
-            }
+              if (dialogResult.canceled || !dialogResult.filePath) {
+                return;
+              }
 
-            // Write EXIF data with timezone
-            await exiftool.writeDateTimeWithTimezone({
-              filePath: tempPngPath,
-              description: ctx.input.worldId,
-              dateTimeOriginal: datefns.format(
-                ctx.input.joinDateTime,
-                'yyyy-MM-dd HH:mm:ss',
-              ),
-              timezoneOffset: datefns.format(ctx.input.joinDateTime, 'xxx'),
-            });
-
-            // Move the temp file to the final destination
-            const saveResult = await utilsService.saveFileToPath(
-              tempPngPath,
-              dialogResult.filePath,
-            );
-            if (saveResult.isErr()) {
-              throw new Error('Failed to save file', {
-                cause: saveResult.error,
+              // Write EXIF data with timezone
+              await exiftool.writeDateTimeWithTimezone({
+                filePath: tempPngPath,
+                description: ctx.input.worldId,
+                dateTimeOriginal: datefns.format(
+                  ctx.input.joinDateTime,
+                  'yyyy-MM-dd HH:mm:ss',
+                ),
+                timezoneOffset: datefns.format(ctx.input.joinDateTime, 'xxx'),
               });
-            }
 
-            eventEmitter.emit('toast', 'downloaded');
-          },
+              // Move the temp file to the final destination
+              await Effect.runPromise(
+                utilsService.saveFileToPath(tempPngPath, dialogResult.filePath),
+              );
+
+              eventEmitter.emit('toast', 'downloaded');
+            },
+          ),
         );
-        if (result.isErr()) {
-          throw new Error('Failed to handle image', { cause: result.error });
-        }
       }),
     copyImageDataByBase64: procedure
       .input(
@@ -134,35 +172,45 @@ export const electronUtilRouter = () =>
           filenameWithoutExt: z.string(),
         }),
       )
-      .mutation(async (ctx) => {
-        const result = await utilsService.copyImageByBase64(ctx.input);
-        handleResultError(result, fileOperationErrorMappings);
-        return true;
-      }),
+      .mutation(({ input }) =>
+        runEffect(
+          utilsService.copyImageByBase64(input).pipe(
+            Effect.map(() => true as const),
+            Effect.mapError(mapFileIOError),
+          ),
+        ),
+      ),
     openPhotoPathWithPhotoApp: procedure
       .input(z.string())
-      .mutation(async (ctx) => {
-        const result = await utilsService.openPhotoPathWithPhotoApp(ctx.input);
-        handleResultError(result, fileOperationErrorMappings);
-        return true;
-      }),
+      .mutation(({ input }) =>
+        runEffect(
+          utilsService.openPhotoPathWithPhotoApp(input).pipe(
+            Effect.map(() => true as const),
+            Effect.mapError(mapOpenPathError),
+          ),
+        ),
+      ),
     openGetDirDialog: procedure.query(async () => {
-      const result = await utilsService.openGetDirDialog();
-      return result.match(
-        (dirPath) => DirectoryPathSchema.parse(dirPath),
-        () => null,
-      );
+      const exit = await Effect.runPromiseExit(utilsService.openGetDirDialog());
+      if (Exit.isSuccess(exit)) {
+        return DirectoryPathSchema.parse(exit.value);
+      }
+      // canceled の場合は null を返す
+      return null;
     }),
     getDownloadsPath: procedure.query(async () => {
       return utilsService.getDownloadsPath();
     }),
     openPathWithAssociatedApp: procedure
       .input(z.string())
-      .mutation(async (ctx) => {
-        const result = await utilsService.openPathWithAssociatedApp(ctx.input);
-        handleResultError(result, fileOperationErrorMappings);
-        return true;
-      }),
+      .mutation(({ input }) =>
+        runEffect(
+          utilsService.openPathWithAssociatedApp(input).pipe(
+            Effect.map(() => true as const),
+            Effect.mapError(mapOpenPathError),
+          ),
+        ),
+      ),
     /**
      * 複数の画像ファイルパスをクリップボードにコピーする
      * 画像データではなく、ファイルパスそのものをコピーします
@@ -174,17 +222,21 @@ export const electronUtilRouter = () =>
         const paths = ctx.input;
         consola.log('copyMultipleImagePaths called with paths:', paths.length);
 
-        const result = await utilsService.copyMultipleFilesToClipboard(paths);
-        handleResultError(result, fileOperationErrorMappings);
+        await Effect.runPromise(
+          utilsService.copyMultipleFilesToClipboard(paths),
+        );
         return true;
       }),
     openGetFileDialog: procedure
       .input(z.array(z.enum(['openDirectory', 'openFile', 'multiSelections'])))
       .query(async (ctx) => {
-        const result = await utilsService.openGetFileDialog(ctx.input);
-        return result.match(
-          (filePaths) => filePaths,
-          () => null,
+        const exit = await Effect.runPromiseExit(
+          utilsService.openGetFileDialog(ctx.input),
         );
+        if (Exit.isSuccess(exit)) {
+          return exit.value;
+        }
+        // canceled の場合は null を返す
+        return null;
       }),
   });
