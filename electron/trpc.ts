@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { initTRPC, TRPCError } from '@trpc/server';
-import { Effect } from 'effect';
+
 import superjson from 'superjson';
 import { match, P } from 'ts-pattern';
 import type { ZodError } from 'zod';
@@ -210,8 +210,8 @@ const logError = (
 };
 
 const errorHandler = t.middleware(async (opts) => {
-  // ResultAsync.fromPromise でミドルウェアのエラーハンドリングを統一
-  const executeMiddleware = async () => {
+  // tRPC ミドルウェアのエラーハンドリングを統一
+  try {
     const result = await opts.next(opts);
     if (!result.ok) {
       const originalError = match(result.error.cause)
@@ -223,9 +223,7 @@ const errorHandler = t.middleware(async (opts) => {
       logError(originalError, requestInfo, originalError);
     }
     return result;
-  };
-
-  const handleError = (cause: unknown): never => {
+  } catch (cause) {
     const error = match(cause)
       .with(P.instanceOf(Error), (err) => err)
       .otherwise(() => new Error(String(cause)));
@@ -240,14 +238,7 @@ const errorHandler = t.middleware(async (opts) => {
       message: error.message,
       cause: error,
     });
-  };
-
-  return Effect.runPromise(
-    Effect.tryPromise({
-      try: () => executeMiddleware(),
-      catch: handleError,
-    }),
-  );
+  }
 });
 
 const logRequest = t.middleware(async (opts) => {

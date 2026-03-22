@@ -60,3 +60,42 @@ export async function runEffect<T>(
 
   throw new Error('Effect was interrupted or failed with an unknown cause');
 }
+
+/**
+ * Effect を実行し、型付きエラー（E チャネル）を呼び出し側で処理可能な形で返す。
+ *
+ * 背景: runEffect は E チャネルのエラーを TRPCError に変換するが、
+ * コントローラー層ではエラー型を検査してから分岐したい場合がある
+ * （例: エラー種別により null を返すか UserFacingError を投げるか決める）。
+ * その場合に Exit/Cause/failureOption/dieOption のボイラープレートを
+ * 毎回手書きするのはエラーハンドリング漏れ（dieOption や interrupt の忘れ）のリスクがある。
+ *
+ * この関数は Defect と Interrupt を自動的に処理し、
+ * 呼び出し側は成功値と型付きエラーのみを扱えばよい。
+ *
+ * @returns 成功時は `{ success: true, value: T }`, 型付きエラー時は `{ success: false, error: E }`
+ * @throws Defect（予期しないエラー）はそのまま re-throw（Sentry 送信）
+ * @throws Interrupt は汎用エラーとして throw
+ */
+export async function runEffectExit<T, E>(
+  effect: Effect.Effect<T, E>,
+): Promise<{ success: true; value: T } | { success: false; error: E }> {
+  const exit = await Effect.runPromiseExit(effect);
+
+  if (Exit.isSuccess(exit)) {
+    return { success: true, value: exit.value };
+  }
+
+  const failOpt = Cause.failureOption(exit.cause);
+  if (Option.isSome(failOpt)) {
+    return { success: false, error: failOpt.value };
+  }
+
+  // Defect（予期しないエラー）→ そのまま re-throw して Sentry で捕捉
+  const dieOpt = Cause.dieOption(exit.cause);
+  if (Option.isSome(dieOpt)) {
+    throw dieOpt.value;
+  }
+
+  throw new Error('Effect was interrupted or failed with an unknown cause');
+}

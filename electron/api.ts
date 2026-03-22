@@ -1,9 +1,9 @@
 import { observable } from '@trpc/server/observable';
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Effect } from 'effect';
 import z from 'zod';
 
 import { initializeMainSentry } from './index';
-import { runEffect } from './lib/effectTRPC';
+import { runEffect, runEffectExit } from './lib/effectTRPC';
 import { ERROR_CATEGORIES, ERROR_CODES, UserFacingError } from './lib/errors';
 import { logger } from './lib/logger';
 import { backgroundSettingsRouter } from './module/backgroundSettings/controller/backgroundSettingsController';
@@ -27,10 +27,6 @@ import { vrchatPhotoRouter } from './module/vrchatPhoto/vrchatPhoto.controller';
 import { vrchatPhotoMetadataRouter } from './module/vrchatPhotoMetadata/vrchatPhotoMetadata.controller';
 import { vrchatWorldJoinLogRouter } from './module/vrchatWorldJoinLog/vrchatWorldJoinLog.controller';
 import { eventEmitter as ee, procedure, router as trpcRouter } from './trpc';
-
-// type ExtractDataTypeFromResult<R> = R extends Result<infer T, unknown>
-//   ? T
-//   : never;
 
 const settingStore = initSettingStore();
 
@@ -104,44 +100,27 @@ export const router = trpcRouter({
     });
   }),
   getVRChatLogFilesDir: procedure.query(async () => {
-    const exit = await Effect.runPromiseExit(service.getVRChatLogFilesDir());
-    // tRPC レスポンス用に変換（後方互換性のため error フィールドを含める）
-    if (Exit.isFailure(exit)) {
-      const failOpt = Cause.failureOption(exit.cause);
-      if (Option.isSome(failOpt)) {
-        return {
-          storedPath: null,
-          path: '',
-          error: failOpt.value,
-        };
-      }
-      // 型付きエラー以外のケース（defect など）は logFileDirNotFound として扱う
+    // runEffectExit が Defect/Interrupt を自動で re-throw（Sentry 送信）
+    const result = await runEffectExit(service.getVRChatLogFilesDir());
+    if (!result.success) {
       return {
         storedPath: null,
         path: '',
-        error: 'logFileDirNotFound' as const,
+        error: result.error,
       };
     }
     return {
-      ...exit.value,
+      ...result.value,
       error: null,
     };
   }),
   getStatusToUseVRChatLogFilesDir: procedure.query(async () => {
-    const exit = await Effect.runPromiseExit(service.getVRChatLogFilesDir());
-    if (Exit.isFailure(exit)) {
-      const failOpt = Cause.failureOption(exit.cause);
-      if (Option.isSome(failOpt)) {
-        return failOpt.value;
-      }
-      // Defect（予期しないエラー）は再スローして Sentry で捕捉
-      const dieOpt = Cause.dieOption(exit.cause);
-      if (Option.isSome(dieOpt)) {
-        throw dieOpt.value;
-      }
-      throw new Error('Effect was interrupted or failed with an unknown cause');
+    // runEffectExit が Defect/Interrupt を自動で re-throw（Sentry 送信）
+    const result = await runEffectExit(service.getVRChatLogFilesDir());
+    if (!result.success) {
+      return result.error;
     }
-    if (exit.value.path === null) {
+    if (result.value.path === null) {
       return 'logFilesDirNotSet';
     }
     return 'ready';
@@ -286,43 +265,35 @@ export const router = trpcRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const exit = await Effect.runPromiseExit(
+      // runEffectExit が Defect/Interrupt を自動で re-throw（Sentry 送信）
+      const result = await runEffectExit(
         openGetFileDialog(
           input.properties as Array<
             'openDirectory' | 'openFile' | 'multiSelections'
           >,
         ),
       );
-      if (Exit.isSuccess(exit)) {
+      if (result.success) {
         return {
           canceled: false,
-          filePaths: exit.value,
+          filePaths: result.value,
         };
       }
-      const failOpt = Cause.failureOption(exit.cause);
-      if (Option.isSome(failOpt)) {
-        const error = failOpt.value;
-        if (error._tag === 'OperationCanceled') {
-          return {
-            canceled: true,
-            filePaths: [],
-          };
-        }
-        // canceledでない場合は予期しないエラーとして扱う
-        throw UserFacingError.withStructuredInfo({
-          code: ERROR_CODES.UNKNOWN,
-          category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-          message: 'File dialog error',
-          userMessage: 'ファイル選択ダイアログでエラーが発生しました。',
-          cause: new Error(String(error)),
-        });
+      const error = result.error;
+      if (error._tag === 'OperationCanceled') {
+        return {
+          canceled: true,
+          filePaths: [],
+        };
       }
-      // Defect
-      const dieOpt = Cause.dieOption(exit.cause);
-      if (Option.isSome(dieOpt)) {
-        throw dieOpt.value;
-      }
-      throw new Error('Effect was interrupted or failed with an unknown cause');
+      // canceledでない場合は予期しないエラーとして扱う
+      throw UserFacingError.withStructuredInfo({
+        code: ERROR_CODES.UNKNOWN,
+        category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+        message: 'File dialog error',
+        userMessage: 'ファイル選択ダイアログでエラーが発生しました。',
+        cause: new Error(String(error)),
+      });
     }),
 });
 

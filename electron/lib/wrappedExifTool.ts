@@ -1,11 +1,11 @@
 import * as nodeFs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { Effect } from 'effect';
+import { Data, Effect } from 'effect';
 import * as exiftool from 'exiftool-vendored';
 import { v4 as uuidv4 } from 'uuid';
 
-/** EXIF操作関連のエラー型 */
+/** EXIF操作関連のエラーコード */
 type ExifOperationErrorCode =
   | 'EXIF_TEMP_DIR_CREATE_FAILED'
   | 'EXIF_TEMP_FILE_WRITE_FAILED'
@@ -13,12 +13,19 @@ type ExifOperationErrorCode =
   | 'EXIF_TEMP_FILE_READ_FAILED'
   | 'EXIF_READ_FAILED';
 
-export type ExifOperationError = {
+/**
+ * EXIF操作関連のエラー型（Data.TaggedError）
+ *
+ * 背景: 呼び出し側で個別コードをハンドリングする必要がないため、
+ * 1クラスに code フィールドを持たせる形式。
+ * Effect.catchTag("ExifOperationError", ...) で一括キャッチ可能。
+ */
+export class ExifOperationError extends Data.TaggedError('ExifOperationError')<{
   code: ExifOperationErrorCode;
   message: string;
   cause?: unknown;
   filePath?: string;
-};
+}> {}
 
 import { logger } from './logger';
 import * as fs from './wrappedFs';
@@ -51,11 +58,11 @@ const createTempFile = (): Effect.Effect<
     try: () => nodeFs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-')),
     catch: (error): ExifOperationError => {
       logger.debug('Failed to create temporary directory', error);
-      return {
+      return new ExifOperationError({
         code: 'EXIF_TEMP_DIR_CREATE_FAILED',
         message: 'Failed to create temporary directory',
         cause: error,
-      };
+      });
     },
   }).pipe(
     Effect.map((tempDir) => ({
@@ -123,12 +130,14 @@ export const setExifToBuffer = (
         'Failed to write buffer to temporary file',
         writeResult.left,
       );
-      return yield* Effect.fail({
-        code: 'EXIF_TEMP_FILE_WRITE_FAILED' as const,
-        message: 'Failed to write buffer to temporary file',
-        cause: writeResult.left,
-        filePath: tempFilePath,
-      });
+      return yield* Effect.fail(
+        new ExifOperationError({
+          code: 'EXIF_TEMP_FILE_WRITE_FAILED',
+          message: 'Failed to write buffer to temporary file',
+          cause: writeResult.left,
+          filePath: tempFilePath,
+        }),
+      );
     }
 
     return yield* Effect.acquireUseRelease(
@@ -145,12 +154,12 @@ export const setExifToBuffer = (
               }),
             catch: (error): ExifOperationError => {
               logger.debug('Failed to write EXIF data', error);
-              return {
+              return new ExifOperationError({
                 code: 'EXIF_WRITE_FAILED',
                 message: 'Failed to write EXIF data',
                 cause: error,
                 filePath: tmpPath,
-              };
+              });
             },
           });
 
@@ -158,12 +167,12 @@ export const setExifToBuffer = (
           return yield* fs.readFileSyncSafe(tmpPath).pipe(
             Effect.mapError((readErr): ExifOperationError => {
               logger.debug('Failed to read temporary file', readErr);
-              return {
+              return new ExifOperationError({
                 code: 'EXIF_TEMP_FILE_READ_FAILED',
                 message: 'Failed to read temporary file',
                 cause: readErr,
                 filePath: tmpPath,
-              };
+              });
             }),
           );
         }),
@@ -209,12 +218,14 @@ export const readExifByBuffer = (
         'Failed to write buffer to temporary file',
         writeResult.left,
       );
-      return yield* Effect.fail({
-        code: 'EXIF_TEMP_FILE_WRITE_FAILED' as const,
-        message: 'Failed to write buffer to temporary file',
-        cause: writeResult.left,
-        filePath: tempFilePath,
-      });
+      return yield* Effect.fail(
+        new ExifOperationError({
+          code: 'EXIF_TEMP_FILE_WRITE_FAILED',
+          message: 'Failed to write buffer to temporary file',
+          cause: writeResult.left,
+          filePath: tempFilePath,
+        }),
+      );
     }
 
     return yield* Effect.acquireUseRelease(
@@ -224,12 +235,12 @@ export const readExifByBuffer = (
           try: () => readExif(tmpPath),
           catch: (error): ExifOperationError => {
             logger.debug('Failed to read EXIF data', error);
-            return {
+            return new ExifOperationError({
               code: 'EXIF_READ_FAILED',
               message: 'Failed to read EXIF data',
               cause: error,
               filePath: tmpPath,
-            };
+            });
           },
         }),
       (tmpPath) =>

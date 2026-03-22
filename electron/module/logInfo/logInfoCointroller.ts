@@ -1,7 +1,8 @@
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 import z from 'zod';
 import { BATCH_CONFIG } from '../../constants/batchConfig';
+import { runEffectExit } from '../../lib/effectTRPC';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -68,7 +69,7 @@ const fetchAndMergeSortedWorldJoinLogs = async (
 };
 
 const getVRCWorldJoinLogList = async () => {
-  return await Effect.runPromise(
+  const result = await runEffectExit(
     worldJoinLogService.findAllVRChatWorldJoinLogList().pipe(
       Effect.map((joinLogList) =>
         joinLogList.map((joinLog) => ({
@@ -81,18 +82,18 @@ const getVRCWorldJoinLogList = async () => {
           updatedAt: joinLog.updatedAt as Date,
         })),
       ),
-      Effect.mapError((error) => {
-        // UserFacingError を直接 throw して tRPC の findUserFacingError で捕捉可能にする
-        throw UserFacingError.withStructuredInfo({
-          code: ERROR_CODES.DATABASE_ERROR,
-          category: ERROR_CATEGORIES.DATABASE_ERROR,
-          message: `Failed to get world join log list: ${error.message}`,
-          userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
-          cause: new Error(error.message),
-        });
-      }),
     ),
   );
+  if (!result.success) {
+    throw UserFacingError.withStructuredInfo({
+      code: ERROR_CODES.DATABASE_ERROR,
+      category: ERROR_CATEGORIES.DATABASE_ERROR,
+      message: `Failed to get world join log list: ${result.error.message}`,
+      userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
+      cause: new Error(result.error.message),
+    });
+  }
+  return result.value;
 };
 
 /**
@@ -200,50 +201,34 @@ const getRecentVRChatWorldJoinLogByVRChatPhotoName = async (
   | 'RECENT_JOIN_LOG_NOT_FOUND'
   | 'DATABASE_ERROR'
 > => {
-  const joinLogExit = await Effect.runPromiseExit(
+  const joinLogResult = await runEffectExit(
     worldJoinLogService.findRecentVRChatWorldJoinLog(
       vrchatPhotoName.photoTakenDateTime,
     ),
   );
-  if (Exit.isFailure(joinLogExit)) {
-    const failOpt = Cause.failureOption(joinLogExit.cause);
-    if (Option.isSome(failOpt)) {
-      logger.error({
-        message: '直近のワールド参加ログ取得中にエラーが発生しました',
-        stack: new Error(JSON.stringify(failOpt.value)),
-      });
-      return 'DATABASE_ERROR' as const;
-    }
-    const dieOpt = Cause.dieOption(joinLogExit.cause);
-    if (Option.isSome(dieOpt)) {
-      throw dieOpt.value;
-    }
-    throw new Error('Effect was interrupted or failed with an unknown cause');
+  if (!joinLogResult.success) {
+    logger.error({
+      message: '直近のワールド参加ログ取得中にエラーが発生しました',
+      stack: new Error(JSON.stringify(joinLogResult.error)),
+    });
+    return 'DATABASE_ERROR' as const;
   }
-  const joinLog = joinLogExit.value;
+  const joinLog = joinLogResult.value;
   if (joinLog === null) {
     return 'RECENT_JOIN_LOG_NOT_FOUND' as const;
   }
 
-  const nextJoinLogExit = await Effect.runPromiseExit(
+  const nextJoinLogResult = await runEffectExit(
     worldJoinLogService.findNextVRChatWorldJoinLog(joinLog.joinDateTime),
   );
-  if (Exit.isFailure(nextJoinLogExit)) {
-    const failOpt = Cause.failureOption(nextJoinLogExit.cause);
-    if (Option.isSome(failOpt)) {
-      logger.error({
-        message: '次のワールド参加ログ取得中にエラーが発生しました',
-        stack: new Error(JSON.stringify(failOpt.value)),
-      });
-      return 'DATABASE_ERROR' as const;
-    }
-    const dieOpt = Cause.dieOption(nextJoinLogExit.cause);
-    if (Option.isSome(dieOpt)) {
-      throw dieOpt.value;
-    }
-    throw new Error('Effect was interrupted or failed with an unknown cause');
+  if (!nextJoinLogResult.success) {
+    logger.error({
+      message: '次のワールド参加ログ取得中にエラーが発生しました',
+      stack: new Error(JSON.stringify(nextJoinLogResult.error)),
+    });
+    return 'DATABASE_ERROR' as const;
   }
-  const nextJoinLog = nextJoinLogExit.value;
+  const nextJoinLog = nextJoinLogResult.value;
 
   return {
     id: joinLog.id as string,
@@ -378,59 +363,49 @@ const getPlayerJoinListInSameWorldCore = async (
     });
 
     logger.debug('Querying player join logs');
-    const playerJoinLogExit = await Effect.runPromiseExit(
+    const playerJoinLogResult = await runEffectExit(
       playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
         startJoinDateTime: worldJoinLog.joinDateTime,
         endJoinDateTime: endDateTime ?? null,
       }),
     );
 
-    if (Exit.isFailure(playerJoinLogExit)) {
-      const failOpt = Cause.failureOption(playerJoinLogExit.cause);
-      if (Option.isSome(failOpt)) {
-        // エラータイプに基づいて適切な処理を行う
-        const error = failOpt.value;
-        logger.error({
-          message: `プレイヤー参加ログの取得に失敗しました: ${
-            error.message
-          } (errorType: ${
-            error._tag
-          }, startDateTime: ${worldJoinLog.joinDateTime.toISOString()}, endDateTime: ${endDateTime?.toISOString() ?? 'null'}, searchRange: ${
-            endDateTime
-              ? Math.round(
-                  (endDateTime.getTime() -
-                    worldJoinLog.joinDateTime.getTime()) /
-                    (1000 * 60 * 60),
-                )
-              : 'unlimited'
-          } hours, worldId: ${worldJoinLog.worldId}, worldName: ${
-            worldJoinLog.worldName
-          })`,
-          stack: new Error(`プレイヤー参加ログエラー: ${error._tag}`),
-        });
+    if (!playerJoinLogResult.success) {
+      const error = playerJoinLogResult.error;
+      logger.error({
+        message: `プレイヤー参加ログの取得に失敗しました: ${
+          error.message
+        } (errorType: ${
+          error._tag
+        }, startDateTime: ${worldJoinLog.joinDateTime.toISOString()}, endDateTime: ${endDateTime?.toISOString() ?? 'null'}, searchRange: ${
+          endDateTime
+            ? Math.round(
+                (endDateTime.getTime() - worldJoinLog.joinDateTime.getTime()) /
+                  (1000 * 60 * 60),
+              )
+            : 'unlimited'
+        } hours, worldId: ${worldJoinLog.worldId}, worldName: ${
+          worldJoinLog.worldName
+        })`,
+        stack: new Error(`プレイヤー参加ログエラー: ${error._tag}`),
+      });
 
-        return match(error._tag)
-          .with(
-            P.union(
-              'PlayerJoinLogDatabaseError',
-              'PlayerJoinLogInvalidDateRange',
-              'PlayerJoinLogNotFound',
-            ),
-            () => null,
-          )
-          .otherwise(() => {
-            // 型安全のためのケース（実際には到達しない）
-            throw new Error(`未知のエラータイプ: ${JSON.stringify(error)}`);
-          });
-      }
-      const dieOpt = Cause.dieOption(playerJoinLogExit.cause);
-      if (Option.isSome(dieOpt)) {
-        throw dieOpt.value;
-      }
-      return null;
+      return match(error._tag)
+        .with(
+          P.union(
+            'PlayerJoinLogDatabaseError',
+            'PlayerJoinLogInvalidDateRange',
+            'PlayerJoinLogNotFound',
+          ),
+          () => null,
+        )
+        .otherwise(() => {
+          // 型安全のためのケース（実際には到達しない）
+          throw new Error(`未知のエラータイプ: ${JSON.stringify(error)}`);
+        });
     }
 
-    const playerJoinLogList = playerJoinLogExit.value;
+    const playerJoinLogList = playerJoinLogResult.value;
     if (playerJoinLogList.length === 0) {
       logger.debug('No player join logs found in time range');
       return null;
@@ -473,22 +448,13 @@ export const logInfoRouter = () =>
       )
       .mutation(async (ctx) => {
         logger.info('loadLogInfoIndex');
-        const exit = await Effect.runPromiseExit(
+        // loadLogInfoIndex は Effect<void, never> なので型付きエラーは発生しない。
+        // Defect は runEffectExit が自動的に re-throw する。
+        await runEffectExit(
           loadLogInfoIndexFromVRChatLog({
             excludeOldLogLoad: ctx.input.excludeOldLogLoad,
           }),
         );
-        if (Exit.isFailure(exit)) {
-          const failOpt = Cause.failureOption(exit.cause);
-          if (Option.isSome(failOpt)) {
-            // loadLogInfoIndex は never エラーなので本来ここには来ないが安全のため
-            return undefined;
-          }
-          const dieOpt = Cause.dieOption(exit.cause);
-          if (Option.isSome(dieOpt)) {
-            throw dieOpt.value;
-          }
-        }
       }),
     getVRCWorldJoinLogList: procedure.query(async () => {
       const joinLogList = await getVRCWorldJoinLogList();
@@ -766,7 +732,7 @@ export const logInfoRouter = () =>
               `[SessionInfoBatch] Fetching player data for ${dateRanges.length} session ranges`,
             );
 
-            const playerBatchExit = await Effect.runPromiseExit(
+            const playerBatchResult = await runEffectExit(
               playerJoinLogService.getVRChatPlayerJoinLogListByMultipleDateRanges(
                 dateRanges,
               ),
@@ -774,8 +740,8 @@ export const logInfoRouter = () =>
 
             const playerQueryTime = performance.now() - playerQueryStartTime;
 
-            if (Exit.isSuccess(playerBatchExit)) {
-              const playersBySession = playerBatchExit.value;
+            if (playerBatchResult.success) {
+              const playersBySession = playerBatchResult.value;
               let totalPlayersFound = 0;
 
               // 各セッションにプレイヤー情報を設定
@@ -793,13 +759,10 @@ export const logInfoRouter = () =>
                 )}ms (${totalPlayersFound} total players)`,
               );
             } else {
-              const failOpt = Cause.failureOption(playerBatchExit.cause);
-              if (Option.isSome(failOpt)) {
-                logger.warnWithSentry({
-                  message: `プレイヤー情報の取得に失敗しましたが、ワールド情報は返します: ${failOpt.value.message}`,
-                  details: { errorType: failOpt.value._tag },
-                });
-              }
+              logger.warnWithSentry({
+                message: `プレイヤー情報の取得に失敗しましたが、ワールド情報は返します: ${playerBatchResult.error.message}`,
+                details: { errorType: playerBatchResult.error._tag },
+              });
               logger.debug(
                 `[SessionInfoBatch] Player query failed in ${playerQueryTime.toFixed(
                   2,

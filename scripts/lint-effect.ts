@@ -11,7 +11,7 @@
  * - no-effect-fail-userfacingerror: Effect.fail(UserFacingError) パターンを検出
  * - no-mock-resolved-effect: mockResolvedValue(Effect.succeed/fail) パターンを検出
  * - no-run-effect-for-trpc: 旧 runEffectForTRPC の使用を検出
- * - require-cause-in-mapError: mapError 内の withStructuredInfo に cause がないケースを警告
+ * - require-cause-in-mapError: mapError/catchTag 内の withStructuredInfo に cause がないケースを警告
  *
  * @see docs/superpowers/specs/2026-03-22-effect-native-error-handling-design.md
  */
@@ -97,25 +97,98 @@ function checkServiceReturnsEffect(filePath: string, content: string) {
  * 背景: Effect.fail で UserFacingError を E チャネルに入れると、
  * Effect.runPromise が FiberFailure に包んで tRPC の findUserFacingError が発見できない。
  * コントローラー層では Effect.mapError で UserFacingError に変換し、runEffect に渡すべき。
+ *
+ * 検出方法: Effect.fail( の後、閉じ括弧までの範囲内に UserFacingError が含まれるかをチェック。
+ * runEffect 内の catchTag/mapError で Effect.fail(UserFacingError) を使うのは正当なパターンなので、
+ * runEffect に渡される Effect チェーン内は除外する。
  */
 function checkNoEffectFailUserFacingError(filePath: string, content: string) {
   // テストファイルは除外
   if (filePath.includes('.test.') || filePath.includes('.spec.')) return;
 
   const lines = content.split('\n');
+
+  // Effect.fail( の開始を追跡し、閉じ括弧までの範囲で UserFacingError を検出
+  let inEffectFail = false;
+  let effectFailStartLine = 0;
+  let parenDepth = 0;
+  let inRunEffect = false;
+  let runEffectDepth = 0;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (
-      line.includes('Effect.fail') &&
-      (line.includes('UserFacingError') ||
-        line.includes('UserFacingError.withStructuredInfo'))
-    ) {
-      addIssue(
-        filePath,
-        i + 1,
-        'no-effect-fail-userfacingerror',
-        'Effect.fail(UserFacingError) は FiberFailure 問題を引き起こします。Effect.mapError で変換し runEffect に渡してください。',
-      );
+
+    // runEffect( ブロックの追跡（内部の Effect.fail(UserFacingError) は正当）
+    if (line.includes('runEffect(')) {
+      inRunEffect = true;
+      runEffectDepth = 0;
+    }
+
+    if (inRunEffect) {
+      for (const char of line) {
+        if (char === '(') runEffectDepth++;
+        if (char === ')') runEffectDepth--;
+      }
+      // runEffect(...) の括弧がすべて閉じたら追跡終了
+      // runEffectDepth は runEffect( の行で 0 から開始するため、
+      // 括弧がバランスした時点で 0 に戻る
+      if (runEffectDepth <= 0) {
+        inRunEffect = false;
+      }
+    }
+
+    // runEffect 内は除外
+    if (inRunEffect) continue;
+
+    // Effect.fail( の開始を検出
+    if (!inEffectFail && line.includes('Effect.fail(')) {
+      inEffectFail = true;
+      effectFailStartLine = i;
+      parenDepth = 0;
+
+      // 同一行に UserFacingError がある場合は即座に報告
+      if (
+        line.includes('UserFacingError') ||
+        line.includes('UserFacingError.withStructuredInfo')
+      ) {
+        addIssue(
+          filePath,
+          i + 1,
+          'no-effect-fail-userfacingerror',
+          'Effect.fail(UserFacingError) は FiberFailure 問題を引き起こします。Effect.mapError で変換し runEffect に渡してください。',
+        );
+        inEffectFail = false;
+        continue;
+      }
+    }
+
+    if (inEffectFail) {
+      // 括弧の深さを追跡
+      for (const char of line) {
+        if (char === '(') parenDepth++;
+        if (char === ')') parenDepth--;
+      }
+
+      // Effect.fail の引数内に UserFacingError が見つかった場合
+      if (
+        i > effectFailStartLine &&
+        (line.includes('UserFacingError') ||
+          line.includes('UserFacingError.withStructuredInfo'))
+      ) {
+        addIssue(
+          filePath,
+          effectFailStartLine + 1,
+          'no-effect-fail-userfacingerror',
+          'Effect.fail(UserFacingError) は FiberFailure 問題を引き起こします。Effect.mapError で変換し runEffect に渡してください。',
+        );
+        inEffectFail = false;
+        continue;
+      }
+
+      // Effect.fail ブロックの終了
+      if (parenDepth <= 0 && i > effectFailStartLine) {
+        inEffectFail = false;
+      }
     }
   }
 }
@@ -171,18 +244,18 @@ function checkNoRunEffectForTRPC(filePath: string, content: string) {
 }
 
 /**
- * mapError 内の withStructuredInfo に cause がないケースを警告
+ * mapError / catchTag 内の withStructuredInfo に cause がないケースを警告
  *
  * 背景: cause がないと logger.error が Sentry に送信しない。
  * 意図的な省略は // effect-lint-ignore-cause コメントで明示。
  */
-function checkCauseInMapError(filePath: string, content: string) {
+function checkCauseInErrorHandler(filePath: string, content: string) {
   // テストファイルは除外
   if (filePath.includes('.test.') || filePath.includes('.spec.')) return;
 
   const lines = content.split('\n');
-  let inMapError = false;
-  let mapErrorStartLine = 0;
+  let inErrorHandler = false;
+  let errorHandlerStartLine = 0;
   let braceDepth = 0;
   let foundWithStructuredInfo = false;
   let foundCause = false;
@@ -191,17 +264,22 @@ function checkCauseInMapError(filePath: string, content: string) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // mapError ブロックの開始を検出
-    if (line.includes('Effect.mapError') || line.includes('mapError(')) {
-      inMapError = true;
-      mapErrorStartLine = i;
+    // mapError / catchTag ブロックの開始を検出
+    if (
+      line.includes('Effect.mapError') ||
+      line.includes('mapError(') ||
+      line.includes('Effect.catchTag') ||
+      line.includes('catchTag(')
+    ) {
+      inErrorHandler = true;
+      errorHandlerStartLine = i;
       braceDepth = 0;
       foundWithStructuredInfo = false;
       foundCause = false;
       hasIgnoreComment = false;
     }
 
-    if (inMapError) {
+    if (inErrorHandler) {
       // effect-lint-ignore-cause コメントを検出
       if (line.includes('effect-lint-ignore-cause')) {
         hasIgnoreComment = true;
@@ -223,18 +301,18 @@ function checkCauseInMapError(filePath: string, content: string) {
         if (char === ')') braceDepth--;
       }
 
-      if (braceDepth <= 0 && i > mapErrorStartLine) {
-        // mapError ブロック終了
+      if (braceDepth <= 0 && i > errorHandlerStartLine) {
+        // エラーハンドラーブロック終了
         if (foundWithStructuredInfo && !foundCause && !hasIgnoreComment) {
           addIssue(
             filePath,
-            mapErrorStartLine + 1,
+            errorHandlerStartLine + 1,
             'require-cause-in-mapError',
-            'mapError 内の UserFacingError.withStructuredInfo に cause がありません。Sentry に元エラーが送信されません。意図的な省略は // effect-lint-ignore-cause を追加してください。',
+            'mapError/catchTag 内の UserFacingError.withStructuredInfo に cause がありません。Sentry に元エラーが送信されません。意図的な省略は // effect-lint-ignore-cause を追加してください。',
             'warning',
           );
         }
-        inMapError = false;
+        inErrorHandler = false;
       }
     }
   }
@@ -264,7 +342,7 @@ async function main() {
     checkNoEffectFailUserFacingError(normalizedPath, content);
     checkNoMockResolvedEffect(normalizedPath, content);
     checkNoRunEffectForTRPC(normalizedPath, content);
-    checkCauseInMapError(normalizedPath, content);
+    checkCauseInErrorHandler(normalizedPath, content);
   }
 
   const errorIssues = issues.filter((i) => i.severity === 'error');

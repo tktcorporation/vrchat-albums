@@ -130,6 +130,7 @@ export const settingsRouter = () =>
                 category: ERROR_CATEGORIES.VALIDATION_ERROR,
                 message: e.message,
                 userMessage: 'アップデートはありません。',
+                cause: e,
               }),
             ),
           ),
@@ -373,11 +374,15 @@ export const settingsRouter = () =>
               details: { errorTag },
             });
           } else {
-            // Defect: re-throw
+            // Defect: re-throw して Sentry で捕捉
             const dieOpt = Cause.dieOption(logSyncExit.cause);
             if (Option.isSome(dieOpt)) {
               throw dieOpt.value;
             }
+            // Interrupt やその他の未知の Cause
+            throw new Error(
+              'Effect was interrupted or failed with an unknown cause',
+            );
           }
         } else {
           logger.info('Log sync completed successfully');
@@ -418,8 +423,12 @@ export const settingsRouter = () =>
           throw error;
         }
 
-        // その他のエラーの場合は新しいUserFacingErrorでラップ
-        throw new UserFacingError(`初期化に失敗しました: ${errorMessage}`);
+        // その他のエラーの場合は新しいUserFacingErrorでラップ（元のスタックトレースを保持）
+        throw new UserFacingError(
+          `初期化に失敗しました: ${errorMessage}`,
+          undefined,
+          { cause: error instanceof Error ? error : undefined },
+        );
       } finally {
         // 処理完了後にフラグをリセット
         isInitializing = false;
