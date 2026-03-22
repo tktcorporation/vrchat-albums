@@ -56,11 +56,6 @@ export class SettingStorageError extends Data.TaggedError(
   key: string;
 }> {}
 
-/**
- * @deprecated Use SettingStorageError tagged error instead
- */
-export type SettingStoreError = SettingStorageError;
-
 const getValue =
   (settingsStore: Store) =>
   (key: SettingStoreKey): unknown => {

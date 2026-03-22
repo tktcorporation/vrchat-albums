@@ -20,11 +20,6 @@ import {
  */
 
 /**
- * @deprecated Use ExportServiceError tagged errors instead
- */
-export type ExportError = ExportServiceError;
-
-/**
  * ExportServiceErrorからユーザー向けメッセージを取得
  */
 export const getExportErrorMessage = (error: ExportServiceError): string =>

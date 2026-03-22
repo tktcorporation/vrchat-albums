@@ -28,11 +28,6 @@ import {
 } from './errors';
 
 /**
- * @deprecated Use BackupServiceError tagged errors instead
- */
-export type BackupError = BackupServiceError;
-
-/**
  * BackupServiceError からユーザー向けメッセージを取得
  */
 export const getBackupErrorMessage = (error: BackupServiceError): string =>

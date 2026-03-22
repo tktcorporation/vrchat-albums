@@ -19,11 +19,6 @@ import {
 } from './errors';
 
 /**
- * @deprecated Use RollbackServiceError tagged errors instead
- */
-export type RollbackError = RollbackServiceError;
-
-/**
  * RollbackServiceError からユーザー向けメッセージを取得
  */
 export const getRollbackErrorMessage = (error: RollbackServiceError): string =>

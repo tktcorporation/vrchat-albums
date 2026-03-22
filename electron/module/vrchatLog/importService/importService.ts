@@ -24,11 +24,6 @@ import {
 } from './errors';
 
 /**
- * @deprecated Use ImportServiceError tagged errors instead
- */
-export type ImportError = ImportServiceError;
-
-/**
  * ImportServiceError からユーザー向けメッセージを取得
  */
 export const getImportErrorMessage = (error: ImportServiceError): string =>

@@ -1,7 +1,7 @@
 import * as nodeFs from 'node:fs';
 import readline from 'node:readline';
 import { Cause, Effect, Option } from 'effect';
-import { match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import * as fs from '../../../lib/wrappedFs';
 import type { VRChatLogFilePath } from '../../vrchatLogFileDir/model';
@@ -9,7 +9,7 @@ import {
   KNOWN_BEHAVIOUR_PATTERNS,
   LOG_PATTERNS,
 } from '../constants/logPatterns';
-import type { VRChatLogFileError } from '../error';
+import { VRChatLogFileError } from '../error';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../model';
 import { VRChatLogLineSchema } from '../model';
 import type { PartialSuccessResult } from '../types/partialSuccess';
@@ -147,17 +147,24 @@ export const getLogLinesFromLogFile = (props: {
             }
           });
 
-          await Promise.all([
-            new Promise((resolve) => {
-              stream.on('close', () => {
-                resolve(null);
-              });
-            }),
-          ]);
+          await new Promise<void>((resolve, reject) => {
+            stream.on('error', reject);
+            reader.on('error', reject);
+            reader.on('close', () => resolve());
+          });
 
           return lines;
         },
-        catch: (e) => e as VRChatLogFileError,
+        catch: (e): VRChatLogFileError =>
+          match(e)
+            .with(P.instanceOf(VRChatLogFileError), (err) => err)
+            .otherwise(
+              (err) =>
+                new VRChatLogFileError({
+                  code: 'UNKNOWN',
+                  message: String(err),
+                }),
+            ),
       }),
     )
     .exhaustive();
@@ -250,7 +257,10 @@ export const getLogLinesByLogFilePathList = (props: {
 
       return logLineList;
     },
-    catch: (e) => e as VRChatLogFileError,
+    catch: (e): VRChatLogFileError =>
+      e instanceof VRChatLogFileError
+        ? e
+        : new VRChatLogFileError({ code: 'UNKNOWN', message: String(e) }),
   });
 
 /**
