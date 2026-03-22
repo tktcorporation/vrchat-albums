@@ -115,15 +115,25 @@ export async function syncLogs(
 function triggerWorldJoinImageGeneration(): void {
   try {
     const settingStore = getSettingStore();
-    if (!settingStore.getWorldJoinImageGenerationEnabled()) {
+    const isEnabled = settingStore.getWorldJoinImageGenerationEnabled();
+    logger.info(
+      `World join image generation setting: ${isEnabled ? 'enabled' : 'disabled'}`,
+    );
+    if (!isEnabled) {
       return;
     }
 
     const photoDirPath = settingStore.getVRChatPhotoDir();
     if (!photoDirPath) {
+      logger.info(
+        'World join image generation skipped: photo directory not configured',
+      );
       return;
     }
 
+    logger.info(
+      `Starting world join image generation with photo dir: ${photoDirPath}`,
+    );
     void generateMissingWorldJoinImages({ photoDirPath }).catch((error) => {
       logger.error({
         message: 'Failed to generate world join images',
