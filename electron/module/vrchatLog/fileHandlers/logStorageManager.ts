@@ -135,14 +135,34 @@ export const getLogStoreFilePathsInRange = async (
 };
 
 /**
+ * 重複判定キャッシュ
+ *
+ * 背景: appendLoglinesToFile はストリーミング処理で複数回呼ばれるが、
+ * 毎回 logStore ファイル全体を読み込んで Set を構築するのは無駄。
+ * sync 操作の開始時に createDedupCache() で作成し、
+ * appendLoglinesToFile に渡すことで、ファイル読み込みを初回のみに限定する。
+ *
+ * sync 操作完了後はキャッシュを破棄する（GCに任せる）。
+ */
+export type DedupCache = Map<string, Set<string>>;
+
+/**
+ * 重複判定キャッシュを作成する
+ * sync 操作の開始時に1回呼び出し、appendLoglinesToFile に渡す。
+ */
+export const createDedupCache = (): DedupCache => new Map();
+
+/**
  * ログ行をストレージファイルに追記
  * @param props.logLines 追記するログ行
  * @param props.logStoreFilePath 保存先ファイルパス（省略時は日付から自動決定）
+ * @param props.dedupCache 重複判定キャッシュ（省略時は毎回ファイルを読み込む）
  * @returns 成功時はok、失敗時はerr
  */
 export const appendLoglinesToFile = (props: {
   logLines: VRChatLogLine[];
   logStoreFilePath?: VRChatLogStoreFilePath;
+  dedupCache?: DedupCache;
 }): Effect.Effect<void, never> => {
   if (props.logLines.length === 0) {
     return Effect.succeed(undefined);
@@ -214,21 +234,39 @@ export const appendLoglinesToFile = (props: {
         }
       }
 
-      // 既存のログ行をSetとして保持
-      const existingLines = new Set<string>();
+      // 既存のログ行をSetとして保持（キャッシュがあれば再利用）
+      const cacheKey = logStoreFilePath.value;
+      let existingLines: Set<string>;
 
-      if (isExists) {
-        // readFileSyncSafe returns Effect<Buffer, ReadFileError>
-        const readExit = yield* fs
-          .readFileSyncSafe(logStoreFilePath.value)
-          .pipe(Effect.either);
-        if (readExit._tag === 'Right') {
-          const content = readExit.right.toString();
-          for (const line of content.split('\n')) {
-            if (line) {
-              existingLines.add(line);
+      const cachedLines = props.dedupCache?.get(cacheKey);
+      if (cachedLines) {
+        existingLines = cachedLines;
+      } else {
+        existingLines = new Set<string>();
+        let readSucceeded = true;
+
+        if (isExists) {
+          // readFileSyncSafe returns Effect<Buffer, ReadFileError>
+          const readExit = yield* fs
+            .readFileSyncSafe(logStoreFilePath.value)
+            .pipe(Effect.either);
+          if (readExit._tag === 'Right') {
+            const content = readExit.right.toString();
+            for (const line of content.split('\n')) {
+              if (line) {
+                existingLines.add(line);
+              }
             }
+          } else {
+            readSucceeded = false;
+            logger.warn(
+              `Failed to read existing log file for dedup: ${logStoreFilePath.value}`,
+            );
           }
+        }
+        // キャッシュに保存（読み込み成功時のみ。失敗時は次回リトライさせる）
+        if (props.dedupCache && readSucceeded) {
+          props.dedupCache.set(cacheKey, existingLines);
         }
       }
 
@@ -253,6 +291,11 @@ export const appendLoglinesToFile = (props: {
             throw e;
           }),
         );
+      }
+
+      // キャッシュを更新（書き込み成功後に新しい行を追加）
+      for (const line of newLines) {
+        existingLines.add(line);
       }
     }
   }) as Effect.Effect<void, never>;

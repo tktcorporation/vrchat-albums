@@ -32,7 +32,19 @@ import {
   getImportErrorMessage,
   importService,
 } from './importService/importService';
+import type { VRChatLogLine } from './model';
 import * as vrchatLogService from './service';
+
+/**
+ * appendLoglines の結果
+ *
+ * 背景: 処理済みのログ行を後続の loadLogInfoIndexFromVRChatLog に直接渡すことで、
+ * logStore ファイルの再読み込みを回避し、起動時間を短縮する。
+ */
+export interface AppendLoglinesResult {
+  /** appendLoglines に渡されたログ行（日付フィルタ済み、logStore との重複除外は未実施） */
+  processedLogLines: VRChatLogLine[];
+}
 
 /**
  * もともとのVRC Log File 解析に必要な行だけ抜き出して、保管用のファイルに保存する
@@ -43,10 +55,12 @@ import * as vrchatLogService from './service';
  * これは月ごとに整理され、`logStore/YYYY-MM/logStore-YYYY-MM.txt`という形式で保存されます。
  * 月ごとのログファイルがサイズ制限（10MB）を超えると、タイムスタンプ付きの新しいファイルが作成されます。
  * このディレクトリはメタデータの保存用ではなく、ログデータ自体の保存用です。
+ *
+ * @returns 処理結果。processedLogLines に新規処理されたログ行を含む。
  */
 export const appendLoglinesToFileFromLogFilePathList = async (
   processAll = false,
-): Promise<void> => {
+): Promise<AppendLoglinesResult> => {
   const vrchatlogFilesDirExit = await Effect.runPromiseExit(
     vrchatLogFileDirService.getValidVRChatLogFileDir(),
   );
@@ -108,6 +122,11 @@ export const appendLoglinesToFileFromLogFilePathList = async (
 
   let totalProcessedLines = 0;
   let hasProcessedAnyLines = false;
+  const allProcessedLines: VRChatLogLine[] = [];
+
+  // 重複判定キャッシュを作成（sync操作全体で共有し、
+  // バッチごとのlogStoreファイル再読み込みを回避する）
+  const dedupCache = vrchatLogService.createDedupCache();
 
   // ストリーミング処理で各バッチを処理
   for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
@@ -126,13 +145,17 @@ export const appendLoglinesToFileFromLogFilePathList = async (
     if (filteredLogLines.length > 0) {
       hasProcessedAnyLines = true;
       totalProcessedLines += filteredLogLines.length;
+      // loadLogInfo に渡すために処理済み行を収集
+      allProcessedLines.push(...filteredLogLines);
 
       logger.debug(`Processing batch of ${filteredLogLines.length} log lines`);
 
-      // 各バッチを保存 (appendLoglinesToFile は Effect<void, never>)
+      // 各バッチを保存（dedupCacheで重複判定を高速化）
+      // appendLoglinesToFile は Effect<void, never>
       await Effect.runPromise(
         vrchatLogService.appendLoglinesToFile({
           logLines: filteredLogLines,
+          dedupCache,
         }),
       );
     }
@@ -140,10 +163,14 @@ export const appendLoglinesToFileFromLogFilePathList = async (
 
   if (!hasProcessedAnyLines) {
     logger.info('No new log lines to process after filtering');
-    return;
+    return { processedLogLines: [] };
   }
 
   logger.info(`Processing completed: ${totalProcessedLines} log lines`);
+
+  return {
+    processedLogLines: allProcessedLines,
+  };
 };
 
 /**

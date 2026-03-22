@@ -136,6 +136,19 @@ export const VRChatLogLineSchema = z.string().brand<'VRChatLogLine'>();
 
 export type VRChatLogLine = z.infer<typeof VRChatLogLineSchema>;
 
+/**
+ * string を VRChatLogLine にキャストする（Zod オーバーヘッドなし）
+ *
+ * 背景: VRChatLogLineSchema は z.string().brand() であり、実質的にバリデーションは
+ * string 型チェックのみ。readline や fs.readFile から取得した値は確実に string なので、
+ * ホットパス（数万行のログパース）では Zod の safeParse オーバーヘッドを回避する。
+ *
+ * 使用条件: 入力が string であることがコード上で保証されている場合のみ使用すること。
+ * 外部境界のバリデーションでは VRChatLogLineSchema.parse() を使うこと。
+ */
+export const castToVRChatLogLine = (value: string): VRChatLogLine =>
+  value as VRChatLogLine;
+
 // ============================================================================
 // Folder Digest (ハッシュ値)
 // ============================================================================
