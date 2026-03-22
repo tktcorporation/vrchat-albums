@@ -242,11 +242,23 @@ export class BackupService {
           continue;
         }
 
-        const metadata = JSON.parse(readExit.right) as ImportBackupMetadata;
-        // Date オブジェクトに変換
-        metadata.backupTimestamp = new Date(metadata.backupTimestamp);
-        metadata.importTimestamp = new Date(metadata.importTimestamp);
-        backups.push(metadata);
+        // JSON パースと Date 変換の失敗は個別にスキップ（corrupt ファイルで全体を壊さない）
+        try {
+          const metadata = JSON.parse(readExit.right) as ImportBackupMetadata;
+          metadata.backupTimestamp = new Date(metadata.backupTimestamp);
+          metadata.importTimestamp = new Date(metadata.importTimestamp);
+          backups.push(metadata);
+        } catch (parseError) {
+          // corrupt メタデータは Sentry に送信して検知可能にする
+          logger.error({
+            message: `Failed to parse backup metadata for ${folderName}`,
+            stack:
+              parseError instanceof Error
+                ? parseError
+                : new Error(String(parseError)),
+            details: { folderName, metadataPath },
+          });
+        }
       }
 
       // 作成日時で降順ソート（新しいものが先頭）
