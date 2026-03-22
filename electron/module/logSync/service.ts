@@ -11,6 +11,7 @@ import { VRChatLogFileError } from '../vrchatLog/error';
 import type { VRChatLogError } from '../vrchatLog/errors';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
+import { getVRChatPhotoDirPath } from '../vrchatPhoto/vrchatPhoto.service';
 import type { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import { generateMissingWorldJoinImages } from '../worldJoinImage/service';
 
@@ -123,10 +124,10 @@ function triggerWorldJoinImageGeneration(): void {
       return;
     }
 
-    const photoDirPath = settingStore.getVRChatPhotoDir();
-    if (!photoDirPath) {
-      return;
-    }
+    // settingStore.getVRChatPhotoDir() はユーザー未設定時に null を返すが、
+    // getVRChatPhotoDirPath() はデフォルトパス（~/Pictures/VRChat）にフォールバックする。
+    // 写真閲覧と同じデフォルトパスを使うことで、初期設定のままでも画像生成が動作する。
+    const photoDirPath = getVRChatPhotoDirPath().value;
 
     void Effect.runPromise(
       generateMissingWorldJoinImages({ photoDirPath }),

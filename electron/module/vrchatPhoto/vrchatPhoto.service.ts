@@ -612,8 +612,11 @@ export const clearVRChatPhotoDirPathInSettingStore = () => {
 };
 
 /**
- * VRChat の写真の保存場所を取得する
- * 指定された場所が保存されていない場合は、デフォルトの場所を返す
+ * VRChat の写真の保存場所を取得する（デフォルトフォールバック付き）
+ *
+ * ユーザーが明示的に設定していない場合は ~/Pictures/VRChat をデフォルトとして返す。
+ * settingStore.getVRChatPhotoDir() と異なり、常に有効なパスを返すことが保証される。
+ * 写真ディレクトリが必要な箇所では、settingStore を直接使わずこの関数を使うこと。
  */
 export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
   // 写真の保存箇所を取得
