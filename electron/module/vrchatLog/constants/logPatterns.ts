@@ -36,3 +36,12 @@ export const FILTER_PATTERNS = [
   LOG_PATTERNS.PLAYER_LEAVE,
   LOG_PATTERNS.APP_EXIT,
 ] as const;
+
+/**
+ * 未知のログパターン検知用の広域フィルタ
+ *
+ * パーサーが処理するパターンより広い範囲を対象にすることで、
+ * VRChat のログ形式が変更・追加された場合に早期検出できる。
+ * パース処理には使わないこと（パフォーマンス劣化を避けるため）。
+ */
+export const DETECTION_BROAD_PATTERNS = ['[Behaviour]'] as const;
