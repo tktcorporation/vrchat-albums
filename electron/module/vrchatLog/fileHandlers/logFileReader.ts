@@ -84,7 +84,6 @@ export const getLogLinesFromLogFile = (props: {
 }): Effect.Effect<string[], VRChatLogFileError> => {
   // ファイルが存在するか確認
   return match(nodeFs.existsSync(props.logFilePath.value))
-<<<<<<< HEAD
     .with(false, () => Effect.succeed<string[]>([]))
     .with(true, () =>
       Effect.tryPromise({

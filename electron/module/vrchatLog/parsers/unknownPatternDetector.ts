@@ -93,15 +93,9 @@ export const detectUnknownPatterns = (
  *   "[Behaviour] Something completely new here" → "[Behaviour] Something"
  */
 export const extractPatternSkeleton = (line: string): string => {
-  // TODO: ここに骨格抽出ロジックを実装してください
-  //
-  // 方針:
-  // - line から [Behaviour] 以降の最初の「動作名」を取り出す
-  // - 動作名は英数字・アンダースコアで構成される単語
-  // - 抽出できない場合は行全体をフォールバックとして返す
-  //
-  // ヒント: /\[Behaviour\]\s+(\w+)/ のような正規表現が使える
-  return line;
+  const match = line.match(/\[Behaviour\]\s+(\w+)/);
+  if (!match) return line;
+  return `[Behaviour] ${match[1]}`;
 };
 
 /**
