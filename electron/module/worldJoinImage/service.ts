@@ -99,18 +99,21 @@ const generateSingleWorldJoinImage = (
     );
 
     // 4. ワールド画像をダウンロード → base64
+    // User-Agent ヘッダーを付与する（convertImageToBase64 と同じ方式）
     const { ofetch } = yield* Effect.promise(() => import('ofetch'));
+    const userAgent = `Electron ${process.versions.electron}; ${process.platform}; ${process.arch}`;
     const imageResponse = yield* Effect.tryPromise({
       try: () =>
         ofetch(worldInfo.imageUrl, {
+          headers: { 'User-Agent': userAgent },
           responseType: 'arrayBuffer',
           timeout: 30_000,
         }) as Promise<ArrayBuffer>,
-      catch: () =>
+      catch: (error) =>
         ({
           type: 'SKIPPABLE_ERROR' as const,
           worldId: join.worldId,
-          message: `Failed to download world image for ${join.worldId}`,
+          message: `Failed to download world image for ${join.worldId}: ${error instanceof Error ? error.message : String(error)}`,
         }) as const,
     });
 
