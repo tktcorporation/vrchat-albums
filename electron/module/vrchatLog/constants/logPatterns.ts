@@ -4,9 +4,6 @@
  */
 
 export const LOG_PATTERNS = {
-  /** [Behaviour] タグ自体。未知パターン検出のフィルタに使用 */
-  BEHAVIOUR_TAG: '[Behaviour]' as const,
-
   // アプリ起動
   APP_START: 'VRC Analytics Initialized' as const,
 
@@ -26,10 +23,12 @@ export const LOG_PATTERNS = {
   APP_EXIT: 'VRCApplication: HandleApplicationQuit' as const,
 } as const;
 
-// フィルタで使用されるパターンのリスト
-// パフォーマンスのため具体的なパターンのみ指定し、パーサーに不要な行を渡さない。
-// [Behaviour] タグの広範囲フィルタは使わないこと。
-// 未知パターン検出は logFileReader.ts で KNOWN_BEHAVIOUR_PATTERNS を使って別経路で行う。
+/**
+ * フィルタで使用されるパターンのリスト
+ *
+ * パフォーマンスのため具体的なパターンのみ指定し、パーサーに不要な行を渡さない。
+ * [Behaviour] タグの広範囲フィルタは使わないこと。
+ */
 export const FILTER_PATTERNS = [
   LOG_PATTERNS.APP_START,
   LOG_PATTERNS.WORLD_JOIN,
@@ -39,19 +38,10 @@ export const FILTER_PATTERNS = [
 ] as const;
 
 /**
- * パーサーが処理する既知の [Behaviour] パターン一覧
+ * 未知のログパターン検知用の広域フィルタ
  *
- * 未知パターン検出で使用: この一覧のどれにもマッチしない [Behaviour] 行は
- * VRChat の仕様変更の可能性があるため Sentry に送信される。
- * 新しいパーサーを追加した場合はここにもパターンを追加すること。
- *
- * 注: 'OnPlayerLeft' は 'OnPlayerLeftRoom' にもマッチする（substring matching）。
- * OnPlayerLeftRoom はパーサーで明示的に除外されるが、既知パターンとして
- * Sentry への未知パターン通知を抑制する（意図的な動作）。
+ * パーサーが処理するパターンより広い範囲を対象にすることで、
+ * VRChat のログ形式が変更・追加された場合に早期検出できる。
+ * パース処理には使わないこと（パフォーマンス劣化を避けるため）。
  */
-export const KNOWN_BEHAVIOUR_PATTERNS = [
-  'Joining wrld_',
-  'Joining or Creating Room:',
-  'OnPlayerJoined',
-  'OnPlayerLeft', // OnPlayerLeftRoom も包含する（意図的）
-] as const;
+export const DETECTION_BROAD_PATTERNS = ['[Behaviour]'] as const;

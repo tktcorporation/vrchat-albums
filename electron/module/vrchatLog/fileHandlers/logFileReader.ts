@@ -5,37 +5,11 @@ import { match, P } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import * as fs from '../../../lib/wrappedFs';
 import type { VRChatLogFilePath } from '../../vrchatLogFileDir/model';
-import {
-  KNOWN_BEHAVIOUR_PATTERNS,
-  LOG_PATTERNS,
-} from '../constants/logPatterns';
 import { VRChatLogFileError } from '../error';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../model';
 import { castToVRChatLogLine } from '../model';
 import type { PartialSuccessResult } from '../types/partialSuccess';
 import { createPartialSuccessResult } from '../types/partialSuccess';
-
-/**
- * [Behaviour] タグを含む行が既知のパターンに該当するかを判定
- *
- * string.includes のみで判定するため正規表現のコストがない。
- * ファイル読み込みの行イベント内で呼ばれるため、軽量であることが重要。
- */
-const isKnownBehaviourPattern = (line: string): boolean =>
-  KNOWN_BEHAVIOUR_PATTERNS.some((pattern) => line.includes(pattern));
-
-/**
- * ログ行から [Behaviour] 以降の部分を抽出する
- *
- * 重複排除に使用: タイムスタンプを除外することで、同一パターンが
- * 異なるタイムスタンプで出現しても1回だけ Sentry に送信される。
- * 例: "2024.01.15 12:00:00 Log - [Behaviour] NewEvent foo"
- *   → "[Behaviour] NewEvent foo"
- */
-const extractBehaviourPattern = (line: string): string => {
-  const idx = line.indexOf(LOG_PATTERNS.BEHAVIOUR_TAG);
-  return idx >= 0 ? line.slice(idx) : line;
-};
 
 /**
  * VRChatログファイルの読み込み機能
@@ -121,29 +95,10 @@ export const getLogLinesFromLogFile = (props: {
           });
 
           const lines: string[] = [];
-          // ファイル単位で同一パターンの重複送信を防ぐ
-          const reportedUnknownPatterns = new Set<string>();
           reader.on('line', (line) => {
             // includesList の配列の中のどれかと一致したら追加
             if (props.includesList.some((include) => line.includes(include))) {
               lines.push(line);
-            }
-            // 未知の [Behaviour] パターン検出（string.includes のみ、正規表現なし）
-            // includesList にマッチしなくても [Behaviour] を含む行は仕様変更の可能性があるため、
-            // 既知パターンに該当しない場合は Sentry に送信する。
-            // タイムスタンプを除外した [Behaviour] 以降の部分で重複判定し、
-            // 同一パターンはファイル内で1回のみ送信する（Sentry flooding 防止）。
-            else if (
-              line.includes(LOG_PATTERNS.BEHAVIOUR_TAG) &&
-              !isKnownBehaviourPattern(line)
-            ) {
-              const pattern = extractBehaviourPattern(line);
-              if (reportedUnknownPatterns.has(pattern)) return;
-              reportedUnknownPatterns.add(pattern);
-              logger.error({
-                message: 'Unrecognized VRChat log pattern detected',
-                details: { logLine: line },
-              });
             }
           });
 
