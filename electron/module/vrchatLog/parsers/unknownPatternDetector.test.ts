@@ -1,9 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VRChatLogLine } from '../model';
 import {
+  _resetReportedSkeletons,
+  detectAndReportUnknownPatterns,
   detectUnknownPatterns,
   extractPatternSkeleton,
 } from './unknownPatternDetector';
+
+vi.mock('../../../lib/logger', () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 /** テスト用ヘルパー: 文字列を VRChatLogLine として扱う */
 const asLogLine = (line: string) => line as VRChatLogLine;
@@ -31,9 +40,11 @@ describe('extractPatternSkeleton', () => {
     );
   });
 
-  it('[Behaviour] が含まれない行はフォールバックとして行全体を返す', () => {
+  it('[Behaviour] が含まれない行は PII を含まないプレースホルダーを返す', () => {
     const line = '2024.01.15 12:34:56 Log - Something else entirely';
-    expect(extractPatternSkeleton(asLogLine(line))).toBe(line);
+    expect(extractPatternSkeleton(asLogLine(line))).toBe(
+      '[Behaviour] <unparsed>',
+    );
   });
 });
 
@@ -86,5 +97,90 @@ describe('detectUnknownPatterns', () => {
     expect(result.uniquePatterns).toHaveLength(2);
     expect(result.uniquePatterns).toContain('[Behaviour] OnGroupInvite');
     expect(result.uniquePatterns).toContain('[Behaviour] OnAvatarChanged');
+  });
+});
+
+describe('detectAndReportUnknownPatterns', () => {
+  beforeEach(() => {
+    _resetReportedSkeletons();
+    vi.clearAllMocks();
+  });
+
+  it('未知パターンがない場合はログを出力しない', async () => {
+    const { logger } = await import('../../../lib/logger');
+    const lines = [
+      '2024.01.15 12:34:56 Log - [Behaviour] OnPlayerJoined Alice (usr_xxx)',
+    ].map(asLogLine);
+
+    detectAndReportUnknownPatterns(lines);
+
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('未知パターンがある場合は warn と error を出力する', async () => {
+    const { logger } = await import('../../../lib/logger');
+    const lines = [
+      '2024.01.15 12:34:56 Log - [Behaviour] OnGroupInvite someGroup',
+    ].map(asLogLine);
+
+    detectAndReportUnknownPatterns(lines);
+
+    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          uniquePatterns: ['[Behaviour] OnGroupInvite'],
+          totalCount: 1,
+        }),
+      }),
+    );
+  });
+
+  it('同一パターンを2回目の呼び出しで再送信しない', async () => {
+    const { logger } = await import('../../../lib/logger');
+    const lines = [
+      '2024.01.15 12:34:56 Log - [Behaviour] OnGroupInvite someGroup',
+    ].map(asLogLine);
+
+    detectAndReportUnknownPatterns(lines);
+    expect(logger.error).toHaveBeenCalledOnce();
+
+    vi.clearAllMocks();
+
+    // 同じパターンで2回目の呼び出し → 送信されない
+    detectAndReportUnknownPatterns(lines);
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('新しいパターンが追加された場合は新規分のみ送信する', async () => {
+    const { logger } = await import('../../../lib/logger');
+
+    // 1回目: OnGroupInvite
+    detectAndReportUnknownPatterns(
+      ['2024.01.15 12:34:56 Log - [Behaviour] OnGroupInvite someGroup'].map(
+        asLogLine,
+      ),
+    );
+    expect(logger.error).toHaveBeenCalledOnce();
+
+    vi.clearAllMocks();
+
+    // 2回目: OnGroupInvite（既知） + OnAvatarChanged（新規）
+    detectAndReportUnknownPatterns(
+      [
+        '2024.01.15 12:35:00 Log - [Behaviour] OnGroupInvite anotherGroup',
+        '2024.01.15 12:35:01 Log - [Behaviour] OnAvatarChanged avatar_xxx',
+      ].map(asLogLine),
+    );
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          uniquePatterns: ['[Behaviour] OnAvatarChanged'],
+        }),
+      }),
+    );
   });
 });

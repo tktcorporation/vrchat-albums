@@ -85,22 +85,35 @@ export const detectUnknownPatterns = (
  *   "2024.01.15 12:34:56 Log - [Behaviour] OnSomethingNew player1 (usr_xxx)"
  *
  * ここから [Behaviour] 以降の「動作名」部分を取り出す。
- * 動作名 = [Behaviour] 直後の、空白で区切られた先頭の単語列（英数字とアンダースコアで構成）。
+ * 動作名 = [Behaviour] 直後の、空白で区切られた先頭トークン。
+ *
+ * PII（プレイヤー名やID等）がフォールバックで Sentry に送信されることを防ぐため、
+ * regex にマッチしない場合は固定のプレースホルダーを返す。
  *
  * 例:
  *   "[Behaviour] OnPlayerJoined Alice" → "[Behaviour] OnPlayerJoined"
  *   "[Behaviour] Joining wrld_xxx:instance" → "[Behaviour] Joining"
  *   "[Behaviour] Something completely new here" → "[Behaviour] Something"
+ *   "unparseable line" → "[Behaviour] <unparsed>"
  */
 export const extractPatternSkeleton = (line: string): string => {
-  const match = line.match(/\[Behaviour\]\s+(\w+)/);
-  if (!match) return line;
-  return `[Behaviour] ${match[1]}`;
+  const matched = line.match(/\[Behaviour\]\s+([^\s]+)/);
+  if (!matched) return '[Behaviour] <unparsed>';
+  return `[Behaviour] ${matched[1]}`;
 };
+
+/**
+ * 同期サイクルをまたいで既に報告済みの骨格パターンを記録する。
+ * 同一プロセス内で同じパターンを繰り返し Sentry に送信することを防ぐ。
+ *
+ * アプリ再起動でリセットされるため、新しいセッションでは再検出される。
+ */
+const reportedSkeletons = new Set<string>();
 
 /**
  * 未知パターンを検出し、結果をロガーに記録する。
  * 未知パターンが見つかった場合のみ Sentry に送信する。
+ * 同一プロセス内で既に報告済みのパターンは再送信しない。
  *
  * @param logLines 検査対象のログ行
  */
@@ -113,20 +126,39 @@ export const detectAndReportUnknownPatterns = (
     return;
   }
 
+  // 未報告のパターンのみ抽出
+  const newPatterns = summary.uniquePatterns.filter(
+    (p) => !reportedSkeletons.has(p),
+  );
+
+  if (newPatterns.length === 0) {
+    return;
+  }
+
+  // 報告済みとして記録
+  for (const p of newPatterns) {
+    reportedSkeletons.add(p);
+  }
+
   logger.warn(
     `Detected ${summary.totalCount} unknown log pattern(s) matching broad filter. ` +
-      `${summary.uniquePatterns.length} unique pattern(s) found. ` +
+      `${newPatterns.length} new unique pattern(s) found. ` +
       'VRChat may have added new log events.',
   );
 
   // Sentry に送信して追跡可能にする
   logger.error({
     message: new Error(
-      `Unknown VRChat log patterns detected: ${summary.uniquePatterns.length} unique pattern(s)`,
+      `Unknown VRChat log patterns detected: ${newPatterns.length} unique pattern(s)`,
     ),
     details: {
-      uniquePatterns: summary.uniquePatterns,
+      uniquePatterns: newPatterns,
       totalCount: summary.totalCount,
     },
   });
+};
+
+/** テスト用: reportedSkeletons をリセットする */
+export const _resetReportedSkeletons = (): void => {
+  reportedSkeletons.clear();
 };
