@@ -11,7 +11,7 @@ import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/pla
 import * as playerLeaveLogService from '../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import type { VRChatLogFileError } from '../vrchatLog/error';
 import type { VRChatLogError } from '../vrchatLog/errors';
-import type { VRChatLogStoreFilePath } from '../vrchatLog/model';
+import type { VRChatLogLine, VRChatLogStoreFilePath } from '../vrchatLog/model';
 import type {
   VRChatPlayerJoinLog,
   VRChatPlayerLeaveLog,
@@ -186,8 +186,21 @@ function _getLogStoreFilePaths(
  */
 export function loadLogInfoIndexFromVRChatLog({
   excludeOldLogLoad = false,
+  preLoadedLogLines,
 }: {
   excludeOldLogLoad?: boolean;
+  /**
+   * appendLoglinesToFileFromLogFilePathList で既に処理済みのログ行
+   *
+   * 背景: syncLogs の処理フローでは、step1（appendLoglines）で VRChat ログファイルを
+   * 読み込んで logStore に書き込み、step2（loadLogInfo）で logStore を再読み込みする。
+   * preLoadedLogLines を渡すことで step2 のファイル再読み込みをスキップし、
+   * メモリ上のデータを直接使用して起動時間を短縮する。
+   *
+   * INCREMENTAL モード + preLoadedLogLines がある場合のみ最適化が適用される。
+   * FULL モードではリカバリのため常にファイルから読み込む。
+   */
+  preLoadedLogLines?: VRChatLogLine[];
 } = {}): Effect.Effect<
   LogProcessingResults,
   VRChatLogFileError | VRChatLogError | LogInfoError | LogInfoServiceError
@@ -196,58 +209,83 @@ export function loadLogInfoIndexFromVRChatLog({
     const totalStartTime = performance.now();
     logger.info('loadLogInfoIndexFromVRChatLog start');
 
-    // 1. 処理対象となるログファイルパスを取得
-    const getLogPathsStartTime = performance.now();
-    const logStoreFilePaths = yield* _getLogStoreFilePaths(excludeOldLogLoad);
-    const getLogPathsEndTime = performance.now();
-    logger.debug(
-      `Get log store file paths took ${
-        getLogPathsEndTime - getLogPathsStartTime
-      } ms`,
-    );
-    logger.info(
-      `loadLogInfoIndexFromVRChatLog excludeOldLogLoad: ${excludeOldLogLoad} target: ${logStoreFilePaths.map(
-        (path) => path.value,
-      )}`,
-    );
+    let logInfoList: ReturnType<
+      typeof vrchatLogService.convertLogLinesToWorldAndPlayerJoinLogInfos
+    >['logInfos'];
 
-    // 3. ログファイルからログ情報を取得（部分的な成功を許容）
-    const getLogInfoStartTime = performance.now();
-    // この関数は never エラーなので常に成功
-    const logInfoListFromLogFile =
-      yield* vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess(
-        logStoreFilePaths,
-      );
-    const getLogInfoEndTime = performance.now();
-    logger.debug(
-      `Get VRChat log info from log files took ${
-        getLogInfoEndTime - getLogInfoStartTime
-      } ms`,
-    );
-
-    // エラーがあった場合は警告を出力し、Sentryにも送信
-    if (logInfoListFromLogFile.errorCount > 0) {
-      const errorSummary = `Failed to process ${logInfoListFromLogFile.errorCount} log files out of ${logInfoListFromLogFile.totalProcessed}`;
-      const errorDetails = logInfoListFromLogFile.errors.map((e) => ({
-        path: e.path,
-        code: '_tag' in e.error ? e.error._tag : e.error.code,
-      }));
-
-      logger.warnWithSentry({
-        message: errorSummary,
-        details: { errorDetails },
-      });
-    }
-
-    // 成功したログが1つもない場合のみエラーを返す
+    // INCREMENTAL モードで処理済みログ行がある場合、ファイル再読み込みをスキップ
     if (
-      logInfoListFromLogFile.successCount === 0 &&
-      logInfoListFromLogFile.errorCount > 0
+      excludeOldLogLoad &&
+      preLoadedLogLines &&
+      preLoadedLogLines.length > 0
     ) {
-      return yield* Effect.fail(logInfoListFromLogFile.errors[0].error);
-    }
+      const parseStartTime = performance.now();
+      logger.info(
+        `Using ${preLoadedLogLines.length} pre-loaded log lines (skipping file read)`,
+      );
+      const parseResult =
+        vrchatLogService.convertLogLinesToWorldAndPlayerJoinLogInfos(
+          preLoadedLogLines,
+        );
+      logInfoList = parseResult.logInfos;
+      const parseEndTime = performance.now();
+      logger.debug(
+        `Parse pre-loaded log lines took ${parseEndTime - parseStartTime} ms`,
+      );
+    } else {
+      // 1. 処理対象となるログファイルパスを取得
+      const getLogPathsStartTime = performance.now();
+      const logStoreFilePaths = yield* _getLogStoreFilePaths(excludeOldLogLoad);
+      const getLogPathsEndTime = performance.now();
+      logger.debug(
+        `Get log store file paths took ${
+          getLogPathsEndTime - getLogPathsStartTime
+        } ms`,
+      );
+      logger.info(
+        `loadLogInfoIndexFromVRChatLog excludeOldLogLoad: ${excludeOldLogLoad} target: ${logStoreFilePaths.map(
+          (path) => path.value,
+        )}`,
+      );
 
-    const logInfoList = logInfoListFromLogFile.data;
+      // 3. ログファイルからログ情報を取得（部分的な成功を許容）
+      const getLogInfoStartTime = performance.now();
+      // この関数は never エラーなので常に成功
+      const logInfoListFromLogFile =
+        yield* vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess(
+          logStoreFilePaths,
+        );
+      const getLogInfoEndTime = performance.now();
+      logger.debug(
+        `Get VRChat log info from log files took ${
+          getLogInfoEndTime - getLogInfoStartTime
+        } ms`,
+      );
+
+      // エラーがあった場合は警告を出力し、Sentryにも送信
+      if (logInfoListFromLogFile.errorCount > 0) {
+        const errorSummary = `Failed to process ${logInfoListFromLogFile.errorCount} log files out of ${logInfoListFromLogFile.totalProcessed}`;
+        const errorDetails = logInfoListFromLogFile.errors.map((e) => ({
+          path: e.path,
+          code: '_tag' in e.error ? e.error._tag : e.error.code,
+        }));
+
+        logger.warnWithSentry({
+          message: errorSummary,
+          details: { errorDetails },
+        });
+      }
+
+      // 成功したログが1つもない場合のみエラーを返す
+      if (
+        logInfoListFromLogFile.successCount === 0 &&
+        logInfoListFromLogFile.errorCount > 0
+      ) {
+        return yield* Effect.fail(logInfoListFromLogFile.errors[0].error);
+      }
+
+      logInfoList = logInfoListFromLogFile.data;
+    }
 
     const filterLogsStartTime = performance.now();
     const newLogs = yield* Effect.promise(() =>

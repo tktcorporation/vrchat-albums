@@ -9,6 +9,7 @@ import type { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playe
 import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
 import { VRChatLogFileError } from '../vrchatLog/error';
 import type { VRChatLogError } from '../vrchatLog/errors';
+import type { AppendLoglinesResult } from '../vrchatLog/vrchatLogController';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import type { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
@@ -64,7 +65,7 @@ export function syncLogs(
 
     // Step 1: VRChatログファイルから新しいログ行を抽出・保存
     emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
-    yield* Effect.tryPromise({
+    const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
       try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
       catch: (error) => {
         logger.error({
@@ -89,9 +90,14 @@ export function syncLogs(
     });
 
     // Step 2: 保存されたログをデータベースに読み込む
+    // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
+    // logStore ファイルの再読み込みをスキップする
     emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
     const loadResult = yield* loadLogInfoIndexFromVRChatLog({
       excludeOldLogLoad: !isFullSync,
+      preLoadedLogLines: !isFullSync
+        ? appendResult.processedLogLines
+        : undefined,
     });
     emitProgress({
       stage: 'log_load',
