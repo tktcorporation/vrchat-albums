@@ -43,12 +43,14 @@ jobs:
             exit 0
           fi
 
-          # changeset ファイルの存在チェック（README.md 以外）
-          CHANGESET_FILES=$(find .changeset -name '*.md' ! -name 'README.md' 2>/dev/null | head -1)
+          # この PR で追加された changeset ファイルがあるかチェック
+          # find ではなく git diff を使うことで、過去の PR の changeset が残っていても
+          # この PR 固有の changeset がなければ正しく fail する
+          PR_CHANGESET_FILES=$(git diff --name-only --diff-filter=A origin/main...HEAD -- '.changeset/*.md' | grep -v 'README.md' | head -1)
 
-          if [ -z "$CHANGESET_FILES" ]; then
-            echo "::error::No changeset found. Run 'pnpm changeset' to create one, or 'pnpm changeset --empty' for changes that don't need a version bump."
+          if [ -z "$PR_CHANGESET_FILES" ]; then
+            echo "::error::No changeset found in this PR. Run 'pnpm changeset' to create one, or 'pnpm changeset --empty' for changes that don't need a version bump."
             exit 1
           fi
 
-          echo "Changeset found"
+          echo "Changeset found: $PR_CHANGESET_FILES"
