@@ -1,0 +1,21 @@
+id: no-hardcoded-gray
+language: TypeScript
+severity: warning
+message: |
+  ハードコードされた gray カラーの使用を避けてください。
+  セマンティックトークン (TEXT_COLOR, SURFACE_COLOR 等) を使用してください。
+note: |
+  マッピング:
+  - text-gray-900 → TEXT_COLOR.primary
+  - text-gray-700 → TEXT_COLOR.secondary
+  - text-gray-500 → TEXT_COLOR.muted
+  - bg-gray-100 → SURFACE_COLOR.muted
+  参照: .claude/rules/ui-ux-design.md
+rule:
+  kind: string_fragment
+  regex: (text|bg|border)-gray-\d+
+files:
+  - src/**/*.tsx
+  - src/**/*.ts
+ignores:
+  - src/v2/constants/**

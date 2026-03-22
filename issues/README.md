@@ -30,16 +30,16 @@ pnpm tsx scripts/lint-{name}.ts
 ```
 参考: `scripts/lint-valueobjects.ts`, `scripts/lint-neverthrow.ts`
 
-### 2. GritQL (`.grit/patterns/*.md`)
-シンプルなパターンマッチング向け
+### 2. ast-grep (`rules/ast-grep/*.yml`)
+シンプルなAST構文パターン検出向け
 ```bash
-grit apply {pattern_name} {target_path} --dry-run
+ast-grep scan
 ```
-参考: `.grit/patterns/neverthrow_catch.md`
+参考: `rules/ast-grep/valueobject-export.yml`
 
 ### 選択基準
 - 型情報が必要 → TypeScript Compiler API
-- 単純な構文パターン検出 → GritQL
+- 単純な構文パターン検出 → ast-grep
 - ESLintは使わない（Biome移行済み）
 
 ## 優先度

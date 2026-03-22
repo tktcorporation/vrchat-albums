@@ -226,7 +226,8 @@ export const settingsRouter = () =>
 
       isInitializing = true;
 
-      // effect-lint-allow-try-catch: finally でリソースクリーンアップ
+      // effect-lint-allow-try-catch: tRPC mutation 内の200行超の処理全体を Effect.gen に変換するのは
+      // 大規模リファクタリングが必要。finally は isInitializing フラグのリセットのみ。
       try {
         logger.info('=== Starting application data initialization ===');
 

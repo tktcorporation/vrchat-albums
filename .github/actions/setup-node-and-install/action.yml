@@ -23,8 +23,3 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       run: |
         pnpm install --frozen-lockfile
-
-    - name: Install Grit CLI
-      shell: bash
-      continue-on-error: true
-      run: curl -fsSL https://docs.grit.io/install | bash

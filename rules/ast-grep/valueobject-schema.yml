@@ -1,0 +1,15 @@
+id: valueobject-schema
+language: TypeScript
+severity: warning
+message: |
+  ValueObject の Zod スキーマ名は PascalCase + "Schema" サフィックスにしてください。
+  例: MyValueObjectSchema
+note: |
+  命名の一貫性を保ち、ValueObject のファクトリであることを明示するため。
+  参照: .claude/rules/valueobject.md
+rule:
+  pattern: export const $SCHEMA = $ZOD.transform(($V) => new $CLASS($V))
+constraints:
+  SCHEMA:
+    not:
+      regex: ^[A-Z][a-zA-Z0-9]*Schema$

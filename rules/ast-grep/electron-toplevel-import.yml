@@ -1,0 +1,21 @@
+id: electron-toplevel-import
+language: TypeScript
+severity: error
+message: |
+  Electron モジュール ($IMPORTS) をトップレベルでインポートしないでください。
+  Playwright テストがクラッシュします。遅延評価パターン (require/dynamic import) を使用してください。
+note: |
+  参照: .claude/rules/electron-import.md
+  許可ファイル: index.ts, preload.ts
+rule:
+  pattern: import { $$$IMPORTS } from 'electron'
+  not:
+    inside:
+      kind: function_declaration
+      stopBy: end
+files:
+  - electron/module/**/*.ts
+ignores:
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+  - "**/__tests__/**"

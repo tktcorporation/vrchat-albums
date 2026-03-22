@@ -76,7 +76,9 @@ describe('getPlayerJoinListInSameWorld', () => {
       playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime,
     ).mockReturnValue(Effect.succeed(mockPlayerJoinLogList));
 
-    const result = await getPlayerJoinListInSameWorld(mockDateTime);
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(mockDateTime),
+    );
 
     expect(result).not.toBeNull();
     expect(result).toEqual(mockPlayerJoinLogList);
@@ -94,7 +96,9 @@ describe('getPlayerJoinListInSameWorld', () => {
 
     vi.mocked(worldJoinLogService.mergeVRChatWorldJoinLogs).mockReturnValue([]);
 
-    const result = await getPlayerJoinListInSameWorld(mockDateTime);
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(mockDateTime),
+    );
 
     expect(result).toBeNull();
   });
@@ -128,7 +132,9 @@ describe('getPlayerJoinListInSameWorld', () => {
 
     // Effect.runPromise inside the controller will throw on failure
     // The controller catches this and returns null
-    const result = await getPlayerJoinListInSameWorld(mockDateTime);
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(mockDateTime),
+    );
 
     expect(result).toBeNull();
   });
@@ -153,7 +159,9 @@ describe('getPlayerJoinListInSameWorld', () => {
       playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime,
     ).mockReturnValue(Effect.succeed([]));
 
-    const result = await getPlayerJoinListInSameWorld(mockDateTime);
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(mockDateTime),
+    );
 
     // Empty player join log list returns null (controller returns null when no players found)
     expect(result).toBeNull();
@@ -190,7 +198,9 @@ describe('getPlayerJoinListInSameWorld', () => {
       playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime,
     ).mockReturnValue(Effect.succeed(mockPlayerJoinLogList));
 
-    const result = await getPlayerJoinListInSameWorld(mockDateTime);
+    const result = await Effect.runPromise(
+      getPlayerJoinListInSameWorld(mockDateTime),
+    );
 
     expect(result).toEqual(mockPlayerJoinLogList);
 
@@ -271,7 +281,9 @@ describe('getPlayerJoinListInSameWorld', () => {
         playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime,
       ).mockReturnValue(Effect.succeed(mockPlayersInSession));
 
-      const result = await getPlayerJoinListInSameWorld(mockDateTime);
+      const result = await Effect.runPromise(
+        getPlayerJoinListInSameWorld(mockDateTime),
+      );
 
       expect(result).not.toBeNull();
       expect(result).toEqual(mockPlayersInSession);
@@ -334,7 +346,9 @@ describe('getPlayerJoinListInSameWorld', () => {
         playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime,
       ).mockReturnValue(Effect.succeed(mockPlayersInSession));
 
-      const result = await getPlayerJoinListInSameWorld(mockDateTime);
+      const result = await Effect.runPromise(
+        getPlayerJoinListInSameWorld(mockDateTime),
+      );
 
       expect(result).toHaveLength(1);
       expect(result?.[0].playerName).toBe('Session Player');
@@ -379,7 +393,9 @@ describe('getPlayerJoinListInSameWorld', () => {
         playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime,
       ).mockReturnValue(Effect.succeed(mockPlayersInCurrentSession));
 
-      const result = await getPlayerJoinListInSameWorld(mockDateTime);
+      const result = await Effect.runPromise(
+        getPlayerJoinListInSameWorld(mockDateTime),
+      );
 
       expect(result).toEqual(mockPlayersInCurrentSession);
 
@@ -433,7 +449,9 @@ describe('getPlayerJoinListInSameWorld', () => {
         playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime,
       ).mockReturnValue(Effect.succeed(mockPlayerJoinLogs));
 
-      const result = await getPlayerJoinListInSameWorld(mockDateTime);
+      const result = await Effect.runPromise(
+        getPlayerJoinListInSameWorld(mockDateTime),
+      );
 
       expect(result).toEqual(mockPlayerJoinLogs);
 

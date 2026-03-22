@@ -1,0 +1,19 @@
+id: log-sync-direct-call
+language: TypeScript
+severity: error
+message: |
+  appendLoglinesToFileFromLogFilePathList() を直接呼び出さないでください。
+  syncLogs() サービスを使用してください。
+note: |
+  ログ同期は appendLoglines → loadLogInfo → cache invalidation の
+  順序を厳守する必要があります。直接呼び出しはデータ整合性を壊します。
+  参照: .claude/rules/log-sync.md
+rule:
+  pattern: appendLoglinesToFileFromLogFilePathList($$$ARGS)
+files:
+  - electron/module/**/*.ts
+ignores:
+  - electron/module/logSync/**
+  - "**/*Controller.ts"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
