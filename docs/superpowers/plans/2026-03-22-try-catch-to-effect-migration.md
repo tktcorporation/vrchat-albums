@@ -156,14 +156,14 @@ const recentWorldJoin = yield* findRecentMergedWorldJoinLog(datetime);
 
 tRPC procedure から直接呼ばれている場合は `runEffect` でラップ。
 
-- [ ] Step 1: `getVRCWorldJoinLogList` を Effect を返す関数に変換
-- [ ] Step 2: `findRecentMergedWorldJoinLog` を Effect を返す関数に変換
-- [ ] Step 3: `findNextMergedWorldJoinLog` を Effect を返す関数に変換
-- [ ] Step 4: `getPlayerJoinListInSameWorldCore` を Effect を返す関数に変換（呼び出す2関数も Effect 化済みなので yield* で合成）
-- [ ] Step 5: 呼び出し側（tRPC procedure, 他のヘルパー）を更新
-- [ ] Step 6: テスト実行 `pnpm test -- electron/module/logInfo/`
-- [ ] Step 7: lint 実行 `pnpm lint:effect`
-- [ ] Step 8: コミット
+- [x] Step 1: `getVRCWorldJoinLogList` を Effect を返す関数に変換 (PR #734 で完了)
+- [x] Step 2: `findRecentMergedWorldJoinLog` を Effect を返す関数に変換 (PR #734 で完了)
+- [x] Step 3: `findNextMergedWorldJoinLog` を Effect を返す関数に変換 (PR #734 で完了)
+- [x] Step 4: `getPlayerJoinListInSameWorldCore` を Effect を返す関数に変換 (PR #734 で完了)
+- [x] Step 5: 呼び出し側（tRPC procedure, 他のヘルパー）を更新 (PR #734 で完了)
+- [x] Step 6: テスト実行 `pnpm test -- electron/module/logInfo/`
+- [x] Step 7: lint 実行 `pnpm lint:effect`
+- [x] Step 8: コミット
 
 ---
 
@@ -199,12 +199,12 @@ ts-pattern でエラー分類して再スロー → `Effect.tryPromise` の `cat
 
 ループ内で個別エラーをスキップ → `Effect.either` パターン。
 
-- [ ] Step 1: line 88 のファイル存在チェックを変換
-- [ ] Step 2: line 120 のエラー分類を変換
-- [ ] Step 3: line 144 のダウンロードエラーを変換
-- [ ] Step 4: allow コメントを削除
-- [ ] Step 5: テスト・lint 実行
-- [ ] Step 6: コミット
+- [x] Step 1: line 88 のファイル存在チェックを変換 (PR #736 で完了)
+- [x] Step 2: line 120 のエラー分類を変換 (PR #736 で完了)
+- [x] Step 3: line 144 のダウンロードエラーを変換 (PR #736 で完了)
+- [x] Step 4: allow コメントを削除 (PR #736 で完了)
+- [x] Step 5: テスト・lint 実行
+- [x] Step 6: コミット
 
 ---
 
@@ -223,12 +223,12 @@ getSettingStore() の初期化エラー → `Effect.try` に変換。
 ### migration/service.ts:183
 エラーログ＋正常終了 → `Effect.catchAll` に変換。
 
-- [ ] Step 1: logSync/service.ts の try-catch を変換
-- [ ] Step 2: migration/service.ts:150 を変換
-- [ ] Step 3: migration/service.ts:183 を変換
-- [ ] Step 4: allow コメントを削除
-- [ ] Step 5: テスト・lint 実行
-- [ ] Step 6: コミット
+- [x] Step 1: logSync/service.ts の try-catch → Group B (許容: getSettingStore 初期化前エラー)
+- [x] Step 2: migration/service.ts:150 → Group B (許容: Electron 環境検出パターン)
+- [x] Step 3: migration/service.ts:183 → Group B (許容: Electron 環境検出パターン)
+- [x] Step 4: 許容コメント維持（Group B のため変換不要）
+- [x] Step 5: テスト・lint 実行
+- [x] Step 6: コミット
 
 ---
 
@@ -239,10 +239,26 @@ getSettingStore() の初期化エラー → `Effect.try` に変換。
 **Files:**
 - Modify: `scripts/lint-effect.ts`
 
-- [ ] Step 1: 残存 warning が 0 であることを確認
-- [ ] Step 2: severity を 'warning' → 'error' に変更（許容コメントなしの try-catch を CI で落とす）
-- [ ] Step 3: lint 実行で 0 errors を確認
-- [ ] Step 4: コミット
+- [x] Step 1: 残存 warning が 0 であることを確認
+- [x] Step 2: severity を 'warning' → 'error' に変更（許容コメントなしの try-catch を CI で落とす）
+- [x] Step 3: lint 実行で 0 errors を確認
+- [x] Step 4: コミット
+
+---
+
+## Task 5: logInfoCointroller.ts — getSessionInfoBatch の Effect 化
+
+**Files:**
+- Modify: `electron/module/logInfo/logInfoCointroller.ts`
+
+tRPC procedure 内の try-catch ブロック全体を `getSessionInfoBatchEffect` 関数に抽出し、
+Effect.gen で実装。tRPC 境界では `runEffect` + `Effect.mapError` で UserFacingError に変換。
+
+- [x] Step 1: `getSessionInfoBatchEffect` 関数を Effect.gen で実装
+- [x] Step 2: tRPC procedure を `runEffect` で簡素化
+- [x] Step 3: `Effect.either` でプレイヤー取得の部分的成功パターンを実装
+- [x] Step 4: allow コメントを削除
+- [x] Step 5: 型チェック・lint 実行
 
 ---
 
