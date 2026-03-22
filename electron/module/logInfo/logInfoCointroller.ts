@@ -486,7 +486,7 @@ type SessionInfoResult = Record<
  */
 const getSessionInfoBatchEffect = (
   inputDates: Date[],
-): Effect.Effect<SessionInfoResult, { message: string }> =>
+): Effect.Effect<SessionInfoResult, never> =>
   Effect.gen(function* () {
     const results: SessionInfoResult = {};
 
@@ -814,18 +814,7 @@ export const logInfoRouter = () =>
         }),
       )
       .query(async (ctx) => {
-        return await runEffect(
-          getSessionInfoBatchEffect(ctx.input).pipe(
-            Effect.mapError((error) =>
-              UserFacingError.withStructuredInfo({
-                code: ERROR_CODES.DATABASE_ERROR,
-                category: ERROR_CATEGORIES.DATABASE_ERROR,
-                message: `[SessionInfoBatch] バッチ処理でエラーが発生しました: ${error.message} (requested sessions: ${ctx.input.length})`,
-                userMessage: 'セッション情報の取得中にエラーが発生しました。',
-                cause: new Error(error.message),
-              }),
-            ),
-          ),
-        );
+        // getSessionInfoBatchEffect は Effect<T, never> なので Effect.runPromise で実行
+        return await Effect.runPromise(getSessionInfoBatchEffect(ctx.input));
       }),
   });
