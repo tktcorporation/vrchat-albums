@@ -29,6 +29,7 @@ import {
 // ファイルハンドラー機能のインポート
 import {
   appendLoglinesToFile,
+  createDedupCache,
   getLegacyLogStoreFilePath,
   getLogLinesByLogFilePathList,
   getLogLinesByLogFilePathListStreaming,
@@ -165,14 +166,16 @@ export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
 
 // ファイルハンドラー機能の再エクスポート
 export {
+  appendLoglinesToFile,
+  createDedupCache,
   getLogLinesByLogFilePathList,
   getLogLinesByLogFilePathListStreaming,
   getLogStoreFilePathForDate,
   getLegacyLogStoreFilePath,
   getLogStoreFilePathsInRange,
-  appendLoglinesToFile,
   importLogLinesFromLogPhotoDirPath,
 };
+export type { DedupCache } from './fileHandlers';
 
 // 型定義の再エクスポート
 export type {
@@ -186,4 +189,8 @@ export type {
 };
 
 // パーサー機能の再エクスポート
-export { extractPlayerJoinInfoFromLog, filterLogLinesByDate };
+export {
+  convertLogLinesToWorldAndPlayerJoinLogInfos,
+  extractPlayerJoinInfoFromLog,
+  filterLogLinesByDate,
+};

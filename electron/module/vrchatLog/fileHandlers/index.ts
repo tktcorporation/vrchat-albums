@@ -9,10 +9,11 @@ export {
   getLogLinesByLogFilePathListWithPartialSuccess,
   getLogLinesFromLogFile,
 } from './logFileReader';
-
+export type { DedupCache } from './logStorageManager';
 // ログストレージ管理
 export {
   appendLoglinesToFile,
+  createDedupCache,
   getLegacyLogStoreFilePath,
   getLogStoreDir,
   getLogStoreFilePathForDate,

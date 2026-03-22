@@ -11,7 +11,7 @@ import {
 } from '../constants/logPatterns';
 import { VRChatLogFileError } from '../error';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../model';
-import { VRChatLogLineSchema } from '../model';
+import { castToVRChatLogLine } from '../model';
 import type { PartialSuccessResult } from '../types/partialSuccess';
 import { createPartialSuccessResult } from '../types/partialSuccess';
 
@@ -213,19 +213,9 @@ export const getLogLinesByLogFilePathList = (props: {
               }
               return [];
             }
-            // 各行をパースし、失敗した行はスキップ
-            const validLines: VRChatLogLine[] = [];
-            for (const line of exit.value) {
-              const parseResult = VRChatLogLineSchema.safeParse(line);
-              if (parseResult.success) {
-                validLines.push(parseResult.data);
-              } else {
-                logger.warn(
-                  `Failed to parse log line in ${logFilePath.value}: ${parseResult.error.message}`,
-                );
-              }
-            }
-            return validLines;
+            // readline から取得した文字列を VRChatLogLine にキャスト
+            // （VRChatLogLineSchema は z.string().brand() であり、string なら必ず通る）
+            return exit.value.map(castToVRChatLogLine);
           }),
         );
 
@@ -308,20 +298,9 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
           return [];
         }
 
-        // 各行をパースし、失敗した行はスキップ
-        const validLines: VRChatLogLine[] = [];
-        for (const line of exit.value) {
-          const parseResult = VRChatLogLineSchema.safeParse(line);
-          if (parseResult.success) {
-            validLines.push(parseResult.data);
-          } else {
-            // パースエラーは警告として記録し、処理を継続
-            logger.warn(
-              `Failed to parse log line in ${logFilePath.value}: ${parseResult.error.message}`,
-            );
-          }
-        }
-        return validLines;
+        // readline から取得した文字列を VRChatLogLine にキャスト
+        // （VRChatLogLineSchema は z.string().brand() であり、string なら必ず通る）
+        return exit.value.map(castToVRChatLogLine);
       }),
     );
 
@@ -418,19 +397,9 @@ export async function* getLogLinesByLogFilePathListStreaming(props: {
           }
           throw new Error('Unknown effect failure');
         }
-        // 各行をパースし、失敗した行はスキップ
-        const validLines: VRChatLogLine[] = [];
-        for (const line of exit.value) {
-          const parseResult = VRChatLogLineSchema.safeParse(line);
-          if (parseResult.success) {
-            validLines.push(parseResult.data);
-          } else {
-            logger.warn(
-              `Failed to parse log line in ${logFilePath.value}: ${parseResult.error.message}`,
-            );
-          }
-        }
-        return validLines;
+        // readline から取得した文字列を VRChatLogLine にキャスト
+        // （VRChatLogLineSchema は z.string().brand() であり、string なら必ず通る）
+        return exit.value.map(castToVRChatLogLine);
       }),
     );
 

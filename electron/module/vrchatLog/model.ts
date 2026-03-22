@@ -5,6 +5,7 @@ import { BaseValueObject } from '../../lib/baseValueObject.js';
 
 // Re-export Branded Types from shared module
 export {
+  castToVRChatLogLine,
   OptionalVRChatPlayerIdSchema,
   type VRChatLogLine,
   VRChatLogLineSchema,
