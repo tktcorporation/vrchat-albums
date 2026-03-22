@@ -1,6 +1,6 @@
 import * as nodeFsPromises from 'node:fs/promises';
 import * as path from 'node:path';
-import { ok, type Result, ResultAsync } from 'neverthrow';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { logger } from '../../lib/logger';
 
 export interface MigrationResult {
@@ -33,9 +33,9 @@ export const clearMigrationCache = (): void => {
  * エラーが発生した場合はfalseを返して正常に動作を継続（エラーはログに記録）
  * Result型で返すが、エラーは常にログ記録後にfalseとして成功扱い
  */
-export const isMigrationNeeded = (): ResultAsync<boolean, never> => {
-  return ResultAsync.fromSafePromise(
-    (async (): Promise<boolean> => {
+export const isMigrationNeeded = (): Effect.Effect<boolean, never> => {
+  return Effect.tryPromise({
+    try: async (): Promise<boolean> => {
       // キャッシュチェック
       if (migrationCheckCache !== null) {
         const cacheAge = Date.now() - migrationCheckCache.timestamp;
@@ -44,10 +44,13 @@ export const isMigrationNeeded = (): ResultAsync<boolean, never> => {
         }
       }
 
+      // effect-lint-allow-try-catch: Electron 環境検出パターン
       try {
         const { app } = await import('electron');
-        const oldAppPathResult = await getOldAppUserDataPath();
-        const oldAppPath = oldAppPathResult._unsafeUnwrap();
+        const oldAppPathResult = await Effect.runPromise(
+          getOldAppUserDataPath(),
+        );
+        const oldAppPath = oldAppPathResult;
         const currentAppPath = app.getPath('userData');
 
         logger.debug('[Migration] Checking migration status:', {
@@ -114,8 +117,12 @@ export const isMigrationNeeded = (): ResultAsync<boolean, never> => {
         };
         return result;
       }
-    })(),
-  );
+    },
+    catch: () => {
+      // This should never happen since the inner try-catch handles all errors
+      return undefined as never;
+    },
+  });
 };
 
 /**
@@ -123,32 +130,13 @@ export const isMigrationNeeded = (): ResultAsync<boolean, never> => {
  * 同期的なファイルアクセスを避けて、パスのみ返す
  * エラー時はデフォルトパスを返す（エラーはログに記録）
  */
-const getOldAppUserDataPath = (): ResultAsync<string, never> => {
-  return ResultAsync.fromSafePromise(
-    (async (): Promise<string> => {
+const getOldAppUserDataPath = (): Effect.Effect<string, never> => {
+  return Effect.tryPromise({
+    try: async (): Promise<string> => {
+      // effect-lint-allow-try-catch: Electron 環境検出パターン（動的 import('electron') の失敗をキャッチ）
       try {
         const { app } = await import('electron');
-        const currentUserDataPath = app.getPath('userData');
-        const parentDir = path.dirname(currentUserDataPath);
-
-        // Check for different variations of the old app name
-        const possibleOldAppNames = [
-          'vrchat-photo-journey',
-          'VRChatPhotoJourney',
-        ];
-
-        for (const appName of possibleOldAppNames) {
-          const possiblePath = path.join(parentDir, appName);
-          try {
-            await nodeFsPromises.access(possiblePath);
-            return possiblePath;
-          } catch {
-            // Continue to next possible name
-          }
-        }
-
-        // Return default if none exist
-        return path.join(parentDir, 'vrchat-photo-journey');
+        return app.getPath('userData');
       } catch (error) {
         logger.error({
           message: 'Failed to get old app path',
@@ -156,7 +144,36 @@ const getOldAppUserDataPath = (): ResultAsync<string, never> => {
         });
         return '';
       }
-    })(),
+    },
+    catch: () => undefined as never,
+  }).pipe(
+    Effect.flatMap((currentUserDataPath) => {
+      if (currentUserDataPath === '') {
+        return Effect.succeed('');
+      }
+      const parentDir = path.dirname(currentUserDataPath);
+      const possibleOldAppNames = [
+        'vrchat-photo-journey',
+        'VRChatPhotoJourney',
+      ];
+      return Effect.tryPromise({
+        try: async () => {
+          for (const appName of possibleOldAppNames) {
+            const possiblePath = path.join(parentDir, appName);
+            const accessible = await nodeFsPromises
+              .access(possiblePath)
+              .then(() => true)
+              .catch(() => false);
+            if (accessible) {
+              return possiblePath;
+            }
+          }
+          // Return default if none exist
+          return path.join(parentDir, 'vrchat-photo-journey');
+        },
+        catch: () => undefined as never,
+      });
+    }),
   );
 };
 
@@ -164,36 +181,30 @@ const getOldAppUserDataPath = (): ResultAsync<string, never> => {
  * Perform the migration from old app to new app
  * エラー時もログ記録後に正常終了（起動を妨げない）
  */
-export const performMigrationIfNeeded = (): ResultAsync<void, never> => {
-  return ResultAsync.fromSafePromise(
-    (async (): Promise<void> => {
-      try {
-        const needsMigrationResult = await isMigrationNeeded();
-        const needsMigration = needsMigrationResult._unsafeUnwrap();
-
-        if (!needsMigration) {
-          logger.info('Migration not needed');
-          return;
-        }
-
-        logger.info('Migration needed, starting migration process...');
-        const result = await performMigration();
-
-        if (result.isErr()) {
-          logger.error({
-            message: 'Migration failed',
-            stack: result.error,
-          });
-        } else {
-          logger.info('Migration completed successfully');
-        }
-      } catch (error) {
-        logger.error({
-          message: 'Error during migration check',
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
+export const performMigrationIfNeeded = (): Effect.Effect<void, never> => {
+  return isMigrationNeeded().pipe(
+    Effect.flatMap((needsMigration) => {
+      if (!needsMigration) {
+        logger.info('Migration not needed');
+        return Effect.void;
       }
-    })(),
+      logger.info('Migration needed, starting migration process...');
+      return performMigration().pipe(
+        Effect.tap((result) =>
+          Effect.sync(() =>
+            logger.info('Migration completed successfully', result),
+          ),
+        ),
+        Effect.asVoid,
+      );
+    }),
+    Effect.catchAllDefect((defect) => {
+      logger.error({
+        message: 'Error during migration check',
+        stack: defect instanceof Error ? defect : new Error(String(defect)),
+      });
+      return Effect.void;
+    }),
   );
 };
 
@@ -201,101 +212,115 @@ export const performMigrationIfNeeded = (): ResultAsync<void, never> => {
  * Perform the migration from old app to new app
  * Note: All errors are captured in result.errors array, function never throws
  */
-export const performMigration = async (): Promise<
-  Result<MigrationResult, never>
-> => {
-  const { app } = await import('electron');
-  const oldAppPathResult = await getOldAppUserDataPath();
-  const oldAppPath = oldAppPathResult._unsafeUnwrap();
-  const currentAppPath = app.getPath('userData');
+export const performMigration = (): Effect.Effect<MigrationResult, never> => {
+  return Effect.tryPromise({
+    try: async () => {
+      const { app } = await import('electron');
+      const oldAppPath = await Effect.runPromise(getOldAppUserDataPath());
+      const currentAppPath = app.getPath('userData');
 
-  logger.info('Starting migration process...');
-  logger.info(`Old app path: ${oldAppPath}`);
-  logger.info(`Current app path: ${currentAppPath}`);
+      logger.info('Starting migration process...');
+      logger.info(`Old app path: ${oldAppPath}`);
+      logger.info(`Current app path: ${currentAppPath}`);
 
-  const result: MigrationResult = {
-    migrated: false,
-    details: {
-      database: false,
-      logStore: false,
-      settings: false,
-    },
-    errors: [],
-  };
+      const result: MigrationResult = {
+        migrated: false,
+        details: {
+          database: false,
+          logStore: false,
+          settings: false,
+        },
+        errors: [],
+      };
 
-  // 1. Migrate settings (config.json)
-  const oldConfigPath = path.join(oldAppPath, 'config.json');
-  const newConfigPath = path.join(currentAppPath, 'config.json');
+      // 1. Migrate settings (config.json)
+      const oldConfigPath = path.join(oldAppPath, 'config.json');
+      const newConfigPath = path.join(currentAppPath, 'config.json');
 
-  await nodeFsPromises.copyFile(oldConfigPath, newConfigPath).then(
-    () => {
-      result.details.settings = true;
-      logger.info('Settings migrated successfully');
-    },
-    (error) => {
-      logger.warn('Settings migration skipped:', error);
-    },
-  );
-
-  // 2. Migrate logStore using importService
-  const oldLogStorePath = path.join(oldAppPath, 'logStore');
-
-  // Check if logStore directory exists, then migrate
-  await nodeFsPromises.access(oldLogStorePath).then(
-    async () => {
-      const { importService, getImportErrorMessage } = await import(
-        '../vrchatLog/importService/importService'
-      );
-      const importResult = await importService.importLogStoreFiles(
-        [oldLogStorePath],
-        async () => {
-          // DBLogProvider is not needed for migration
-          return [];
+      await nodeFsPromises.copyFile(oldConfigPath, newConfigPath).then(
+        () => {
+          result.details.settings = true;
+          logger.info('Settings migrated successfully');
+        },
+        (error) => {
+          logger.warn('Settings migration skipped:', error);
         },
       );
 
-      if (importResult.isOk()) {
-        result.details.logStore = true;
-        logger.info('LogStore migrated successfully');
-      } else {
-        result.errors.push(
-          `LogStore import failed: ${getImportErrorMessage(importResult.error)}`,
+      // 2. Migrate logStore using importService
+      const oldLogStorePath = path.join(oldAppPath, 'logStore');
+
+      // Check if logStore directory exists, then migrate
+      await nodeFsPromises.access(oldLogStorePath).then(
+        async () => {
+          const { importService } = await import(
+            '../vrchatLog/importService/importService'
+          );
+          const importExit = await Effect.runPromiseExit(
+            importService.importLogStoreFiles([oldLogStorePath], async () => {
+              // DBLogProvider is not needed for migration
+              return [];
+            }),
+          );
+          if (Exit.isSuccess(importExit)) {
+            result.details.logStore = true;
+            logger.info('LogStore migrated successfully');
+          } else {
+            const failOpt = Cause.failureOption(importExit.cause);
+            if (Option.isSome(failOpt)) {
+              const importError = failOpt.value;
+              result.errors.push(`LogStore import failed: ${importError._tag}`);
+            } else {
+              // Unexpected error (defect)
+              const dieOpt = Cause.dieOption(importExit.cause);
+              const errorMsg = Option.isSome(dieOpt)
+                ? dieOpt.value instanceof Error
+                  ? dieOpt.value.message
+                  : String(dieOpt.value)
+                : 'Unknown error';
+              result.errors.push(`LogStore import failed: ${errorMsg}`);
+            }
+          }
+        },
+        (error) => {
+          logger.warn('LogStore migration skipped:', error);
+        },
+      );
+
+      // 3. Create migration marker if any migration was successful
+      if (
+        result.details.settings ||
+        result.details.logStore ||
+        result.details.database
+      ) {
+        const markerPath = path.join(currentAppPath, '.migration-completed');
+        const markerContent = JSON.stringify(
+          {
+            timestamp: new Date().toISOString(),
+            fromApp: 'vrchat-photo-journey',
+            toApp: 'VRChatAlbums',
+            result: result,
+          },
+          null,
+          2,
+        );
+
+        await nodeFsPromises.writeFile(markerPath, markerContent, 'utf-8').then(
+          () => {
+            result.migrated = true;
+          },
+          (error) => {
+            result.errors.push(`Failed to create migration marker: ${error}`);
+          },
         );
       }
+
+      logger.info('Migration completed:', result);
+      return result;
     },
-    (error) => {
-      logger.warn('LogStore migration skipped:', error);
+    catch: () => {
+      // This should never happen since the inner try-catch handles all errors
+      return undefined as never;
     },
-  );
-
-  // 3. Create migration marker if any migration was successful
-  if (
-    result.details.settings ||
-    result.details.logStore ||
-    result.details.database
-  ) {
-    const markerPath = path.join(currentAppPath, '.migration-completed');
-    const markerContent = JSON.stringify(
-      {
-        timestamp: new Date().toISOString(),
-        fromApp: 'vrchat-photo-journey',
-        toApp: 'VRChatAlbums',
-        result: result,
-      },
-      null,
-      2,
-    );
-
-    await nodeFsPromises.writeFile(markerPath, markerContent, 'utf-8').then(
-      () => {
-        result.migrated = true;
-      },
-      (error) => {
-        result.errors.push(`Failed to create migration marker: ${error}`);
-      },
-    );
-  }
-
-  logger.info('Migration completed:', result);
-  return ok(result);
+  });
 };

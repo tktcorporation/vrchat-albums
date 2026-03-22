@@ -56,6 +56,7 @@ const DataImport = memo(() => {
 
   // ファイル選択
   const selectFiles = async () => {
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       const filePaths = await trpcClient.electronUtil.openGetFileDialog.query([
         'openFile',
@@ -81,6 +82,7 @@ const DataImport = memo(() => {
 
   // ディレクトリ選択
   const selectDirectory = async () => {
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       const dirPath = await trpcClient.electronUtil.openGetDirDialog.query();
 

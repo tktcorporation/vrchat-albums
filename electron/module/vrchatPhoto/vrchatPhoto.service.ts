@@ -5,9 +5,8 @@ import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
 import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { xxhash128 } from 'hash-wasm';
-import * as neverthrow from 'neverthrow';
-import { ResultAsync } from 'neverthrow';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
 import {
@@ -79,6 +78,7 @@ const getElectronApp = (): typeof import('electron').app | null => {
     return null;
   }
 
+  // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { app } = require('electron') as typeof import('electron');
@@ -108,6 +108,7 @@ const getElectronApp = (): typeof import('electron').app | null => {
 const getThumbnailCacheDir = (): string => {
   const app = getElectronApp();
   if (app) {
+    // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
     try {
       return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
     } catch (error) {
@@ -144,19 +145,15 @@ interface CacheDirError {
 /**
  * キャッシュディレクトリを初期化
  *
- * @returns ResultAsync<cacheDir, CacheDirError> - 成功時はディレクトリパス、失敗時はエラー
+ * @returns Effect<cacheDir, CacheDirError> - 成功時はディレクトリパス、失敗時はエラー
  */
-const ensureCacheDir = (): neverthrow.ResultAsync<string, CacheDirError> => {
+const ensureCacheDir = (): Effect.Effect<string, CacheDirError> => {
   const cacheDir = getThumbnailCacheDir();
-  return neverthrow.ResultAsync.fromPromise(
-    fsPromises.mkdir(cacheDir, { recursive: true }),
-    (error) => {
-      // ディレクトリが既に存在する場合は成功扱い（後でmapで処理）
-      // それ以外はエラー
+  return Effect.tryPromise({
+    try: () => fsPromises.mkdir(cacheDir, { recursive: true }),
+    catch: (error): CacheDirError => {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'EEXIST') {
-        // この分岐はResultAsync.fromPromiseでは直接okを返せないので、
-        // エラーとして返し後でフィルタリング
         return {
           type: 'CACHE_DIR_CREATION_FAILED' as const,
           message: 'EEXIST',
@@ -173,15 +170,13 @@ const ensureCacheDir = (): neverthrow.ResultAsync<string, CacheDirError> => {
         code: nodeError.code,
       };
     },
-  )
-    .map(() => cacheDir)
-    .orElse((error) => {
-      // EEXIST の場合は成功として扱う
-      if (error.code === 'EEXIST') {
-        return neverthrow.ok(cacheDir);
-      }
-      return neverthrow.err(error);
-    });
+  }).pipe(
+    Effect.map(() => cacheDir),
+    Effect.catchIf(
+      (error) => error.code === 'EEXIST',
+      () => Effect.succeed(cacheDir),
+    ),
+  );
 };
 
 /**
@@ -205,17 +200,18 @@ type CacheStatError =
   | { type: 'IO_ERROR'; error: Error };
 
 /**
- * キャッシュファイルのstatを取得（ResultAsync版）
+ * キャッシュファイルのstatを取得（Effect版）
  */
 const statCacheFile = (
   cachePath: string,
-): neverthrow.ResultAsync<
+): Effect.Effect<
   { stats: Awaited<ReturnType<typeof fsPromises.stat>>; cachePath: string },
   CacheStatError
 > =>
-  neverthrow.ResultAsync.fromPromise(
-    fsPromises.stat(cachePath).then((stats) => ({ stats, cachePath })),
-    (error): CacheStatError => {
+  Effect.tryPromise({
+    try: () =>
+      fsPromises.stat(cachePath).then((stats) => ({ stats, cachePath })),
+    catch: (error): CacheStatError => {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
         return { type: 'NOT_FOUND' };
@@ -227,17 +223,17 @@ const statCacheFile = (
       });
       return { type: 'IO_ERROR', error: err };
     },
-  );
+  });
 
 /**
- * キャッシュファイルを読み込み（ResultAsync版）
+ * キャッシュファイルを読み込み（Effect版）
  */
 const readCacheFile = (
   cachePath: string,
-): neverthrow.ResultAsync<Buffer, CacheStatError> =>
-  neverthrow.ResultAsync.fromPromise(
-    fsPromises.readFile(cachePath),
-    (error): CacheStatError => {
+): Effect.Effect<Buffer, CacheStatError> =>
+  Effect.tryPromise({
+    try: () => fsPromises.readFile(cachePath),
+    catch: (error): CacheStatError => {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'ENOENT') {
         return { type: 'NOT_FOUND' };
@@ -249,7 +245,7 @@ const readCacheFile = (
       });
       return { type: 'IO_ERROR', error: err };
     },
-  );
+  });
 
 /**
  * キャッシュからサムネイルを取得
@@ -266,22 +262,26 @@ const readCacheFile = (
 const getCachedThumbnail = async (
   cacheKey: string,
 ): Promise<CacheReadResult> => {
-  const cacheDirResult = await ensureCacheDir();
-  if (cacheDirResult.isErr()) {
+  const cacheDirEither = await Effect.runPromise(
+    Effect.either(ensureCacheDir()),
+  );
+  if (cacheDirEither._tag === 'Left') {
     // キャッシュディレクトリが利用不可の場合
     logger.debug({
       message: 'Cache directory unavailable, skipping cache lookup',
-      stack: new Error(cacheDirResult.error.message),
+      stack: new Error(cacheDirEither.left.message),
     });
     return { status: 'miss', reason: 'cache_dir_unavailable' };
   }
 
-  const cachePath = path.join(cacheDirResult.value, `${cacheKey}.webp`);
+  const cachePath = path.join(cacheDirEither.right, `${cacheKey}.webp`);
 
   // キャッシュファイルのstatを取得
-  const statResult = await statCacheFile(cachePath);
-  if (statResult.isErr()) {
-    return match(statResult.error)
+  const statEither = await Effect.runPromise(
+    Effect.either(statCacheFile(cachePath)),
+  );
+  if (statEither._tag === 'Left') {
+    return match(statEither.left)
       .with({ type: 'NOT_FOUND' }, () => ({
         status: 'miss' as const,
         reason: 'not_found' as const,
@@ -294,7 +294,7 @@ const getCachedThumbnail = async (
   }
 
   // キャッシュが有効期限を超えている場合は無効
-  const { stats } = statResult.value;
+  const { stats } = statEither.right;
   const cacheDate = new Date(Number(stats.mtimeMs));
   const expiryDate = dateFns.subDays(new Date(), CACHE_EXPIRY_DAYS);
   if (cacheDate < expiryDate) {
@@ -302,21 +302,23 @@ const getCachedThumbnail = async (
   }
 
   // キャッシュファイルを読み込み
-  const readResult = await readCacheFile(cachePath);
-  return readResult.match(
-    (data) => ({ status: 'hit' as const, data }),
-    (error) =>
-      match(error)
-        .with({ type: 'NOT_FOUND' }, () => ({
-          status: 'miss' as const,
-          reason: 'not_found' as const,
-        }))
-        .with({ type: 'IO_ERROR' }, ({ error: err }) => ({
-          status: 'error' as const,
-          error: err,
-        }))
-        .exhaustive(),
+  const readEither = await Effect.runPromise(
+    Effect.either(readCacheFile(cachePath)),
   );
+  if (readEither._tag === 'Left') {
+    return match(readEither.left)
+      .with({ type: 'NOT_FOUND' }, () => ({
+        status: 'miss' as const,
+        reason: 'not_found' as const,
+      }))
+      .with({ type: 'IO_ERROR' }, ({ error: err }) => ({
+        status: 'error' as const,
+        error: err,
+      }))
+      .exhaustive();
+  }
+
+  return { status: 'hit' as const, data: readEither.right };
 };
 
 /**
@@ -341,18 +343,21 @@ const saveThumbnailToCache = async (
   }
   pendingCacheWrites.add(cacheKey);
 
+  // effect-lint-allow-try-catch: finally でリソースクリーンアップ（pendingCacheWrites.delete）
   try {
-    const cacheDirResult = await ensureCacheDir();
-    if (cacheDirResult.isErr()) {
+    const cacheDirEither = await Effect.runPromise(
+      Effect.either(ensureCacheDir()),
+    );
+    if (cacheDirEither._tag === 'Left') {
       // キャッシュディレクトリが利用不可の場合は書き込みをスキップ
       logger.debug({
         message: 'Cache directory unavailable, skipping cache write',
-        stack: new Error(cacheDirResult.error.message),
+        stack: new Error(cacheDirEither.left.message),
       });
       return;
     }
 
-    const cachePath = path.join(cacheDirResult.value, `${cacheKey}.webp`);
+    const cachePath = path.join(cacheDirEither.right, `${cacheKey}.webp`);
     const tempPath = `${cachePath}.tmp`;
 
     // アトミック書き込み: tmp -> rename
@@ -400,8 +405,8 @@ type CacheFileStatResult = {
 
 const statCacheFileForCleanup = (
   filePath: string,
-): neverthrow.ResultAsync<CacheFileStatResult, never> =>
-  neverthrow.ResultAsync.fromSafePromise(
+): Effect.Effect<CacheFileStatResult, never> =>
+  Effect.promise(() =>
     fsPromises
       .stat(filePath)
       .then(
@@ -432,10 +437,8 @@ const statCacheFileForCleanup = (
  * キャッシュファイル削除（クリーンアップ用）
  * 削除失敗は警告ログを出力して継続（致命的ではない）
  */
-const unlinkCacheFile = (
-  filePath: string,
-): neverthrow.ResultAsync<boolean, never> =>
-  neverthrow.ResultAsync.fromSafePromise(
+const unlinkCacheFile = (filePath: string): Effect.Effect<boolean, never> =>
+  Effect.promise(() =>
     fsPromises
       .unlink(filePath)
       .then(() => true)
@@ -461,10 +464,10 @@ type CacheReaddirError =
  */
 const readCacheDir = (
   cacheDir: string,
-): neverthrow.ResultAsync<string[], CacheReaddirError> =>
-  neverthrow.ResultAsync.fromPromise(
-    fsPromises.readdir(cacheDir),
-    (error): CacheReaddirError => {
+): Effect.Effect<string[], CacheReaddirError> =>
+  Effect.tryPromise({
+    try: () => fsPromises.readdir(cacheDir),
+    catch: (error): CacheReaddirError => {
       const nodeError = error as NodeJS.ErrnoException;
       if (nodeError.code === 'EACCES' || nodeError.code === 'EPERM') {
         return {
@@ -477,37 +480,41 @@ const readCacheDir = (
         message: `Failed to read cache directory: ${nodeError.message}`,
       };
     },
-  );
+  });
 
 /**
  * 古いキャッシュをクリーンアップ（必要に応じて呼び出される）
  */
 export const cleanupThumbnailCache = async (): Promise<void> => {
-  const cacheDirResult = await ensureCacheDir();
-  if (cacheDirResult.isErr()) {
+  const cacheDirEither = await Effect.runPromise(
+    Effect.either(ensureCacheDir()),
+  );
+  if (cacheDirEither._tag === 'Left') {
     // キャッシュディレクトリが利用不可の場合はクリーンアップをスキップ
     logger.debug({
       message: 'Cache directory unavailable, skipping cleanup',
-      stack: new Error(cacheDirResult.error.message),
+      stack: new Error(cacheDirEither.left.message),
     });
     return;
   }
-  const cacheDir = cacheDirResult.value;
+  const cacheDir = cacheDirEither.right;
 
-  const filesResult = await readCacheDir(cacheDir);
-  if (filesResult.isErr()) {
+  const filesEither = await Effect.runPromise(
+    Effect.either(readCacheDir(cacheDir)),
+  );
+  if (filesEither._tag === 'Left') {
     logger.error({
       message: 'Failed to cleanup thumbnail cache',
-      stack: new Error(filesResult.error.message),
+      stack: new Error(filesEither.left.message),
     });
     return;
   }
 
-  const files = filesResult.value;
+  const files = filesEither.right;
   const fileStats = await Promise.all(
     files.map((file) => {
       const filePath = path.join(cacheDir, file);
-      return statCacheFileForCleanup(filePath).then((r) => r._unsafeUnwrap());
+      return Effect.runPromise(statCacheFileForCleanup(filePath));
     }),
   );
 
@@ -535,9 +542,7 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
     if (currentSize <= targetSize) {
       break;
     }
-    const deleted = await unlinkCacheFile(file.filePath).then((r) =>
-      r._unsafeUnwrap(),
-    );
+    const deleted = await Effect.runPromise(unlinkCacheFile(file.filePath));
     if (deleted) {
       currentSize -= file.size / 1024 / 1024;
     }
@@ -584,9 +589,11 @@ export const setVRChatPhotoDirPathToSettingStore = (
  */
 export const clearVRChatPhotoDirPathInSettingStore = () => {
   const settingStore = getSettingStore();
-  const result = settingStore.clearStoredSetting('vrchatPhotoDir');
-  if (result.isErr()) {
-    throw result.error;
+  const either = Effect.runSync(
+    Effect.either(settingStore.clearStoredSetting('vrchatPhotoDir')),
+  );
+  if (either._tag === 'Left') {
+    throw either.left;
   }
 };
 
@@ -625,7 +632,7 @@ type FolderDigestError =
  * 注意: xxhash128は32文字のhexを出力し、既存のFolderDigestSchema（MD5形式）と互換
  *
  * @param folderPath VRChat写真を含むフォルダのパス
- * @returns ResultAsync<FolderDigest, FolderDigestError>
+ * @returns Effect<FolderDigest, FolderDigestError>
  *          - 成功時: FolderDigest（xxhash128ハッシュ値、32文字hex）
  *          - FOLDER_NOT_FOUND: スキャン中にフォルダが削除された（想定内）
  *          - PERMISSION_DENIED: 権限エラー（ユーザーに通知すべき）
@@ -633,62 +640,63 @@ type FolderDigestError =
  */
 const computeFolderDigest = (
   folderPath: VRChatPhotoContainingFolderPath,
-): neverthrow.ResultAsync<FolderDigest, FolderDigestError> => {
-  return neverthrow.ResultAsync.fromPromise(
-    fsPromises.readdir(folderPath as string),
-    (error): FolderDigestError => {
-      const nodeError = error as NodeJS.ErrnoException;
-      return match(nodeError.code)
-        .with('ENOENT', () => {
-          logger.debug(`Folder not found during hash: ${folderPath}`);
-          return {
-            type: 'FOLDER_NOT_FOUND' as const,
-            folderPath: folderPath as string,
-          };
-        })
-        .with(P.union('EACCES', 'EPERM'), () => {
-          logger.warn({
-            message: `Permission denied reading folder: ${folderPath}`,
-            stack: error instanceof Error ? error : new Error(String(error)),
+): Effect.Effect<FolderDigest, FolderDigestError> =>
+  Effect.gen(function* () {
+    const files = yield* Effect.tryPromise({
+      try: () => fsPromises.readdir(folderPath as string),
+      catch: (error): FolderDigestError => {
+        const nodeError = error as NodeJS.ErrnoException;
+        return match(nodeError.code)
+          .with('ENOENT', () => {
+            logger.debug(`Folder not found during hash: ${folderPath}`);
+            return {
+              type: 'FOLDER_NOT_FOUND' as const,
+              folderPath: folderPath as string,
+            };
+          })
+          .with(P.union('EACCES', 'EPERM'), () => {
+            logger.warn({
+              message: `Permission denied reading folder: ${folderPath}`,
+              stack: error instanceof Error ? error : new Error(String(error)),
+            });
+            return {
+              type: 'PERMISSION_DENIED' as const,
+              folderPath: folderPath as string,
+            };
+          })
+          .otherwise(() => {
+            // 想定外エラー → Sentry送信のため再スロー
+            throw error;
           });
-          return {
-            type: 'PERMISSION_DENIED' as const,
-            folderPath: folderPath as string,
-          };
-        })
-        .otherwise(() => {
-          // 想定外エラー → Sentry送信のため再スロー
-          throw error;
-        });
-    },
-  ).andThen((files) => {
+      },
+    });
+
     // VRChat写真ファイルのみをフィルタリングしてソート
     const pngFiles = files.filter((f) => isVRChatPhotoFile(f)).sort();
 
     // ファイル名リストをハッシュ化（ファイル内容は読まない）
-    return neverthrow.ResultAsync.fromPromise(
-      xxhash128(pngFiles.join('\n')),
-      (error) => {
+    const hash = yield* Effect.tryPromise({
+      try: () => xxhash128(pngFiles.join('\n')),
+      catch: (error) => {
         // hash-wasmの内部エラーは想定外 → Sentry送信のため再スロー
         throw error;
       },
-    ).andThen((hash) =>
-      neverthrow.fromThrowable(
-        () => FolderDigestSchema.parse(hash),
-        (error): FolderDigestError => {
-          // xxhash128が予期しないハッシュ形式を返した場合
-          // これはライブラリのバグまたは破壊的変更を示すため、Sentryに送信
-          logger.error({
-            message: 'Invalid hash format from hash-wasm library',
-            stack: error instanceof Error ? error : new Error(String(error)),
-            details: { hash, folderPath: folderPath as string },
-          });
-          throw error;
-        },
-      )(),
-    );
+    });
+
+    return yield* Effect.try({
+      try: () => FolderDigestSchema.parse(hash),
+      catch: (error): FolderDigestError => {
+        // xxhash128が予期しないハッシュ形式を返した場合
+        // これはライブラリのバグまたは破壊的変更を示すため、Sentryに送信
+        logger.error({
+          message: 'Invalid hash format from hash-wasm library',
+          stack: error instanceof Error ? error : new Error(String(error)),
+          details: { hash, folderPath: folderPath as string },
+        });
+        throw error;
+      },
+    });
   });
-};
 
 /**
  * VRChat写真を含むフォルダを全て探索（再帰的）
@@ -704,6 +712,7 @@ const getPhotoFolders = async (
 
   const scanDir = async (dirPath: string): Promise<void> => {
     let entries: Dirent[];
+    // effect-lint-allow-try-catch: ts-patternでエラー分類し予期しないエラーを再スロー
     try {
       entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
     } catch (error) {
@@ -804,11 +813,13 @@ const getChangedFoldersWithFiles = async (
 
   for (const folderPath of folders) {
     // hash-wasm でダイジェスト計算（エラー時はスキップ）
-    const digestResult = await computeFolderDigest(folderPath);
+    const digestEither = await Effect.runPromise(
+      Effect.either(computeFolderDigest(folderPath)),
+    );
 
-    if (digestResult.isErr()) {
+    if (digestEither._tag === 'Left') {
       // FOLDER_NOT_FOUND/PERMISSION_DENIED はログ済み、統計を記録してスキップ
-      match(digestResult.error.type)
+      match(digestEither.left.type)
         .with('FOLDER_NOT_FOUND', () => {
           skipStats.digestErrors.folderNotFound++;
         })
@@ -819,7 +830,7 @@ const getChangedFoldersWithFiles = async (
       continue;
     }
 
-    const currentDigest = digestResult.value;
+    const currentDigest = digestEither.right;
 
     // ブランド型から生のstring値を取得して比較（オブジェクトキーアクセス用）
     const savedState = savedStates[folderPath as string];
@@ -839,32 +850,45 @@ const getChangedFoldersWithFiles = async (
     );
 
     // 変更があったフォルダのファイル一覧を取得（エラー時はスキップ）
-    const fileNamesResult = await neverthrow.ResultAsync.fromPromise(
-      fsPromises.readdir(folderPath as string),
-      (error): { type: 'READDIR_ERROR'; code: string | undefined } => {
-        const nodeError = error as NodeJS.ErrnoException;
-        return match(nodeError.code)
-          .with('ENOENT', () => {
-            logger.debug(`Folder deleted during scan: ${folderPath}`);
-            return { type: 'READDIR_ERROR' as const, code: nodeError.code };
-          })
-          .with(P.union('EACCES', 'EPERM'), () => {
-            logger.warn({
-              message: `Permission denied reading folder: ${folderPath}`,
-              stack: error instanceof Error ? error : new Error(String(error)),
-            });
-            return { type: 'READDIR_ERROR' as const, code: nodeError.code };
-          })
-          .otherwise(() => {
-            // 想定外エラー → Sentry送信のため再スロー
-            throw error;
-          });
-      },
+    const fileNamesEither = await Effect.runPromise(
+      Effect.either(
+        Effect.tryPromise({
+          try: () => fsPromises.readdir(folderPath as string),
+          catch: (
+            error,
+          ): { type: 'READDIR_ERROR'; code: string | undefined } => {
+            const nodeError = error as NodeJS.ErrnoException;
+            return match(nodeError.code)
+              .with('ENOENT', () => {
+                logger.debug(`Folder deleted during scan: ${folderPath}`);
+                return {
+                  type: 'READDIR_ERROR' as const,
+                  code: nodeError.code,
+                };
+              })
+              .with(P.union('EACCES', 'EPERM'), () => {
+                logger.warn({
+                  message: `Permission denied reading folder: ${folderPath}`,
+                  stack:
+                    error instanceof Error ? error : new Error(String(error)),
+                });
+                return {
+                  type: 'READDIR_ERROR' as const,
+                  code: nodeError.code,
+                };
+              })
+              .otherwise(() => {
+                // 想定外エラー → Sentry送信のため再スロー
+                throw error;
+              });
+          },
+        }),
+      ),
     );
 
-    if (fileNamesResult.isErr()) {
+    if (fileNamesEither._tag === 'Left') {
       // 統計を記録してスキップ
-      match(fileNamesResult.error.code)
+      match(fileNamesEither.left.code)
         .with('ENOENT', () => {
           skipStats.readdirErrors.folderNotFound++;
         })
@@ -883,7 +907,7 @@ const getChangedFoldersWithFiles = async (
       continue;
     }
 
-    const fileNames = fileNamesResult.value;
+    const fileNames = fileNamesEither.right;
 
     logger.debug(
       `Folder changed: ${folderPath} (saved: ${savedState?.digest ?? 'none'}, current: ${currentDigest})`,
@@ -934,42 +958,52 @@ const filterNewFilesByMtime = async (
     }
 
     // ファイルのmtimeを取得
-    const statsResult = await neverthrow.ResultAsync.fromPromise(
-      fsPromises.stat(filePath),
-      (
-        error,
-      ): { type: 'FILE_NOT_FOUND' | 'PERMISSION_DENIED'; message: string } => {
-        const nodeError = error as NodeJS.ErrnoException;
-        return match(nodeError.code)
-          .with('ENOENT', () => {
-            // スキャン中にファイルが削除された → 想定内
-            logger.debug(`File not found (deleted during scan): ${filePath}`);
-            return {
-              type: 'FILE_NOT_FOUND' as const,
-              message: 'File not found',
-            };
-          })
-          .with(P.union('EACCES', 'EPERM'), () => {
-            // 権限エラー → ユーザーに通知すべき
-            logger.warn({
-              message: `Permission denied accessing file: ${filePath}`,
-              stack: error instanceof Error ? error : new Error(String(error)),
-            });
-            return {
-              type: 'PERMISSION_DENIED' as const,
-              message: nodeError.message ?? 'Permission denied',
-            };
-          })
-          .otherwise(() => {
-            // 想定外エラー → Sentry送信のため再スロー
-            throw error;
-          });
-      },
+    const statsEither = await Effect.runPromise(
+      Effect.either(
+        Effect.tryPromise({
+          try: () => fsPromises.stat(filePath),
+          catch: (
+            error,
+          ): {
+            type: 'FILE_NOT_FOUND' | 'PERMISSION_DENIED';
+            message: string;
+          } => {
+            const nodeError = error as NodeJS.ErrnoException;
+            return match(nodeError.code)
+              .with('ENOENT', () => {
+                // スキャン中にファイルが削除された → 想定内
+                logger.debug(
+                  `File not found (deleted during scan): ${filePath}`,
+                );
+                return {
+                  type: 'FILE_NOT_FOUND' as const,
+                  message: 'File not found',
+                };
+              })
+              .with(P.union('EACCES', 'EPERM'), () => {
+                // 権限エラー → ユーザーに通知すべき
+                logger.warn({
+                  message: `Permission denied accessing file: ${filePath}`,
+                  stack:
+                    error instanceof Error ? error : new Error(String(error)),
+                });
+                return {
+                  type: 'PERMISSION_DENIED' as const,
+                  message: nodeError.message ?? 'Permission denied',
+                };
+              })
+              .otherwise(() => {
+                // 想定外エラー → Sentry送信のため再スロー
+                throw error;
+              });
+          },
+        }),
+      ),
     );
 
-    if (statsResult.isErr()) {
+    if (statsEither._tag === 'Left') {
       // エラー種別に応じて統計を更新
-      match(statsResult.error.type)
+      match(statsEither.left.type)
         .with('FILE_NOT_FOUND', () => {
           statErrors.fileNotFound++;
         })
@@ -981,7 +1015,7 @@ const filterNewFilesByMtime = async (
     }
 
     // mtime > lastScannedAt なら新規/更新ファイル
-    if (statsResult.value.mtime > lastScannedAt) {
+    if (statsEither.right.mtime > lastScannedAt) {
       newFiles.push(filePath);
     }
   }
@@ -1046,53 +1080,58 @@ async function processPhotoBatch(
       );
 
       // Transformerインスタンスを使い捨てにしてメモリリークを防ぐ
-      const metadataResult = await neverthrow.ResultAsync.fromPromise(
-        fsPromises.readFile(photoPath).then(async (buf) => {
-          const transformer = new Transformer(buf);
-          return transformer.metadata();
-        }),
-        (error): { type: 'SHARP_ERROR'; message: string } => {
-          const nodeError = error as NodeJS.ErrnoException;
-          return match(nodeError.code)
-            .with('ENOENT', () => {
-              // ファイル削除はレースコンディションで想定される
-              logger.debug(
-                `Photo file not found during metadata extraction: ${photoPath}`,
-              );
-              return {
-                type: 'SHARP_ERROR' as const,
-                message: 'File not found',
-              };
-            })
-            .with(P.union('EACCES', 'EPERM'), () => {
-              // 権限エラー → ユーザーに通知すべき
-              logger.warn({
-                message: `Permission denied reading photo: ${photoPath}`,
-                stack:
-                  error instanceof Error ? error : new Error(String(error)),
-              });
-              return {
-                type: 'SHARP_ERROR' as const,
-                message: nodeError.message ?? 'Permission denied',
-              };
-            })
-            .otherwise(() => {
-              // 画像処理の内部エラー、破損ファイル等 → Sentry送信のため再スロー
-              // デバッグのためファイルパス情報を付加
-              const contextualError = new Error(
-                `Image processing failed for: ${photoPath}`,
-                { cause: error },
-              );
-              throw contextualError;
-            });
-        },
+      const metadataEither = await Effect.runPromise(
+        Effect.either(
+          Effect.tryPromise({
+            try: () =>
+              fsPromises.readFile(photoPath).then(async (buf) => {
+                const transformer = new Transformer(buf);
+                return transformer.metadata();
+              }),
+            catch: (error): { type: 'SHARP_ERROR'; message: string } => {
+              const nodeError = error as NodeJS.ErrnoException;
+              return match(nodeError.code)
+                .with('ENOENT', () => {
+                  // ファイル削除はレースコンディションで想定される
+                  logger.debug(
+                    `Photo file not found during metadata extraction: ${photoPath}`,
+                  );
+                  return {
+                    type: 'SHARP_ERROR' as const,
+                    message: 'File not found',
+                  };
+                })
+                .with(P.union('EACCES', 'EPERM'), () => {
+                  // 権限エラー → ユーザーに通知すべき
+                  logger.warn({
+                    message: `Permission denied reading photo: ${photoPath}`,
+                    stack:
+                      error instanceof Error ? error : new Error(String(error)),
+                  });
+                  return {
+                    type: 'SHARP_ERROR' as const,
+                    message: nodeError.message ?? 'Permission denied',
+                  };
+                })
+                .otherwise(() => {
+                  // 画像処理の内部エラー、破損ファイル等 → Sentry送信のため再スロー
+                  // デバッグのためファイルパス情報を付加
+                  const contextualError = new Error(
+                    `Image processing failed for: ${photoPath}`,
+                    { cause: error },
+                  );
+                  throw contextualError;
+                });
+            },
+          }),
+        ),
       );
 
-      if (metadataResult.isErr()) {
+      if (metadataEither._tag === 'Left') {
         return null;
       }
 
-      const metadata = metadataResult.value;
+      const metadata = metadataEither.right;
       const height = metadata.height ?? 720;
       const width = metadata.width ?? 1280;
 
@@ -1197,6 +1236,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
     `Starting photo index creation with ${allDirs.length} directories (mode: ${isIncremental ? 'incremental' : 'full'})`,
   );
 
+  // effect-lint-allow-try-catch: finally でリソースクリーンアップ（スキャン状態の永続化）
   try {
     // 各ディレクトリを順番に処理
     for (const dir of allDirs) {
@@ -1285,6 +1325,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
             // DBエラーは予期しないエラーとしてSentryに送信
             // batch情報をログに記録してから再スロー
             let createdModels: model.VRChatPhotoPathModel[];
+            // effect-lint-allow-try-catch: エラー情報補強してから再スロー（Sentry送信用）
             try {
               createdModels = await model.createOrUpdateListVRChatPhotoPath(
                 processedBatch.map((photo) => ({
@@ -1342,6 +1383,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   } finally {
     // エラー発生時も途中経過を保存（次回スキャンで未処理分が再処理される）
     // このtry-catchはオリジナルエラーを隠さないために内部で処理
+    // effect-lint-allow-try-catch: finally内のクリーンアップ（オリジナルエラーを隠さない）
     try {
       settingStore.setPhotoFolderScanStates(updatedStates);
     } catch (stateError) {
@@ -1465,17 +1507,14 @@ export const validateVRChatPhotoPathModel = async ({
  * - width指定時: WebP形式でキャッシュし、再利用
  * - 元サイズ時: キャッシュなし（大きすぎるため）
  */
-export const getVRChatPhotoItemData = async ({
-  photoPath,
-  width,
-}: {
+export const getVRChatPhotoItemData = (params: {
   photoPath: string;
   // 指定しない場合は元画像のサイズをそのまま返す
   width?: number;
-}): Promise<neverthrow.Result<string, 'InputFileIsMissing'>> => {
-  // ResultAsync.fromPromise で予期されたエラー (InputFileIsMissing) を処理
-  return ResultAsync.fromPromise(
-    (async () => {
+}): Effect.Effect<string, 'InputFileIsMissing'> =>
+  Effect.tryPromise({
+    try: async () => {
+      const { photoPath, width } = params;
       // サムネイル（width指定あり）の場合はキャッシュを使用
       if (width !== undefined) {
         const cacheKey = generateCacheKey(photoPath, width);
@@ -1519,8 +1558,8 @@ export const getVRChatPhotoItemData = async ({
       return `data:image/${path
         .extname(photoPath)
         .replace('.', '')};base64,${photoBuf.toString('base64')}`;
-    })(),
-    (error): 'InputFileIsMissing' => {
+    },
+    catch: (error): 'InputFileIsMissing' => {
       return match(error)
         .with(
           P.intersection(P.instanceOf(Error), {
@@ -1534,8 +1573,7 @@ export const getVRChatPhotoItemData = async ({
           throw e instanceof Error ? e : new Error(JSON.stringify(e));
         });
     },
-  );
-};
+  });
 
 /**
  * データベース内で最新の写真日時を取得する
@@ -1614,49 +1652,49 @@ export const getBatchThumbnails = async (
     const batch = photoPaths.slice(i, i + thumbnailParallelLimit);
 
     const thumbnailPromises = batch.map(async (photoPath) => {
-      // getVRChatPhotoItemData は予期しないエラーを throw するため
-      // エラーをキャッチして photoPath と共に返す
-      try {
-        const result = await getVRChatPhotoItemData({ photoPath, width });
-        return { photoPath, result, unexpectedError: null as Error | null };
-      } catch (error) {
-        // 予期しないエラー（画像処理内部エラー等）はここでキャッチ
-        return {
-          photoPath,
-          result: null,
-          unexpectedError:
-            error instanceof Error ? error : new Error(String(error)),
-        };
-      }
+      // Effect.runPromiseExit で defect も含めた全結果を安全に取得
+      const exit = await Effect.runPromiseExit(
+        getVRChatPhotoItemData({ photoPath, width }),
+      );
+      return { photoPath, exit };
     });
 
     // 全てのPromiseが成功するため Promise.all を使用
     const results = await Promise.all(thumbnailPromises);
 
-    for (const item of results) {
-      if (item.unexpectedError) {
-        // 予期しないエラー（画像処理内部エラー等）をログ出力
-        // Sentryに送信されるのは logger.error() 経由
-        logger.error({
-          message: 'Unexpected error during batch thumbnail fetch',
-          stack: item.unexpectedError,
-          details: { photoPath: item.photoPath },
-        });
-        failed.push({
-          photoPath: item.photoPath,
-          reason: 'unexpected_error',
-          message: item.unexpectedError.message,
-        });
-      } else if (item.result) {
-        item.result.match(
-          (data) => success.set(item.photoPath, data),
-          (error) =>
-            failed.push({
-              photoPath: item.photoPath,
-              reason: 'file_not_found',
-              message: error,
-            }),
-        );
+    for (const { photoPath, exit } of results) {
+      if (Exit.isSuccess(exit)) {
+        success.set(photoPath, exit.value);
+      } else {
+        // 予期されたエラー（InputFileIsMissing）かdefect（予期しないエラー）かを判別
+        const failureOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failureOpt)) {
+          // 予期されたエラー: ファイルが見つからない
+          failed.push({
+            photoPath,
+            reason: 'file_not_found',
+            message: failureOpt.value,
+          });
+        } else {
+          // 予期しないエラー（画像処理内部エラー等）
+          const dieOpt = Cause.dieOption(exit.cause);
+          const unexpectedError = Option.isSome(dieOpt)
+            ? dieOpt.value instanceof Error
+              ? dieOpt.value
+              : new Error(String(dieOpt.value))
+            : new Error('Unknown error');
+          // Sentryに送信されるのは logger.error() 経由
+          logger.error({
+            message: 'Unexpected error during batch thumbnail fetch',
+            stack: unexpectedError,
+            details: { photoPath },
+          });
+          failed.push({
+            photoPath,
+            reason: 'unexpected_error',
+            message: unexpectedError.message,
+          });
+        }
       }
     }
   }

@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Effect } from 'effect';
 import { uuidv7 } from 'uuidv7';
 import {
   afterAll,
@@ -13,6 +14,7 @@ import {
   vi,
 } from 'vitest';
 import type { ImportBackupMetadata } from './backupService/backupService';
+import { BackupExportFailed, BackupNotFound } from './backupService/errors';
 import {
   VRChatPlayerIdSchema,
   VRChatPlayerNameSchema,
@@ -30,13 +32,13 @@ const mockState = {
 };
 
 vi.mock('../logSync/service', () => {
-  const { ok } = require('neverthrow');
+  const { Effect } = require('effect');
   return {
     LOG_SYNC_MODE: {
       FULL: 'FULL',
       INCREMENTAL: 'INCREMENTAL',
     },
-    syncLogs: vi.fn(async (mode) => {
+    syncLogs: vi.fn((mode) => {
       console.log('[Mock] syncLogs called with mode:', mode);
 
       // Simulate actual sync by creating logs that would be created from imported data
@@ -53,8 +55,8 @@ vi.mock('../logSync/service', () => {
         playerLogs.push(...mockState.importedPlayerLogs);
       }
 
-      // Return mock data that simulates actual sync results
-      return ok({
+      // syncLogs returns Effect, not Promise
+      return Effect.succeed({
         createdWorldJoinLogModelList: worldLogs,
         createdPlayerJoinLogModelList: playerLogs,
         createdPlayerLeaveLogModelList: [],
@@ -65,15 +67,17 @@ vi.mock('../logSync/service', () => {
 });
 
 // エクスポートサービスのモック定義
-vi.mock('./exportService/exportService', () => {
+vi.mock('./exportService/exportService', async (importOriginal) => {
+  const original = await importOriginal();
   const path = require('node:path');
   const fs = require('node:fs');
-  const { ok } = require('neverthrow');
+  const { Effect } = require('effect');
   return {
+    ...(original as object),
     exportLogStoreFromDB: vi
       .fn()
       .mockImplementation(
-        async ({ outputBasePath, startDate, endDate }, _getDBLogs) => {
+        ({ outputBasePath, startDate, endDate }, _getDBLogs) => {
           const exportFolderName = 'vrchat-albums-export_2023-12-01_14-30-45';
           const actualOutputPath = outputBasePath || '/tmp/test-export';
           const exportDir = path.join(actualOutputPath, exportFolderName);
@@ -119,7 +123,8 @@ vi.mock('./exportService/exportService', () => {
           });
           console.log('[Mock] Returning exportedFiles:', exportedFiles);
 
-          return ok({
+          // exportLogStoreFromDB returns Effect, not Promise
+          return Effect.succeed({
             totalLogLines: totalLines,
             exportedFiles: exportedFiles,
             exportStartTime: new Date('2023-12-01T14:30:00'),
@@ -134,7 +139,7 @@ vi.mock('./exportService/exportService', () => {
 const backupHistory: ImportBackupMetadata[] = [];
 vi.mock('./backupService/backupService', async (importOriginal) => {
   const original = await importOriginal();
-  const { ok } = await import('neverthrow');
+  const { Effect } = await import('effect');
   const { uuidv7 } = await import('uuidv7');
   const path = await import('node:path');
   const fs = await import('node:fs');
@@ -144,54 +149,54 @@ vi.mock('./backupService/backupService', async (importOriginal) => {
     backupService: {
       getBackupBasePath: () =>
         path.join(require('node:os').tmpdir(), 'test-backups'),
-      createPreImportBackup: vi.fn(async (_getDBLogs) => {
-        const backupId = uuidv7();
-        const exportFolderPath = `backup-${backupId}`;
-        const backupPath = path.join(
-          require('node:os').tmpdir(),
-          'test-backups',
-          exportFolderPath,
-        );
+      createPreImportBackup: vi.fn((_getDBLogs) => {
+        return Effect.tryPromise({
+          try: async () => {
+            const backupId = uuidv7();
+            const exportFolderPath = `backup-${backupId}`;
+            const backupPath = path.join(
+              require('node:os').tmpdir(),
+              'test-backups',
+              exportFolderPath,
+            );
 
-        // Create backup directory
-        await fs.promises.mkdir(backupPath, { recursive: true });
+            // Create backup directory
+            await fs.promises.mkdir(backupPath, { recursive: true });
 
-        const backup: ImportBackupMetadata = {
-          id: backupId,
-          exportFolderPath,
-          status: 'completed',
-          sourceFiles: [],
-          importTimestamp: new Date(),
-          backupTimestamp: new Date(),
-          totalLogLines: 0,
-          exportedFiles: [],
-        };
+            const backup: ImportBackupMetadata = {
+              id: backupId,
+              exportFolderPath,
+              status: 'completed',
+              sourceFiles: [],
+              importTimestamp: new Date(),
+              backupTimestamp: new Date(),
+              totalLogLines: 0,
+              exportedFiles: [],
+            };
 
-        backupHistory.push(backup);
+            backupHistory.push(backup);
 
-        return ok(backup);
+            return backup;
+          },
+          catch: (e) => new BackupExportFailed({ message: String(e) }),
+        });
       }),
-      getBackupHistory: vi.fn(async () => {
-        return ok(backupHistory); // 全てのバックアップを返す（statusに関係なく）
+      getBackupHistory: vi.fn(() => {
+        return Effect.succeed(backupHistory);
       }),
-      getBackup: vi.fn(async (backupId: string) => {
+      getBackup: vi.fn((backupId: string) => {
         const backup = backupHistory.find((b) => b.id === backupId);
         if (!backup) {
-          return {
-            isErr: (): boolean => true,
-            error: { type: 'BACKUP_NOT_FOUND' as const, backupId },
-            _tag: 'Err',
-            isOk: (): boolean => false,
-          };
+          return Effect.fail(new BackupNotFound({ backupId }));
         }
-        return ok(backup);
+        return Effect.succeed(backup);
       }),
-      updateBackupMetadata: vi.fn(async (backup: ImportBackupMetadata) => {
+      updateBackupMetadata: vi.fn((backup: ImportBackupMetadata) => {
         const index = backupHistory.findIndex((b) => b.id === backup.id);
         if (index >= 0) {
           backupHistory[index] = backup;
         }
-        return ok(backup);
+        return Effect.succeed(undefined);
       }),
     },
   };
@@ -199,17 +204,17 @@ vi.mock('./backupService/backupService', async (importOriginal) => {
 
 // ロールバックサービスのモック
 vi.mock('./backupService/rollbackService', async () => {
-  const { ok } = await import('neverthrow');
+  const { Effect } = await import('effect');
   return {
     rollbackService: {
-      rollbackToBackup: vi.fn(async (backup: ImportBackupMetadata) => {
+      rollbackToBackup: vi.fn((backup: ImportBackupMetadata) => {
         console.log('[Mock] rollbackToBackup called for backup:', backup.id);
         // Update backup status in history
         const index = backupHistory.findIndex((b) => b.id === backup.id);
         if (index >= 0) {
           backupHistory[index].status = 'rolled_back';
         }
-        return ok(undefined);
+        return Effect.succeed(undefined);
       }),
     },
   };
@@ -238,7 +243,7 @@ vi.mock('../../lib/wrappedApp', () => ({
 vi.mock('../fileHandlers/logStorageManager', () => {
   const path = require('node:path');
   const fs = require('node:fs');
-  const { ok } = require('neverthrow');
+  const { Effect } = require('effect');
   const testUserDataDir = path.join(
     require('node:os').tmpdir(),
     'vrchat-albums-test-logstore',
@@ -247,7 +252,8 @@ vi.mock('../fileHandlers/logStorageManager', () => {
   return {
     getLogStoreDir: vi.fn(() => path.join(testUserDataDir, 'logStore')),
     initLogStoreDir: vi.fn(),
-    appendLoglinesToFile: vi.fn(async ({ logLines }) => {
+    // appendLoglinesToFile returns Effect<void, never>
+    appendLoglinesToFile: vi.fn(({ logLines }) => {
       console.log(
         '[Mock] appendLoglinesToFile called with',
         logLines.length,
@@ -256,7 +262,7 @@ vi.mock('../fileHandlers/logStorageManager', () => {
       const logStoreDir = path.join(testUserDataDir, 'logStore');
 
       if (logLines.length === 0) {
-        return ok({ logStoreFilePath: '' });
+        return Effect.succeed(undefined);
       }
 
       // Parse log lines to extract world and player join data
@@ -326,38 +332,37 @@ vi.mock('../fileHandlers/logStorageManager', () => {
         .join('\n')}\n`;
       fs.appendFileSync(filePath, content);
 
-      return ok({ logStoreFilePath: filePath });
+      return Effect.succeed(undefined);
     }),
   };
 });
 
 // VRChatログファイルディレクトリのモック（テスト環境では実際のログファイルは存在しない）
 vi.mock('../vrchatLogFileDirService/vrchatLogFileDirService', async () => {
-  const { ok } = await import('neverthrow');
+  const { Effect } = await import('effect');
   return {
-    getValidVRChatLogFileDir: vi.fn(async () =>
-      ok({ path: '/tmp/mock-vrchat-logs' }),
+    getValidVRChatLogFileDir: vi.fn(() =>
+      Effect.succeed({ path: '/tmp/mock-vrchat-logs' }),
     ),
-    getVRChatLogFilePathList: vi.fn(async () => ok([])),
+    getVRChatLogFilePathList: vi.fn(() => Effect.succeed([])),
   };
 });
 
 // VRChatログサービスのモック（統合テスト用に最小限の実装）
 vi.mock('./service', async (importOriginal) => {
   const original = await importOriginal();
-  const { ok } = await import('neverthrow');
   return {
     ...(original as object),
-    getLogLinesByLogFilePathList: vi.fn(async () => ok([])),
+    getLogLinesByLogFilePathList: vi.fn(async () => []),
     filterLogLinesByDate: vi.fn(() => []),
-    getVRChatLogFilePaths: vi.fn(async () => ok([])),
+    getVRChatLogFilePaths: vi.fn(async () => []),
   };
 });
 
 // loadLogInfoIndexFromVRChatLogのモック（統合テスト用）
 vi.mock('../../logInfo/service', async (importOriginal) => {
   const original = await importOriginal();
-  const { ok } = await import('neverthrow');
+  const { Effect: Eff } = await import('effect');
   const worldJoinLogService = await import('../vrchatWorldJoinLog/service');
   const playerJoinLogService = await import(
     '../VRChatPlayerJoinLogModel/playerJoinLog.service'
@@ -365,42 +370,48 @@ vi.mock('../../logInfo/service', async (importOriginal) => {
 
   return {
     ...(original as object),
-    loadLogInfoIndexFromVRChatLog: vi.fn(async () => {
-      console.log('[Mock] loadLogInfoIndexFromVRChatLog called');
+    // loadLogInfoIndexFromVRChatLog returns Effect, not Promise
+    loadLogInfoIndexFromVRChatLog: vi.fn(() => {
+      return Eff.tryPromise({
+        try: async () => {
+          console.log('[Mock] loadLogInfoIndexFromVRChatLog called');
 
-      // Parse imported log content and create actual DB records
-      const worldLogs = [];
-      const playerLogs = [];
+          // Parse imported log content and create actual DB records
+          const worldLogs = [];
+          const playerLogs = [];
 
-      // Check if we have imported data to process
-      if (mockState.importedWorldLogs.length > 0) {
-        // Create actual world join logs in the database
-        for (const logData of mockState.importedWorldLogs) {
-          const createdLogsResult =
-            await worldJoinLogService.createVRChatWorldJoinLogModel([logData]);
-          if (createdLogsResult.isOk()) {
-            worldLogs.push(...createdLogsResult.value);
+          // Check if we have imported data to process
+          if (mockState.importedWorldLogs.length > 0) {
+            // Create actual world join logs in the database
+            for (const logData of mockState.importedWorldLogs) {
+              const createdLogs = await Eff.runPromise(
+                worldJoinLogService.createVRChatWorldJoinLogModel([logData]),
+              );
+              worldLogs.push(...createdLogs);
+            }
           }
-        }
-      }
 
-      if (mockState.importedPlayerLogs.length > 0) {
-        // Create actual player join logs in the database
-        for (const logData of mockState.importedPlayerLogs) {
-          const createdLogs =
-            await playerJoinLogService.createVRChatPlayerJoinLogModel([
-              logData,
-            ]);
-          playerLogs.push(...createdLogs);
-        }
-      }
+          if (mockState.importedPlayerLogs.length > 0) {
+            // Create actual player join logs in the database
+            for (const logData of mockState.importedPlayerLogs) {
+              const createdLogs =
+                await playerJoinLogService.createVRChatPlayerJoinLogModel([
+                  logData,
+                ]);
+              playerLogs.push(...createdLogs);
+            }
+          }
 
-      // Return the created logs
-      return ok({
-        createdWorldJoinLogModelList: worldLogs,
-        createdPlayerJoinLogModelList: playerLogs,
-        createdPlayerLeaveLogModelList: [],
-        createdVRChatPhotoPathModelList: [],
+          return {
+            createdWorldJoinLogModelList: worldLogs,
+            createdPlayerJoinLogModelList: playerLogs,
+            createdPlayerLeaveLogModelList: [],
+            createdVRChatPhotoPathModelList: [],
+          };
+        },
+        catch: (e) => {
+          throw e;
+        },
       });
     }),
   };
@@ -469,21 +480,18 @@ describe('vrchatLogController integration - Import and Rollback', () => {
   };
 
   const createTestWorldJoinLog = async (joinDateTime: Date) => {
-    const logsResult = await worldJoinLogService.createVRChatWorldJoinLogModel([
-      {
-        logType: 'worldJoin' as const,
-        joinDate: joinDateTime,
-        worldId: VRChatWorldIdSchema.parse(`wrld_${uuidv7()}`),
-        worldName: VRChatWorldNameSchema.parse('Test World'),
-        worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
-      },
-    ]);
-    if (logsResult.isErr()) {
-      throw new Error(
-        `Failed to create world join log: ${logsResult.error.message}`,
-      );
-    }
-    return logsResult.value[0];
+    const logs = await Effect.runPromise(
+      worldJoinLogService.createVRChatWorldJoinLogModel([
+        {
+          logType: 'worldJoin' as const,
+          joinDate: joinDateTime,
+          worldId: VRChatWorldIdSchema.parse(`wrld_${uuidv7()}`),
+          worldName: VRChatWorldNameSchema.parse('Test World'),
+          worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
+        },
+      ]),
+    );
+    return logs[0];
   };
 
   const createTestPlayerJoinLog = async (joinDateTime: Date) => {

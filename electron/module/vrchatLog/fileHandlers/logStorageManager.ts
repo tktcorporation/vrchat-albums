@@ -1,8 +1,7 @@
 import * as nodeFs from 'node:fs';
 import path from 'node:path';
 import * as datefns from 'date-fns';
-import * as neverthrow from 'neverthrow';
-import { fromThrowable } from 'neverthrow';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { logger } from '../../../lib/logger';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import * as fs from '../../../lib/wrappedFs';
@@ -96,17 +95,19 @@ export const getLogStoreFilePathsInRange = async (
 
     // 同じ月のタイムスタンプ付きのログファイルを検索
     if (nodeFs.existsSync(monthDir)) {
-      const safeReaddir = fromThrowable(
-        () => nodeFs.readdirSync(monthDir),
-        (e): { type: 'READDIR_FAILED'; path: string; message: string } => ({
+      const safeReaddir = Effect.try({
+        try: () => nodeFs.readdirSync(monthDir),
+        catch: (
+          e,
+        ): { type: 'READDIR_FAILED'; path: string; message: string } => ({
           type: 'READDIR_FAILED',
           path: monthDir,
           message: e instanceof Error ? e.message : String(e),
         }),
-      );
-      const readdirResult = safeReaddir();
-      if (readdirResult.isOk()) {
-        const timestampedLogFiles = readdirResult.value.filter((file) =>
+      });
+      const readdirExit = Effect.runSyncExit(safeReaddir);
+      if (Exit.isSuccess(readdirExit)) {
+        const timestampedLogFiles = readdirExit.value.filter((file) =>
           file.match(VRChatLogStoreFilePathRegex),
         );
         for (const file of timestampedLogFiles) {
@@ -115,9 +116,13 @@ export const getLogStoreFilePathsInRange = async (
         }
       } else {
         // ディレクトリ読み取り失敗は警告のみで継続
-        logger.warn(
-          `Failed to read directory ${readdirResult.error.path}: ${readdirResult.error.message}`,
-        );
+        const failOpt = Cause.failureOption(readdirExit.cause);
+        if (Option.isSome(failOpt)) {
+          const error = failOpt.value;
+          logger.warn(
+            `Failed to read directory ${error.path}: ${error.message}`,
+          );
+        }
       }
     }
 
@@ -135,114 +140,120 @@ export const getLogStoreFilePathsInRange = async (
  * @param props.logStoreFilePath 保存先ファイルパス（省略時は日付から自動決定）
  * @returns 成功時はok、失敗時はerr
  */
-export const appendLoglinesToFile = async (props: {
+export const appendLoglinesToFile = (props: {
   logLines: VRChatLogLine[];
   logStoreFilePath?: VRChatLogStoreFilePath;
-}): Promise<neverthrow.Result<void, never>> => {
+}): Effect.Effect<void, never> => {
   if (props.logLines.length === 0) {
-    return neverthrow.ok(undefined);
+    return Effect.succeed(undefined);
   }
 
-  // ログを日付ごとにグループ化
-  const logsByMonth = new Map<string, VRChatLogLine[]>();
+  return Effect.gen(function* () {
+    // ログを日付ごとにグループ化
+    const logsByMonth = new Map<string, VRChatLogLine[]>();
 
-  for (const logLine of props.logLines) {
-    const dateMatch = logLine.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
-    if (!dateMatch) {
-      const key = datefns.format(new Date(), 'yyyy-MM');
+    for (const logLine of props.logLines) {
+      const dateMatch = logLine.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+      if (!dateMatch) {
+        const key = datefns.format(new Date(), 'yyyy-MM');
+        const monthLogs = logsByMonth.get(key) || [];
+        monthLogs.push(logLine);
+        logsByMonth.set(key, monthLogs);
+        continue;
+      }
+
+      const year = dateMatch[1];
+      const month = dateMatch[2];
+      const key = `${year}-${month}`;
+
       const monthLogs = logsByMonth.get(key) || [];
       monthLogs.push(logLine);
       logsByMonth.set(key, monthLogs);
-      continue;
     }
 
-    const year = dateMatch[1];
-    const month = dateMatch[2];
-    const key = `${year}-${month}`;
+    // 各月のログを対応するファイルに書き込む
+    for (const [yearMonth, logs] of logsByMonth.entries()) {
+      const [year, month] = yearMonth.split('-');
+      const date = datefns.parse(
+        `${year}-${month}-01`,
+        'yyyy-MM-dd',
+        new Date(),
+      );
 
-    const monthLogs = logsByMonth.get(key) || [];
-    monthLogs.push(logLine);
-    logsByMonth.set(key, monthLogs);
-  }
+      const monthDir = path.join(getLogStoreDir(), yearMonth);
 
-  // 各月のログを対応するファイルに書き込む
-  for (const [yearMonth, logs] of logsByMonth.entries()) {
-    const [year, month] = yearMonth.split('-');
-    const date = datefns.parse(`${year}-${month}-01`, 'yyyy-MM-dd', new Date());
+      initLogStoreDir();
 
-    const monthDir = path.join(getLogStoreDir(), yearMonth);
-
-    initLogStoreDir();
-
-    if (!nodeFs.existsSync(monthDir)) {
-      nodeFs.mkdirSync(monthDir, { recursive: true });
-    }
-
-    const logStoreFilePath = getLogStoreFilePathForDate(date);
-    const isExists = await fs.existsSyncSafe(logStoreFilePath.value);
-
-    // ファイルサイズをチェック（10MB制限）
-    if (isExists) {
-      const stats = nodeFs.statSync(logStoreFilePath.value);
-      if (stats.size >= 10 * 1024 * 1024) {
-        const timestamp = new Date();
-        const newFilePath = createTimestampedLogFilePath(
-          monthDir,
-          yearMonth,
-          timestamp,
-        );
-
-        const newLog = `${logs.join('\n')}\n`;
-        const writeResult = await fs.writeFileSyncSafe(newFilePath, newLog);
-        if (writeResult.isErr()) {
-          throw writeResult.error;
-        }
-        continue;
+      if (!nodeFs.existsSync(monthDir)) {
+        nodeFs.mkdirSync(monthDir, { recursive: true });
       }
-    }
 
-    // 既存のログ行をSetとして保持
-    const existingLines = new Set<string>();
+      const logStoreFilePath = getLogStoreFilePathForDate(date);
+      const isExists = fs.existsSyncSafe(logStoreFilePath.value);
 
-    if (isExists) {
-      const readResult = await fs.readFileSyncSafe(logStoreFilePath.value);
-      if (readResult.isOk()) {
-        const content = readResult.value.toString();
-        for (const line of content.split('\n')) {
-          if (line) {
-            existingLines.add(line);
+      // ファイルサイズをチェック（10MB制限）
+      if (isExists) {
+        const stats = nodeFs.statSync(logStoreFilePath.value);
+        if (stats.size >= 10 * 1024 * 1024) {
+          const timestamp = new Date();
+          const newFilePath = createTimestampedLogFilePath(
+            monthDir,
+            yearMonth,
+            timestamp,
+          );
+
+          const newLog = `${logs.join('\n')}\n`;
+          // writeFileSyncSafe returns Effect<void, WriteFileError>
+          // Unexpected errors should propagate as defects
+          yield* fs.writeFileSyncSafe(newFilePath, newLog).pipe(
+            Effect.catchAll((e) => {
+              throw e;
+            }),
+          );
+          continue;
+        }
+      }
+
+      // 既存のログ行をSetとして保持
+      const existingLines = new Set<string>();
+
+      if (isExists) {
+        // readFileSyncSafe returns Effect<Buffer, ReadFileError>
+        const readExit = yield* fs
+          .readFileSyncSafe(logStoreFilePath.value)
+          .pipe(Effect.either);
+        if (readExit._tag === 'Right') {
+          const content = readExit.right.toString();
+          for (const line of content.split('\n')) {
+            if (line) {
+              existingLines.add(line);
+            }
           }
         }
       }
-    }
 
-    // 重複を除外して新しいログ行を追加
-    const newLines = logs.filter((log) => !existingLines.has(log));
-    if (newLines.length === 0) {
-      continue;
-    }
-
-    const newLog = `${newLines.join('\n')}\n`;
-
-    // ファイルが存在しない場合は新規作成、存在する場合は追記
-    if (!isExists) {
-      const writeResult = await fs.writeFileSyncSafe(
-        logStoreFilePath.value,
-        newLog,
-      );
-      if (writeResult.isErr()) {
-        throw writeResult.error;
+      // 重複を除外して新しいログ行を追加
+      const newLines = logs.filter((log) => !existingLines.has(log));
+      if (newLines.length === 0) {
+        continue;
       }
-    } else {
-      const appendResult = await fs.appendFileAsync(
-        logStoreFilePath.value,
-        newLog,
-      );
-      if (appendResult.isErr()) {
-        throw appendResult.error;
+
+      const newLog = `${newLines.join('\n')}\n`;
+
+      // ファイルが存在しない場合は新規作成、存在する場合は追記
+      if (!isExists) {
+        yield* fs.writeFileSyncSafe(logStoreFilePath.value, newLog).pipe(
+          Effect.catchAll((e) => {
+            throw e;
+          }),
+        );
+      } else {
+        yield* fs.appendFileAsync(logStoreFilePath.value, newLog).pipe(
+          Effect.catchAll((e) => {
+            throw e;
+          }),
+        );
       }
     }
-  }
-
-  return neverthrow.ok(undefined);
+  }) as Effect.Effect<void, never>;
 };

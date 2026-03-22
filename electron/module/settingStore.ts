@@ -1,7 +1,6 @@
+import { Data, Effect } from 'effect';
 import type { Rectangle } from 'electron';
 import Store from 'electron-store';
-import type * as neverthrow from 'neverthrow';
-import { fromThrowable } from 'neverthrow';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
 import { FolderDigestSchema } from '../lib/brandedTypes';
@@ -48,13 +47,14 @@ export const PhotoFolderScanStatesSchema = z.record(
 export type PhotoFolderScanStates = z.infer<typeof PhotoFolderScanStatesSchema>;
 
 /**
- * 設定ストアの操作エラー
+ * 設定の読み書きに失敗
  */
-export type SettingStoreError = {
-  type: 'STORAGE_ERROR';
+export class SettingStorageError extends Data.TaggedError(
+  'SettingStorageError',
+)<{
   message: string;
-  key: SettingStoreKey;
-};
+  key: string;
+}> {}
 
 const getValue =
   (settingsStore: Store) =>
@@ -216,23 +216,21 @@ const clearAllStoredSettings = (settingsStore: Store) => () => {
  */
 const clearStoredSetting =
   (settingsStore: Store) =>
-  (key: SettingStoreKey): neverthrow.Result<void, SettingStoreError> => {
-    const safeDelete = fromThrowable(
-      () => settingsStore.delete(key),
-      (error): SettingStoreError => {
+  (key: SettingStoreKey): Effect.Effect<void, SettingStorageError> => {
+    return Effect.try({
+      try: () => settingsStore.delete(key),
+      catch: (error): SettingStorageError => {
         return match(error)
-          .with(P.instanceOf(Error), (e) => ({
-            type: 'STORAGE_ERROR' as const,
-            message: e.message,
-            key,
-          }))
+          .with(
+            P.instanceOf(Error),
+            (e) => new SettingStorageError({ message: e.message, key }),
+          )
           .otherwise((e) => {
             // 予期しないエラーはre-throw（Sentry通知）
             throw e;
           });
       },
-    );
-    return safeDelete();
+    });
   };
 
 import path from 'node:path';
@@ -403,7 +401,7 @@ export interface SettingStore {
   clearAllStoredSettings: () => void;
   clearStoredSetting: (
     key: SettingStoreKey,
-  ) => neverthrow.Result<void, SettingStoreError>;
+  ) => Effect.Effect<void, SettingStorageError>;
   getWindowBounds: () => Rectangle | undefined;
   setWindowBounds: (bounds: Rectangle) => void;
   getTermsAccepted: () => boolean;

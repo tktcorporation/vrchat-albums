@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { ok } from 'neverthrow';
+import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createQueryStub } from '@/v2/helpers/testing/createQueryStub';
 import { LocationGroupHeader } from '../index';
@@ -139,14 +139,14 @@ describe('LocationGroupHeader - Player Uniqueness', () => {
 
     // デフォルトのサービスモック設定
     mockWorldJoinLogService.findVRChatWorldJoinLogList.mockResolvedValue(
-      ok([]),
+      Effect.succeed([]),
     );
     mockWorldJoinLogFromPhotoService.findVRChatWorldJoinLogFromPhotoList.mockResolvedValue(
-      ok([]),
+      Effect.succeed([]),
     );
     mockWorldJoinLogService.mergeVRChatWorldJoinLogs.mockReturnValue([]);
     mockPlayerJoinLogService.getVRChatPlayerJoinLogListByMultipleDateRanges.mockResolvedValue(
-      ok([]),
+      Effect.succeed([]),
     );
     mockPlayerListCache.get.mockReturnValue(null);
   });
@@ -187,7 +187,7 @@ describe('LocationGroupHeader - Player Uniqueness', () => {
 
     // サービスレイヤーのモック設定
     mockPlayerJoinLogService.getVRChatPlayerJoinLogListByMultipleDateRanges.mockResolvedValue(
-      ok(duplicatePlayersData),
+      Effect.succeed(duplicatePlayersData),
     );
 
     // tRPCクライアントのモック設定（サービスの結果を返す）
@@ -268,7 +268,7 @@ describe('LocationGroupHeader - Player Uniqueness', () => {
 
     // サービスレイヤーのモック設定
     mockPlayerJoinLogService.getVRChatPlayerJoinLogListByMultipleDateRanges.mockResolvedValue(
-      ok(uniquePlayersData),
+      Effect.succeed(uniquePlayersData),
     );
 
     // tRPCクライアントのモック設定
@@ -318,7 +318,7 @@ describe('LocationGroupHeader - Player Uniqueness', () => {
 
     // サービスレイヤーのモック設定（空のプレイヤーリスト）
     mockPlayerJoinLogService.getVRChatPlayerJoinLogListByMultipleDateRanges.mockResolvedValue(
-      ok([]),
+      Effect.succeed([]),
     );
 
     // tRPCクライアントのモック設定

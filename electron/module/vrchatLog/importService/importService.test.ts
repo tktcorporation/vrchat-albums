@@ -1,13 +1,11 @@
 import type { Dirent, Stats } from 'node:fs';
 import { promises as fs } from 'node:fs';
-import * as neverthrow from 'neverthrow';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as logSyncModule from '../../logSync/service';
-import type {
-  BackupError,
-  DBLogProvider,
-} from '../backupService/backupService';
+import type { DBLogProvider } from '../backupService/backupService';
 import * as backupServiceModule from '../backupService/backupService';
+import { BackupExportFailed } from '../backupService/errors';
 import type { LogRecord } from '../converters/dbToLogStore';
 import * as logStorageManagerModule from '../fileHandlers/logStorageManager';
 import { getImportErrorMessage, importService } from './importService';
@@ -85,15 +83,15 @@ describe('importService', () => {
 
       vi.mocked(
         backupServiceModule.backupService.createPreImportBackup,
-      ).mockResolvedValue(neverthrow.ok(mockBackup));
+      ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService.updateBackupMetadata,
-      ).mockResolvedValue(neverthrow.ok(undefined));
-      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockResolvedValue(
-        neverthrow.ok(undefined),
+      ).mockReturnValue(Effect.succeed(undefined));
+      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
+        Effect.succeed(undefined),
       );
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.ok({
+      vi.mocked(logSyncModule.syncLogs).mockReturnValue(
+        Effect.succeed({
           createdWorldJoinLogModelList: [],
           createdPlayerJoinLogModelList: [],
           createdPlayerLeaveLogModelList: [],
@@ -101,13 +99,13 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        filePaths,
-        mockGetDBLogs,
+      const exit = await Effect.runPromiseExit(
+        importService.importLogStoreFiles(filePaths, mockGetDBLogs),
       );
 
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
+      expect(Exit.isSuccess(exit)).toBe(true);
+      if (Exit.isSuccess(exit)) {
+        const result = exit;
         expect(result.value.success).toBe(true);
         expect(result.value.backup).toEqual(mockBackup);
         expect(result.value.importedData.totalLines).toBe(1);
@@ -176,15 +174,15 @@ describe('importService', () => {
 
       vi.mocked(
         backupServiceModule.backupService.createPreImportBackup,
-      ).mockResolvedValue(neverthrow.ok(mockBackup));
+      ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService.updateBackupMetadata,
-      ).mockResolvedValue(neverthrow.ok(undefined));
-      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockResolvedValue(
-        neverthrow.ok(undefined),
+      ).mockReturnValue(Effect.succeed(undefined));
+      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
+        Effect.succeed(undefined),
       );
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.ok({
+      vi.mocked(logSyncModule.syncLogs).mockReturnValue(
+        Effect.succeed({
           createdWorldJoinLogModelList: [],
           createdPlayerJoinLogModelList: [],
           createdPlayerLeaveLogModelList: [],
@@ -192,17 +190,16 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        [dirPath],
-        mockGetDBLogs,
+      const exit = await Effect.runPromiseExit(
+        importService.importLogStoreFiles([dirPath], mockGetDBLogs),
       );
 
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        expect(result.value.success).toBe(true);
-        expect(result.value.importedData.totalLines).toBe(1);
-        expect(result.value.importedData.processedFiles).toHaveLength(1);
-        expect(result.value.importedData.processedFiles[0]).toContain(
+      expect(Exit.isSuccess(exit)).toBe(true);
+      if (Exit.isSuccess(exit)) {
+        expect(exit.value.success).toBe(true);
+        expect(exit.value.importedData.totalLines).toBe(1);
+        expect(exit.value.importedData.processedFiles).toHaveLength(1);
+        expect(exit.value.importedData.processedFiles[0]).toContain(
           'logStore-2023-11.txt',
         );
       }
@@ -213,17 +210,19 @@ describe('importService', () => {
 
       vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
-      const result = await importService.importLogStoreFiles(
-        filePaths,
-        mockGetDBLogs,
+      const exit = await Effect.runPromiseExit(
+        importService.importLogStoreFiles(filePaths, mockGetDBLogs),
       );
 
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(result.error.type).toBe('NO_FILES_FOUND');
-        expect(getImportErrorMessage(result.error)).toContain(
-          'インポート対象のlogStoreファイルが見つかりませんでした',
-        );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value._tag).toBe('ImportNoFilesFound');
+          expect(getImportErrorMessage(failOpt.value)).toContain(
+            'インポート対象のlogStoreファイルが見つかりませんでした',
+          );
+        }
       }
     });
 
@@ -235,23 +234,26 @@ describe('importService', () => {
         isFile: () => true,
         isDirectory: () => false,
       } as Stats);
-      const backupError: BackupError = {
-        type: 'EXPORT_FAILED',
+      const backupError = new BackupExportFailed({
         message: 'Backup failed',
-      };
+      });
       vi.mocked(
         backupServiceModule.backupService.createPreImportBackup,
-      ).mockResolvedValue(neverthrow.err(backupError));
+      ).mockReturnValue(Effect.fail(backupError));
 
-      const result = await importService.importLogStoreFiles(
-        filePaths,
-        mockGetDBLogs,
+      const exit = await Effect.runPromiseExit(
+        importService.importLogStoreFiles(filePaths, mockGetDBLogs),
       );
 
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(result.error.type).toBe('BACKUP_FAILED');
-        expect(getImportErrorMessage(result.error)).toContain('Backup failed');
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value._tag).toBe('ImportBackupFailed');
+          expect(getImportErrorMessage(failOpt.value)).toContain(
+            'Backup failed',
+          );
+        }
       }
     });
   });
@@ -309,15 +311,15 @@ describe('importService', () => {
 
       vi.mocked(
         backupServiceModule.backupService.createPreImportBackup,
-      ).mockResolvedValue(neverthrow.ok(mockBackup));
+      ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService.updateBackupMetadata,
-      ).mockResolvedValue(neverthrow.ok(undefined));
-      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockResolvedValue(
-        neverthrow.ok(undefined),
+      ).mockReturnValue(Effect.succeed(undefined));
+      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
+        Effect.succeed(undefined),
       );
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.ok({
+      vi.mocked(logSyncModule.syncLogs).mockReturnValue(
+        Effect.succeed({
           createdWorldJoinLogModelList: [],
           createdPlayerJoinLogModelList: [],
           createdPlayerLeaveLogModelList: [],
@@ -325,13 +327,13 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        paths,
-        mockGetDBLogs,
+      const exit = await Effect.runPromiseExit(
+        importService.importLogStoreFiles(paths, mockGetDBLogs),
       );
 
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
+      expect(Exit.isSuccess(exit)).toBe(true);
+      if (Exit.isSuccess(exit)) {
+        const result = exit;
         // /path/to/dir内のlogStoreファイルのみが処理される
         // file.txtはlogStoreファイルではないのでスキップ
         // dir/logStore-2023-11.txt + dir/subdir/logStore-2023-12.txt = 2ファイル
@@ -367,15 +369,15 @@ describe('importService', () => {
 
       vi.mocked(
         backupServiceModule.backupService.createPreImportBackup,
-      ).mockResolvedValue(neverthrow.ok(mockBackup));
+      ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService.updateBackupMetadata,
-      ).mockResolvedValue(neverthrow.ok(undefined));
-      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockResolvedValue(
-        neverthrow.ok(undefined),
+      ).mockReturnValue(Effect.succeed(undefined));
+      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
+        Effect.succeed(undefined),
       );
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.ok({
+      vi.mocked(logSyncModule.syncLogs).mockReturnValue(
+        Effect.succeed({
           createdWorldJoinLogModelList: [],
           createdPlayerJoinLogModelList: [],
           createdPlayerLeaveLogModelList: [],
@@ -383,17 +385,16 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        filePaths,
-        mockGetDBLogs,
+      const exit = await Effect.runPromiseExit(
+        importService.importLogStoreFiles(filePaths, mockGetDBLogs),
       );
 
       // 処理自体は成功する（無効な行も含めて処理される）
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
+      expect(Exit.isSuccess(exit)).toBe(true);
+      if (Exit.isSuccess(exit)) {
         // 実際の動作に合わせて、totalLinesは2（無効でも行数としてカウント）
-        expect(result.value.importedData.totalLines).toBe(2);
-        expect(result.value.success).toBe(true);
+        expect(exit.value.importedData.totalLines).toBe(2);
+        expect(exit.value.success).toBe(true);
       }
     });
   });
@@ -474,15 +475,15 @@ describe('importService', () => {
 
       vi.mocked(
         backupServiceModule.backupService.createPreImportBackup,
-      ).mockResolvedValue(neverthrow.ok(mockBackup));
+      ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService.updateBackupMetadata,
-      ).mockResolvedValue(neverthrow.ok(undefined));
-      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockResolvedValue(
-        neverthrow.ok(undefined),
+      ).mockReturnValue(Effect.succeed(undefined));
+      vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
+        Effect.succeed(undefined),
       );
-      vi.mocked(logSyncModule.syncLogs).mockResolvedValue(
-        neverthrow.ok({
+      vi.mocked(logSyncModule.syncLogs).mockReturnValue(
+        Effect.succeed({
           createdWorldJoinLogModelList: [],
           createdPlayerJoinLogModelList: [],
           createdPlayerLeaveLogModelList: [],
@@ -490,13 +491,13 @@ describe('importService', () => {
         }),
       );
 
-      const result = await importService.importLogStoreFiles(
-        paths,
-        mockGetDBLogs,
+      const exit = await Effect.runPromiseExit(
+        importService.importLogStoreFiles(paths, mockGetDBLogs),
       );
 
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
+      expect(Exit.isSuccess(exit)).toBe(true);
+      if (Exit.isSuccess(exit)) {
+        const result = exit;
         // logStore-2023-11.txt と vrchat-albums-export_data.txt のみが処理される
         expect(result.value.importedData.processedFiles).toHaveLength(2);
         expect(result.value.importedData.totalLines).toBe(2);

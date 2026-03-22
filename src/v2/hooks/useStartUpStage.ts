@@ -111,6 +111,7 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
 
         // ログ同期完了後、ログ関連のクエリキャッシュを無効化
         // キャッシュ無効化完了を待ってからステージ遷移する
+        // effect-lint-allow-try-catch: React フロントエンド境界
         try {
           await invalidatePhotoGalleryQueries(utils);
         } catch (error) {

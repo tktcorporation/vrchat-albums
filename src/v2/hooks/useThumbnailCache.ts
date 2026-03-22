@@ -47,6 +47,7 @@ function notifyCacheUpdate(photoPath: string, data: string): void {
   const pathListeners = cacheListeners.get(photoPath);
   if (pathListeners) {
     for (const listener of pathListeners) {
+      // effect-lint-allow-try-catch: React フロントエンド境界
       try {
         listener(data);
       } catch (error) {
@@ -354,6 +355,7 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
       }
 
       const batchToFetch = pathsToFetch.slice(0, PREFETCH_BATCH_SIZE);
+      // effect-lint-allow-try-catch: React フロントエンド境界
       try {
         const result = await utils.vrchatPhoto.getBatchThumbnails.fetch({
           photoPaths: batchToFetch,
@@ -415,6 +417,7 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
 
     isPrefetchingRef.current = true;
 
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       while (prefetchQueueRef.current.length > 0) {
         const batch = prefetchQueueRef.current.splice(0, PREFETCH_BATCH_SIZE);

@@ -62,7 +62,7 @@ export interface StructuredErrorInfo {
  * ユーザー向けエラーの基底クラス
  *
  * @see docs/error-handling.md - 詳細なエラーハンドリング方針
- * @see electron/lib/errorHelpers.ts
+ * @see electron/lib/effectTRPC.ts - runEffect (tRPC 実行境界)
  * @see electron/lib/logger.ts
  */
 export class UserFacingError extends Error {
@@ -134,7 +134,7 @@ export class UserFacingError extends Error {
  * Sentry通知済みエラークラス
  *
  * 予期しないエラーが発生したが、logger.error()でSentryに通知済みであることを示す。
- * neverthrowのResult型でgeneric Error型を避けつつ、Sentry通知を保証するために使用。
+ * Effect TSのEチャネルでgeneric Error型を避けつつ、Sentry通知を保証するために使用。
  *
  * ⚠️ 使用は最小限に：ユーザビリティ上本当に必要な場合のみ使用してください。
  * 基本的にはエラーを伝播させ、予期しないエラーは自然にSentryに送られるようにします。

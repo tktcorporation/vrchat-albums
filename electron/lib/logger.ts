@@ -1,6 +1,6 @@
 import { captureException, captureMessage } from '@sentry/electron/main';
+import { Effect, Either } from 'effect';
 import * as log from 'electron-log';
-import { Result } from 'neverthrow';
 import path from 'pathe';
 import { stackWithCauses } from 'pony-cause';
 import { match, P } from 'ts-pattern';
@@ -9,6 +9,7 @@ import { UserFacingError } from './errors';
 
 // ログファイルパスを遅延評価する
 const getLogFilePath = (): string => {
+  // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
     const { app } = require('electron');
     return path.join(app.getPath('logs'), 'app.log');
@@ -27,6 +28,7 @@ log.transports.file.maxSize = 5 * 1024 * 1024;
 
 // ログレベルの設定
 const getIsProduction = (): boolean => {
+  // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
     const { app } = require('electron');
     return app.isPackaged;
@@ -89,6 +91,16 @@ const debug = log.debug;
 const warn = log.warn;
 
 /**
+ * 同期的に try-catch を Either で返すヘルパー。
+ * logger 内で Result.fromThrowable の代替として使用。
+ */
+const trySyncEither = <A>(fn: () => A): Either.Either<A, unknown> => {
+  return Effect.runSync(
+    Effect.either(Effect.try({ try: fn, catch: (e) => e })),
+  );
+};
+
+/**
  * ローカルログ出力に加え、Sentry に warning レベルで送信するラッパー関数。
  *
  * 背景: logger.warn はローカルログのみだが、一部の警告はプロダクション環境で
@@ -110,43 +122,38 @@ const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
   );
 
   // 規約同意済みかどうかを確認
-  const termsAccepted = Result.fromThrowable(
-    () => {
-      const settingStore = getSettingStore();
-      return settingStore.getTermsAccepted();
-    },
-    (error) => error,
-  )().match(
-    (accepted) => accepted,
-    (error) => {
+  const termsResult = trySyncEither(() => {
+    const settingStore = getSettingStore();
+    return settingStore.getTermsAccepted();
+  });
+  const termsAccepted = Either.match(termsResult, {
+    onRight: (accepted) => accepted,
+    onLeft: (error) => {
       log.warn('Failed to get terms accepted:', error);
       return false;
     },
-  );
+  });
 
   match(termsAccepted)
     .with(true, () => {
       log.debug('Attempting to send warning to Sentry...');
-      const sendResult = Result.fromThrowable(
-        () => {
-          captureMessage(messageString, {
-            level: 'warning',
-            extra: {
-              ...(stack ? { stack: stackWithCauses(stack) } : {}),
-              ...(details ? { details } : {}),
-            },
-            tags: {
-              source: 'electron-main',
-            },
-          });
-        },
-        (error) => error,
-      )();
-      sendResult.match(
-        () => log.debug('Warning sent to Sentry successfully'),
-        (sentryError) =>
+      const sendResult = trySyncEither(() => {
+        captureMessage(messageString, {
+          level: 'warning',
+          extra: {
+            ...(stack ? { stack: stackWithCauses(stack) } : {}),
+            ...(details ? { details } : {}),
+          },
+          tags: {
+            source: 'electron-main',
+          },
+        });
+      });
+      Either.match(sendResult, {
+        onRight: () => log.debug('Warning sent to Sentry successfully'),
+        onLeft: (sentryError) =>
           log.debug('Failed to send warning to Sentry:', sentryError),
-      );
+      });
     })
     .with(false, () => {
       log.debug('Terms not accepted, skipping Sentry warning');
@@ -169,19 +176,17 @@ const error = ({ message, stack, details }: ErrorLogParams): void => {
   );
 
   // 規約同意済みかどうかを確認
-  const termsAccepted = Result.fromThrowable(
-    () => {
-      const settingStore = getSettingStore();
-      return settingStore.getTermsAccepted();
-    },
-    (error) => error,
-  )().match(
-    (accepted) => accepted,
-    (error) => {
+  const termsResult = trySyncEither(() => {
+    const settingStore = getSettingStore();
+    return settingStore.getTermsAccepted();
+  });
+  const termsAccepted = Either.match(termsResult, {
+    onRight: (accepted) => accepted,
+    onLeft: (error) => {
       log.warn('Failed to get terms accepted:', error);
       return false;
     },
-  );
+  });
 
   // UserFacingErrorの場合でもcauseがあればSentryに送信（予期しないエラーの詳細を取得するため）
   // causeがない純粋なUserFacingErrorは意図的に処理されたエラーなので送信しない
@@ -204,37 +209,34 @@ const error = ({ message, stack, details }: ErrorLogParams): void => {
       log.debug('Attempting to send error to Sentry...');
       // UserFacingErrorの場合はcauseを送信、それ以外は元のエラーを送信
       const errorToSend = causeError ?? errorInfo;
-      const sendResult = Result.fromThrowable(
-        () => {
-          captureException(errorToSend, {
-            extra: {
-              ...(stack ? { stack: stackWithCauses(stack) } : {}),
-              ...(details ? { details } : {}),
-              // UserFacingErrorの場合は追加情報を付与
-              ...(userFacingError
-                ? {
-                    userFacingMessage: userFacingError.message,
-                    errorCode: userFacingError.errorInfo?.code,
-                    errorCategory: userFacingError.errorInfo?.category,
-                  }
-                : {}),
-            },
-            tags: {
-              source: 'electron-main',
-              ...(userFacingError ? { hasUserFacingWrapper: 'true' } : {}),
-            },
-          });
-        },
-        (error) => error,
-      )();
-      sendResult.match(
-        () =>
+      const sendResult = trySyncEither(() => {
+        captureException(errorToSend, {
+          extra: {
+            ...(stack ? { stack: stackWithCauses(stack) } : {}),
+            ...(details ? { details } : {}),
+            // UserFacingErrorの場合は追加情報を付与
+            ...(userFacingError
+              ? {
+                  userFacingMessage: userFacingError.message,
+                  errorCode: userFacingError.errorInfo?.code,
+                  errorCategory: userFacingError.errorInfo?.category,
+                }
+              : {}),
+          },
+          tags: {
+            source: 'electron-main',
+            ...(userFacingError ? { hasUserFacingWrapper: 'true' } : {}),
+          },
+        });
+      });
+      Either.match(sendResult, {
+        onRight: () =>
           log.debug(
             `Error sent to Sentry successfully${causeError ? ' (cause from UserFacingError)' : ''}`,
           ),
-        (sentryError) =>
+        onLeft: (sentryError) =>
           log.debug('Failed to send error to Sentry:', sentryError),
-      );
+      });
     })
     .with({ termsAccepted: true, shouldSendToSentry: false }, () => {
       log.debug(

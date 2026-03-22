@@ -1,8 +1,12 @@
-import * as neverthrow from 'neverthrow';
-import { ResultAsync } from 'neverthrow';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { match } from 'ts-pattern';
 import z from 'zod';
-import { ERROR_CATEGORIES, UserFacingError } from '../../lib/errors';
+import { runEffect } from '../../lib/effectTRPC';
+import {
+  ERROR_CATEGORIES,
+  ERROR_CODES,
+  UserFacingError,
+} from '../../lib/errors';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
 import * as playerJoinLogService from './../VRChatPlayerJoinLogModel/playerJoinLog.service';
@@ -42,27 +46,39 @@ import * as vrchatLogService from './service';
  */
 export const appendLoglinesToFileFromLogFilePathList = async (
   processAll = false,
-): Promise<neverthrow.Result<void, VRChatLogFileError>> => {
-  const vrchatlogFilesDir =
-    await vrchatLogFileDirService.getValidVRChatLogFileDir();
-  if (vrchatlogFilesDir.isErr()) {
-    return neverthrow.err(
-      new VRChatLogFileError(
-        match(vrchatlogFilesDir.error.error)
+): Promise<void> => {
+  const vrchatlogFilesDirExit = await Effect.runPromiseExit(
+    vrchatLogFileDirService.getValidVRChatLogFileDir(),
+  );
+  if (Exit.isFailure(vrchatlogFilesDirExit)) {
+    const failOpt = Cause.failureOption(vrchatlogFilesDirExit.cause);
+    if (Option.isSome(failOpt)) {
+      throw new VRChatLogFileError(
+        match(failOpt.value.error)
           .with('logFilesNotFound', () => 'LOG_FILES_NOT_FOUND' as const)
           .with('logFileDirNotFound', () => 'LOG_FILE_DIR_NOT_FOUND' as const)
           .exhaustive(),
-      ),
-    );
+      );
+    }
+    const dieOpt = Cause.dieOption(vrchatlogFilesDirExit.cause);
+    if (Option.isSome(dieOpt)) {
+      throw dieOpt.value;
+    }
+    throw new Error('Effect was interrupted or failed with an unknown cause');
   }
+  const vrchatlogFilesDir = vrchatlogFilesDirExit.value;
 
   // DBから最新のログ日時を取得（processAllがfalseの場合のみ）
   let startDate = new Date(0); // デフォルトは最古の日時
   if (!processAll) {
-    const latestWorldJoinLogResult =
-      await worldJoinLogService.findLatestWorldJoinLog();
-    if (latestWorldJoinLogResult.isOk() && latestWorldJoinLogResult.value) {
-      startDate = latestWorldJoinLogResult.value.joinDateTime;
+    const latestWorldJoinLogExit = await Effect.runPromiseExit(
+      worldJoinLogService.findLatestWorldJoinLog(),
+    );
+    if (
+      Exit.isSuccess(latestWorldJoinLogExit) &&
+      latestWorldJoinLogExit.value
+    ) {
+      startDate = latestWorldJoinLogExit.value.joinDateTime;
       logger.info(`Processing logs after ${startDate.toISOString()}`);
     } else {
       logger.info('No existing logs found in DB, processing all logs');
@@ -72,87 +88,62 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   }
 
   // すべてのログファイルパスを取得
-  const logFilePathList =
-    await vrchatLogFileDirService.getVRChatLogFilePathList(
-      vrchatlogFilesDir.value.path,
-    );
-  if (logFilePathList.isErr()) {
-    return neverthrow.err(
-      new VRChatLogFileError(
-        match(logFilePathList.error)
-          .with('ENOENT', () => 'LOG_FILE_DIR_NOT_FOUND' as const)
-          .exhaustive(),
-      ),
-    );
+  const logFilePathListExit = await Effect.runPromiseExit(
+    vrchatLogFileDirService.getVRChatLogFilePathList(vrchatlogFilesDir.path),
+  );
+  if (Exit.isFailure(logFilePathListExit)) {
+    const failOpt = Cause.failureOption(logFilePathListExit.cause);
+    if (Option.isSome(failOpt)) {
+      throw new VRChatLogFileError('LOG_FILE_DIR_NOT_FOUND' as const);
+    }
+    const dieOpt = Cause.dieOption(logFilePathListExit.cause);
+    if (Option.isSome(dieOpt)) {
+      throw dieOpt.value;
+    }
+    throw new Error('Effect was interrupted or failed with an unknown cause');
   }
+  const logFilePathList = logFilePathListExit.value;
 
-  logger.info(`Found ${logFilePathList.value.length} log files to process`);
+  logger.info(`Found ${logFilePathList.length} log files to process`);
 
-  // ResultAsync.fromPromise でストリーミング処理のエラーを処理
-  const streamResult = await ResultAsync.fromPromise(
-    (async () => {
-      let totalProcessedLines = 0;
-      let hasProcessedAnyLines = false;
+  let totalProcessedLines = 0;
+  let hasProcessedAnyLines = false;
 
-      // ストリーミング処理で各バッチを処理
-      for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
-        {
-          logFilePathList: logFilePathList.value,
-          includesList: [...FILTER_PATTERNS],
-          batchSize: 1000, // バッチサイズを指定
-          maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
-        },
-      )) {
-        // ログ行をフィルタリング（processAll=trueの場合はスキップ）
-        const filteredLogLines = processAll
-          ? logLineBatch
-          : vrchatLogService.filterLogLinesByDate(logLineBatch, startDate);
-
-        if (filteredLogLines.length > 0) {
-          hasProcessedAnyLines = true;
-          totalProcessedLines += filteredLogLines.length;
-
-          logger.debug(
-            `Processing batch of ${filteredLogLines.length} log lines`,
-          );
-
-          // 各バッチを保存
-          const result = await vrchatLogService.appendLoglinesToFile({
-            logLines: filteredLogLines,
-          });
-          if (result.isErr()) {
-            // エラーをthrowしてerror handlerで処理
-            throw result.error;
-          }
-        }
-      }
-
-      return { totalProcessedLines, hasProcessedAnyLines };
-    })(),
-    (error): VRChatLogFileError => {
-      // VRChatLogFileError は予期されたエラーなのでそのまま返す
-      if (error instanceof VRChatLogFileError) {
-        return error;
-      }
-      // その他のエラーは予期しないエラーなので上位に伝播（Sentryに送信される）
-      throw error;
+  // ストリーミング処理で各バッチを処理
+  for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
+    {
+      logFilePathList: logFilePathList,
+      includesList: [...FILTER_PATTERNS],
+      batchSize: 1000, // バッチサイズを指定
+      maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
     },
-  );
+  )) {
+    // ログ行をフィルタリング（processAll=trueの場合はスキップ）
+    const filteredLogLines = processAll
+      ? logLineBatch
+      : vrchatLogService.filterLogLinesByDate(logLineBatch, startDate);
 
-  if (streamResult.isErr()) {
-    return neverthrow.err(streamResult.error);
+    if (filteredLogLines.length > 0) {
+      hasProcessedAnyLines = true;
+      totalProcessedLines += filteredLogLines.length;
+
+      logger.debug(`Processing batch of ${filteredLogLines.length} log lines`);
+
+      // 各バッチを保存 (appendLoglinesToFile は Effect<void, never>)
+      await Effect.runPromise(
+        vrchatLogService.appendLoglinesToFile({
+          logLines: filteredLogLines,
+        }),
+      );
+    }
   }
 
-  if (!streamResult.value.hasProcessedAnyLines) {
+  if (!hasProcessedAnyLines) {
     logger.info('No new log lines to process after filtering');
-    return neverthrow.ok(undefined);
+    return;
   }
 
-  logger.info(
-    `Processing completed: ${streamResult.value.totalProcessedLines} log lines`,
-  );
-
-  return neverthrow.ok(undefined);
+  logger.info(`Processing completed: ${totalProcessedLines} log lines`);
 };
 
 /**
@@ -200,30 +191,21 @@ const getDBLogsFromDatabase = async (
   }
 
   // プレイヤー参加ログを取得
-  let playerJoinResult: Awaited<
-    ReturnType<
-      typeof playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime
-    >
-  >;
-
-  if (startDate) {
-    playerJoinResult =
-      await playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: startDate,
-        endJoinDateTime: endDate || null,
-      });
-  } else {
+  let playerJoinStartDate = startDate;
+  if (!playerJoinStartDate) {
     // 期間指定がない場合は、最古の日付から現在までを取得
-    const oldestDate = new Date('2017-01-01'); // VRChatリリース日程度
-    playerJoinResult =
-      await playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
-        startJoinDateTime: oldestDate,
-        endJoinDateTime: endDate || new Date(),
-      });
+    playerJoinStartDate = new Date('2017-01-01'); // VRChatリリース日程度
   }
 
-  if (playerJoinResult.isOk()) {
-    for (const log of playerJoinResult.value) {
+  const playerJoinLogExit = await Effect.runPromiseExit(
+    playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
+      startJoinDateTime: playerJoinStartDate,
+      endJoinDateTime: endDate || null,
+    }),
+  );
+
+  if (Exit.isSuccess(playerJoinLogExit)) {
+    for (const log of playerJoinLogExit.value) {
       logRecords.push({
         type: 'playerJoin',
         record: {
@@ -272,13 +254,6 @@ const getDBLogsFromDatabase = async (
     });
   }
 
-  // TODO: アプリイベントログの取得は今後実装
-  // const appEventRecords = await appEventService.getAppEventLogRecords(
-  //   startDate,
-  //   endDate,
-  // );
-  // logRecords.push(...appEventRecords);
-
   return logRecords;
 };
 
@@ -298,13 +273,7 @@ export const vrchatLogRouter = () =>
         logger.info(
           `appendLoglinesToFileFromLogFilePathList (processAll=${input.processAll})`,
         );
-        const result = await appendLoglinesToFileFromLogFilePathList(
-          input.processAll,
-        );
-        if (result.isErr()) {
-          throw result.error;
-        }
-        return result.value;
+        await appendLoglinesToFileFromLogFilePathList(input.processAll);
       }),
     exportLogStoreData: procedure
       .input(
@@ -322,33 +291,32 @@ export const vrchatLogRouter = () =>
             : '全期間';
         logger.info(`exportLogStoreData: ${dateRangeMsg}`);
 
-        const exportResult = await exportLogStoreFromDB(
-          {
-            startDate: input.startDate,
-            endDate: input.endDate,
-            outputBasePath: input.outputPath,
-          },
-          getDBLogsFromDatabase,
+        const result = await runEffect(
+          exportLogStoreFromDB(
+            {
+              startDate: input.startDate,
+              endDate: input.endDate,
+              outputBasePath: input.outputPath,
+            },
+            getDBLogsFromDatabase,
+          ).pipe(
+            Effect.mapError((e) => {
+              const errorMessage = getExportErrorMessage(e);
+              logger.error({ message: `Export failed: ${errorMessage}` });
+              eventEmitter.emit(
+                'toast',
+                `エクスポートに失敗しました: ${errorMessage}`,
+              );
+              return UserFacingError.withStructuredInfo({
+                code: ERROR_CODES.EXPORT_ERROR,
+                category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+                message: errorMessage,
+                userMessage: errorMessage,
+                cause: e,
+              });
+            }),
+          ),
         );
-
-        if (exportResult.isErr()) {
-          const errorMessage = getExportErrorMessage(exportResult.error);
-          logger.error({
-            message: `Export failed: ${errorMessage}`,
-          });
-          eventEmitter.emit(
-            'toast',
-            `エクスポートに失敗しました: ${errorMessage}`,
-          );
-          throw new UserFacingError(errorMessage, {
-            code: 'EXPORT_ERROR',
-            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-            message: errorMessage,
-            userMessage: errorMessage,
-          });
-        }
-
-        const result = exportResult.value;
 
         logger.info(
           `Export completed: ${result.exportedFiles.length} files, ${result.totalLogLines} lines`,
@@ -364,25 +332,27 @@ export const vrchatLogRouter = () =>
     createPreImportBackup: procedure.mutation(async () => {
       logger.info('Creating pre-import backup');
 
-      // backupService.createPreImportBackup は Result 型を返すため、try-catch は不要
-      // 予期しないエラーは自動的に throw されて Sentry に送信される
-      const backupResult = await backupService.createPreImportBackup(
-        getDBLogsFromDatabase,
+      const backup = await runEffect(
+        backupService.createPreImportBackup(getDBLogsFromDatabase).pipe(
+          Effect.mapError((e) => {
+            const errorMessage = getBackupErrorMessage(e);
+            logger.error({
+              message: `Pre-import backup failed: ${errorMessage}`,
+            });
+            eventEmitter.emit(
+              'toast',
+              `バックアップ作成に失敗しました: ${errorMessage}`,
+            );
+            return UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.UNKNOWN,
+              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+              message: errorMessage,
+              userMessage: `バックアップ作成に失敗しました: ${errorMessage}`,
+              cause: e,
+            });
+          }),
+        ),
       );
-
-      if (backupResult.isErr()) {
-        const errorMessage = getBackupErrorMessage(backupResult.error);
-        logger.error({
-          message: `Pre-import backup failed: ${errorMessage}`,
-        });
-        eventEmitter.emit(
-          'toast',
-          `バックアップ作成に失敗しました: ${errorMessage}`,
-        );
-        throw new Error(errorMessage);
-      }
-
-      const backup = backupResult.value;
 
       logger.info(`Pre-import backup created successfully: ${backup.id}`);
       eventEmitter.emit(
@@ -404,26 +374,29 @@ export const vrchatLogRouter = () =>
           `Starting logStore import for ${input.filePaths.length} files`,
         );
 
-        // importService.importLogStoreFiles は Result 型を返すため、try-catch は不要
-        // 予期しないエラーは自動的に throw されて Sentry に送信される
-        const importResult = await importService.importLogStoreFiles(
-          input.filePaths,
-          getDBLogsFromDatabase,
+        const result = await runEffect(
+          importService
+            .importLogStoreFiles(input.filePaths, getDBLogsFromDatabase)
+            .pipe(
+              Effect.mapError((e) => {
+                const errorMessage = getImportErrorMessage(e);
+                logger.error({
+                  message: `LogStore import failed: ${errorMessage}`,
+                });
+                eventEmitter.emit(
+                  'toast',
+                  `インポートに失敗しました: ${errorMessage}`,
+                );
+                return UserFacingError.withStructuredInfo({
+                  code: ERROR_CODES.UNKNOWN,
+                  category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+                  message: errorMessage,
+                  userMessage: `インポートに失敗しました: ${errorMessage}`,
+                  cause: e,
+                });
+              }),
+            ),
         );
-
-        if (importResult.isErr()) {
-          const errorMessage = getImportErrorMessage(importResult.error);
-          logger.error({
-            message: `LogStore import failed: ${errorMessage}`,
-          });
-          eventEmitter.emit(
-            'toast',
-            `インポートに失敗しました: ${errorMessage}`,
-          );
-          throw new Error(errorMessage);
-        }
-
-        const result = importResult.value;
 
         logger.info(
           `LogStore import completed: ${result.importedData.totalLines} lines from ${result.importedData.processedFiles.length} files`,
@@ -436,20 +409,25 @@ export const vrchatLogRouter = () =>
 
         return result;
       }),
-    getImportBackupHistory: procedure.query(async () => {
+    getImportBackupHistory: procedure.query(() => {
       logger.info('Getting import backup history');
 
-      const historyResult = await backupService.getBackupHistory();
-
-      return historyResult.match(
-        (history) => history,
-        (error) => {
-          const errorMessage = getBackupErrorMessage(error);
-          logger.error({
-            message: `Failed to get backup history: ${errorMessage}`,
-          });
-          throw new Error(errorMessage);
-        },
+      return runEffect(
+        backupService.getBackupHistory().pipe(
+          Effect.mapError((e) => {
+            const errorMessage = getBackupErrorMessage(e);
+            logger.error({
+              message: `Failed to get backup history: ${errorMessage}`,
+            });
+            return UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.UNKNOWN,
+              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+              message: errorMessage,
+              userMessage: `バックアップ履歴の取得に失敗しました: ${errorMessage}`,
+              cause: e,
+            });
+          }),
+        ),
       );
     }),
     rollbackToBackup: procedure
@@ -462,35 +440,47 @@ export const vrchatLogRouter = () =>
         const { input } = opts;
         logger.info(`Starting rollback to backup: ${input.backupId}`);
 
-        // backupService.getBackup, rollbackService.rollbackToBackup は Result 型を返すため、try-catch は不要
-        // 予期しないエラーは自動的に throw されて Sentry に送信される
-        const backupResult = await backupService.getBackup(input.backupId);
-        if (backupResult.isErr()) {
-          const errorMessage = getBackupErrorMessage(backupResult.error);
-          logger.error({
-            message: `Failed to get backup: ${errorMessage}`,
-          });
-          eventEmitter.emit(
-            'toast',
-            `バックアップの取得に失敗しました: ${errorMessage}`,
-          );
-          throw new Error(errorMessage);
-        }
+        const backup = await runEffect(
+          backupService.getBackup(input.backupId).pipe(
+            Effect.mapError((e) => {
+              const errorMessage = getBackupErrorMessage(e);
+              logger.error({
+                message: `Failed to get backup: ${errorMessage}`,
+              });
+              eventEmitter.emit(
+                'toast',
+                `バックアップの取得に失敗しました: ${errorMessage}`,
+              );
+              return UserFacingError.withStructuredInfo({
+                code: ERROR_CODES.UNKNOWN,
+                category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+                message: errorMessage,
+                userMessage: `バックアップの取得に失敗しました: ${errorMessage}`,
+                cause: e,
+              });
+            }),
+          ),
+        );
 
-        const backup = backupResult.value;
-
-        const rollbackResult = await rollbackService.rollbackToBackup(backup);
-        if (rollbackResult.isErr()) {
-          const errorMessage = getRollbackErrorMessage(rollbackResult.error);
-          logger.error({
-            message: `Rollback failed: ${errorMessage}`,
-          });
-          eventEmitter.emit(
-            'toast',
-            `ロールバックに失敗しました: ${errorMessage}`,
-          );
-          throw new Error(errorMessage);
-        }
+        await runEffect(
+          rollbackService.rollbackToBackup(backup).pipe(
+            Effect.mapError((e) => {
+              const errorMessage = getRollbackErrorMessage(e);
+              logger.error({ message: `Rollback failed: ${errorMessage}` });
+              eventEmitter.emit(
+                'toast',
+                `ロールバックに失敗しました: ${errorMessage}`,
+              );
+              return UserFacingError.withStructuredInfo({
+                code: ERROR_CODES.UNKNOWN,
+                category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+                message: errorMessage,
+                userMessage: `ロールバックに失敗しました: ${errorMessage}`,
+                cause: e,
+              });
+            }),
+          ),
+        );
 
         logger.info(`Rollback completed successfully: ${input.backupId}`);
         eventEmitter.emit(

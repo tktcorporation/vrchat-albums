@@ -1,4 +1,4 @@
-import { err, ok, type Result } from 'neverthrow';
+import { Effect } from 'effect';
 import type {
   VRChatLogLine,
   VRChatWorldId,
@@ -52,7 +52,7 @@ export type WorldJoinParseError =
 export const extractWorldJoinInfoFromLogs = (
   logLines: VRChatLogLine[],
   index: number,
-): Result<VRChatWorldJoinLog, WorldJoinParseError> => {
+): Effect.Effect<VRChatWorldJoinLog, WorldJoinParseError> => {
   const logEntry = logLines[index];
 
   // コロンとインスタンスIDをオプショナルにしたパターン
@@ -63,7 +63,7 @@ export const extractWorldJoinInfoFromLogs = (
   const matches = logEntry.match(regex);
 
   if (!matches) {
-    return err({ type: 'LOG_FORMAT_MISMATCH' });
+    return Effect.fail({ type: 'LOG_FORMAT_MISMATCH' });
   }
 
   const date = matches[1];
@@ -75,7 +75,7 @@ export const extractWorldJoinInfoFromLogs = (
   // ワールドIDの検証
   const worldIdResult = VRChatWorldIdSchema.safeParse(worldId);
   if (!worldIdResult.success) {
-    return err({ type: 'INVALID_WORLD_ID', worldId });
+    return Effect.fail({ type: 'INVALID_WORLD_ID', worldId });
   }
   const validatedWorldId = worldIdResult.data;
 
@@ -83,7 +83,7 @@ export const extractWorldJoinInfoFromLogs = (
   // VRChat ログにインスタンスIDが含まれない場合（ローカルワールド等）や、
   // 予期しない形式の場合（wrld_xxx がインスタンスIDとして記録される等）はエラーを返す
   if (instanceId === undefined || instanceId === '') {
-    return err({
+    return Effect.fail({
       type: 'INVALID_INSTANCE_ID',
       instanceId: instanceId ?? '',
       worldId,
@@ -92,7 +92,7 @@ export const extractWorldJoinInfoFromLogs = (
 
   const instanceIdResult = VRChatWorldInstanceIdSchema.safeParse(instanceId);
   if (!instanceIdResult.success) {
-    return err({ type: 'INVALID_INSTANCE_ID', instanceId, worldId });
+    return Effect.fail({ type: 'INVALID_INSTANCE_ID', instanceId, worldId });
   }
   const validatedInstanceId = instanceIdResult.data;
 
@@ -108,13 +108,13 @@ export const extractWorldJoinInfoFromLogs = (
   }
 
   if (!foundWorldName) {
-    return err({ type: 'WORLD_NAME_NOT_FOUND' });
+    return Effect.fail({ type: 'WORLD_NAME_NOT_FOUND' });
   }
 
   const joinDate = parseLogDateTime(date, time);
   const validatedWorldName = VRChatWorldNameSchema.parse(foundWorldName);
 
-  return ok({
+  return Effect.succeed({
     logType: 'worldJoin',
     joinDate,
     worldInstanceId: validatedInstanceId,

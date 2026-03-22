@@ -1,4 +1,5 @@
 import * as datefns from 'date-fns';
+import { Effect } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as client from '../../lib/sequelize';
 import * as service from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
@@ -79,8 +80,7 @@ describe('logInfo service', () => {
 
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
-      const resultWrapper = await getFrequentPlayerNames(3);
-      const result = resultWrapper._unsafeUnwrap();
+      const result = await Effect.runPromise(getFrequentPlayerNames(3));
 
       // 頻度順（Player1: 3回, Player2: 2回, Player3: 1回）で返されることを確認
       expect(result).toEqual(['Player1', 'Player2', 'Player3']);
@@ -218,16 +218,14 @@ describe('logInfo service', () => {
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
       // 上位2名のみ取得
-      const resultWrapper = await getFrequentPlayerNames(2);
-      const result = resultWrapper._unsafeUnwrap();
+      const result = await Effect.runPromise(getFrequentPlayerNames(2));
 
       expect(result).toHaveLength(2);
       expect(result).toEqual(['Player1', 'Player2']);
     });
 
     it('プレイヤーログが存在しない場合は空配列を返す', async () => {
-      const resultWrapper = await getFrequentPlayerNames(5);
-      const result = resultWrapper._unsafeUnwrap();
+      const result = await Effect.runPromise(getFrequentPlayerNames(5));
 
       expect(result).toEqual([]);
     });
@@ -281,8 +279,7 @@ describe('logInfo service', () => {
 
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
-      const resultWrapper = await getFrequentPlayerNames(3);
-      const result = resultWrapper._unsafeUnwrap();
+      const result = await Effect.runPromise(getFrequentPlayerNames(3));
 
       expect(result).toHaveLength(3);
       expect(result).toContain('PlayerA');
@@ -336,8 +333,7 @@ describe('logInfo service', () => {
         await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
       expect(createdEntries).toHaveLength(4); // 全て異なる時刻なので4つ作成される
 
-      const resultWrapper = await getFrequentPlayerNames(2);
-      const result = resultWrapper._unsafeUnwrap();
+      const result = await Effect.runPromise(getFrequentPlayerNames(2));
 
       // FrequentPlayerは3回、SinglePlayerは1回なので、この順序で返される
       expect(result).toEqual(['FrequentPlayer', 'SinglePlayer']);

@@ -515,8 +515,10 @@ describe('createVRChatPhotoPathIndex', () => {
           },
         );
 
+        // Effect.runPromise は予期しないエラー（die）を FiberFailure でラップするため、
+        // エラーメッセージでマッチする
         await expect(service.createVRChatPhotoPathIndex(false)).rejects.toThrow(
-          unexpectedError,
+          'EMFILE: too many open files',
         );
       });
     });
@@ -749,8 +751,10 @@ describe('createVRChatPhotoPathIndex', () => {
 
         vi.mocked(nodefsPromises.stat).mockRejectedValue(unexpectedError);
 
+        // Effect.runPromise は予期しないエラー（die）を FiberFailure でラップするため、
+        // エラーメッセージでマッチする
         await expect(service.createVRChatPhotoPathIndex(true)).rejects.toThrow(
-          unexpectedError,
+          'EMFILE: too many open files',
         );
       });
     });

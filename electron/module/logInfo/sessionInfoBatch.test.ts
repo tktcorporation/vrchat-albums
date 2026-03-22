@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { parseISO } from 'date-fns';
+import { Effect, Exit } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as client from '../../lib/sequelize';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
@@ -58,8 +59,8 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
         await getPlayerJoinListInSameWorldOriginal(testDate);
       const batchPlayers = await getPlayersFromSessionBatch(testDate);
 
-      // 元のロジックはエラーを返す
-      expect(originalResult.isErr()).toBe(true);
+      // 元のロジックは null を返す（ワールド参加ログなし）
+      expect(originalResult).toBeNull();
 
       // バッチロジックは空の配列を返す
       expect(batchPlayers).toEqual([]);
@@ -84,13 +85,12 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
         joinDate: worldJoinDate,
       };
 
-      const worldJoinResultAsync =
-        await worldJoinLogService.createVRChatWorldJoinLogModel([
-          worldJoinData,
-        ]);
+      const worldJoinResultExit = await Effect.runPromiseExit(
+        worldJoinLogService.createVRChatWorldJoinLogModel([worldJoinData]),
+      );
 
-      const nextWorldJoinResultAsync =
-        await worldJoinLogService.createVRChatWorldJoinLogModel([
+      const nextWorldJoinResultExit = await Effect.runPromiseExit(
+        worldJoinLogService.createVRChatWorldJoinLogModel([
           {
             logType: 'worldJoin' as const,
             worldId: VRChatWorldIdSchema.parse(
@@ -100,13 +100,14 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             worldInstanceId: VRChatWorldInstanceIdSchema.parse('67890'),
             joinDate: nextWorldJoinDate,
           },
-        ]);
+        ]),
+      );
 
-      const worldJoinResult = worldJoinResultAsync.isOk()
-        ? worldJoinResultAsync.value
+      const worldJoinResult = Exit.isSuccess(worldJoinResultExit)
+        ? worldJoinResultExit.value
         : [];
-      const nextWorldJoinResult = nextWorldJoinResultAsync.isOk()
-        ? nextWorldJoinResultAsync.value
+      const nextWorldJoinResult = Exit.isSuccess(nextWorldJoinResultExit)
+        ? nextWorldJoinResultExit.value
         : [];
 
       if (worldJoinResult.length > 0 && nextWorldJoinResult.length > 0) {
@@ -140,8 +141,8 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             await getPlayerJoinListInSameWorldOriginal(testDate);
           const batchPlayers = await getPlayersFromSessionBatch(testDate);
 
-          if (originalResult.isOk()) {
-            const originalPlayers = originalResult.value;
+          if (originalResult !== null) {
+            const originalPlayers = originalResult;
 
             // プレイヤー数が一致することを確認
             expect(batchPlayers.length).toBe(originalPlayers.length);
@@ -186,13 +187,12 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
         joinDate: worldJoinDate,
       };
 
-      const worldJoinResultAsync =
-        await worldJoinLogService.createVRChatWorldJoinLogModel([
-          worldJoinData,
-        ]);
+      const worldJoinResultExit = await Effect.runPromiseExit(
+        worldJoinLogService.createVRChatWorldJoinLogModel([worldJoinData]),
+      );
 
-      const nextWorldJoinResultAsync =
-        await worldJoinLogService.createVRChatWorldJoinLogModel([
+      const nextWorldJoinResultExit = await Effect.runPromiseExit(
+        worldJoinLogService.createVRChatWorldJoinLogModel([
           {
             logType: 'worldJoin' as const,
             worldId: VRChatWorldIdSchema.parse(
@@ -204,13 +204,14 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             worldInstanceId: VRChatWorldInstanceIdSchema.parse('54321'),
             joinDate: nextWorldJoinDate,
           },
-        ]);
+        ]),
+      );
 
-      const worldJoinResult = worldJoinResultAsync.isOk()
-        ? worldJoinResultAsync.value
+      const worldJoinResult = Exit.isSuccess(worldJoinResultExit)
+        ? worldJoinResultExit.value
         : [];
-      const nextWorldJoinResult = nextWorldJoinResultAsync.isOk()
-        ? nextWorldJoinResultAsync.value
+      const nextWorldJoinResult = Exit.isSuccess(nextWorldJoinResultExit)
+        ? nextWorldJoinResultExit.value
         : [];
 
       if (worldJoinResult.length > 0 && nextWorldJoinResult.length > 0) {
@@ -251,8 +252,8 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
           console.log('Batch players:', batchPlayers);
 
           // このケースでは結果が一致することを確認
-          if (originalResult.isOk()) {
-            const originalPlayers = originalResult.value;
+          if (originalResult !== null) {
+            const originalPlayers = originalResult;
 
             expect(batchPlayers.length).toBe(originalPlayers.length);
 

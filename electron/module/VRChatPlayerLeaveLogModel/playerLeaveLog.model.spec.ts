@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { Effect } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as client from '../../lib/sequelize';
 import { type getSettingStore, initSettingStoreForTest } from '../settingStore';
@@ -30,19 +31,13 @@ describe('module/VRChatPlayerLeaveLogModel', () => {
       getLogFilesDir: () => storedVRChatLogFilesDirPath.value,
     } as unknown as ReturnType<typeof getSettingStore>);
 
-    const logFilesDirPath = await getValidVRChatLogFileDir();
-    if (logFilesDirPath.isErr()) {
-      throw new Error('Unexpected error');
-    }
+    const logFilesDirPath = await Effect.runPromise(getValidVRChatLogFileDir());
 
-    const logInfoList = await getVRChaLogInfoFromLogPath(
-      logFilesDirPath.value.path,
+    const logInfoList = await Effect.runPromise(
+      getVRChaLogInfoFromLogPath(logFilesDirPath.path),
     );
-    if (logInfoList.isErr()) {
-      throw new Error('Unexpected error');
-    }
 
-    const leaveLogList = logInfoList.value.filter(
+    const leaveLogList = logInfoList.filter(
       (logInfo): logInfo is VRChatPlayerLeaveLog =>
         logInfo.logType === 'playerLeave',
     );

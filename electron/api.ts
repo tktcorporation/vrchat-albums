@@ -1,12 +1,9 @@
 import { observable } from '@trpc/server/observable';
+import { Effect } from 'effect';
 import z from 'zod';
 
 import { initializeMainSentry } from './index';
-import {
-  fileOperationErrorMappings,
-  handleResultError,
-  handleResultErrorWithSilent,
-} from './lib/errorHelpers';
+import { runEffect, runEffectExit } from './lib/effectTRPC';
 import { ERROR_CATEGORIES, ERROR_CODES, UserFacingError } from './lib/errors';
 import { logger } from './lib/logger';
 import { backgroundSettingsRouter } from './module/backgroundSettings/controller/backgroundSettingsController';
@@ -30,10 +27,6 @@ import { vrchatPhotoRouter } from './module/vrchatPhoto/vrchatPhoto.controller';
 import { vrchatPhotoMetadataRouter } from './module/vrchatPhotoMetadata/vrchatPhotoMetadata.controller';
 import { vrchatWorldJoinLogRouter } from './module/vrchatWorldJoinLog/vrchatWorldJoinLog.controller';
 import { eventEmitter as ee, procedure, router as trpcRouter } from './trpc';
-
-// type ExtractDataTypeFromResult<R> = R extends Result<infer T, unknown>
-//   ? T
-//   : never;
 
 const settingStore = initSettingStore();
 
@@ -107,26 +100,27 @@ export const router = trpcRouter({
     });
   }),
   getVRChatLogFilesDir: procedure.query(async () => {
-    const logFilesDirResult = await service.getVRChatLogFilesDir();
-    // tRPC レスポンス用に変換（後方互換性のため error フィールドを含める）
-    if (logFilesDirResult.isErr()) {
+    // runEffectExit が Defect/Interrupt を自動で re-throw（Sentry 送信）
+    const result = await runEffectExit(service.getVRChatLogFilesDir());
+    if (!result.success) {
       return {
         storedPath: null,
         path: '',
-        error: logFilesDirResult.error,
+        error: result.error,
       };
     }
     return {
-      ...logFilesDirResult.value,
+      ...result.value,
       error: null,
     };
   }),
   getStatusToUseVRChatLogFilesDir: procedure.query(async () => {
-    const vrchatLogFilesDirResult = await service.getVRChatLogFilesDir();
-    if (vrchatLogFilesDirResult.isErr()) {
-      return vrchatLogFilesDirResult.error;
+    // runEffectExit が Defect/Interrupt を自動で re-throw（Sentry 送信）
+    const result = await runEffectExit(service.getVRChatLogFilesDir());
+    if (!result.success) {
+      return result.error;
     }
-    if (vrchatLogFilesDirResult.value.path === null) {
+    if (result.value.path === null) {
       return 'logFilesDirNotSet';
     }
     return 'ready';
@@ -139,40 +133,85 @@ export const router = trpcRouter({
   clearStoredSetting: procedure
     .input(z.union([z.literal('logFilesDir'), z.literal('vrchatPhotoDir')]))
     .mutation(async (ctx) => {
-      const result = service.clearStoredSetting(ctx.input);
-      // clearStoredSettingのエラーはサイレントに処理（ログのみ出力）
-      const clearResult = handleResultErrorWithSilent(result, ['Error']);
-      if (clearResult !== null || result.isOk()) {
-        ee.emit('toast', '設定を削除しました');
-      }
+      const clearEffect = service.clearStoredSetting(ctx.input);
+      await runEffect(
+        clearEffect.pipe(
+          // SettingStoreError は silent（設定削除失敗は致命的ではない）
+          Effect.catchAll(() => Effect.succeed(undefined)),
+        ),
+      );
+      ee.emit('toast', '設定を削除しました');
       return undefined;
     }),
   openPathOnExplorer: procedure.input(z.string()).mutation(async (ctx) => {
-    const result = await service.openPathOnExplorer(ctx.input);
-    handleResultError(result, fileOperationErrorMappings);
+    await runEffect(
+      service.openPathOnExplorer(ctx.input).pipe(
+        Effect.mapError((e) =>
+          UserFacingError.withStructuredInfo({
+            code: ERROR_CODES.UNKNOWN,
+            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+            message: String(e),
+            userMessage: 'ファイル操作中にエラーが発生しました。',
+            cause: e instanceof Error ? e : new Error(String(e)),
+          }),
+        ),
+      ),
+    );
     return true;
   }),
   openElectronLogOnExplorer: procedure.mutation(async () => {
-    const result = await service.openElectronLogOnExplorer();
-    handleResultError(result, fileOperationErrorMappings);
+    await runEffect(
+      service.openElectronLogOnExplorer().pipe(
+        Effect.mapError((e) =>
+          UserFacingError.withStructuredInfo({
+            code: ERROR_CODES.UNKNOWN,
+            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+            message: String(e),
+            userMessage: 'ファイル操作中にエラーが発生しました。',
+            cause: e instanceof Error ? e : new Error(String(e)),
+          }),
+        ),
+      ),
+    );
     return true;
   }),
   openDirOnExplorer: procedure.input(z.string()).mutation(async (ctx) => {
-    const result = await service.openDirOnExplorer(ctx.input);
-    handleResultError(result, fileOperationErrorMappings);
+    await runEffect(
+      service.openDirOnExplorer(ctx.input).pipe(
+        Effect.mapError((e) =>
+          UserFacingError.withStructuredInfo({
+            code: ERROR_CODES.UNKNOWN,
+            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+            message: String(e),
+            userMessage: 'ファイル操作中にエラーが発生しました。',
+            cause: e instanceof Error ? e : new Error(String(e)),
+          }),
+        ),
+      ),
+    );
     return true;
   }),
   setVRChatLogFilesDirByDialog: procedure.mutation(async () => {
-    const result = await service.setVRChatLogFilesDirByDialog();
-    // キャンセルはサイレントに処理、その他のエラーはUserFacingErrorに変換
-    const dialogResult = handleResultErrorWithSilent(
-      result,
-      ['canceled'],
-      fileOperationErrorMappings,
+    await runEffect(
+      service.setVRChatLogFilesDirByDialog().pipe(
+        Effect.catchAll((e) => {
+          if (e === 'canceled') {
+            // キャンセルは silent（ユーザーの意図的な操作）
+            return Effect.succeed(undefined);
+          }
+          return Effect.fail(
+            UserFacingError.withStructuredInfo({
+              code: ERROR_CODES.UNKNOWN,
+              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+              message: String(e),
+              userMessage: 'ファイル操作中にエラーが発生しました。',
+              cause: e instanceof Error ? e : new Error(String(e)),
+            }),
+          );
+        }),
+      ),
     );
-    if (dialogResult !== null) {
-      ee.emit('toast', 'VRChatのログファイルの保存先を設定しました');
-    }
+    ee.emit('toast', 'VRChatのログファイルの保存先を設定しました');
     return true;
   }),
   setVRChatLogFilePath: procedure
@@ -226,33 +265,35 @@ export const router = trpcRouter({
       }),
     )
     .mutation(async ({ input }) => {
-      const result = await openGetFileDialog(
-        input.properties as Array<
-          'openDirectory' | 'openFile' | 'multiSelections'
-        >,
+      // runEffectExit が Defect/Interrupt を自動で re-throw（Sentry 送信）
+      const result = await runEffectExit(
+        openGetFileDialog(
+          input.properties as Array<
+            'openDirectory' | 'openFile' | 'multiSelections'
+          >,
+        ),
       );
-      return result.match(
-        (filePaths) => ({
+      if (result.success) {
+        return {
           canceled: false,
-          filePaths,
-        }),
-        (error) => {
-          if (error === 'canceled') {
-            return {
-              canceled: true,
-              filePaths: [],
-            };
-          }
-          // canceledでない場合は予期しないエラーとして扱う
-          throw UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.UNKNOWN,
-            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-            message: 'File dialog error',
-            userMessage: 'ファイル選択ダイアログでエラーが発生しました。',
-            cause: new Error(String(error)),
-          });
-        },
-      );
+          filePaths: result.value,
+        };
+      }
+      const error = result.error;
+      if (error._tag === 'OperationCanceled') {
+        return {
+          canceled: true,
+          filePaths: [],
+        };
+      }
+      // canceledでない場合は予期しないエラーとして扱う
+      throw UserFacingError.withStructuredInfo({
+        code: ERROR_CODES.UNKNOWN,
+        category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+        message: 'File dialog error',
+        userMessage: 'ファイル選択ダイアログでエラーが発生しました。',
+        cause: new Error(String(error)),
+      });
     }),
 });
 

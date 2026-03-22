@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ERROR_CODES, UserFacingError } from '../../../lib/errors';
 import { logger } from '../../../lib/logger';
@@ -85,7 +86,8 @@ describe('settingsController.initializeAppData', () => {
       .fn()
       .mockResolvedValue([]);
 
-    mockSyncLogs.mockResolvedValue({ isErr: () => false });
+    // syncLogs returns Effect, not Promise
+    mockSyncLogs.mockReturnValue(Effect.succeed({ success: true }));
 
     // getSettingStoreのモック
     mockSettingStore.getSettingStore = vi.fn().mockReturnValue({
@@ -185,13 +187,13 @@ describe('settingsController.initializeAppData', () => {
 
   it('LOG_FILE_DIR_NOT_FOUND エラー時はセットアップが必要なエラーをスローする', async () => {
     // ログ同期でLOG_FILE_DIR_NOT_FOUNDエラー
-    mockSyncLogs.mockResolvedValue({
-      isErr: () => true,
-      error: {
+    // syncLogs returns Effect - use Effect.fail with error object that has code and message
+    mockSyncLogs.mockReturnValue(
+      Effect.fail({
         code: 'LOG_FILE_DIR_NOT_FOUND',
         message: 'Log directory not found',
-      },
-    });
+      }),
+    );
 
     if (!initializeAppData)
       throw new Error('initializeAppData not initialized');
@@ -224,10 +226,12 @@ describe('settingsController.initializeAppData', () => {
 
   it('LOG_FILES_NOT_FOUND エラー時もセットアップが必要なエラーをスローする', async () => {
     // ログ同期でLOG_FILES_NOT_FOUNDエラー
-    mockSyncLogs.mockResolvedValue({
-      isErr: () => true,
-      error: { code: 'LOG_FILES_NOT_FOUND', message: 'No log files found' },
-    });
+    mockSyncLogs.mockReturnValue(
+      Effect.fail({
+        code: 'LOG_FILES_NOT_FOUND',
+        message: 'No log files found',
+      }),
+    );
 
     if (!initializeAppData)
       throw new Error('initializeAppData not initialized');
@@ -251,10 +255,12 @@ describe('settingsController.initializeAppData', () => {
 
   it('その他のログ同期エラーは警告として記録され処理は継続される', async () => {
     // ログ同期で別のエラー
-    mockSyncLogs.mockResolvedValue({
-      isErr: () => true,
-      error: { code: 'OTHER_ERROR', message: 'Some other error' },
-    });
+    mockSyncLogs.mockReturnValue(
+      Effect.fail({
+        code: 'OTHER_ERROR',
+        message: 'Some other error',
+      }),
+    );
 
     if (!initializeAppData)
       throw new Error('initializeAppData not initialized');
@@ -263,7 +269,7 @@ describe('settingsController.initializeAppData', () => {
     expect(result).toEqual({ success: true });
     expect(mockLogger.warnWithSentry).toHaveBeenCalledWith({
       message: 'Log sync failed: Some other error',
-      details: { errorCode: 'OTHER_ERROR' },
+      details: { errorTag: 'OTHER_ERROR' },
     });
     expect(mockLogger.info).toHaveBeenCalledWith(
       '=== Application data initialization completed ===',

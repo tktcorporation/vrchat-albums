@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { ok } from 'neverthrow';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LogRecord } from '../converters/dbToLogStore';
 import type { ExportResult } from '../exportService/exportService';
@@ -75,26 +75,23 @@ describe('backupService', () => {
         exportEndTime: mockTimestamp,
       };
 
-      vi.mocked(exportServiceModule.exportLogStoreFromDB).mockResolvedValue(
-        ok(mockExportResult),
+      vi.mocked(exportServiceModule.exportLogStoreFromDB).mockReturnValue(
+        Effect.succeed(mockExportResult),
       );
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
-      const result = await backupService.createPreImportBackup(mockGetDBLogs);
-
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        const backup = result.value;
-        expect(backup.id).toBe('backup_20231201_143045');
-        expect(backup.backupTimestamp).toEqual(mockTimestamp);
-        expect(backup.exportFolderPath).toBe(
-          'vrchat-albums-export_2023-12-01_14-30-45',
-        );
-        expect(backup.status).toBe('completed');
-        expect(backup.totalLogLines).toBe(100);
-        expect(backup.exportedFiles).toEqual(mockExportResult.exportedFiles);
-      }
+      const backup = await Effect.runPromise(
+        backupService.createPreImportBackup(mockGetDBLogs),
+      );
+      expect(backup.id).toBe('backup_20231201_143045');
+      expect(backup.backupTimestamp).toEqual(mockTimestamp);
+      expect(backup.exportFolderPath).toBe(
+        'vrchat-albums-export_2023-12-01_14-30-45',
+      );
+      expect(backup.status).toBe('completed');
+      expect(backup.totalLogLines).toBe(100);
+      expect(backup.exportedFiles).toEqual(mockExportResult.exportedFiles);
 
       // エクスポート関数が正しいパラメータで呼ばれたことを確認
       expect(exportServiceModule.exportLogStoreFromDB).toHaveBeenCalledWith(
@@ -116,14 +113,24 @@ describe('backupService', () => {
     });
 
     it('エクスポートに失敗した場合は例外がスローされる', async () => {
-      // 予期しないエラーなので throw される
-      vi.mocked(exportServiceModule.exportLogStoreFromDB).mockRejectedValue(
-        new Error('Export failed'),
+      // 予期しないエラーなので die (defect) として伝播される
+      vi.mocked(exportServiceModule.exportLogStoreFromDB).mockReturnValue(
+        Effect.die(new Error('Export failed')),
       );
 
-      await expect(
+      const exit = await Effect.runPromiseExit(
         backupService.createPreImportBackup(mockGetDBLogs),
-      ).rejects.toThrow('Export failed');
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const dieOpt = Cause.dieOption(exit.cause);
+        expect(Option.isSome(dieOpt)).toBe(true);
+        if (Option.isSome(dieOpt)) {
+          expect(dieOpt.value).toBeInstanceOf(Error);
+          expect((dieOpt.value as Error).message).toBe('Export failed');
+        }
+      }
     });
   });
 
@@ -143,9 +150,7 @@ describe('backupService', () => {
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
       vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-      const result = await backupService.updateBackupMetadata(metadata);
-
-      expect(result.isOk()).toBe(true);
+      await Effect.runPromise(backupService.updateBackupMetadata(metadata));
       expect(fs.writeFile).toHaveBeenCalledWith(
         path.join(
           '/mocked/userData/backups',
@@ -161,12 +166,8 @@ describe('backupService', () => {
     it('バックアップディレクトリが存在しない場合は空配列を返す', async () => {
       vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
-      const result = await backupService.getBackupHistory();
-
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        expect(result.value).toEqual([]);
-      }
+      const value = await Effect.runPromise(backupService.getBackupHistory());
+      expect(value).toEqual([]);
     });
 
     it('バックアップ履歴を取得できる', async () => {
@@ -236,15 +237,12 @@ describe('backupService', () => {
         .mockResolvedValueOnce(JSON.stringify(metadata1))
         .mockResolvedValueOnce(JSON.stringify(metadata2));
 
-      const result = await backupService.getBackupHistory();
+      const value = await Effect.runPromise(backupService.getBackupHistory());
 
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        expect(result.value).toHaveLength(2);
-        // 降順ソート（新しいものが先頭）
-        expect(result.value[0].id).toBe('backup_20231202_102030');
-        expect(result.value[1].id).toBe('backup_20231201_143045');
-      }
+      expect(value).toHaveLength(2);
+      // 降順ソート（新しいものが先頭）
+      expect(value[0].id).toBe('backup_20231202_102030');
+      expect(value[1].id).toBe('backup_20231201_143045');
     });
 
     it('メタデータ読み込みに失敗したバックアップはスキップする', async () => {
@@ -266,12 +264,8 @@ describe('backupService', () => {
 
       vi.mocked(fs.readFile).mockRejectedValue(new Error('File not found'));
 
-      const result = await backupService.getBackupHistory();
-
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        expect(result.value).toEqual([]);
-      }
+      const value = await Effect.runPromise(backupService.getBackupHistory());
+      expect(value).toEqual([]);
     });
   });
 
@@ -307,26 +301,28 @@ describe('backupService', () => {
       ] as Dirent<Buffer>[]);
       vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(metadata));
 
-      const result = await backupService.getBackup(targetId);
-
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        expect(result.value.id).toBe(targetId);
-      }
+      const value = await Effect.runPromise(backupService.getBackup(targetId));
+      expect(value.id).toBe(targetId);
     });
 
     it('バックアップが見つからない場合はエラーを返す', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.readdir).mockResolvedValue([]);
 
-      const result = await backupService.getBackup('non-existent-id');
+      const exit = await Effect.runPromiseExit(
+        backupService.getBackup('non-existent-id'),
+      );
 
-      expect(result.isErr()).toBe(true);
-      if (result.isErr()) {
-        expect(result.error.type).toBe('BACKUP_NOT_FOUND');
-        expect(getBackupErrorMessage(result.error)).toContain(
-          'バックアップが見つかりません',
-        );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value._tag).toBe('BackupNotFound');
+          expect(getBackupErrorMessage(failOpt.value)).toContain(
+            'バックアップが見つかりません',
+          );
+        }
       }
     });
   });

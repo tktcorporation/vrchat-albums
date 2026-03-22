@@ -128,6 +128,7 @@ function calcColors(data: Buffer, step: number): DominantColors {
 export async function extractDominantColorsFromBuffer(
   imageBuffer: Buffer,
 ): Promise<DominantColors> {
+  // effect-lint-allow-try-catch: 非Effectプレーン関数、破損画像時にデフォルトカラーを返す
   try {
     const transformer = new Transformer(imageBuffer);
     const rawPixels = await transformer.rawPixels();

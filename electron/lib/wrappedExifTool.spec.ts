@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { Transformer } from '@napi-rs/image';
+import { Effect } from 'effect';
 import type { ExifDateTime } from 'exiftool-vendored';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as wrappedExiftool from './wrappedExifTool';
@@ -58,16 +59,14 @@ describe('wrappedExifTool', () => {
 
       // 書き込んだEXIFデータを読み込んで検証
       const buffer = await fs.promises.readFile(testImagePath);
-      const result = await wrappedExiftool.readExifByBuffer(buffer);
+      const exifData = await Effect.runPromise(
+        wrappedExiftool.readExifByBuffer(buffer),
+      );
 
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        const exifData = result.value;
-        expect(exifData.Description).toBe(testData.description);
-        expect(exifData.ImageDescription).toBe(testData.description);
-        const dateTime = exifData.DateTimeOriginal as ExifDateTime;
-        expect(dateTime.rawValue).toBe('2024:01:01 12:34:56+09:00');
-      }
+      expect(exifData.Description).toBe(testData.description);
+      expect(exifData.ImageDescription).toBe(testData.description);
+      const dateTime = exifData.DateTimeOriginal as ExifDateTime;
+      expect(dateTime.rawValue).toBe('2024:01:01 12:34:56+09:00');
     });
   });
 
@@ -83,26 +82,18 @@ describe('wrappedExifTool', () => {
       const originalBuffer = await fs.promises.readFile(testImagePath);
 
       // バッファにEXIFデータを設定
-      const result = await wrappedExiftool.setExifToBuffer(
-        originalBuffer,
-        testData,
+      const newBuffer = await Effect.runPromise(
+        wrappedExiftool.setExifToBuffer(originalBuffer, testData),
       );
 
-      expect(result.isOk()).toBe(true);
-      if (result.isOk()) {
-        const newBuffer = result.value;
-
-        // 新しいバッファからEXIFデータを読み込んで検証
-        const exifResult = await wrappedExiftool.readExifByBuffer(newBuffer);
-        expect(exifResult.isOk()).toBe(true);
-        if (exifResult.isOk()) {
-          const exifData = exifResult.value;
-          expect(exifData.Description).toBe(testData.description);
-          expect(exifData.ImageDescription).toBe(testData.description);
-          const dateTime = exifData.DateTimeOriginal as ExifDateTime;
-          expect(dateTime.rawValue).toBe('2024:01:01 12:34:56+09:00');
-        }
-      }
+      // 新しいバッファからEXIFデータを読み込んで検証
+      const exifData = await Effect.runPromise(
+        wrappedExiftool.readExifByBuffer(newBuffer),
+      );
+      expect(exifData.Description).toBe(testData.description);
+      expect(exifData.ImageDescription).toBe(testData.description);
+      const dateTime = exifData.DateTimeOriginal as ExifDateTime;
+      expect(dateTime.rawValue).toBe('2024:01:01 12:34:56+09:00');
     });
   });
 });

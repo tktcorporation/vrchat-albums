@@ -1,57 +1,58 @@
+import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import * as neverthrow from 'neverthrow';
+
+type NodeDirent = Dirent;
+
+import { Cause, Effect, Option } from 'effect';
 import { match } from 'ts-pattern';
 import { getDBQueue } from '../../../lib/dbQueue';
 import { logger } from '../../../lib/logger';
+import {
+  RollbackBackupDirNotFound,
+  RollbackDbRebuildFailed,
+  RollbackMetadataNotFound,
+  RollbackNoDirsRestored,
+  RollbackNoValidMonthData,
+  type RollbackServiceError,
+  RollbackTransactionFailed,
+} from './errors';
 
 /**
- * ロールバック処理のエラー型
- * 呼び出し側でパターンマッチングできるように具体的な型を定義
- * 予期しないエラーはthrowしてSentryに送信（ここには含めない）
+ * RollbackServiceError からユーザー向けメッセージを取得
  */
-export type RollbackError =
-  | { type: 'BACKUP_DIR_NOT_FOUND'; path: string }
-  | { type: 'METADATA_NOT_FOUND'; path: string }
-  | { type: 'NO_VALID_MONTH_DATA'; path: string }
-  | { type: 'VALIDATION_FAILED'; message: string }
-  | { type: 'RESTORE_FAILED'; message: string }
-  | { type: 'NO_DIRS_RESTORED' }
-  | { type: 'DB_REBUILD_FAILED'; message: string }
-  | { type: 'TRANSACTION_FAILED'; message: string };
-
-/**
- * RollbackError からユーザー向けメッセージを取得
- */
-export const getRollbackErrorMessage = (error: RollbackError): string =>
+export const getRollbackErrorMessage = (error: RollbackServiceError): string =>
   match(error)
     .with(
-      { type: 'BACKUP_DIR_NOT_FOUND' },
+      { _tag: 'RollbackBackupDirNotFound' },
       (e) => `バックアップディレクトリが見つかりません: ${e.path}`,
     )
     .with(
-      { type: 'METADATA_NOT_FOUND' },
+      { _tag: 'RollbackMetadataNotFound' },
       (e) => `メタデータファイルが見つかりません: ${e.path}`,
     )
     .with(
-      { type: 'NO_VALID_MONTH_DATA' },
+      { _tag: 'RollbackNoValidMonthData' },
       (e) => `有効な月別データが見つかりません: ${e.path}`,
     )
     .with(
-      { type: 'VALIDATION_FAILED' },
+      { _tag: 'RollbackValidationFailed' },
       (e) => `検証に失敗しました: ${e.message}`,
     )
-    .with({ type: 'RESTORE_FAILED' }, (e) => `復帰に失敗しました: ${e.message}`)
     .with(
-      { type: 'NO_DIRS_RESTORED' },
+      { _tag: 'RollbackRestoreFailed' },
+      (e) => `復帰に失敗しました: ${e.message}`,
+    )
+    .with(
+      { _tag: 'RollbackNoDirsRestored' },
       () => 'バックアップからディレクトリを復帰できませんでした',
     )
     .with(
-      { type: 'DB_REBUILD_FAILED' },
+      { _tag: 'RollbackDbRebuildFailed' },
       (e) => `DB再構築に失敗しました: ${e.message}`,
     )
     .with(
-      { type: 'TRANSACTION_FAILED' },
+      { _tag: 'RollbackTransactionFailed' },
       (e) => `トランザクションに失敗しました: ${e.message}`,
     )
     .exhaustive();
@@ -89,124 +90,199 @@ export class RollbackService {
   /**
    * 指定されたバックアップにロールバック
    */
-  async rollbackToBackup(
+  rollbackToBackup(
     backup: ImportBackupMetadata,
-  ): Promise<neverthrow.Result<void, RollbackError>> {
-    logger.info(`Starting rollback to backup: ${backup.id}`);
+  ): Effect.Effect<void, RollbackServiceError> {
+    return Effect.gen(this, function* () {
+      logger.info(`Starting rollback to backup: ${backup.id}`);
 
-    const dbQueue = getDBQueue();
+      const dbQueue = getDBQueue();
 
-    // dbQueue.transactionは予期しないエラーをそのまま throw する
-    // これによりSentryにエラーが送信される
-    // QUEUE_FULL, TASK_TIMEOUT のみがResult型で返される
-    const transactionResult = await dbQueue.transaction(async () => {
-      const backupPath = path.join(
-        backupService.getBackupBasePath(),
-        backup.exportFolderPath,
-      );
+      // dbQueue.transaction returns Effect<T, DBQueueError>
+      // The inner callback is a regular async function
+      // We use a discriminated union to pass inner errors out of the transaction boundary
+      type InnerResult =
+        | { _tag: 'ok' }
+        | { _tag: 'err'; error: RollbackServiceError };
 
-      // 1. バックアップデータの存在確認
-      const validationResult = await this.validateBackupData(backupPath);
-      if (validationResult.isErr()) {
-        return neverthrow.err(validationResult.error);
+      const innerResult = yield* dbQueue
+        .transaction<InnerResult>(async () => {
+          const backupPath = path.join(
+            backupService.getBackupBasePath(),
+            backup.exportFolderPath,
+          );
+
+          // 1. バックアップデータの存在確認
+          const validationExit = await Effect.runPromiseExit(
+            this.validateBackupData(backupPath),
+          );
+          if (validationExit._tag === 'Failure') {
+            const failOpt = Cause.failureOption(validationExit.cause);
+            if (Option.isSome(failOpt)) {
+              return { _tag: 'err' as const, error: failOpt.value };
+            }
+            // Defect - rethrow
+            const dieOpt = Cause.dieOption(validationExit.cause);
+            if (Option.isSome(dieOpt)) throw dieOpt.value;
+            throw new Error('Unknown effect failure');
+          }
+
+          // 2. 現在のlogStoreをクリア
+          // ファイルシステムエラーは予期しないエラーとしてthrow
+          await this.clearCurrentLogStore();
+
+          // 3. バックアップからlogStore復帰
+          const restoreExit = await Effect.runPromiseExit(
+            this.restoreLogStoreFromBackup(backupPath),
+          );
+          if (restoreExit._tag === 'Failure') {
+            const failOpt = Cause.failureOption(restoreExit.cause);
+            if (Option.isSome(failOpt)) {
+              return { _tag: 'err' as const, error: failOpt.value };
+            }
+            const dieOpt = Cause.dieOption(restoreExit.cause);
+            if (Option.isSome(dieOpt)) throw dieOpt.value;
+            throw new Error('Unknown effect failure');
+          }
+
+          // 4. DBを再構築（復帰したlogStoreから）
+          const rebuildExit = await Effect.runPromiseExit(
+            this.rebuildDatabaseFromLogStore(),
+          );
+          if (rebuildExit._tag === 'Failure') {
+            const failOpt = Cause.failureOption(rebuildExit.cause);
+            if (Option.isSome(failOpt)) {
+              return { _tag: 'err' as const, error: failOpt.value };
+            }
+            const dieOpt = Cause.dieOption(rebuildExit.cause);
+            if (Option.isSome(dieOpt)) throw dieOpt.value;
+            throw new Error('Unknown effect failure');
+          }
+
+          // 5. バックアップ状態更新
+          backup.status = 'rolled_back';
+          const updateExit = await Effect.runPromiseExit(
+            backupService.updateBackupMetadata(backup),
+          );
+          if (updateExit._tag === 'Failure') {
+            const failOpt = Cause.failureOption(updateExit.cause);
+            if (Option.isSome(failOpt)) {
+              logger.warnWithSentry({
+                message: `Failed to update backup metadata after rollback: ${getBackupErrorMessage(failOpt.value)}`,
+                details: {
+                  backupId: backup.id,
+                  errorTag: failOpt.value._tag,
+                },
+              });
+            }
+            // ロールバック自体は成功しているので警告のみ
+          }
+
+          logger.info(`Rollback completed successfully: ${backup.id}`);
+          return { _tag: 'ok' as const };
+        })
+        .pipe(
+          Effect.mapError(
+            (dbQueueError): RollbackServiceError =>
+              match(dbQueueError)
+                .with(
+                  { type: 'QUEUE_FULL' },
+                  (e) => new RollbackTransactionFailed({ message: e.message }),
+                )
+                .with(
+                  { type: 'TASK_TIMEOUT' },
+                  (e) => new RollbackTransactionFailed({ message: e.message }),
+                )
+                .exhaustive(),
+          ),
+        );
+
+      if (innerResult._tag === 'err') {
+        return yield* Effect.fail(innerResult.error);
       }
-
-      // 2. 現在のlogStoreをクリア
-      // ファイルシステムエラーは予期しないエラーとしてthrow
-      await this.clearCurrentLogStore();
-
-      // 3. バックアップからlogStore復帰
-      const restoreResult = await this.restoreLogStoreFromBackup(backupPath);
-      if (restoreResult.isErr()) {
-        return neverthrow.err(restoreResult.error);
-      }
-
-      // 4. DBを再構築（復帰したlogStoreから）
-      const rebuildResult = await this.rebuildDatabaseFromLogStore();
-      if (rebuildResult.isErr()) {
-        return neverthrow.err(rebuildResult.error);
-      }
-
-      // 5. バックアップ状態更新
-      backup.status = 'rolled_back';
-      const updateResult = await backupService.updateBackupMetadata(backup);
-      if (updateResult.isErr()) {
-        logger.warnWithSentry({
-          message: `Failed to update backup metadata after rollback: ${getBackupErrorMessage(updateResult.error)}`,
-          details: { backupId: backup.id, errorType: updateResult.error.type },
-        });
-        // ロールバック自体は成功しているので警告のみ
-      }
-
-      logger.info(`Rollback completed successfully: ${backup.id}`);
-      return neverthrow.ok(undefined);
     });
-
-    if (transactionResult.isErr()) {
-      // DBQueueError (QUEUE_FULL, TASK_TIMEOUT) を RollbackError にマッピング
-      return neverthrow.err<void, RollbackError>(
-        match(transactionResult.error)
-          .with({ type: 'QUEUE_FULL' }, (e) => ({
-            type: 'TRANSACTION_FAILED' as const,
-            message: e.message,
-          }))
-          .with({ type: 'TASK_TIMEOUT' }, (e) => ({
-            type: 'TRANSACTION_FAILED' as const,
-            message: e.message,
-          }))
-          .exhaustive(),
-      );
-    }
-
-    return transactionResult.value;
   }
 
   /**
    * バックアップデータの存在と整合性を確認
    */
-  private async validateBackupData(
+  private validateBackupData(
     backupPath: string,
-  ): Promise<neverthrow.Result<void, RollbackError>> {
-    // バックアップディレクトリの存在確認
-    if (!(await existsAsync(backupPath))) {
-      return neverthrow.err({ type: 'BACKUP_DIR_NOT_FOUND', path: backupPath });
-    }
+  ): Effect.Effect<void, RollbackServiceError> {
+    return Effect.gen(this, function* () {
+      // バックアップディレクトリの存在確認
+      const backupExists = yield* Effect.tryPromise({
+        try: () => existsAsync(backupPath),
+        catch: (e) => {
+          throw e;
+        },
+      }) as Effect.Effect<boolean, RollbackServiceError>;
 
-    // メタデータファイルの存在確認
-    const metadataPath = path.join(backupPath, 'backup-metadata.json');
-    if (!(await existsAsync(metadataPath))) {
-      return neverthrow.err({ type: 'METADATA_NOT_FOUND', path: metadataPath });
-    }
+      if (!backupExists) {
+        return yield* Effect.fail(
+          new RollbackBackupDirNotFound({ path: backupPath }),
+        );
+      }
 
-    // 月別ディレクトリの存在確認
-    // readdir失敗は予期しないエラーなのでthrow
-    const entries = await fs.readdir(backupPath, { withFileTypes: true });
-    const monthDirs = entries.filter(
-      (entry) => entry.isDirectory() && /^\d{4}-\d{2}$/.test(entry.name),
-    );
+      // メタデータファイルの存在確認
+      const metadataPath = path.join(backupPath, 'backup-metadata.json');
+      const metadataExists = yield* Effect.tryPromise({
+        try: () => existsAsync(metadataPath),
+        catch: (e) => {
+          throw e;
+        },
+      }) as Effect.Effect<boolean, RollbackServiceError>;
 
-    if (monthDirs.length === 0) {
-      return neverthrow.err({ type: 'NO_VALID_MONTH_DATA', path: backupPath });
-    }
+      if (!metadataExists) {
+        return yield* Effect.fail(
+          new RollbackMetadataNotFound({ path: metadataPath }),
+        );
+      }
 
-    // 各月別ディレクトリ内のlogStoreファイル確認
-    for (const monthDir of monthDirs) {
-      const monthPath = path.join(backupPath, monthDir.name);
-      const logStoreFile = path.join(
-        monthPath,
-        `logStore-${monthDir.name}.txt`,
+      // 月別ディレクトリの存在確認
+      // readdir失敗は予期しないエラーなのでthrow
+      const entries = yield* Effect.tryPromise({
+        try: () => fs.readdir(backupPath, { withFileTypes: true }),
+        catch: (e) => {
+          throw e;
+        },
+      }) as Effect.Effect<NodeDirent[], RollbackServiceError>;
+
+      const monthDirs = entries.filter(
+        (entry) => entry.isDirectory() && /^\d{4}-\d{2}$/.test(entry.name),
       );
 
-      if (!(await existsAsync(logStoreFile))) {
-        logger.warn(`logStore file not found: ${logStoreFile}`);
-        // 一部のファイルが見つからなくても継続（警告のみ）
+      if (monthDirs.length === 0) {
+        return yield* Effect.fail(
+          new RollbackNoValidMonthData({ path: backupPath }),
+        );
       }
-    }
 
-    logger.info(
-      `Backup validation completed: ${monthDirs.length} month directories found`,
-    );
-    return neverthrow.ok(undefined);
+      // 各月別ディレクトリ内のlogStoreファイル確認
+      for (const monthDir of monthDirs) {
+        const monthPath = path.join(backupPath, monthDir.name);
+        const logStoreFile = path.join(
+          monthPath,
+          `logStore-${monthDir.name}.txt`,
+        );
+
+        const logStoreExists = yield* Effect.tryPromise({
+          try: () => existsAsync(logStoreFile),
+          catch: (e) => {
+            throw e;
+          },
+        }) as Effect.Effect<boolean, RollbackServiceError>;
+
+        if (!logStoreExists) {
+          logger.warn(`logStore file not found: ${logStoreFile}`);
+          // 一部のファイルが見つからなくても継続（警告のみ）
+        }
+      }
+
+      logger.info(
+        `Backup validation completed: ${monthDirs.length} month directories found`,
+      );
+    });
   }
 
   /**
@@ -230,59 +306,80 @@ export class RollbackService {
    * バックアップからlogStoreを復帰
    * ファイルシステムエラーは予期しないエラーとしてthrow（Sentryに送信）
    */
-  private async restoreLogStoreFromBackup(
+  private restoreLogStoreFromBackup(
     backupPath: string,
-  ): Promise<neverthrow.Result<void, RollbackError>> {
-    const currentLogStoreDir = getLogStoreDir();
+  ): Effect.Effect<void, RollbackServiceError> {
+    return Effect.gen(this, function* () {
+      const currentLogStoreDir = getLogStoreDir();
 
-    // バックアップ内の月別フォルダを現在のlogStoreに復帰
-    // readdir失敗は予期しないエラーなのでthrow
-    const backupEntries = await fs.readdir(backupPath, { withFileTypes: true });
-    const monthDirs = backupEntries.filter(
-      (entry) => entry.isDirectory() && /^\d{4}-\d{2}$/.test(entry.name),
-    );
+      // バックアップ内の月別フォルダを現在のlogStoreに復帰
+      // readdir失敗は予期しないエラーなのでthrow
+      const backupEntries = yield* Effect.tryPromise({
+        try: () => fs.readdir(backupPath, { withFileTypes: true }),
+        catch: (e) => {
+          throw e;
+        },
+      }) as Effect.Effect<NodeDirent[], RollbackServiceError>;
 
-    // 各月別ディレクトリをコピー
-    // ファイルシステムエラーは予期しないエラーとしてthrow
-    for (const monthDir of monthDirs) {
-      const sourceDir = path.join(backupPath, monthDir.name);
-      const targetDir = path.join(currentLogStoreDir, monthDir.name);
+      const monthDirs = backupEntries.filter(
+        (entry) => entry.isDirectory() && /^\d{4}-\d{2}$/.test(entry.name),
+      );
 
-      await fs.mkdir(targetDir, { recursive: true });
-      await fs.cp(sourceDir, targetDir, { recursive: true, force: true });
-      logger.info(`Restored month directory: ${monthDir.name}`);
-    }
+      // 各月別ディレクトリをコピー
+      // ファイルシステムエラーは予期しないエラーとしてthrow
+      for (const monthDir of monthDirs) {
+        const sourceDir = path.join(backupPath, monthDir.name);
+        const targetDir = path.join(currentLogStoreDir, monthDir.name);
 
-    if (monthDirs.length === 0) {
-      return neverthrow.err({ type: 'NO_DIRS_RESTORED' });
-    }
+        yield* Effect.tryPromise({
+          try: async () => {
+            await fs.mkdir(targetDir, { recursive: true });
+            await fs.cp(sourceDir, targetDir, { recursive: true, force: true });
+          },
+          catch: (e) => {
+            throw e;
+          },
+        }) as Effect.Effect<void, RollbackServiceError>;
 
-    logger.info(
-      `Successfully restored ${monthDirs.length} month directories from backup`,
-    );
-    return neverthrow.ok(undefined);
+        logger.info(`Restored month directory: ${monthDir.name}`);
+      }
+
+      if (monthDirs.length === 0) {
+        return yield* Effect.fail(
+          new RollbackNoDirsRestored({
+            message: 'No month directories found in backup to restore',
+          }),
+        );
+      }
+
+      logger.info(
+        `Successfully restored ${monthDirs.length} month directories from backup`,
+      );
+    });
   }
 
   /**
    * 復帰したlogStoreからDBを完全再構築
    * 予期しないエラーは上位のtry-catchでSentryに送信される
    */
-  private async rebuildDatabaseFromLogStore(): Promise<
-    neverthrow.Result<void, RollbackError>
+  private rebuildDatabaseFromLogStore(): Effect.Effect<
+    void,
+    RollbackServiceError
   > {
-    logger.info('Starting database rebuild from restored logStore');
+    return Effect.gen(function* () {
+      logger.info('Starting database rebuild from restored logStore');
 
-    // 復帰したlogStoreからDBを完全再構築
-    const syncResult = await syncLogs(LOG_SYNC_MODE.FULL);
-    if (syncResult.isErr()) {
-      return neverthrow.err({
-        type: 'DB_REBUILD_FAILED',
-        message: syncResult.error.message,
-      });
-    }
+      // 復帰したlogStoreからDBを完全再構築
+      // syncLogs returns Effect<LogSyncResults, VRChatLogFileError | LogInfoError>
+      yield* syncLogs(LOG_SYNC_MODE.FULL).pipe(
+        Effect.mapError(
+          (syncError) =>
+            new RollbackDbRebuildFailed({ message: syncError.message }),
+        ),
+      );
 
-    logger.info('Database rebuild completed successfully');
-    return neverthrow.ok(undefined);
+      logger.info('Database rebuild completed successfully');
+    });
   }
 }
 

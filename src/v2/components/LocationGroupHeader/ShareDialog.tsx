@@ -83,6 +83,7 @@ export const ShareDialog = ({
   const generatePreview = useCallback(async () => {
     if (!base64Data || !worldName) return;
     setIsGeneratingPreview(true);
+    // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       const pngBase64 = await generatePreviewMutation.mutateAsync({
         worldName,

@@ -1,42 +1,39 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as datefns from 'date-fns';
-import * as neverthrow from 'neverthrow';
-import { ResultAsync } from 'neverthrow';
+import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 import {
   exportLogsToLogStore,
   formatLogStoreContent,
   type LogRecord,
 } from '../converters/dbToLogStore';
+import {
+  ExportDbQueryFailed,
+  ExportDirCreateFailed,
+  ExportFileWriteFailed,
+  type ExportServiceError,
+} from './errors';
 
 /**
  * DBからlogStore形式でエクスポートするサービス
  */
 
 /**
- * エクスポートエラー型
+ * ExportServiceErrorからユーザー向けメッセージを取得
  */
-export type ExportError =
-  | { type: 'DIR_CREATE_FAILED'; path: string; message: string }
-  | { type: 'FILE_WRITE_FAILED'; path: string; message: string }
-  | { type: 'DB_QUERY_FAILED'; message: string };
-
-/**
- * ExportErrorからユーザー向けメッセージを取得
- */
-export const getExportErrorMessage = (error: ExportError): string =>
+export const getExportErrorMessage = (error: ExportServiceError): string =>
   match(error)
     .with(
-      { type: 'DIR_CREATE_FAILED' },
+      { _tag: 'ExportDirCreateFailed' },
       (e) => `ディレクトリ作成に失敗しました: ${e.path} (${e.message})`,
     )
     .with(
-      { type: 'FILE_WRITE_FAILED' },
+      { _tag: 'ExportFileWriteFailed' },
       (e) => `ファイル書き込みに失敗しました: ${e.path} (${e.message})`,
     )
     .with(
-      { type: 'DB_QUERY_FAILED' },
+      { _tag: 'ExportDbQueryFailed' },
       (e) => `データベースクエリに失敗しました: ${e.message}`,
     )
     .exhaustive();
@@ -67,6 +64,7 @@ const getElectronDownloadsPath = (): string | null => {
   // Playwright テスト互換性のため遅延評価
   // @see CLAUDE.md Electron Module Import パターン
   const electronApp = (() => {
+    // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
     try {
       return require('electron').app;
     } catch {
@@ -76,6 +74,7 @@ const getElectronDownloadsPath = (): string | null => {
 
   if (!electronApp) return null;
 
+  // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
   try {
     return electronApp.getPath('downloads');
   } catch {
@@ -180,25 +179,31 @@ const groupLogRecordsByMonth = (
  */
 const ensureDirectoryExists = (
   dirPath: string,
-): ResultAsync<void, ExportError> =>
-  ResultAsync.fromPromise(fs.mkdir(dirPath, { recursive: true }), (e) => ({
-    type: 'DIR_CREATE_FAILED' as const,
-    path: dirPath,
-    message: e instanceof Error ? e.message : String(e),
-  })).map(() => undefined);
+): Effect.Effect<void, ExportServiceError> =>
+  Effect.tryPromise({
+    try: () => fs.mkdir(dirPath, { recursive: true }).then(() => undefined),
+    catch: (e) =>
+      new ExportDirCreateFailed({
+        path: dirPath,
+        message: e instanceof Error ? e.message : String(e),
+      }),
+  });
 
 /**
- * ファイル書き込み（ResultAsync版）
+ * ファイル書き込み（Effect版）
  */
 const writeFileSafe = (
   filePath: string,
   content: string,
-): ResultAsync<void, ExportError> =>
-  ResultAsync.fromPromise(fs.writeFile(filePath, content, 'utf-8'), (e) => ({
-    type: 'FILE_WRITE_FAILED' as const,
-    path: filePath,
-    message: e instanceof Error ? e.message : String(e),
-  }));
+): Effect.Effect<void, ExportServiceError> =>
+  Effect.tryPromise({
+    try: () => fs.writeFile(filePath, content, 'utf-8'),
+    catch: (e) =>
+      new ExportFileWriteFailed({
+        path: filePath,
+        message: e instanceof Error ? e.message : String(e),
+      }),
+  });
 
 /**
  * DBからlogStore形式でデータをエクスポート
@@ -206,72 +211,73 @@ const writeFileSafe = (
  * @param getDBLogs DB取得関数
  * @returns エクスポート結果
  */
-export const exportLogStoreFromDB = async (
+export const exportLogStoreFromDB = (
   options: ExportLogStoreOptions,
   getDBLogs: DBLogProvider,
-): Promise<neverthrow.Result<ExportResult, ExportError>> => {
-  const exportStartTime = new Date();
+): Effect.Effect<ExportResult, ExportServiceError> =>
+  Effect.gen(function* () {
+    const exportStartTime = new Date();
 
-  // DBからログデータを取得（期間指定がない場合は全データ取得）
-  const logRecords = await getDBLogs(options.startDate, options.endDate);
-
-  if (logRecords.length === 0) {
-    return neverthrow.ok({
-      exportedFiles: [],
-      totalLogLines: 0,
-      exportStartTime,
-      exportEndTime: new Date(),
+    // DBからログデータを取得（期間指定がない場合は全データ取得）
+    const logRecords = yield* Effect.tryPromise({
+      try: () => getDBLogs(options.startDate, options.endDate),
+      catch: (e) =>
+        new ExportDbQueryFailed({
+          message: e instanceof Error ? e.message : String(e),
+        }),
     });
-  }
 
-  // 月別にグループ化
-  const groupedRecords = groupLogRecordsByMonth(logRecords);
-
-  const exportedFiles: string[] = [];
-  let totalLogLines = 0;
-
-  // 月別にファイルを作成
-  for (const [yearMonth, monthRecords] of groupedRecords) {
-    // logStore形式に変換
-    const logLines = exportLogsToLogStore(monthRecords);
-    totalLogLines += logLines.length;
-
-    if (logLines.length > 0) {
-      // ファイルパスを生成
-      const sampleDate = datefns.parse(yearMonth, 'yyyy-MM', new Date());
-      const filePath = getLogStoreExportPath(
-        sampleDate,
-        options.outputBasePath,
+    if (logRecords.length === 0) {
+      return {
+        exportedFiles: [],
+        totalLogLines: 0,
         exportStartTime,
-      );
-
-      // ディレクトリを作成
-      const dirPath = path.dirname(filePath);
-      const dirResult = await ensureDirectoryExists(dirPath);
-      if (dirResult.isErr()) {
-        return neverthrow.err(dirResult.error);
-      }
-
-      // ファイルに書き込み
-      const content = formatLogStoreContent(logLines);
-      const writeResult = await writeFileSafe(filePath, content);
-      if (writeResult.isErr()) {
-        return neverthrow.err(writeResult.error);
-      }
-
-      exportedFiles.push(filePath);
+        exportEndTime: new Date(),
+      };
     }
-  }
 
-  const exportEndTime = new Date();
+    // 月別にグループ化
+    const groupedRecords = groupLogRecordsByMonth(logRecords);
 
-  return neverthrow.ok({
-    exportedFiles,
-    totalLogLines,
-    exportStartTime,
-    exportEndTime,
+    const exportedFiles: string[] = [];
+    let totalLogLines = 0;
+
+    // 月別にファイルを作成
+    for (const [yearMonth, monthRecords] of groupedRecords) {
+      // logStore形式に変換
+      const logLines = exportLogsToLogStore(monthRecords);
+      totalLogLines += logLines.length;
+
+      if (logLines.length > 0) {
+        // ファイルパスを生成
+        const sampleDate = datefns.parse(yearMonth, 'yyyy-MM', new Date());
+        const filePath = getLogStoreExportPath(
+          sampleDate,
+          options.outputBasePath,
+          exportStartTime,
+        );
+
+        // ディレクトリを作成
+        const dirPath = path.dirname(filePath);
+        yield* ensureDirectoryExists(dirPath);
+
+        // ファイルに書き込み
+        const content = formatLogStoreContent(logLines);
+        yield* writeFileSafe(filePath, content);
+
+        exportedFiles.push(filePath);
+      }
+    }
+
+    const exportEndTime = new Date();
+
+    return {
+      exportedFiles,
+      totalLogLines,
+      exportStartTime,
+      exportEndTime,
+    };
   });
-};
 
 /**
  * 単一ファイルとしてlogStoreデータをエクスポート
@@ -280,54 +286,55 @@ export const exportLogStoreFromDB = async (
  * @param outputFilePath 出力ファイルパス
  * @returns エクスポート結果
  */
-export const exportLogStoreToSingleFile = async (
+export const exportLogStoreToSingleFile = (
   options: ExportLogStoreOptions,
   getDBLogs: DBLogProvider,
   outputFilePath: string,
-): Promise<neverthrow.Result<ExportResult, ExportError>> => {
-  const exportStartTime = new Date();
+): Effect.Effect<ExportResult, ExportServiceError> =>
+  Effect.gen(function* () {
+    const exportStartTime = new Date();
 
-  // DBからログデータを取得（期間指定がない場合は全データ取得）
-  const logRecords = await getDBLogs(options.startDate, options.endDate);
-
-  if (logRecords.length === 0) {
-    return neverthrow.ok({
-      exportedFiles: [],
-      totalLogLines: 0,
-      exportStartTime,
-      exportEndTime: new Date(),
+    // DBからログデータを取得（期間指定がない場合は全データ取得）
+    const logRecords = yield* Effect.tryPromise({
+      try: () => getDBLogs(options.startDate, options.endDate),
+      catch: (e) =>
+        new ExportDbQueryFailed({
+          message: e instanceof Error ? e.message : String(e),
+        }),
     });
-  }
 
-  // logStore形式に変換
-  const logLines = exportLogsToLogStore(logRecords);
+    if (logRecords.length === 0) {
+      return {
+        exportedFiles: [],
+        totalLogLines: 0,
+        exportStartTime,
+        exportEndTime: new Date(),
+      };
+    }
 
-  // エクスポート実行日時のサブフォルダ名を生成
-  const exportFolder = generateExportFolderName(exportStartTime);
-  const outputDir = path.dirname(outputFilePath);
-  const outputFileName = path.basename(outputFilePath);
-  const finalOutputPath = path.join(outputDir, exportFolder, outputFileName);
+    // logStore形式に変換
+    const logLines = exportLogsToLogStore(logRecords);
 
-  // ディレクトリを作成
-  const dirPath = path.dirname(finalOutputPath);
-  const dirResult = await ensureDirectoryExists(dirPath);
-  if (dirResult.isErr()) {
-    return neverthrow.err(dirResult.error);
-  }
+    // エクスポート実行日時のサブフォルダ名を生成
+    const exportFolder = generateExportFolderName(exportStartTime);
+    const outputDir = path.dirname(outputFilePath);
+    const outputFileName = path.basename(outputFilePath);
+    const finalOutputPath = path.join(outputDir, exportFolder, outputFileName);
 
-  // ファイルに書き込み
-  const content = formatLogStoreContent(logLines);
-  const writeResult = await writeFileSafe(finalOutputPath, content);
-  if (writeResult.isErr()) {
-    return neverthrow.err(writeResult.error);
-  }
+    // ディレクトリを作成
+    const dirPath = path.dirname(finalOutputPath);
+    yield* ensureDirectoryExists(dirPath);
 
-  const exportEndTime = new Date();
+    // ファイルに書き込み
+    const content = formatLogStoreContent(logLines);
+    yield* writeFileSafe(finalOutputPath, content);
 
-  return neverthrow.ok({
-    exportedFiles: [finalOutputPath],
-    totalLogLines: logLines.length,
-    exportStartTime,
-    exportEndTime,
+    const exportEndTime = new Date();
+
+    return {
+      exportedFiles: [finalOutputPath],
+      totalLogLines: logLines.length,
+      exportStartTime,
+      exportEndTime,
+    };
   });
-};

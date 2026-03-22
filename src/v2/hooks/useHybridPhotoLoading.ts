@@ -135,6 +135,7 @@ export function useHybridPhotoLoading(
           pendingIdsRef.current.add(id);
         }
 
+        // effect-lint-allow-try-catch: React フロントエンド境界
         try {
           const result = await utils.vrchatPhoto.getVrchatPhotoPathsByIds.fetch(
             { ids: batch },

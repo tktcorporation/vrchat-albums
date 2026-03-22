@@ -1,11 +1,32 @@
 import * as nodeFs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { Data, Effect } from 'effect';
 import * as exiftool from 'exiftool-vendored';
-import type { Result } from 'neverthrow';
-import { err, ok, ResultAsync } from 'neverthrow';
 import { v4 as uuidv4 } from 'uuid';
-import type { ExifOperationError } from './errorHelpers';
+
+/** EXIF操作関連のエラーコード */
+type ExifOperationErrorCode =
+  | 'EXIF_TEMP_DIR_CREATE_FAILED'
+  | 'EXIF_TEMP_FILE_WRITE_FAILED'
+  | 'EXIF_WRITE_FAILED'
+  | 'EXIF_TEMP_FILE_READ_FAILED'
+  | 'EXIF_READ_FAILED';
+
+/**
+ * EXIF操作関連のエラー型（Data.TaggedError）
+ *
+ * 背景: 呼び出し側で個別コードをハンドリングする必要がないため、
+ * 1クラスに code フィールドを持たせる形式。
+ * Effect.catchTag("ExifOperationError", ...) で一括キャッチ可能。
+ */
+export class ExifOperationError extends Data.TaggedError('ExifOperationError')<{
+  code: ExifOperationErrorCode;
+  message: string;
+  cause?: unknown;
+  filePath?: string;
+}> {}
+
 import { logger } from './logger';
 import * as fs from './wrappedFs';
 
@@ -27,26 +48,28 @@ const safeUnlink = async (filePath: string): Promise<void> => {
 
 /**
  * 一時ディレクトリとファイルパスを作成するヘルパー
- * ResultAsync を使用して非同期エラーを型安全に処理
+ * Effect を使用して非同期エラーを型安全に処理
  */
-const createTempFile = (): ResultAsync<
+const createTempFile = (): Effect.Effect<
   { tempDir: string; tempFilePath: string },
   ExifOperationError
 > =>
-  ResultAsync.fromPromise(
-    nodeFs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-')),
-    (error): ExifOperationError => {
+  Effect.tryPromise({
+    try: () => nodeFs.promises.mkdtemp(path.join(os.tmpdir(), 'exif-')),
+    catch: (error): ExifOperationError => {
       logger.debug('Failed to create temporary directory', error);
-      return {
+      return new ExifOperationError({
         code: 'EXIF_TEMP_DIR_CREATE_FAILED',
         message: 'Failed to create temporary directory',
         cause: error,
-      };
+      });
     },
-  ).map((tempDir) => ({
-    tempDir,
-    tempFilePath: path.join(tempDir, `${uuidv4()}.png`),
-  }));
+  }).pipe(
+    Effect.map((tempDir) => ({
+      tempDir,
+      tempFilePath: path.join(tempDir, `${uuidv4()}.png`),
+    })),
+  );
 
 let exiftoolInstance: exiftool.ExifTool | null = null;
 
@@ -82,69 +105,85 @@ export const writeDateTimeWithTimezone = async ({
   });
 };
 
-export const setExifToBuffer = async (
+export const setExifToBuffer = (
   buffer: Buffer,
   exif: {
     description: string;
     dateTimeOriginal: string;
     timezoneOffset: string;
   },
-): Promise<Result<Buffer, ExifOperationError>> => {
-  // Windows短縮パス問題を回避するため、一時ディレクトリを作成
-  const tempFileResult = await createTempFile();
-  if (tempFileResult.isErr()) {
-    return err(tempFileResult.error);
-  }
-  const { tempDir, tempFilePath } = tempFileResult.value;
+): Effect.Effect<Buffer, ExifOperationError> => {
+  return Effect.gen(function* () {
+    // Windows短縮パス問題を回避するため、一時ディレクトリを作成
+    const { tempDir, tempFilePath } = yield* createTempFile();
 
-  // 一時ファイルに書き込み
-  const write_r = fs.writeFileSyncSafe(tempFilePath, new Uint8Array(buffer));
-  if (write_r.isErr()) {
-    // 非クリティカルなクリーンアップ
-    await safeRmdir(tempDir);
-    logger.debug('Failed to write buffer to temporary file', write_r.error);
-    return err({
-      code: 'EXIF_TEMP_FILE_WRITE_FAILED',
-      message: 'Failed to write buffer to temporary file',
-      cause: write_r.error,
-      filePath: tempFilePath,
-    });
-  }
-
-  try {
-    await writeDateTimeWithTimezone({
-      filePath: tempFilePath,
-      description: exif.description,
-      dateTimeOriginal: exif.dateTimeOriginal,
-      timezoneOffset: exif.timezoneOffset,
-    });
-
-    // 一時ファイルを読み込み
-    const read_r = fs.readFileSyncSafe(tempFilePath);
-    if (read_r.isErr()) {
-      logger.debug('Failed to read temporary file', read_r.error);
-      return err({
-        code: 'EXIF_TEMP_FILE_READ_FAILED',
-        message: 'Failed to read temporary file',
-        cause: read_r.error,
-        filePath: tempFilePath,
-      });
+    // 一時ファイルに書き込み
+    const writeEffect = fs.writeFileSyncSafe(
+      tempFilePath,
+      new Uint8Array(buffer),
+    );
+    const writeResult = yield* Effect.either(writeEffect);
+    if (writeResult._tag === 'Left') {
+      // 非クリティカルなクリーンアップ
+      yield* Effect.promise(() => safeRmdir(tempDir));
+      logger.debug(
+        'Failed to write buffer to temporary file',
+        writeResult.left,
+      );
+      return yield* Effect.fail(
+        new ExifOperationError({
+          code: 'EXIF_TEMP_FILE_WRITE_FAILED',
+          message: 'Failed to write buffer to temporary file',
+          cause: writeResult.left,
+          filePath: tempFilePath,
+        }),
+      );
     }
 
-    return ok(read_r.value);
-  } catch (error) {
-    logger.debug('Failed to write EXIF data', error);
-    return err({
-      code: 'EXIF_WRITE_FAILED',
-      message: 'Failed to write EXIF data',
-      cause: error,
-      filePath: tempFilePath,
-    });
-  } finally {
-    // 非クリティカルなクリーンアップ
-    await safeUnlink(tempFilePath);
-    await safeRmdir(tempDir);
-  }
+    return yield* Effect.acquireUseRelease(
+      Effect.succeed(tempFilePath),
+      (tmpPath) =>
+        Effect.gen(function* () {
+          yield* Effect.tryPromise({
+            try: () =>
+              writeDateTimeWithTimezone({
+                filePath: tmpPath,
+                description: exif.description,
+                dateTimeOriginal: exif.dateTimeOriginal,
+                timezoneOffset: exif.timezoneOffset,
+              }),
+            catch: (error): ExifOperationError => {
+              logger.debug('Failed to write EXIF data', error);
+              return new ExifOperationError({
+                code: 'EXIF_WRITE_FAILED',
+                message: 'Failed to write EXIF data',
+                cause: error,
+                filePath: tmpPath,
+              });
+            },
+          });
+
+          // 一時ファイルを読み込み
+          return yield* fs.readFileSyncSafe(tmpPath).pipe(
+            Effect.mapError((readErr): ExifOperationError => {
+              logger.debug('Failed to read temporary file', readErr);
+              return new ExifOperationError({
+                code: 'EXIF_TEMP_FILE_READ_FAILED',
+                message: 'Failed to read temporary file',
+                cause: readErr,
+                filePath: tmpPath,
+              });
+            }),
+          );
+        }),
+      (tmpPath) =>
+        Effect.promise(async () => {
+          // 非クリティカルなクリーンアップ
+          await safeUnlink(tmpPath);
+          await safeRmdir(tempDir);
+        }),
+    );
+  });
 };
 
 /**
@@ -159,46 +198,59 @@ export const readExif = async (filePath: string) => {
   return exif;
 };
 
-export const readExifByBuffer = async (
+export const readExifByBuffer = (
   buffer: Buffer,
-): Promise<Result<exiftool.Tags, ExifOperationError>> => {
-  // Windows短縮パス問題を回避するため、一時ディレクトリを作成
-  const tempFileResult = await createTempFile();
-  if (tempFileResult.isErr()) {
-    return err(tempFileResult.error);
-  }
-  const { tempDir, tempFilePath } = tempFileResult.value;
+): Effect.Effect<exiftool.Tags, ExifOperationError> => {
+  return Effect.gen(function* () {
+    // Windows短縮パス問題を回避するため、一時ディレクトリを作成
+    const { tempDir, tempFilePath } = yield* createTempFile();
 
-  // 一時ファイルに書き込み
-  const write_r = fs.writeFileSyncSafe(tempFilePath, new Uint8Array(buffer));
-  if (write_r.isErr()) {
-    // 非クリティカルなクリーンアップ
-    await safeRmdir(tempDir);
-    logger.debug('Failed to write buffer to temporary file', write_r.error);
-    return err({
-      code: 'EXIF_TEMP_FILE_WRITE_FAILED',
-      message: 'Failed to write buffer to temporary file',
-      cause: write_r.error,
-      filePath: tempFilePath,
-    });
-  }
+    // 一時ファイルに書き込み
+    const writeEffect = fs.writeFileSyncSafe(
+      tempFilePath,
+      new Uint8Array(buffer),
+    );
+    const writeResult = yield* Effect.either(writeEffect);
+    if (writeResult._tag === 'Left') {
+      // 非クリティカルなクリーンアップ
+      yield* Effect.promise(() => safeRmdir(tempDir));
+      logger.debug(
+        'Failed to write buffer to temporary file',
+        writeResult.left,
+      );
+      return yield* Effect.fail(
+        new ExifOperationError({
+          code: 'EXIF_TEMP_FILE_WRITE_FAILED',
+          message: 'Failed to write buffer to temporary file',
+          cause: writeResult.left,
+          filePath: tempFilePath,
+        }),
+      );
+    }
 
-  try {
-    const exif = await readExif(tempFilePath);
-    return ok(exif);
-  } catch (error) {
-    logger.debug('Failed to read EXIF data', error);
-    return err({
-      code: 'EXIF_READ_FAILED',
-      message: 'Failed to read EXIF data',
-      cause: error,
-      filePath: tempFilePath,
-    });
-  } finally {
-    // 非クリティカルなクリーンアップ
-    await safeUnlink(tempFilePath);
-    await safeRmdir(tempDir);
-  }
+    return yield* Effect.acquireUseRelease(
+      Effect.succeed(tempFilePath),
+      (tmpPath) =>
+        Effect.tryPromise({
+          try: () => readExif(tmpPath),
+          catch: (error): ExifOperationError => {
+            logger.debug('Failed to read EXIF data', error);
+            return new ExifOperationError({
+              code: 'EXIF_READ_FAILED',
+              message: 'Failed to read EXIF data',
+              cause: error,
+              filePath: tmpPath,
+            });
+          },
+        }),
+      (tmpPath) =>
+        Effect.promise(async () => {
+          // 非クリティカルなクリーンアップ
+          await safeUnlink(tmpPath);
+          await safeRmdir(tempDir);
+        }),
+    );
+  });
 };
 
 // アプリケーション終了時にExiftoolのインスタンスを終了

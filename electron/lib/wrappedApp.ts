@@ -3,6 +3,7 @@
  * ex. C:\Users\username\AppData\Roaming\app-name
  */
 export const getAppUserDataPath = () => {
+  // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
     const { app } = require('electron');
     return app.getPath('userData');

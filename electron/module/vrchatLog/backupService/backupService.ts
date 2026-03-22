@@ -1,7 +1,11 @@
+import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+
+type NodeDirent = Dirent;
+
 import * as datefns from 'date-fns';
-import * as neverthrow from 'neverthrow';
+import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 import { logger } from '../../../lib/logger';
 import {
@@ -15,43 +19,38 @@ import {
   exportLogStoreFromDB,
   getExportErrorMessage,
 } from '../exportService/exportService';
+import {
+  BackupExportFailed,
+  BackupMetadataUpdateFailed,
+  BackupMetadataWriteFailed,
+  BackupNotFound,
+  type BackupServiceError,
+} from './errors';
 
 /**
- * バックアップエラー型
- * 呼び出し側でパターンマッチできるように具体的な型を定義
- * 予期しないエラーはthrowしてSentryに送信（ここには含めない）
+ * BackupServiceError からユーザー向けメッセージを取得
  */
-export type BackupError =
-  | { type: 'EXPORT_FAILED'; message: string }
-  | { type: 'METADATA_WRITE_FAILED'; path: string; message: string }
-  | { type: 'METADATA_UPDATE_FAILED'; backupId: string; message: string }
-  | { type: 'HISTORY_READ_FAILED'; message: string }
-  | { type: 'BACKUP_NOT_FOUND'; backupId: string };
-
-/**
- * BackupError からユーザー向けメッセージを取得
- */
-export const getBackupErrorMessage = (error: BackupError): string =>
+export const getBackupErrorMessage = (error: BackupServiceError): string =>
   match(error)
     .with(
-      { type: 'EXPORT_FAILED' },
+      { _tag: 'BackupExportFailed' },
       (e) => `バックアップ作成に失敗しました: ${e.message}`,
     )
     .with(
-      { type: 'METADATA_WRITE_FAILED' },
+      { _tag: 'BackupMetadataWriteFailed' },
       (e) => `メタデータの保存に失敗しました (${e.path}): ${e.message}`,
     )
     .with(
-      { type: 'METADATA_UPDATE_FAILED' },
+      { _tag: 'BackupMetadataUpdateFailed' },
       (e) =>
         `バックアップメタデータの更新に失敗しました (${e.backupId}): ${e.message}`,
     )
     .with(
-      { type: 'HISTORY_READ_FAILED' },
+      { _tag: 'BackupHistoryReadFailed' },
       (e) => `バックアップ履歴の取得に失敗しました: ${e.message}`,
     )
     .with(
-      { type: 'BACKUP_NOT_FOUND' },
+      { _tag: 'BackupNotFound' },
       (e) => `バックアップが見つかりません: ${e.backupId}`,
     )
     .exhaustive();
@@ -87,183 +86,214 @@ export class BackupService {
   /**
    * インポート前バックアップ作成（既存エクスポート機能活用）
    */
-  async createPreImportBackup(
+  createPreImportBackup(
     getDBLogs: DBLogProvider,
-  ): Promise<neverthrow.Result<ImportBackupMetadata, BackupError>> {
-    const backupTimestamp = new Date();
+  ): Effect.Effect<ImportBackupMetadata, BackupServiceError> {
+    return Effect.gen(this, function* () {
+      const backupTimestamp = new Date();
 
-    logger.info('Creating pre-import backup using export functionality');
+      logger.info('Creating pre-import backup using export functionality');
 
-    // 1. 既存エクスポート機能で全データエクスポート
-    const exportResultAsync = await exportLogStoreFromDB(
-      {
-        // 全期間エクスポート（startDate/endDate指定なし）
-        outputBasePath: this.getBackupBasePath(),
-      },
-      getDBLogs,
-    );
+      // 1. 既存エクスポート機能で全データエクスポート
+      const exportResult = yield* exportLogStoreFromDB(
+        {
+          // 全期間エクスポート（startDate/endDate指定なし）
+          outputBasePath: this.getBackupBasePath(),
+        },
+        getDBLogs,
+      ).pipe(
+        Effect.mapError(
+          (exportError) =>
+            new BackupExportFailed({
+              message: getExportErrorMessage(exportError),
+            }),
+        ),
+      );
 
-    if (exportResultAsync.isErr()) {
-      return neverthrow.err({
-        type: 'EXPORT_FAILED' as const,
-        message: getExportErrorMessage(exportResultAsync.error),
-      });
-    }
+      // エクスポートファイルが存在しない場合（空のDB）
+      if (exportResult.exportedFiles.length === 0) {
+        logger.info('No data to backup (empty database)');
+        // 空のバックアップメタデータを作成
+        const backupId = this.generateBackupId(backupTimestamp);
+        const metadata: ImportBackupMetadata = {
+          id: backupId,
+          backupTimestamp,
+          exportFolderPath: '', // 空のDB時はエクスポートフォルダなし
+          sourceFiles: [],
+          status: 'completed',
+          importTimestamp: backupTimestamp,
+          totalLogLines: 0,
+          exportedFiles: [],
+        };
+        return metadata;
+      }
 
-    const exportResult = exportResultAsync.value;
-
-    // エクスポートファイルが存在しない場合（空のDB）
-    if (exportResult.exportedFiles.length === 0) {
-      logger.info('No data to backup (empty database)');
-      // 空のバックアップメタデータを作成
+      // 2. バックアップメタデータ作成
       const backupId = this.generateBackupId(backupTimestamp);
+      const exportPath = ExportPathObjectSchema.parse(
+        exportResult.exportedFiles[0],
+      );
+      const exportFolderPath = this.extractExportFolderPath(exportPath);
+
       const metadata: ImportBackupMetadata = {
         id: backupId,
         backupTimestamp,
-        exportFolderPath: '', // 空のDB時はエクスポートフォルダなし
-        sourceFiles: [],
+        exportFolderPath,
+        sourceFiles: [], // インポート時に設定
         status: 'completed',
         importTimestamp: backupTimestamp,
-        totalLogLines: 0,
-        exportedFiles: [],
+        totalLogLines: exportResult.totalLogLines,
+        exportedFiles: exportResult.exportedFiles,
       };
-      return neverthrow.ok(metadata);
-    }
 
-    // 2. バックアップメタデータ作成
-    const backupId = this.generateBackupId(backupTimestamp);
-    const exportPath = ExportPathObjectSchema.parse(
-      exportResult.exportedFiles[0],
-    );
-    const exportFolderPath = this.extractExportFolderPath(exportPath);
+      // 3. メタデータファイル保存
+      yield* this.saveBackupMetadata(exportFolderPath, metadata);
 
-    const metadata: ImportBackupMetadata = {
-      id: backupId,
-      backupTimestamp,
-      exportFolderPath,
-      sourceFiles: [], // インポート時に設定
-      status: 'completed',
-      importTimestamp: backupTimestamp,
-      totalLogLines: exportResult.totalLogLines,
-      exportedFiles: exportResult.exportedFiles,
-    };
+      logger.info(
+        `Pre-import backup created successfully: ${backupId}, files: ${exportResult.exportedFiles.length}`,
+      );
 
-    // 3. メタデータファイル保存
-    const saveResult = await this.saveBackupMetadata(
-      exportFolderPath,
-      metadata,
-    );
-    if (saveResult.isErr()) {
-      return neverthrow.err(saveResult.error);
-    }
-
-    logger.info(
-      `Pre-import backup created successfully: ${backupId}, files: ${exportResult.exportedFiles.length}`,
-    );
-
-    return neverthrow.ok(metadata);
+      return metadata;
+    });
   }
 
   /**
    * バックアップメタデータを更新
    */
-  async updateBackupMetadata(
+  updateBackupMetadata(
     metadata: ImportBackupMetadata,
-  ): Promise<neverthrow.Result<void, BackupError>> {
-    const saveResult = await this.saveBackupMetadata(
-      metadata.exportFolderPath,
-      metadata,
+  ): Effect.Effect<void, BackupServiceError> {
+    return this.saveBackupMetadata(metadata.exportFolderPath, metadata).pipe(
+      Effect.mapError(
+        (saveError) =>
+          new BackupMetadataUpdateFailed({
+            backupId: metadata.id,
+            message: getBackupErrorMessage(saveError),
+          }),
+      ),
+      Effect.tap(() => {
+        logger.info(`Backup metadata updated: ${metadata.id}`);
+        return Effect.succeed(undefined);
+      }),
     );
-    if (saveResult.isErr()) {
-      return neverthrow.err({
-        type: 'METADATA_UPDATE_FAILED',
-        backupId: metadata.id,
-        message: getBackupErrorMessage(saveResult.error),
-      });
-    }
-    logger.info(`Backup metadata updated: ${metadata.id}`);
-    return neverthrow.ok(undefined);
   }
 
   /**
    * バックアップ履歴を取得
    */
-  async getBackupHistory(): Promise<
-    neverthrow.Result<ImportBackupMetadata[], BackupError>
+  getBackupHistory(): Effect.Effect<
+    ImportBackupMetadata[],
+    BackupServiceError
   > {
-    const backupBasePath = this.getBackupBasePath();
+    return Effect.gen(this, function* () {
+      const backupBasePath = this.getBackupBasePath();
 
-    // バックアップディレクトリが存在しない場合は空配列を返す
-    const accessResult = await neverthrow.ResultAsync.fromPromise(
-      fs.access(backupBasePath),
-      () => 'NOT_FOUND' as const,
-    );
-    if (accessResult.isErr()) {
-      return neverthrow.ok([]);
-    }
-
-    // ディレクトリ一覧取得 - 失敗は予期しないエラーなのでthrow
-    const entries = await fs.readdir(backupBasePath, { withFileTypes: true });
-    const backupFolders = entries
-      .filter(
-        (entry) =>
-          entry.isDirectory() && entry.name.startsWith('vrchat-albums-export_'),
-      )
-      .map((entry) => entry.name);
-
-    const backups: ImportBackupMetadata[] = [];
-
-    for (const folderName of backupFolders) {
-      const metadataPath = path.join(
-        backupBasePath,
-        folderName,
-        'backup-metadata.json',
-      );
-
-      // 個別のメタデータ読み込み失敗は警告のみで継続
-      const readResult = await neverthrow.ResultAsync.fromPromise(
-        fs.readFile(metadataPath, 'utf-8'),
-        (e) => e,
-      );
-      if (readResult.isErr()) {
-        logger.warn(
-          `Failed to read backup metadata for ${folderName}: ${String(readResult.error)}`,
-        );
-        continue;
+      // バックアップディレクトリが存在しない場合は空配列を返す
+      const accessExists = yield* Effect.tryPromise({
+        try: () =>
+          fs
+            .access(backupBasePath)
+            .then(() => true)
+            .catch(() => false),
+        catch: () => {
+          // This should never happen since the promise catches internally
+          throw new Error('Unexpected error checking backup directory access');
+        },
+      }) as Effect.Effect<boolean, BackupServiceError>;
+      if (!accessExists) {
+        return [];
       }
 
-      const metadata = JSON.parse(readResult.value) as ImportBackupMetadata;
-      // Date オブジェクトに変換
-      metadata.backupTimestamp = new Date(metadata.backupTimestamp);
-      metadata.importTimestamp = new Date(metadata.importTimestamp);
-      backups.push(metadata);
-    }
+      // ディレクトリ一覧取得 - 失敗は予期しないエラーなのでthrow
+      const entries = yield* Effect.tryPromise({
+        try: () => fs.readdir(backupBasePath, { withFileTypes: true }),
+        catch: (e) => {
+          throw e; // Unexpected error
+        },
+      }) as Effect.Effect<NodeDirent[], BackupServiceError>;
 
-    // 作成日時で降順ソート（新しいものが先頭）
-    backups.sort((a, b) =>
-      datefns.compareDesc(a.backupTimestamp, b.backupTimestamp),
-    );
+      const backupFolders = entries
+        .filter(
+          (entry) =>
+            entry.isDirectory() &&
+            entry.name.startsWith('vrchat-albums-export_'),
+        )
+        .map((entry) => entry.name);
 
-    return neverthrow.ok(backups);
+      const backups: ImportBackupMetadata[] = [];
+
+      for (const folderName of backupFolders) {
+        const metadataPath = path.join(
+          backupBasePath,
+          folderName,
+          'backup-metadata.json',
+        );
+
+        // 個別のメタデータ読み込み失敗は警告のみで継続
+        const readExit = yield* Effect.tryPromise({
+          try: () => fs.readFile(metadataPath, 'utf-8'),
+          catch: (e) => e,
+        }).pipe(Effect.either);
+
+        if (readExit._tag === 'Left') {
+          logger.warn(
+            `Failed to read backup metadata for ${folderName}: ${String(readExit.left)}`,
+          );
+          continue;
+        }
+
+        // JSON パースと Date 変換の失敗は個別にスキップ（corrupt ファイルで全体を壊さない）
+        const parseExit = yield* Effect.try({
+          try: () => {
+            const metadata = JSON.parse(readExit.right) as ImportBackupMetadata;
+            metadata.backupTimestamp = new Date(metadata.backupTimestamp);
+            metadata.importTimestamp = new Date(metadata.importTimestamp);
+            return metadata;
+          },
+          catch: (e) => e,
+        }).pipe(Effect.either);
+
+        if (parseExit._tag === 'Left') {
+          // corrupt メタデータは Sentry に送信して検知可能にする
+          logger.error({
+            message: `Failed to parse backup metadata for ${folderName}`,
+            stack:
+              parseExit.left instanceof Error
+                ? parseExit.left
+                : new Error(String(parseExit.left)),
+            details: { folderName, metadataPath },
+          });
+          continue;
+        }
+
+        backups.push(parseExit.right);
+      }
+
+      // 作成日時で降順ソート（新しいものが先頭）
+      backups.sort((a, b) =>
+        datefns.compareDesc(a.backupTimestamp, b.backupTimestamp),
+      );
+
+      return backups;
+    });
   }
 
   /**
    * 指定されたIDのバックアップを取得
    */
-  async getBackup(
+  getBackup(
     backupId: string,
-  ): Promise<neverthrow.Result<ImportBackupMetadata, BackupError>> {
-    const historyResult = await this.getBackupHistory();
-    if (historyResult.isErr()) {
-      return neverthrow.err(historyResult.error);
-    }
+  ): Effect.Effect<ImportBackupMetadata, BackupServiceError> {
+    return Effect.gen(this, function* () {
+      const history = yield* this.getBackupHistory();
 
-    const backup = historyResult.value.find((b) => b.id === backupId);
-    if (!backup) {
-      return neverthrow.err({ type: 'BACKUP_NOT_FOUND', backupId });
-    }
+      const backup = history.find((b) => b.id === backupId);
+      if (!backup) {
+        return yield* Effect.fail(new BackupNotFound({ backupId }));
+      }
 
-    return neverthrow.ok(backup);
+      return backup;
+    });
   }
 
   /**
@@ -305,30 +335,36 @@ export class BackupService {
   /**
    * バックアップメタデータを保存
    */
-  private async saveBackupMetadata(
+  private saveBackupMetadata(
     exportFolderPath: string,
     metadata: ImportBackupMetadata,
-  ): Promise<neverthrow.Result<void, BackupError>> {
+  ): Effect.Effect<void, BackupServiceError> {
     const metadataPath = path.join(
       this.getBackupBasePath(),
       exportFolderPath,
       'backup-metadata.json',
     );
 
-    // ディレクトリ作成 - 失敗は予期しないエラーなのでthrow
-    await fs.mkdir(path.dirname(metadataPath), { recursive: true });
+    return Effect.gen(function* () {
+      // ディレクトリ作成 - 失敗は予期しないエラーなのでthrow
+      yield* Effect.tryPromise({
+        try: () => fs.mkdir(path.dirname(metadataPath), { recursive: true }),
+        catch: (e) => {
+          throw e; // Unexpected error
+        },
+      }) as Effect.Effect<unknown, BackupServiceError>;
 
-    // ファイル書き込み
-    const writeResult = await neverthrow.ResultAsync.fromPromise(
-      fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2)),
-      (e): BackupError => ({
-        type: 'METADATA_WRITE_FAILED',
-        path: metadataPath,
-        message: e instanceof Error ? e.message : String(e),
-      }),
-    );
-
-    return writeResult;
+      // ファイル書き込み
+      yield* Effect.tryPromise({
+        try: () =>
+          fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2)),
+        catch: (e) =>
+          new BackupMetadataWriteFailed({
+            path: metadataPath,
+            message: e instanceof Error ? e.message : String(e),
+          }),
+      });
+    });
   }
 }
 
