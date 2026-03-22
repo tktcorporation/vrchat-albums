@@ -360,7 +360,7 @@ function checkNoTryCatch(filePath: string, content: string) {
         i + 1,
         'no-try-catch',
         'try-catch は Effect.try / Effect.tryPromise に置き換えてください。許容する場合は前の行に // effect-lint-allow-try-catch を追加してください。',
-        'warning',
+        'error',
       );
     }
   }
