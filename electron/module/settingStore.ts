@@ -102,6 +102,13 @@ const setLogFilesDir =
     set('logFilesDir', dirPath);
   };
 
+/**
+ * ユーザーが明示的に設定した写真ディレクトリを返す（未設定なら null）
+ *
+ * 注意: デフォルトパス（~/Pictures/VRChat）へのフォールバックは行わない。
+ * デフォルトフォールバック付きで取得したい場合は
+ * vrchatPhoto.service.ts の getVRChatPhotoDirPath() を使うこと。
+ */
 const getVRChatPhotoDir =
   (getS: (key: SettingStoreKey) => string | null) => (): string | null => {
     return getS('vrchatPhotoDir');
