@@ -85,6 +85,7 @@
       "cacache>glob": "10.5.0"
     },
     "onlyBuiltDependencies": [
+      "@ast-grep/cli",
       "@sentry/cli",
       "electron",
       "electron-winstaller",
