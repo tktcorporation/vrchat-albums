@@ -55,9 +55,8 @@ const setVRChatPhotoDirPathByDialog = async (): Promise<'ok' | 'canceled'> => {
 
 export const vrchatPhotoRouter = () =>
   trpcRouter({
-    getVRChatPhotoDirPath: procedure.query(async () => {
-      const result = await vrchatPhotoService.getVRChatPhotoDirPath();
-      return result;
+    getVRChatPhotoDirPath: procedure.query(() => {
+      return vrchatPhotoService.getVRChatPhotoDirPath();
     }),
     setVRChatPhotoDirPathToSettingStore: procedure.mutation(async () => {
       const dialogResult = await setVRChatPhotoDirPathByDialog();
@@ -68,10 +67,8 @@ export const vrchatPhotoRouter = () =>
       eventEmitter.emit('toast', 'canceled');
       return false;
     }),
-    clearVRChatPhotoDirPathInSettingStore: procedure.mutation(async () => {
-      const result =
-        await vrchatPhotoService.clearVRChatPhotoDirPathInSettingStore();
-      return result;
+    clearVRChatPhotoDirPathInSettingStore: procedure.mutation(() => {
+      return vrchatPhotoService.clearVRChatPhotoDirPathInSettingStore();
     }),
     setVRChatPhotoDirPathDirectly: procedure
       .input(z.string().min(1, 'パスを入力してください'))

@@ -188,7 +188,7 @@ export function groupPhotosBySession(
       session.photos.push(photo);
     } else {
       console.warn(
-        `Could not find appropriate session for photo: ${photo.id} taken at ${photo.takenAt}`,
+        `Could not find appropriate session for photo: ${photo.id} taken at ${photo.takenAt.toISOString()}`,
       );
     }
   }

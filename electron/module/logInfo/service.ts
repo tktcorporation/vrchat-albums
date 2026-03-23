@@ -81,7 +81,9 @@ function _getLogStoreFilePathsImpl(
         ]
           .filter((d): d is Date => d instanceof Date) // Date型のみをフィルタリング
           .toSorted(datefns.compareAsc);
-        logger.debug(`_getLogStoreFilePaths: latest dates: ${dates}`);
+        logger.debug(
+          `_getLogStoreFilePaths: latest dates: ${dates.map((d) => d.toISOString()).join(', ')}`,
+        );
 
         // 最新の日付を取得、なければ1年前
         startDate = dates.at(-1) ?? datefns.subYears(new Date(), 1);
@@ -245,9 +247,7 @@ export function loadLogInfoIndexFromVRChatLog({
         } ms`,
       );
       logger.info(
-        `loadLogInfoIndexFromVRChatLog excludeOldLogLoad: ${excludeOldLogLoad} target: ${logStoreFilePaths.map(
-          (path) => path.value,
-        )}`,
+        `loadLogInfoIndexFromVRChatLog excludeOldLogLoad: ${String(excludeOldLogLoad)} target: ${logStoreFilePaths.map((path) => path.value).join(', ')}`,
       );
 
       // 3. ログファイルからログ情報を取得（部分的な成功を許容）

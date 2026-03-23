@@ -4,8 +4,6 @@ import { match, P } from 'ts-pattern';
 import { invalidatePhotoGalleryQueries } from '@/queryClient';
 import { trpcReact } from '@/trpc';
 
-import type { TypedTRPCError } from '../types/trpcErrors';
-
 type ProcessStage = 'pending' | 'inProgress' | 'success' | 'error' | 'skipped';
 
 /**
@@ -125,7 +123,7 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
         // 初期化完了を通知
         callbacks?.onComplete?.();
       },
-      onError: (error: TypedTRPCError | Error | unknown) => {
+      onError: (error: unknown) => {
         // 重複実行エラーの場合は無視
         const shouldIgnore = match(error)
           .when(

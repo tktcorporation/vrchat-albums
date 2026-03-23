@@ -244,13 +244,13 @@ export const handlePngBase64WithCallback = (
             { code: P.union('EACCES', 'EPERM') },
             (e) =>
               new PermissionDenied({
-                message: e instanceof Error ? e.message : String(e),
+                message: e instanceof Error ? e.message : JSON.stringify(e),
               }),
           )
           .otherwise(
             (e) =>
               new FileCreateFailed({
-                message: e instanceof Error ? e.message : String(e),
+                message: e instanceof Error ? e.message : JSON.stringify(e),
               }),
           ),
     }),
@@ -272,13 +272,13 @@ export const handlePngBase64WithCallback = (
               { code: P.union('EACCES', 'EPERM') },
               (e) =>
                 new PermissionDenied({
-                  message: e instanceof Error ? e.message : String(e),
+                  message: e instanceof Error ? e.message : JSON.stringify(e),
                 }),
             )
             .otherwise(
               (e) =>
                 new FileCreateFailed({
-                  message: e instanceof Error ? e.message : String(e),
+                  message: e instanceof Error ? e.message : JSON.stringify(e),
                 }),
             ),
       }),

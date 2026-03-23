@@ -137,6 +137,33 @@ const SearchOverlay = memo(
       playerSuggestions,
     ]);
 
+    // モーダルを閉じる
+    const handleClose = useCallback(() => {
+      setQuery('');
+      setHighlightedIndex(0);
+      onClose();
+    }, [onClose]);
+
+    // 候補選択
+    const handleSelect = useCallback(
+      (suggestion: SearchSuggestion) => {
+        setQuery(suggestion.value);
+        onSearch(
+          suggestion.value,
+          suggestion.type === 'recent' ? undefined : suggestion.type,
+        );
+        onClose();
+      },
+      [onSearch, onClose],
+    );
+
+    // 直接検索
+    const handleSearch = useCallback(() => {
+      const trimmedQuery = query.trim();
+      onSearch(trimmedQuery);
+      onClose();
+    }, [query, onSearch, onClose]);
+
     // キーボードナビゲーション
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
@@ -164,35 +191,8 @@ const SearchOverlay = memo(
             break;
         }
       },
-      [suggestions, highlightedIndex, query],
+      [suggestions, highlightedIndex, handleSelect, handleSearch, handleClose],
     );
-
-    // 候補選択
-    const handleSelect = useCallback(
-      (suggestion: SearchSuggestion) => {
-        setQuery(suggestion.value);
-        onSearch(
-          suggestion.value,
-          suggestion.type === 'recent' ? undefined : suggestion.type,
-        );
-        onClose();
-      },
-      [onSearch, onClose],
-    );
-
-    // 直接検索
-    const handleSearch = useCallback(() => {
-      const trimmedQuery = query.trim();
-      onSearch(trimmedQuery);
-      onClose();
-    }, [query, onSearch, onClose]);
-
-    // モーダルを閉じる
-    const handleClose = useCallback(() => {
-      setQuery('');
-      setHighlightedIndex(0);
-      onClose();
-    }, [onClose]);
 
     // モーダル外クリックで閉じる
     const handleBackdropClick = useCallback(
