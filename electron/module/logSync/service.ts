@@ -8,8 +8,10 @@ import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
 import { getSettingStore } from '../settingStore';
 import { VRChatLogFileError } from '../vrchatLog/error';
 import type { VRChatLogError } from '../vrchatLog/errors';
+import type { AppendLoglinesResult } from '../vrchatLog/vrchatLogController';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
+import { getVRChatPhotoDirPath } from '../vrchatPhoto/vrchatPhoto.service';
 import type { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
 import type { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
@@ -65,7 +67,7 @@ export function syncLogs(
 
     // Step 1: VRChatログファイルから新しいログ行を抽出・保存
     emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
-    yield* Effect.tryPromise({
+    const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
       try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
       catch: (error) => {
         logger.error({
@@ -90,9 +92,14 @@ export function syncLogs(
     });
 
     // Step 2: 保存されたログをデータベースに読み込む
+    // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
+    // logStore ファイルの再読み込みをスキップする
     emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
     const loadResult = yield* loadLogInfoIndexFromVRChatLog({
       excludeOldLogLoad: !isFullSync,
+      preLoadedLogLines: !isFullSync
+        ? appendResult.processedLogLines
+        : undefined,
     });
     emitProgress({
       stage: 'log_load',
@@ -124,10 +131,10 @@ function triggerWorldJoinImageGeneration(): void {
       return;
     }
 
-    const photoDirPath = settingStore.getVRChatPhotoDir();
-    if (!photoDirPath) {
-      return;
-    }
+    // settingStore.getVRChatPhotoDir() はユーザー未設定時に null を返すが、
+    // getVRChatPhotoDirPath() はデフォルトパス（~/Pictures/VRChat）にフォールバックする。
+    // 写真閲覧と同じデフォルトパスを使うことで、初期設定のままでも画像生成が動作する。
+    const photoDirPath = getVRChatPhotoDirPath().value;
 
     void Effect.runPromise(
       generateMissingWorldJoinImages({ photoDirPath }),
