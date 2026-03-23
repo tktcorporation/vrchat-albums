@@ -48,10 +48,47 @@ const safeUnlink = async (filePath: string): Promise<void> => {
 };
 
 /**
+ * バッファの先頭バイト（マジックバイト）から画像フォーマットの拡張子を判定する。
+ *
+ * 背景: exiftool はファイル拡張子と実際のフォーマットが一致しないと
+ * 書き込みに失敗する。JPEG バッファを `.png` 拡張子のファイルに書き込むと
+ * "Not a valid PNG" 等のエラーになるため、正しい拡張子を使う必要がある。
+ */
+const detectImageExtension = (buffer: Buffer): string => {
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return '.jpg';
+  }
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return '.png';
+  }
+  // フォールバック: 判定不能な場合は拡張子なし（exiftool は中身で判断可能）
+  return '.bin';
+};
+
+/**
  * 一時ディレクトリとファイルパスを作成するヘルパー
  * Effect を使用して非同期エラーを型安全に処理
+ *
+ * @param buffer - 画像バッファ。マジックバイトから拡張子を自動判定する。
  */
-const createTempFile = (): Effect.Effect<
+const createTempFile = (
+  buffer: Buffer,
+): Effect.Effect<
   { tempDir: string; tempFilePath: string },
   ExifOperationError
 > =>
@@ -68,7 +105,10 @@ const createTempFile = (): Effect.Effect<
   }).pipe(
     Effect.map((tempDir) => ({
       tempDir,
-      tempFilePath: path.join(tempDir, `${uuidv4()}.png`),
+      tempFilePath: path.join(
+        tempDir,
+        `${uuidv4()}${detectImageExtension(buffer)}`,
+      ),
     })),
   );
 
@@ -116,7 +156,8 @@ export const setExifToBuffer = (
 ): Effect.Effect<Buffer, ExifOperationError> => {
   return Effect.gen(function* () {
     // Windows短縮パス問題を回避するため、一時ディレクトリを作成
-    const { tempDir, tempFilePath } = yield* createTempFile();
+    // バッファのマジックバイトから拡張子を判定し、exiftool のフォーマット不一致エラーを防ぐ
+    const { tempDir, tempFilePath } = yield* createTempFile(buffer);
 
     // 一時ファイルに書き込み
     const writeEffect = fs.writeFileSyncSafe(
@@ -204,7 +245,8 @@ export const readExifByBuffer = (
 ): Effect.Effect<exiftool.Tags, ExifOperationError> => {
   return Effect.gen(function* () {
     // Windows短縮パス問題を回避するため、一時ディレクトリを作成
-    const { tempDir, tempFilePath } = yield* createTempFile();
+    // バッファのマジックバイトから拡張子を判定し、exiftool のフォーマット不一致エラーを防ぐ
+    const { tempDir, tempFilePath } = yield* createTempFile(buffer);
 
     // 一時ファイルに書き込み
     const writeEffect = fs.writeFileSyncSafe(

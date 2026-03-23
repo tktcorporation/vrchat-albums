@@ -73,7 +73,7 @@ describe('wrappedExifTool', () => {
   });
 
   describe('setExifToBuffer', () => {
-    it('should set EXIF data to buffer and return new buffer with EXIF', async () => {
+    it('should set EXIF data to PNG buffer and return new buffer with EXIF', async () => {
       const testData = {
         description: 'wrld_test_world',
         dateTimeOriginal: '2024-01-01 12:34:56',
@@ -96,6 +96,32 @@ describe('wrappedExifTool', () => {
       expect(exifData.ImageDescription).toBe(testData.description);
       const dateTime = exifData.DateTimeOriginal as ExifDateTime;
       expect(dateTime.rawValue).toBe('2024:01:01 12:34:56+09:00');
+    });
+
+    it('should set EXIF data to JPEG buffer and return new buffer with EXIF', async () => {
+      const testData = {
+        description: 'wrld_jpeg_test_world',
+        dateTimeOriginal: '2024-06-15 18:30:00',
+        timezoneOffset: '+09:00',
+      };
+
+      // PNG バッファを JPEG に変換（World Join 画像の生成フローを再現）
+      const pngBuffer = await fs.promises.readFile(testImagePath);
+      const jpegBuffer = Buffer.from(await new Transformer(pngBuffer).jpeg(85));
+
+      // JPEG バッファに EXIF データを設定
+      const newBuffer = await Effect.runPromise(
+        wrappedExiftool.setExifToBuffer(jpegBuffer, testData),
+      );
+
+      // 新しいバッファから EXIF データを読み込んで検証
+      const exifData = await Effect.runPromise(
+        wrappedExiftool.readExifByBuffer(newBuffer),
+      );
+      expect(exifData.Description).toBe(testData.description);
+      expect(exifData.ImageDescription).toBe(testData.description);
+      const dateTime = exifData.DateTimeOriginal as ExifDateTime;
+      expect(dateTime.rawValue).toBe('2024:06:15 18:30:00+09:00');
     });
   });
 });
