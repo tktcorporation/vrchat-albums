@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import { Transformer } from '@napi-rs/image';
 import { Resvg } from '@resvg/resvg-js';
 import { Effect } from 'effect';
+import type Electron from 'electron';
 import * as path from 'pathe';
 
 import type { ImageGenerationError } from './errors';
@@ -32,7 +33,7 @@ const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
   const fontsDir = (() => {
     // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
     try {
-      const { app } = require('electron') as typeof import('electron');
+      const { app } = require('electron') as typeof Electron;
       return path.join(
         app.isPackaged
           ? process.resourcesPath

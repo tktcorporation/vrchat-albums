@@ -455,25 +455,21 @@ export async function lintValueObjects(
     });
   } else {
     // Find all TypeScript files that might contain ValueObjects
-    let patterns: string[];
-
-    if (testMode) {
-      // In test mode, ONLY scan the test directory
-      patterns = ['test-valueobjects/**/*.ts'];
-    } else {
-      patterns = [
-        'electron/**/*.ts',
-        'src/**/*.ts',
-        '!electron/**/*.test.ts',
-        '!electron/**/*.spec.ts',
-        '!src/**/*.test.ts',
-        '!src/**/*.spec.ts',
-        '!node_modules/**/*',
-        '!dist/**/*',
-        '!main/**/*',
-        '!out/**/*',
-      ];
-    }
+    // In test mode, ONLY scan the test directory
+    const patterns: string[] = testMode
+      ? ['test-valueobjects/**/*.ts']
+      : [
+          'electron/**/*.ts',
+          'src/**/*.ts',
+          '!electron/**/*.test.ts',
+          '!electron/**/*.spec.ts',
+          '!src/**/*.test.ts',
+          '!src/**/*.spec.ts',
+          '!node_modules/**/*',
+          '!dist/**/*',
+          '!main/**/*',
+          '!out/**/*',
+        ];
 
     files = await glob(patterns, {
       cwd: process.cwd(),

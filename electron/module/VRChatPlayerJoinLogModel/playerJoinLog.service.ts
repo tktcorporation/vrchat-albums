@@ -58,12 +58,13 @@ export const getVRChatPlayerJoinLogListByJoinDateTime = (props: {
   return Effect.gen(function* () {
     let modelList: model.VRChatPlayerJoinLogModel[];
 
-    // 終了日時が指定されていない場合は無制限に取得
-    if (!props.endJoinDateTime) {
+    // 終了日時が指定されている場合はその範囲で取得、なければ無制限
+    if (props.endJoinDateTime) {
+      const endDate: Date = props.endJoinDateTime;
       modelList = yield* enqueueTask(() =>
         model.getVRChatPlayerJoinLogListByJoinDateTime({
           gteJoinDateTime: props.startJoinDateTime,
-          ltJoinDateTime: null,
+          ltJoinDateTime: endDate,
           getUntilDays: null,
         }),
       ).pipe(
@@ -78,11 +79,10 @@ export const getVRChatPlayerJoinLogListByJoinDateTime = (props: {
         PlayerJoinLogServiceError
       >;
     } else {
-      const endDate: Date = props.endJoinDateTime;
       modelList = yield* enqueueTask(() =>
         model.getVRChatPlayerJoinLogListByJoinDateTime({
           gteJoinDateTime: props.startJoinDateTime,
-          ltJoinDateTime: endDate,
+          ltJoinDateTime: null,
           getUntilDays: null,
         }),
       ).pipe(

@@ -97,9 +97,9 @@ export function syncLogs(
     emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
     const loadResult = yield* loadLogInfoIndexFromVRChatLog({
       excludeOldLogLoad: !isFullSync,
-      preLoadedLogLines: !isFullSync
-        ? appendResult.processedLogLines
-        : undefined,
+      preLoadedLogLines: isFullSync
+        ? undefined
+        : appendResult.processedLogLines,
     });
     emitProgress({
       stage: 'log_load',

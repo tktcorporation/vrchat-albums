@@ -160,7 +160,7 @@ const generateTestPhotos = async (
       .replace(/[-:]/g, '-')
       .replace('T', '_')
       .slice(0, 23);
-    const fileName = `VRChat_${dateStr.replace(/\./g, '.')}_test${i}.png`;
+    const fileName = `VRChat_${dateStr.replaceAll('.', '.')}_test${i}.png`;
     const filePath = path.join(dir, fileName);
 
     // 1920x1080のダミー画像を生成（RGBA ピクセルから PNG を生成）

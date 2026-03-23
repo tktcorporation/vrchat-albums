@@ -278,11 +278,13 @@ export class NeverthrowLinter {
     }
 
     // Case 2: Assigned to a variable - track it
-    if (ts.isVariableDeclaration(parent) && parent.initializer === node) {
-      if (ts.isIdentifier(parent.name)) {
-        // We'll check variable usage in a second pass
-        return true; // Don't report here, will be checked via variable tracking
-      }
+    if (
+      ts.isVariableDeclaration(parent) &&
+      parent.initializer === node &&
+      ts.isIdentifier(parent.name)
+    ) {
+      // We'll check variable usage in a second pass
+      return true; // Don't report here, will be checked via variable tracking
     }
 
     // Case 3: Returned from function
@@ -400,13 +402,11 @@ export class NeverthrowLinter {
             const grandParent = parent.parent;
             if (
               ts.isCallExpression(grandParent) &&
-              grandParent.expression === parent
+              grandParent.expression === parent &&
+              this.isResultHandled(grandParent)
             ) {
-              // Check if the chain eventually gets handled
-              if (this.isResultHandled(grandParent)) {
-                const varInfo = resultVariables.get(node.text);
-                if (varInfo) varInfo.handled = true;
-              }
+              const varInfo = resultVariables.get(node.text);
+              if (varInfo) varInfo.handled = true;
             }
           }
         }
@@ -509,17 +509,15 @@ export class NeverthrowLinter {
         // 1. Inside a function that returns ResultAsync
         // 2. Used as arguments to ResultAsync.fromPromise() or similar
         // 3. Callbacks passed to other function calls (common pattern for utility functions)
-        if (insideResultAsyncFunction && ts.isArrowFunction(node)) {
+        if (
+          insideResultAsyncFunction &&
+          ts.isArrowFunction(node) &&
+          (this.isInsideNeverthrowCall(node) || this.isCallbackArgument(node))
+        ) {
           // This is a nested async function inside a ResultAsync-returning function
-          // Skip checking it as it's likely an IIFE or callback for ResultAsync
-          if (
-            this.isInsideNeverthrowCall(node) ||
-            this.isCallbackArgument(node)
-          ) {
-            // Recurse but still mark as inside ResultAsync function
-            ts.forEachChild(node, (child) => visit(child, true));
-            return;
-          }
+          // Recurse but still mark as inside ResultAsync function
+          ts.forEachChild(node, (child) => visit(child, true));
+          return;
         }
 
         if (returnsResultAsync) {
@@ -1125,26 +1123,28 @@ export class NeverthrowLinter {
     let hasReturnErr = false;
 
     const visit = (n: ts.Node) => {
-      if (ts.isReturnStatement(n) && n.expression) {
+      if (
+        ts.isReturnStatement(n) &&
+        n.expression &&
+        ts.isCallExpression(n.expression)
+      ) {
         // Check for return err(...) or return neverthrow.err(...)
-        if (ts.isCallExpression(n.expression)) {
-          const callExpr = n.expression;
-          const callee = callExpr.expression;
+        const callExpr = n.expression;
+        const callee = callExpr.expression;
 
-          // Check for err(...)
-          if (ts.isIdentifier(callee) && callee.text === 'err') {
-            hasReturnErr = true;
-          }
+        // Check for err(...)
+        if (ts.isIdentifier(callee) && callee.text === 'err') {
+          hasReturnErr = true;
+        }
 
-          // Check for neverthrow.err(...)
-          if (
-            ts.isPropertyAccessExpression(callee) &&
-            ts.isIdentifier(callee.expression) &&
-            callee.expression.text === 'neverthrow' &&
-            callee.name.text === 'err'
-          ) {
-            hasReturnErr = true;
-          }
+        // Check for neverthrow.err(...)
+        if (
+          ts.isPropertyAccessExpression(callee) &&
+          ts.isIdentifier(callee.expression) &&
+          callee.expression.text === 'neverthrow' &&
+          callee.name.text === 'err'
+        ) {
+          hasReturnErr = true;
         }
       }
       if (!hasReturnErr) {

@@ -243,27 +243,22 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
             handleClick();
           }
         }}
-        role="button"
         tabIndex={0}
-        aria-selected={isSelected}
+        aria-pressed={isSelected}
       >
         <ContextMenu>
           <ContextMenuTrigger className="absolute inset-0">
-            <div
+            <button
+              type="button"
               className={clsx(
                 'absolute top-2 left-2 z-10 rounded-full transition-opacity duration-150',
+                'appearance-none border-none bg-transparent p-0',
                 isMultiSelectMode || isHovering || isSelected
                   ? 'opacity-100'
                   : 'opacity-0 group-hover:opacity-100',
               )}
               onClick={handleSelectIconClick}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  handleSelectIconClick(e);
-                }
-              }}
-              role="checkbox"
-              aria-checked={isSelected}
+              aria-pressed={isSelected}
               aria-label={t('common.contextMenu.copyPhotoData')}
               tabIndex={0}
             >
@@ -285,7 +280,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
                   strokeWidth={2}
                 />
               )}
-            </div>
+            </button>
 
             <div
               className={clsx(

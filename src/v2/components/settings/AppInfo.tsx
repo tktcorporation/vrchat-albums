@@ -56,15 +56,14 @@ const AppInfo = memo(() => {
           <span className={TEXT_COLOR.secondary}>
             {t('settings.info.version')}
           </span>
-          <span
-            className={`font-mono ${TEXT_COLOR.primary} cursor-pointer`}
+          <button
+            type="button"
+            className={`font-mono ${TEXT_COLOR.primary} cursor-pointer appearance-none border-none bg-transparent p-0`}
             onClick={handleVersionClick}
             onKeyDown={handleKeyDown}
-            role="button"
-            tabIndex={0}
           >
             {appVersion}
-          </span>
+          </button>
         </div>
         <div className="flex justify-between">
           <span className={TEXT_COLOR.secondary}>

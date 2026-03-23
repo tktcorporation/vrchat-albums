@@ -269,18 +269,11 @@ const VirtualizedGallery = memo(
 
     return (
       <>
+        {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- scroll container, not interactive */}
         <div
           ref={scrollElementRef}
           className="flex-1 min-h-0 overflow-y-auto p-4 pr-4 scrollbar-none"
           onClick={handleBackgroundClick}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              handleBackgroundClick(e);
-            }
-          }}
-          role="button"
-          tabIndex={-1}
-          aria-label="ギャラリー背景"
         >
           <div
             style={{

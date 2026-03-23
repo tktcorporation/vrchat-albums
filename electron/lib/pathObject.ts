@@ -147,7 +147,7 @@ class BackupPathObject extends PathObject {
    * インポートバックアップ用のプレフィックスを追加
    */
   withImportBackupPrefix(): BackupPathObject {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
     const backupName = `backup_${timestamp}`;
     return new BackupPathObject(path.join(this.value, backupName));
   }

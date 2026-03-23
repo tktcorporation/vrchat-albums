@@ -7,6 +7,7 @@ import { performance } from 'node:perf_hooks';
 import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
+import type Electron from 'electron';
 import { xxhash128 } from 'hash-wasm';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
@@ -73,7 +74,7 @@ let consecutiveCacheFailures = 0;
  *
  * @returns Electron appモジュール、または利用不可時はnull
  */
-const getElectronApp = (): typeof import('electron').app | null => {
+const getElectronApp = (): typeof Electron.app | null => {
   // テスト環境ではElectronを試行しない（想定された動作）
   if (isTestEnvironment()) {
     logger.debug('Test environment detected, skipping Electron module');
@@ -82,7 +83,7 @@ const getElectronApp = (): typeof import('electron').app | null => {
 
   // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
   try {
-    const { app } = require('electron') as typeof import('electron');
+    const { app } = require('electron') as typeof Electron;
     return app;
   } catch (error) {
     // 開発/プロダクション環境でのElectronロード失敗は予期しない
@@ -1174,7 +1175,8 @@ async function processPhotoBatch(
       };
     });
 
-    const subResults = (await Promise.all(photoInfoPromises)).filter(
+    const resolvedPhotoInfos = await Promise.all(photoInfoPromises);
+    const subResults = resolvedPhotoInfos.filter(
       (
         info,
       ): info is {

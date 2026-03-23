@@ -14,7 +14,7 @@ export const usePlayerListDisplay = (players: Player[] | null) => {
   const [isCopied, setIsCopied] = useState(false);
 
   const playerListRef = useRef<HTMLSpanElement>(null);
-  const playerListContainerRef = useRef<HTMLDivElement>(null);
+  const playerListContainerRef = useRef<HTMLButtonElement>(null);
   // パフォーマンス改善: 幅計算用の一時DOM要素をキャッシュ
   const measureElementRef = useRef<HTMLDivElement | null>(null);
 
@@ -35,7 +35,7 @@ export const usePlayerListDisplay = (players: Player[] | null) => {
     // クリーンアップ時に要素を削除
     return () => {
       if (measureElementRef.current) {
-        document.body.removeChild(measureElementRef.current);
+        measureElementRef.current.remove();
         measureElementRef.current = null;
       }
     };

@@ -100,7 +100,7 @@ export function BoldPreviewSvg({
       }
     }
 
-    document.body.removeChild(tempDiv);
+    tempDiv.remove();
     setVisiblePlayers(visible);
     setHiddenCount(showAllPlayers ? 0 : players.length - visible.length);
   }, [players, showAllPlayers]);

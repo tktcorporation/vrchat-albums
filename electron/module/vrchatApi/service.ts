@@ -202,7 +202,7 @@ export const getVrcUserInfoByUserName = (
             result.data.length === 0 ||
             result.data[0].displayName !== userName
           ) {
-            reject('USER_NOT_FOUND' as const);
+            reject(new Error('USER_NOT_FOUND'));
             return;
           }
           resolve(result.data[0]);
@@ -212,7 +212,7 @@ export const getVrcUserInfoByUserName = (
         }
       }),
     catch: (error): Error | 'USER_NOT_FOUND' => {
-      if (error === 'USER_NOT_FOUND') {
+      if (error instanceof Error && error.message === 'USER_NOT_FOUND') {
         return 'USER_NOT_FOUND';
       }
       return error instanceof Error ? error : new Error(String(error));

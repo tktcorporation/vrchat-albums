@@ -281,14 +281,14 @@ export const appendLoglinesToFile = (props: {
       const newLog = `${newLines.join('\n')}\n`;
 
       // ファイルが存在しない場合は新規作成、存在する場合は追記
-      if (!isExists) {
-        yield* fs.writeFileSyncSafe(logStoreFilePath.value, newLog).pipe(
+      if (isExists) {
+        yield* fs.appendFileAsync(logStoreFilePath.value, newLog).pipe(
           Effect.catchAll((e) => {
             throw e;
           }),
         );
       } else {
-        yield* fs.appendFileAsync(logStoreFilePath.value, newLog).pipe(
+        yield* fs.writeFileSyncSafe(logStoreFilePath.value, newLog).pipe(
           Effect.catchAll((e) => {
             throw e;
           }),

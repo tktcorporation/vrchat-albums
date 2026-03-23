@@ -12,7 +12,7 @@ import GalleryContent from './PhotoGallery/GalleryContent';
 import { usePhotoGallery } from './PhotoGallery/usePhotoGallery';
 import SettingsModal from './settings/SettingsModal';
 
-interface PhotoGalleryProps extends UseLoadingStateResult {}
+type PhotoGalleryProps = UseLoadingStateResult;
 
 export interface PhotoGalleryData {
   searchQuery: string;

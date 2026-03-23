@@ -1,6 +1,8 @@
 import { renderHook } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { Photo, isPhotoLoaded as _isPhotoLoaded } from '../../types/photo';
+
 // tRPCをモック（Electronのpreload依存を回避）
 vi.mock('@/trpc', () => ({
   trpcReact: {
@@ -444,8 +446,7 @@ describe('useHybridPhotoLoading', () => {
 describe('isPhotoLoaded', () => {
   // isPhotoLoadedをインポート（相対パスでテストディレクトリからの位置）
   // vitest は ES modules を使うため動的インポートを使用
-  type Photo = import('../../types/photo').Photo;
-  type IsPhotoLoaded = typeof import('../../types/photo').isPhotoLoaded;
+  type IsPhotoLoaded = typeof _isPhotoLoaded;
   let isPhotoLoaded: IsPhotoLoaded;
 
   beforeAll(async () => {

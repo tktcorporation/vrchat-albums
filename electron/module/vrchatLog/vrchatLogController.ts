@@ -85,7 +85,9 @@ export const appendLoglinesToFileFromLogFilePathList = async (
 
   // DBから最新のログ日時を取得（processAllがfalseの場合のみ）
   let startDate = new Date(0); // デフォルトは最古の日時
-  if (!processAll) {
+  if (processAll) {
+    logger.info('Processing all logs (processAll=true)');
+  } else {
     const latestWorldJoinLogExit = await Effect.runPromiseExit(
       worldJoinLogService.findLatestWorldJoinLog(),
     );
@@ -98,8 +100,6 @@ export const appendLoglinesToFileFromLogFilePathList = async (
     } else {
       logger.info('No existing logs found in DB, processing all logs');
     }
-  } else {
-    logger.info('Processing all logs (processAll=true)');
   }
 
   // すべてのログファイルパスを取得

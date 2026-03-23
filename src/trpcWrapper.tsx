@@ -15,7 +15,7 @@ export const TrpcWrapper: FC<Props> = ({ children }) => {
   if (MOCK_API) {
     // console.log('USING MOCK MODE');
 
-    return <>{children}</>;
+    return children;
   }
 
   // oxlint-disable-next-line react/rules-of-hooks -- MOCK_API はビルド時定数のため、条件付き early return の後でも hooks の呼び出し順序は安定している

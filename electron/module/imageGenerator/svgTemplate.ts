@@ -133,14 +133,14 @@ function generatePlayerElements(
         if (currentWidth + width <= effectiveWidth) {
           tempPlayers.push(players[index]);
           currentWidth += width + 6;
-        } else if (!isSecondRow) {
+        } else if (isSecondRow) {
+          // 2行目も埋まったら終了
+          break;
+        } else {
           // 1行目が埋まったら2行目へ
           isSecondRow = true;
           currentWidth = width + 6;
           tempPlayers.push(players[index]);
-        } else {
-          // 2行目も埋まったら終了
-          break;
         }
       }
 

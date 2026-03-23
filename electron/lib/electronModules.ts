@@ -12,7 +12,8 @@
  * 「Electron 環境前提」のヘルパー。
  */
 
-const getElectron = () => require('electron') as typeof import('electron');
+import type Electron from 'electron';
+const getElectron = () => require('electron') as typeof Electron;
 
 export const getApp = () => getElectron().app;
 export const getShell = () => getElectron().shell;

@@ -108,28 +108,29 @@ export class TsPatternLinter {
 
   private lintFile(sourceFile: ts.SourceFile) {
     const visit = (node: ts.Node) => {
-      if (ts.isCallExpression(node)) {
-        if (this.isOtherwiseCall(node)) {
-          if (this.isMatchChain(node) && !this.hasExhaustiveInChain(node)) {
-            // Get position of the .otherwise property access for accurate line reporting
-            const expr = node.expression;
-            const pos = ts.isPropertyAccessExpression(expr)
-              ? expr.name.getStart(sourceFile)
-              : node.getStart(sourceFile);
+      if (
+        ts.isCallExpression(node) &&
+        this.isOtherwiseCall(node) &&
+        this.isMatchChain(node) &&
+        !this.hasExhaustiveInChain(node)
+      ) {
+        // Get position of the .otherwise property access for accurate line reporting
+        const expr = node.expression;
+        const pos = ts.isPropertyAccessExpression(expr)
+          ? expr.name.getStart(sourceFile)
+          : node.getStart(sourceFile);
 
-            const { line, character } =
-              sourceFile.getLineAndCharacterOfPosition(pos);
+        const { line, character } =
+          sourceFile.getLineAndCharacterOfPosition(pos);
 
-            this.issues.push({
-              file: sourceFile.fileName,
-              line: line + 1,
-              column: character + 1,
-              message:
-                'match() chain uses .otherwise() without .exhaustive(). Consider adding .exhaustive() for type safety.',
-              severity: 'warning',
-            });
-          }
-        }
+        this.issues.push({
+          file: sourceFile.fileName,
+          line: line + 1,
+          column: character + 1,
+          message:
+            'match() chain uses .otherwise() without .exhaustive(). Consider adding .exhaustive() for type safety.',
+          severity: 'warning',
+        });
       }
 
       ts.forEachChild(node, visit);

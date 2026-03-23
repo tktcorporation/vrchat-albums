@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import * as datefns from 'date-fns';
 import { Effect } from 'effect';
+import type Electron from 'electron';
 import { match } from 'ts-pattern';
 
 import {
@@ -68,7 +69,7 @@ const getElectronDownloadsPath = (): string | null => {
   const electronApp = (() => {
     // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
     try {
-      return (require('electron') as typeof import('electron')).app;
+      return (require('electron') as typeof Electron).app;
     } catch {
       return null;
     }

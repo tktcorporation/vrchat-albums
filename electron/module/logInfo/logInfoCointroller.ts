@@ -814,9 +814,7 @@ export const logInfoRouter = () =>
               error,
             )
               .with(P.instanceOf(Error), (err) => err.message)
-              .otherwise((err) => String(err))} (requested sessions: ${
-              ctx.input.length
-            })`,
+              .otherwise(String)} (requested sessions: ${ctx.input.length})`,
             userMessage: 'セッション情報の取得中にエラーが発生しました。',
             cause: error instanceof Error ? error : new Error(String(error)),
           });

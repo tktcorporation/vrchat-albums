@@ -60,7 +60,9 @@ async function getInitializeAppDataFunction() {
   return async () => {
     // Callerを作成してmutationを呼び出す
     const caller = router.createCaller({
-      eventEmitter: new (await import('node:events')).EventEmitter(),
+      eventEmitter: await import('node:events').then(
+        (m) => new m.EventEmitter(),
+      ),
     });
     return await caller.initializeAppData();
   };

@@ -219,11 +219,11 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
           {/* Extra Directories */}
           <div className={SPACING.stack.default}>
-            <label
+            <span
               className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
             >
               追加で読み込ませる写真フォルダ
-            </label>
+            </span>
             <div className={SPACING.stack.default}>
               {extraDirs.map((dir: string, index: number) => (
                 <div key={`extra-dir-${dir}`} className="flex gap-2">

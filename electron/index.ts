@@ -28,7 +28,8 @@ import { initSettingStore } from './module/settingStore';
 const settingStore = initSettingStore();
 initializeSettingStoreForUtil();
 
-export let isSentryInitializedMain = false; // Sentry初期化フラグ exportする
+let isSentryInitializedMain = false;
+export const getIsSentryInitializedMain = () => isSentryInitializedMain; // Sentry初期化フラグ exportする
 
 export interface ErrorEvent extends Event {
   type: undefined;

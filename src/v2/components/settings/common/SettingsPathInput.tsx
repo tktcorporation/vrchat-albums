@@ -74,7 +74,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
       onChange(event.target.value);
     };
 
-    const inputId = `path-input-${label.replace(/\s+/g, '-').toLowerCase()}`;
+    const inputId = `path-input-${label.replaceAll(/\s+/g, '-').toLowerCase()}`;
 
     return (
       <div className={cn(SPACING.stack.default, className)}>

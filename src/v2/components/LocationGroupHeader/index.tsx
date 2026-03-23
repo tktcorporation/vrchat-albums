@@ -372,34 +372,27 @@ export const LocationGroupHeader = ({
                         <div className="text-gray-500 dark:text-gray-400">
                           |
                         </div>
-                        <div
+                        <button
+                          type="button"
                           ref={playerListContainerRef}
-                          className="relative cursor-pointer flex-1 min-w-0"
+                          className="relative cursor-pointer flex-1 min-w-0 appearance-none border-none bg-transparent p-0 text-left"
                           onMouseEnter={() => setIsHovered(true)}
                           onMouseLeave={() => setIsHovered(false)}
                           onMouseMove={handleMouseMove}
                           onClick={() => void handleCopyPlayers()}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              void handleCopyPlayers();
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
                           title={t('locationHeader.clickToCopy')}
                         >
                           <div className="flex items-center gap-2 w-full">
-                            {!isCopied ? (
-                              <PlayerList
-                                players={players}
-                                maxVisiblePlayers={maxVisiblePlayers}
-                              />
-                            ) : (
+                            {isCopied ? (
                               <span className="text-green-400 flex items-center gap-2">
                                 <CheckIcon className={ICON_SIZE.sm.class} />
                                 {t('locationHeader.copied')}
                               </span>
+                            ) : (
+                              <PlayerList
+                                players={players}
+                                maxVisiblePlayers={maxVisiblePlayers}
+                              />
                             )}
                           </div>
                           {players &&
@@ -428,7 +421,7 @@ export const LocationGroupHeader = ({
                               </div>,
                               document.body,
                             )}
-                        </div>
+                        </button>
                         <Copy
                           className={`${ICON_SIZE.sm.class} ml-2 text-gray-800 dark:text-white group-hover/players:text-gray-200 transition-colors flex-shrink-0`}
                         />

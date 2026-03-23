@@ -73,7 +73,10 @@ export function hslToRgb(
   let b: number;
 
   if (sNorm === 0) {
-    r = g = b = lNorm; // achromatic
+    // achromatic
+    r = lNorm;
+    g = lNorm;
+    b = lNorm;
   } else {
     const q = lNorm < 0.5 ? lNorm * (1 + sNorm) : lNorm + sNorm - lNorm * sNorm;
     const p = 2 * lNorm - q;
