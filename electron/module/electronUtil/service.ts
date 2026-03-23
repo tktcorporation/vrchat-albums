@@ -4,9 +4,15 @@ import * as path from 'node:path';
 
 import { writeClipboardFilePaths } from 'clip-filepaths';
 import { Effect } from 'effect';
-import { app, clipboard, dialog, nativeImage, shell } from 'electron';
 import { match, P } from 'ts-pattern';
 
+import {
+  getApp,
+  getClipboard,
+  getDialog,
+  getNativeImage,
+  getShell,
+} from '../../lib/electronModules';
 import type { DownloadImageError, FileIOError } from './errors';
 import {
   FileCopyFailed,
@@ -28,7 +34,9 @@ const openPathWithShell = (
   return Effect.gen(function* () {
     // shell.openPath() returns error message string on failure, empty string on success
     // Any exceptions thrown are unexpected and should propagate to Sentry
-    const errorMsg = yield* Effect.promise(() => shell.openPath(targetPath));
+    const errorMsg = yield* Effect.promise(() =>
+      getShell().openPath(targetPath),
+    );
     if (errorMsg) {
       return yield* Effect.fail(
         new OpenPathFailed({
@@ -51,7 +59,7 @@ const openPathInExplorer = openPathWithShell;
  * エラーログ閲覧メニューなどで参照される。
  */
 export const getApplicationLogPath = (): string => {
-  return app.getPath('logs');
+  return getApp().getPath('logs');
 };
 
 /**
@@ -59,7 +67,7 @@ export const getApplicationLogPath = (): string => {
  * エクスポート機能のデフォルト出力先として利用される。
  */
 const getDownloadsPath = (): string => {
-  return app.getPath('downloads');
+  return getApp().getPath('downloads');
 };
 
 /**
@@ -71,7 +79,7 @@ const openElectronDialog = (
 ): Effect.Effect<string[], OperationCanceled> => {
   return Effect.gen(function* () {
     const result = yield* Effect.promise(() =>
-      dialog.showOpenDialog({ properties }),
+      getDialog().showOpenDialog({ properties }),
     );
     if (result.canceled) {
       return yield* Effect.fail(new OperationCanceled({}));
@@ -107,7 +115,7 @@ const openGetFileDialog = (
  * ShareDialog などからリンクを開く際に使用される。
  */
 const openUrlInDefaultBrowser = (url: string) => {
-  return shell.openExternal(url);
+  return getShell().openExternal(url);
 };
 
 /**
@@ -131,8 +139,8 @@ const copyImageDataByPath = (filePath: string): Effect.Effect<void> => {
   // and should propagate to Sentry
   return Effect.promise(async () => {
     const photoBuf = await fs.readFile(filePath);
-    const image = nativeImage.createFromBuffer(photoBuf);
-    clipboard.writeImage(image);
+    const image = getNativeImage().createFromBuffer(photoBuf);
+    getClipboard().writeImage(image);
     // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
   });
 };
@@ -150,8 +158,8 @@ const copyImageByBase64 = (options: {
       pngBase64: options.pngBase64,
     },
     async (tempPngPath) => {
-      const image = nativeImage.createFromPath(tempPngPath);
-      clipboard.writeImage(image);
+      const image = getNativeImage().createFromPath(tempPngPath);
+      getClipboard().writeImage(image);
       // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
     },
   );
@@ -302,7 +310,7 @@ export const handlePngBase64WithCallback = (
  * downloadImageAsPng から呼び出される。
  */
 export const showSavePngDialog = async (filenameWithoutExt: string) => {
-  return dialog.showSaveDialog({
+  return getDialog().showSaveDialog({
     defaultPath: path.join(
       os.homedir(),
       'Downloads',

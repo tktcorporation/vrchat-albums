@@ -11,7 +11,8 @@ import { electronUtilRouter } from '../electronUtilController';
 const normalizePath = (p: string) => p.replace(/\\/g, '/');
 
 vi.mock('node:fs/promises');
-vi.mock('electron', () => ({
+
+const mockElectron = vi.hoisted(() => ({
   app: {
     isPackaged: false,
   },
@@ -26,6 +27,15 @@ vi.mock('electron', () => ({
   dialog: {
     showSaveDialog: vi.fn(),
   },
+}));
+
+vi.mock('electron', () => mockElectron);
+vi.mock('../../../../lib/electronModules', () => ({
+  getApp: () => mockElectron.app,
+  getShell: () => ({}),
+  getDialog: () => mockElectron.dialog,
+  getClipboard: () => mockElectron.clipboard,
+  getNativeImage: () => mockElectron.nativeImage,
 }));
 
 describe('electronUtilController', () => {

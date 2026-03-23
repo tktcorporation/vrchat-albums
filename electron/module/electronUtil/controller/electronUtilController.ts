@@ -2,12 +2,12 @@ import { Transformer } from '@napi-rs/image';
 import consola from 'consola';
 import * as datefns from 'date-fns';
 import { Effect, Exit } from 'effect';
-import { clipboard } from 'electron';
 import * as path from 'pathe';
 import z from 'zod';
 
 import { reloadMainWindow } from '../../../electronUtil';
 import { runEffect } from '../../../lib/effectTRPC';
+import { getClipboard } from '../../../lib/electronModules';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -81,7 +81,7 @@ export const electronUtilRouter = () =>
         .replace('.', '')};base64,${Buffer.from(photoBuf).toString('base64')}`;
     }),
     copyTextToClipboard: procedure.input(z.string()).mutation(async (ctx) => {
-      clipboard.writeText(ctx.input);
+      getClipboard().writeText(ctx.input);
       eventEmitter.emit('toast', 'copied');
     }),
     copyImageDataByPath: procedure.input(z.string()).mutation(async (ctx) => {

@@ -3,9 +3,10 @@ language: TypeScript
 severity: error
 message: |
   Electron モジュール ($IMPORTS) をトップレベルでインポートしないでください。
-  Playwright テストがクラッシュします。遅延評価パターン (require/dynamic import) を使用してください。
+  Playwright テストがクラッシュします。electron/lib/electronModules.ts の遅延取得ヘルパーを使用してください。
 note: |
   参照: .claude/rules/electron-import.md
+  ヘルパー: electron/lib/electronModules.ts
   許可ファイル: index.ts, preload.ts
 rule:
   pattern: import { $$$IMPORTS } from 'electron'
