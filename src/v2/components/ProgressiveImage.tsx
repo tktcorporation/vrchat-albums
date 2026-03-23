@@ -30,10 +30,10 @@ const ProgressiveImage: React.FC<ProgressiveImageProps> = ({
   useEffect(() => {
     const img = new Image();
     img.src = src;
-    img.onload = () => {
+    img.addEventListener('load', () => {
       setIsLoaded(true);
       setCurrentSrc(src);
-    };
+    });
   }, [src]);
 
   return (

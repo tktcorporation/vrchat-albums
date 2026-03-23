@@ -153,7 +153,7 @@ export const getVRChatLogFilePathList = (
     const logFilePathList = logFileNames
       .map((fileName) => {
         const result = VRChatLogFilePathSchema.safeParse(
-          `${path.join(vrChatlogFilesDir.value, fileName.name.toString())}`,
+          path.join(vrChatlogFilesDir.value, fileName.name.toString()),
         );
         if (!result.success) {
           logger.debug('generally ignore this log', result.error);

@@ -55,10 +55,10 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
   });
 
   /** 選択をクリアし、複数選択モードを解除するハンドラ */
-  const handleClearSelection = () => {
+  const handleClearSelection = useCallback(() => {
     setSelectedPhotos([]);
     setIsMultiSelectMode(false);
-  };
+  }, [setSelectedPhotos, setIsMultiSelectMode]);
 
   // 複数画像をクリップボードにコピーするミューテーション
   const { mutate: copyMultipleImagesToClipboard } =

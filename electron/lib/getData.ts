@@ -50,9 +50,14 @@ export class FetchError extends Error {
  * ofetch を利用して HTTP リクエストを行うユーティリティ
  * getData からのみ呼ばれ、成功可否を Effect 型で返す
  */
+type FetchOptions = Omit<RequestInit, 'headers'> & {
+  headers?: Record<string, string>;
+  query?: QueryObject;
+};
+
 const fetchWithResult = <T = unknown>(
   url: string,
-  options?: RequestInit & { query?: QueryObject },
+  options?: FetchOptions,
 ): Effect.Effect<T, FetchError> => {
   // ちゃんとした User-Agent を設定する
   const userAgent = `Electron ${process.versions.electron}; ${process.platform}; ${process.arch}`;
@@ -91,7 +96,7 @@ const fetchWithResult = <T = unknown>(
  */
 export const getData = <T>(
   url: string,
-  options?: RequestInit & { query?: QueryObject },
+  options?: FetchOptions,
 ): Effect.Effect<T, FetchError> => {
   return fetchWithResult<T>(url, options);
 };

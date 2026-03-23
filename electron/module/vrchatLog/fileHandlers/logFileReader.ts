@@ -311,6 +311,7 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
  * @param props.concurrency 並列処理数（デフォルト: 5）
  * @param props.batchSize バッチサイズ（デフォルト: 1000行）
  * @param props.maxMemoryUsageMB メモリ使用量の上限（MB、デフォルト: 500）
+ * @yields {string[]} バッチサイズごとにまとめられたログ行の配列
  */
 export async function* getLogLinesByLogFilePathListStreaming(props: {
   logFilePathList: (VRChatLogFilePath | VRChatLogStoreFilePath)[];

@@ -457,6 +457,3 @@ export const LocationGroupHeader = ({
     </div>
   );
 };
-
-// Re-export for backward compatibility
-export { LocationGroupHeader as default } from './index';
