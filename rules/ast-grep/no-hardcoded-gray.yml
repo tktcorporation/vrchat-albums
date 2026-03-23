@@ -19,3 +19,5 @@ files:
   - src/**/*.ts
 ignores:
   - src/v2/constants/**
+  # VRChat サービス準拠のインスタンスタイプ固有色（green/yellow/purple/gray の統一パレット）
+  - src/v2/utils/instanceTypeUtils.ts

@@ -1,6 +1,6 @@
-import { app } from 'electron';
 import z from 'zod';
 
+import { getApp } from '../../../lib/electronModules';
 import { UserFacingError } from './../../../lib/errors';
 import { procedure, router as trpcRouter } from './../../../trpc';
 import type { getSettingStore } from './../../settingStore';
@@ -32,7 +32,7 @@ const setIsBackgroundFileCreationEnabled =
  * SystemSettings コンポーネントから利用される。
  */
 const getIsAppAutoStartEnabled = async (): Promise<boolean> => {
-  const loginItemSettings = app.getLoginItemSettings();
+  const loginItemSettings = getApp().getLoginItemSettings();
   return loginItemSettings.openAtLogin;
 };
 
@@ -42,7 +42,7 @@ const getIsAppAutoStartEnabled = async (): Promise<boolean> => {
  */
 const setIsAppAutoStartEnabled = async (isEnabled: boolean) => {
   // macOSの場合、openAsHiddenをtrueに設定することで、バックグラウンドで起動するように
-  app.setLoginItemSettings({
+  getApp().setLoginItemSettings({
     openAtLogin: isEnabled,
     openAsHidden: true,
   });
@@ -51,7 +51,7 @@ const setIsAppAutoStartEnabled = async (isEnabled: boolean) => {
   await new Promise((resolve) => setTimeout(resolve, 100));
 
   // 設定が反映されたか確認
-  const newSettings = app.getLoginItemSettings();
+  const newSettings = getApp().getLoginItemSettings();
 
   if (newSettings.openAtLogin !== isEnabled) {
     throw new UserFacingError('自動起動設定の更新に失敗しました。');

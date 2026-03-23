@@ -6,6 +6,7 @@
  *
  * @see src/v2/hooks/useInitProgress.ts - tRPC subscription使用
  */
+export type {};
 
 declare global {
   const __SENTRY_RELEASE__: string;
@@ -31,5 +32,3 @@ declare global {
     };
   }
 }
-
-export type {};

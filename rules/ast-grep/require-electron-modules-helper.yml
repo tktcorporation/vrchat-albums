@@ -1,0 +1,22 @@
+id: require-electron-modules-helper
+language: TypeScript
+severity: error
+message: |
+  require('electron') を直接使用しないでください。
+  代わりに electron/lib/electronModules.ts の遅延取得ヘルパー (getApp, getShell 等) を使用してください。
+note: |
+  参照: .claude/rules/electron-import.md
+  ヘルパー: electron/lib/electronModules.ts
+  使用例: import { getApp } from '../../lib/electronModules';
+rule:
+  pattern: require('electron')
+files:
+  - electron/module/**/*.ts
+ignores:
+  - '**/*.test.ts'
+  - '**/*.spec.ts'
+  - '**/__tests__/**'
+  # try-catch フォールバック付きの Electron 環境検出パターン（テスト環境対応）
+  - electron/module/imageGenerator/renderSvg.ts
+  - electron/module/vrchatLog/exportService/exportService.ts
+  - electron/module/vrchatPhoto/vrchatPhoto.service.ts
