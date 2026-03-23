@@ -90,7 +90,7 @@ const GroupingSkeleton = () => (
  */
 interface VirtualizedGalleryProps {
   width: ValidWidth;
-  filteredGroups: Array<[string, GroupedPhoto]>;
+  filteredGroups: [string, GroupedPhoto][];
   groupsArray: GroupedPhoto[];
   selectedPhotos: string[];
   setSelectedPhotos: (
@@ -121,7 +121,7 @@ const VirtualizedGallery = memo(
   }: VirtualizedGalleryProps) => {
     const [currentGroupIndex, setCurrentGroupIndex] = useState<
       number | undefined
-    >(undefined);
+    >();
     const observerRef = useRef<IntersectionObserver | null>(null);
 
     // スクロールコンテナへの参照（virtualizer用）
@@ -195,10 +195,12 @@ const VirtualizedGallery = memo(
     // 表示中のグループの写真をプリフェッチ
     useEffect(() => {
       const virtualItems = virtualizer.getVirtualItems();
-      if (virtualItems.length === 0) return;
+      if (virtualItems.length === 0) {
+        return;
+      }
 
       const firstIndex = virtualItems[0].index;
-      const lastIndex = virtualItems[virtualItems.length - 1].index;
+      const lastIndex = virtualItems.at(-1).index;
       const prefetchStart = Math.max(0, firstIndex - 2);
       const prefetchEnd = Math.min(filteredGroups.length, lastIndex + 5);
 
@@ -219,7 +221,9 @@ const VirtualizedGallery = memo(
 
     // IntersectionObserverでビューポート内のグループを検知
     useEffect(() => {
-      if (!scrollElementRef.current) return;
+      if (!scrollElementRef.current) {
+        return;
+      }
 
       const observer = new IntersectionObserver(
         (entries) => {
@@ -233,7 +237,7 @@ const VirtualizedGallery = memo(
                 ? prev
                 : current;
             });
-            const index = topEntry.target.getAttribute('data-index');
+            const index = topEntry.target.dataset.index;
             if (index !== null) {
               setCurrentGroupIndex(Number.parseInt(index, 10));
             }
@@ -254,11 +258,7 @@ const VirtualizedGallery = memo(
     }, []);
 
     const handleBackgroundClick = useCallback(
-      (
-        event:
-          | React.MouseEvent<HTMLDivElement>
-          | React.KeyboardEvent<HTMLDivElement>,
-      ) => {
+      (event: React.MouseEvent<HTMLDivElement>) => {
         if (event.target === scrollElementRef.current && isMultiSelectMode) {
           setSelectedPhotos([]);
           setIsMultiSelectMode(false);
@@ -431,7 +431,7 @@ const GalleryContent = memo(
             isMultiSelectMode={galleryData.isMultiSelectMode}
             onCopySelected={galleryData.onCopySelected}
             loadingState={galleryData.loadingState}
-            showGalleryControls={true}
+            showGalleryControls
           />
         )}
         {/* コンテナは常にレンダリング（幅測定のため） */}

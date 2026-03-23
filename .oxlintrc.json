@@ -82,7 +82,7 @@
     "jsx-a11y/prefer-tag-over-role": "warn",
     "jsx-a11y/role-supports-aria-props": "warn",
 
-    "no-unsafe-type-assertion": "off",
+    "typescript/no-unsafe-type-assertion": "off",
     "no-magic-numbers": "off",
     "sort-keys": "off",
     "capitalized-comments": "off",

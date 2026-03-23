@@ -112,7 +112,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
       );
 
     // 最終的に表示するサムネイル（キャッシュ優先）
-    const thumbnailSrc = cachedThumbnail || photoData?.data || '';
+    const thumbnailSrc = cachedThumbnail ?? photoData?.data ?? '';
 
     // Handle missing photo validation
     React.useEffect(() => {
@@ -259,8 +259,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
               )}
               onClick={handleSelectIconClick}
               aria-pressed={isSelected}
-              aria-label={t('common.contextMenu.copyPhotoData')}
-              tabIndex={0}
+              aria-label={t('common.contextMenu.selectPhoto')}
             >
               {isSelected ? (
                 <div

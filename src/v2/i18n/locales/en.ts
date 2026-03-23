@@ -19,6 +19,7 @@ const en: Translations = {
     },
     contextMenu: {
       copyPhotoData: 'Copy',
+      selectPhoto: 'Select photo',
       openInPhotoApp: 'Open in photo app',
       showInExplorer: 'Show in folder',
       shareImage: 'Share image',
