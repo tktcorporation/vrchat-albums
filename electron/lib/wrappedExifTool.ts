@@ -235,8 +235,8 @@ export const setExifToBuffer = (
  * 呼び出し元: wrappedExifTool 内部、vrchatPhotoMetadata/service.ts
  */
 export const readExif = async (filePath: string) => {
-  const exiftool = await getExiftoolInstance();
-  const exif = await exiftool.read(filePath);
+  const instance = await getExiftoolInstance();
+  const exif = await instance.read(filePath);
   return exif;
 };
 
