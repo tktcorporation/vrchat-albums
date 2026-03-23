@@ -41,16 +41,18 @@ jobs:
       - name: Publish screenshot to branch
         id: publish_screenshots
         env:
-          BRANCH: pr-screenshot-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          BRANCH: pr-screenshots
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SCREENSHOT_DIR="playwright/previews"
           UPLOAD_DIR="upload"
-          
+          PR_DIR="${UPLOAD_DIR}/pr-${PR_NUMBER}"
+
           FINAL_MESSAGE="Screenshots for this PR:"
 
-          mkdir -p "$UPLOAD_DIR"
+          mkdir -p "$PR_DIR"
 
           shopt -s nullglob
           SCREENSHOT_FILES=("$SCREENSHOT_DIR"/*.png)
@@ -60,35 +62,61 @@ jobs:
             echo "No PNG screenshots found in $SCREENSHOT_DIR"
             FINAL_MESSAGE="No screenshots found for this PR."
           else
-            echo "Copying screenshots to $UPLOAD_DIR:"
-            cp "${SCREENSHOT_FILES[@]}" "$UPLOAD_DIR/"
-            
-            echo "Screenshots in $UPLOAD_DIR:"
-            ls "$UPLOAD_DIR"
+            echo "Copying screenshots to $PR_DIR:"
+            cp "${SCREENSHOT_FILES[@]}" "$PR_DIR/"
+
+            echo "Screenshots in $PR_DIR:"
+            ls "$PR_DIR"
+
+            # raw.githubusercontent.com の URL を組み立て
+            for FILE in "${SCREENSHOT_FILES[@]}"; do
+              BASENAME=$(basename "$FILE")
+              ENCODED_FILE=$(printf %s "$BASENAME" | jq -sRr @uri)
+              FINAL_MESSAGE="${FINAL_MESSAGE}\\n![${BASENAME}](https://raw.githubusercontent.com/${REPO}/${BRANCH}/pr-${PR_NUMBER}/${ENCODED_FILE})"
+            done
 
             cd "$UPLOAD_DIR"
 
-            for FILE in *.png; do
-              ENCODED_FILE=$(printf %s "$FILE" | jq -sRr @uri)
-              FINAL_MESSAGE="${FINAL_MESSAGE}\\n![](https://raw.githubusercontent.com/${REPO}/${BRANCH}/${ENCODED_FILE})"
-            done
-            
-            git init -b "$BRANCH" 
+            # 既存の pr-screenshots ブランチがあれば取得、なければ orphan で作成
+            git init -b "$BRANCH"
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
+            git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+
+            if git fetch origin "$BRANCH" 2>/dev/null; then
+              git reset --soft FETCH_HEAD
+              # 他の PR のスクショを復元
+              git checkout FETCH_HEAD -- . 2>/dev/null || true
+              # 今回の PR のスクショを上書き（checkout で古い版に戻された場合の対策）
+              cp ../"$SCREENSHOT_DIR"/*.png "pr-${PR_NUMBER}/"
+
+              # クローズ済み PR のディレクトリを削除
+              for DIR in pr-*/; do
+                CLOSED_PR="${DIR#pr-}"
+                CLOSED_PR="${CLOSED_PR%/}"
+                if [ "$CLOSED_PR" = "$PR_NUMBER" ]; then
+                  continue
+                fi
+                STATE=$(gh pr view "$CLOSED_PR" --repo "$REPO" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")
+                if [ "$STATE" = "MERGED" ] || [ "$STATE" = "CLOSED" ]; then
+                  echo "Cleaning up screenshots for closed PR #${CLOSED_PR}"
+                  rm -rf "$DIR"
+                fi
+              done
+            fi
+
             git add .
-            
+
             if ! git diff --staged --quiet; then
               echo "Committing and pushing screenshots..."
-              git commit -m "Add screenshots for PR #${{ github.event.pull_request.number }}"
-              git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+              git commit -m "Update screenshots for PR #${PR_NUMBER}"
               git push origin "$BRANCH" --force
             else
               echo "No new screenshots were staged for commit."
             fi
             cd ..
           fi
-          
+
           {
             echo "screenshot_comment_body<<EOF"
             echo -e "${FINAL_MESSAGE}"
