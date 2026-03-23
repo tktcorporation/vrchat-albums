@@ -32,3 +32,4 @@ declare global {
   }
 }
 
+export type {};
