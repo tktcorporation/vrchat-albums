@@ -80,6 +80,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   useEffect(() => {
     checkForUpdates.mutate();
+    // oxlint-disable-next-line react/exhaustive-deps -- 起動時に一度だけ実行。mutate の参照変化で再実行させたくない
   }, []);
 
   /** ウィンドウを最小化する */

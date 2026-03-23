@@ -20,13 +20,10 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 export const readFileSyncSafe = (
   filePath: string,
   options?: { encoding?: null; flag?: string } | null,
-): Effect.Effect<
-  Buffer,
-  { code: 'ENOENT' | string; message: string; error: Error }
-> => {
+): Effect.Effect<Buffer, { code: string; message: string; error: Error }> => {
   return Effect.try({
     try: () => fs.readFileSync(filePath, options),
-    catch: (e): { code: 'ENOENT' | string; message: string; error: Error } => {
+    catch: (e): { code: string; message: string; error: Error } => {
       if (!isNodeError(e)) {
         throw e; // 予期しないエラーをre-throw
       }

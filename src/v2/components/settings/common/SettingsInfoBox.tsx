@@ -15,9 +15,9 @@ const infoBoxVariants = cva('rounded-lg', {
       /** 一般的な情報・ヒント */
       info: 'bg-primary/10 dark:bg-primary/20',
       /** 注意事項 */
-      warning: `${STATUS_COLOR.warning.bg}`,
+      warning: STATUS_COLOR.warning.bg,
       /** 成功・完了 */
-      success: `${STATUS_COLOR.success.bg}`,
+      success: STATUS_COLOR.success.bg,
     },
   },
   defaultVariants: {

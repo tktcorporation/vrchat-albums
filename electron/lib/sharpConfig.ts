@@ -1,7 +1,7 @@
 /**
  * 画像処理エンジンの初期化管理
  *
- * @napi-rs/image (Rust製) を使用。
+ * napi-rs/image (Rust製) を使用。
  * sharp (libvips) と異なり、キャッシュや並行性の設定APIは不要。
  * GTK/libvips の GLib-GObject 競合問題も発生しない。
  *
@@ -20,7 +20,7 @@ let isInitialized = false;
 /**
  * 画像処理エンジンを初期化する
  *
- * @napi-rs/image はステートレスなため、初期化フラグの設定のみ行う。
+ * napi-rs/image はステートレスなため、初期化フラグの設定のみ行う。
  */
 export const initializeSharp = (): void => {
   isInitialized = true;
@@ -36,7 +36,7 @@ export const isSharpInitialized = (): boolean => {
 /**
  * キャッシュクリア（互換性のためのno-op）
  *
- * @napi-rs/image にはグローバルキャッシュがないため何もしない。
+ * napi-rs/image にはグローバルキャッシュがないため何もしない。
  * 呼び出し元がこの関数を使わなくなれば削除可能。
  */
 export const clearSharpCache = (): void => {

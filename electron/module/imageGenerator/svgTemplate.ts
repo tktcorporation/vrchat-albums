@@ -35,7 +35,7 @@ function assertValidBase64(value: string): string {
  * CJK 文字は 14px 幅、ASCII 文字は 7px 幅として計算し、パディング 20px を加算。
  */
 function estimatePlayerNameWidth(playerName: string): number {
-  const nameWidth = [...playerName].reduce((width, char) => {
+  const nameWidth = Array.from(playerName).reduce((width, char) => {
     return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
   }, 0);
   return nameWidth + 20;
@@ -199,7 +199,7 @@ function generatePlayerElements(
         !showAllPlayers && remainingCount > 0,
       () => {
         const moreText = `+${remainingCount} more`;
-        const moreTextWidth = [...moreText].reduce((width, char) => {
+        const moreTextWidth = Array.from(moreText).reduce((width, char) => {
           return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
         }, 0);
         const moreWidth = moreTextWidth + 20;

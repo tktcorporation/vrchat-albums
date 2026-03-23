@@ -52,10 +52,10 @@ export function BoldPreviewSvg({
     if (imageSource) {
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = () => {
+      img.addEventListener('load', () => {
         const extractedColors = extractDominantColors(img);
         setColors(extractedColors);
-      };
+      });
       img.src = imageSource;
     }
   }, [imageSource]);

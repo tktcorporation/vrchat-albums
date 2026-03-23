@@ -197,7 +197,7 @@ const executeSyncRDB = async (options: { force: boolean }) => {
 export const syncRDBClient = async (options?: { checkRequired: boolean }) => {
   // デフォルトは確認してから実行
   const checkRequired = options?.checkRequired ?? true;
-  const appVersion = await settingService.getAppVersion();
+  const appVersion = settingService.getAppVersion();
   const migrationRequired = match(checkRequired)
     .with(true, async () => await checkMigrationRDBClient(appVersion))
     .with(false, () => true);

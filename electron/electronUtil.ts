@@ -135,7 +135,11 @@ function createWindow(): BrowserWindow {
     if (!win) {
       return;
     }
-    win.isMinimized() ? win.restore() : win.minimize();
+    if (win.isMinimized()) {
+      win.restore();
+    } else {
+      win.minimize();
+    }
   });
 
   ipcMain.on('maximize', () => {
@@ -143,7 +147,11 @@ function createWindow(): BrowserWindow {
     if (!win) {
       return;
     }
-    win.isMaximized() ? win.restore() : win.maximize();
+    if (win.isMaximized()) {
+      win.restore();
+    } else {
+      win.maximize();
+    }
   });
 
   ipcMain.on('close', () => {
@@ -300,9 +308,7 @@ const setTray = () => {
   const createTray = async () => {
     if (tray !== null) return;
 
-    const appPath = app.isPackaged
-      ? process.resourcesPath
-      : `${app.getAppPath()}`;
+    const appPath = app.isPackaged ? process.resourcesPath : app.getAppPath();
     const iconPath = join(appPath, 'assets', 'icon.png');
 
     // アイコンパスの存在確認
