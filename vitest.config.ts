@@ -44,13 +44,38 @@ export default defineConfig({
           },
         },
       },
-      // Electron/Node.js用の設定
+      // Electron/Node.js ユニットテスト用の設定
       {
         test: {
           name: 'electron',
           environment: 'node',
           include: ['electron/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+          exclude: [
+            ...defaultExclude,
+            '**/*.integration.test.{js,jsx,ts,tsx}',
+            '**/*.memory.integration.test.{js,jsx,ts,tsx}',
+          ],
           setupFiles: ['./vitest.setup.ts'],
+        },
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, './src'),
+            '@shared': path.resolve(__dirname, './shared'),
+          },
+        },
+      },
+      // Electron/Node.js 統合テスト用の設定（DB使用のため逐次実行）
+      {
+        test: {
+          name: 'electron-integration',
+          environment: 'node',
+          include: [
+            'electron/**/*.integration.test.{js,jsx,ts,tsx}',
+            'electron/**/*.memory.integration.test.{js,jsx,ts,tsx}',
+          ],
+          setupFiles: ['./vitest.setup.ts'],
+          // 統合テストはSQLiteのファイルロック競合を避けるため逐次実行
+          fileParallelism: false,
         },
         resolve: {
           alias: {
