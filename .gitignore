@@ -5,6 +5,7 @@ dist
 dist-ssr
 *.local
 !.claude/settings.local.json
+!.claude/hookify.*.local.md
 *.log
 
 # production
