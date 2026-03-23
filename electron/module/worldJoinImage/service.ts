@@ -1,11 +1,13 @@
 import * as fsPromises from 'node:fs/promises';
 
+import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
 
 import { VRChatWorldIdSchema } from '../../lib/brandedTypes';
 import { logger } from '../../lib/logger';
+import { setExifToBuffer } from '../../lib/wrappedExifTool';
 import type { ImageGenerationError } from '../imageGenerator/errors';
 import { generateWorldJoinImage } from '../imageGenerator/service';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
@@ -122,7 +124,7 @@ const generateSingleWorldJoinImage = (
     const imageBase64 = Buffer.from(imageResponse).toString('base64');
 
     // 5. 画像生成（プレイヤー一覧は将来的に対応予定）
-    const imageBuffer = yield* generateWorldJoinImage({
+    const rawImageBuffer = yield* generateWorldJoinImage({
       worldName: worldInfo.name,
       imageBase64,
       players: null,
@@ -134,6 +136,27 @@ const generateSingleWorldJoinImage = (
             type: 'SKIPPABLE_ERROR' as const,
             worldId: join.worldId,
             message: `Failed to generate image for ${join.worldId}`,
+          }) as const,
+      ),
+    );
+
+    // 5.5. EXIF メタデータを埋め込む
+    // 背景: vrchat-join-recorder と同様に、生成画像に撮影日時・ワールド情報を
+    // EXIF として記録する。写真管理ソフトでの日時ソートやメタデータ表示に必要。
+    const imageBuffer = yield* setExifToBuffer(rawImageBuffer, {
+      description: worldInfo.name,
+      dateTimeOriginal: datefns.format(
+        join.joinDateTime,
+        'yyyy:MM:dd HH:mm:ss',
+      ),
+      timezoneOffset: datefns.format(join.joinDateTime, 'xxx'),
+    }).pipe(
+      Effect.mapError(
+        () =>
+          ({
+            type: 'SKIPPABLE_ERROR' as const,
+            worldId: join.worldId,
+            message: `Failed to set EXIF data for ${join.worldId}`,
           }) as const,
       ),
     );

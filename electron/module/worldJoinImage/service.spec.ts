@@ -5,6 +5,7 @@ vi.mock('node:fs/promises');
 vi.mock('../imageGenerator/service');
 vi.mock('../vrchatApi/service');
 vi.mock('../vrchatWorldJoinLog/service');
+vi.mock('../../lib/wrappedExifTool');
 vi.mock('../../lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -20,6 +21,7 @@ import * as fsPromises from 'node:fs/promises';
 
 import { ofetch } from 'ofetch';
 
+import { setExifToBuffer } from '../../lib/wrappedExifTool';
 import { generateWorldJoinImage } from '../imageGenerator/service';
 import { VRChatApiWorldNotFound } from '../vrchatApi/errors';
 import { getVrcWorldInfoByWorldId } from '../vrchatApi/service';
@@ -33,6 +35,10 @@ describe('generateMissingWorldJoinImages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     _resetGeneratingFlag();
+    // setExifToBuffer のデフォルトモック: 入力バッファをそのまま返す
+    vi.mocked(setExifToBuffer).mockImplementation((buffer) =>
+      Effect.succeed(buffer),
+    );
   });
 
   const makeWorldInfo = () => ({
@@ -142,6 +148,14 @@ describe('generateMissingWorldJoinImages', () => {
       Buffer.from(new ArrayBuffer(8)).toString('base64'),
     );
     expect(genCall.joinDateTime).toEqual(new Date('2024-01-15T12:00:00'));
+
+    // Verify setExifToBuffer was called with correct EXIF metadata
+    expect(setExifToBuffer).toHaveBeenCalledOnce();
+    const exifCall = vi.mocked(setExifToBuffer).mock.calls[0];
+    expect(exifCall[0]).toEqual(Buffer.from('fake-jpeg'));
+    expect(exifCall[1].description).toBe('Test World');
+    expect(exifCall[1].dateTimeOriginal).toMatch(/^2024:01:15 \d{2}:00:00$/);
+    expect(exifCall[1].timezoneOffset).toMatch(/^[+-]\d{2}:\d{2}$/);
 
     // Verify mkdir was called with { recursive: true }
     expect(fsPromises.mkdir).toHaveBeenCalledOnce();
