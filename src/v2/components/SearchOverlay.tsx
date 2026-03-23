@@ -275,69 +275,75 @@ const SearchOverlay = memo(
 
             {/* 検索候補部分 */}
             <div className="max-h-80 overflow-y-auto scrollbar-hide">
-              {isLoading && debouncedQuery.length > 0 ? (
-                <div className="p-6 text-center text-muted-foreground/80">
-                  検索中...
-                </div>
-              ) : suggestions.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground/80">
-                  {debouncedQuery.length > 0
-                    ? '候補が見つかりません'
-                    : 'よく利用する項目を読み込み中...'}
-                </div>
-              ) : (
-                <div className="p-2">
-                  {debouncedQuery.length === 0 && (
-                    <div className="px-3 py-2 text-xs font-medium text-muted-foreground/60 uppercase tracking-wide">
-                      よく利用する項目
+              {(() => {
+                if (isLoading && debouncedQuery.length > 0)
+                  return (
+                    <div className="p-6 text-center text-muted-foreground/80">
+                      検索中...
                     </div>
-                  )}
-                  {suggestions.map((suggestion, index) => (
-                    <div
-                      key={suggestion.id}
-                      className={`flex items-center px-3 py-2.5 rounded-xl cursor-pointer transition-colors duration-150 ${
-                        index === highlightedIndex
-                          ? 'bg-primary/10 dark:bg-primary/20'
-                          : 'hover:bg-muted/50'
-                      }`}
-                      onClick={() => handleSelect(suggestion)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleSelect(suggestion);
-                        }
-                      }}
-                      onMouseEnter={() => setHighlightedIndex(index)}
-                      role="option"
-                      aria-selected={index === highlightedIndex}
-                      tabIndex={0}
-                    >
-                      {suggestion.type === 'world' ? (
-                        <Globe
-                          className={`${ICON_SIZE.sm.class} mr-3 text-muted-foreground`}
-                        />
-                      ) : (
-                        <User
-                          className={`${ICON_SIZE.sm.class} mr-3 text-muted-foreground`}
-                        />
-                      )}
-                      <span className="flex-1 font-medium text-foreground">
-                        {suggestion.label}
-                      </span>
-                      {suggestion.type === 'world' && (
-                        <span className="text-xs text-muted-foreground/60 bg-muted/50 px-2 py-1 rounded-md">
-                          ワールド
-                        </span>
-                      )}
-                      {suggestion.type === 'player' && (
-                        <span className="text-xs text-muted-foreground/60 bg-muted/50 px-2 py-1 rounded-md">
-                          プレイヤー
-                        </span>
-                      )}
+                  );
+                if (suggestions.length === 0)
+                  return (
+                    <div className="p-6 text-center text-muted-foreground/80">
+                      {debouncedQuery.length > 0
+                        ? '候補が見つかりません'
+                        : 'よく利用する項目を読み込み中...'}
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                return (
+                  <div className="p-2">
+                    {debouncedQuery.length === 0 && (
+                      <div className="px-3 py-2 text-xs font-medium text-muted-foreground/60 uppercase tracking-wide">
+                        よく利用する項目
+                      </div>
+                    )}
+                    {suggestions.map((suggestion, index) => (
+                      <div
+                        key={suggestion.id}
+                        className={`flex items-center px-3 py-2.5 rounded-xl cursor-pointer transition-colors duration-150 ${
+                          index === highlightedIndex
+                            ? 'bg-primary/10 dark:bg-primary/20'
+                            : 'hover:bg-muted/50'
+                        }`}
+                        onClick={() => handleSelect(suggestion)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleSelect(suggestion);
+                          }
+                        }}
+                        onMouseEnter={() => setHighlightedIndex(index)}
+                        role="option"
+                        aria-selected={index === highlightedIndex}
+                        tabIndex={0}
+                      >
+                        {suggestion.type === 'world' ? (
+                          <Globe
+                            className={`${ICON_SIZE.sm.class} mr-3 text-muted-foreground`}
+                          />
+                        ) : (
+                          <User
+                            className={`${ICON_SIZE.sm.class} mr-3 text-muted-foreground`}
+                          />
+                        )}
+                        <span className="flex-1 font-medium text-foreground">
+                          {suggestion.label}
+                        </span>
+                        {suggestion.type === 'world' && (
+                          <span className="text-xs text-muted-foreground/60 bg-muted/50 px-2 py-1 rounded-md">
+                            ワールド
+                          </span>
+                        )}
+                        {suggestion.type === 'player' && (
+                          <span className="text-xs text-muted-foreground/60 bg-muted/50 px-2 py-1 rounded-md">
+                            プレイヤー
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* フッター（オプション） */}

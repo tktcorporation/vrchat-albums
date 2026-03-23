@@ -99,13 +99,13 @@ export const getVRChatPlayerJoinLogListByJoinDateTime = (props: {
     }
 
     // 結果が空の場合は空の配列を返す（エラーではない）
-    return modelList.map((model) => ({
-      id: model.id,
-      playerId: model.playerId,
-      playerName: model.playerName,
-      joinDateTime: model.joinDateTime,
-      createdAt: model.createdAt,
-      updatedAt: model.updatedAt,
+    return modelList.map((dbModel) => ({
+      id: dbModel.id,
+      playerId: dbModel.playerId,
+      playerName: dbModel.playerName,
+      joinDateTime: dbModel.joinDateTime,
+      createdAt: dbModel.createdAt,
+      updatedAt: dbModel.updatedAt,
     }));
   });
 };
@@ -171,18 +171,18 @@ export const getVRChatPlayerJoinLogListByMultipleDateRanges = (
     // 結果をキーごとにグループ化
     const groupedResults: Record<string, PlayerJoinLogData[]> = {};
 
-    for (const model of modelList) {
-      const key = model.range_key;
+    for (const dbModel of modelList) {
+      const key = dbModel.range_key;
       if (!groupedResults[key]) {
         groupedResults[key] = [];
       }
       groupedResults[key].push({
-        id: model.id,
-        playerId: model.playerId,
-        playerName: model.playerName,
-        joinDateTime: model.joinDateTime,
-        createdAt: model.createdAt,
-        updatedAt: model.updatedAt,
+        id: dbModel.id,
+        playerId: dbModel.playerId,
+        playerName: dbModel.playerName,
+        joinDateTime: dbModel.joinDateTime,
+        createdAt: dbModel.createdAt,
+        updatedAt: dbModel.updatedAt,
       });
     }
 

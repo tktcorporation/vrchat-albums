@@ -12,7 +12,7 @@ export const useVRChatPhotoExtraDirList = (): [
     trpcReact.getVRChatPhotoExtraDirList.useQuery();
   const { mutate } = trpcReact.setVRChatPhotoExtraDirList.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
     },
   });
 

@@ -4,7 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BoldPreviewSvg } from './BoldPreview';
 
 // jsdomではレイアウト計算が正確に行われないため、getBoundingClientRectをモック化
-const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+const originalGetBoundingClientRect = function (this: Element) {
+  return Element.prototype.getBoundingClientRect.call(this);
+};
 beforeAll(() => {
   Element.prototype.getBoundingClientRect = function () {
     if (this.textContent?.includes('Player')) {

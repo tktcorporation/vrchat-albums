@@ -578,11 +578,11 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
                 <div
                   className={cn(
                     'w-1 h-1 rounded-full transition-all duration-300',
-                    isCurrentDate
-                      ? 'bg-primary scale-150'
-                      : isHovered
-                        ? 'bg-foreground/80 scale-125'
-                        : 'bg-foreground/30',
+                    (() => {
+                      if (isCurrentDate) return 'bg-primary scale-150';
+                      if (isHovered) return 'bg-foreground/80 scale-125';
+                      return 'bg-foreground/30';
+                    })(),
                   )}
                 />
               </div>

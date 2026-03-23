@@ -37,7 +37,7 @@ const resolveStringTag = (
   ...keys: string[]
 ): string | null => {
   for (const key of keys) {
-    const value = tags[key];
+    const value: unknown = tags[key];
     if (typeof value === 'string' && value.length > 0) {
       return value;
     }

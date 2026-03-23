@@ -26,7 +26,7 @@ function Download() {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
 
-        const data = await res.json();
+        const data = (await res.json()) as Release;
 
         if (!data.assets || !Array.isArray(data.assets)) {
           throw new Error('Invalid release data format');
@@ -43,7 +43,7 @@ function Download() {
       }
     };
 
-    fetchRelease();
+    void fetchRelease();
   }, []);
 
   const getDownloadLink = (platform: string) => {

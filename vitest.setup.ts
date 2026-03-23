@@ -70,17 +70,14 @@ vi.mock('electron', () => {
 });
 
 // vi.mock section after existing mocks
-vi.mock('electron-trpc/renderer', () => {
-  // Mock implementation of ipcLink that returns a no-op TRPC link.
-  // This prevents tests from requiring an Electron context with the
-  // `electronTRPC` global being exposed.
-  const mockIpcLink = () => {
-    // Return a TRPC link that simply forwards operations without modification.
-    return (_runtime: unknown) =>
-      ({ next, op }: { next: (operation: unknown) => unknown; op: unknown }) =>
-        next(op);
-  };
+/** No-op TRPC link mock to prevent tests from requiring Electron context */
+const mockIpcLink = () => {
+  return (_runtime: unknown) =>
+    ({ next, op }: { next: (operation: unknown) => unknown; op: unknown }) =>
+      next(op);
+};
 
+vi.mock('electron-trpc/renderer', () => {
   return {
     ipcLink: mockIpcLink,
   };

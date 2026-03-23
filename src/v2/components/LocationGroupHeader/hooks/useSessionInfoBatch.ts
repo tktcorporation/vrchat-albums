@@ -141,7 +141,7 @@ class PlayerInfoBatchManager {
       const startTime = performance.now();
 
       if (this.executeBatch) {
-        this.executeBatch().finally(() => {
+        void this.executeBatch().finally(() => {
           const executionTime = performance.now() - startTime;
           console.debug(
             `[PlayerInfoBatch] Split batch #${currentBatchCount} completed in ${executionTime.toFixed(
@@ -175,7 +175,7 @@ class PlayerInfoBatchManager {
     const startTime = performance.now();
 
     if (this.executeBatch) {
-      this.executeBatch().finally(() => {
+      void this.executeBatch().finally(() => {
         const executionTime = performance.now() - startTime;
         console.debug(
           `[PlayerInfoBatch] Batch #${currentBatchCount} completed in ${executionTime.toFixed(
@@ -270,16 +270,18 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
         );
 
         globalPlayerBatchManager.clearPendingRequests();
-      } catch (error) {
+      } catch (caughtError) {
         console.error(
           `[PlayerInfoBatch] Batch execution failed for ${pendingRequests.length} requests:`,
-          error,
+          caughtError,
         );
 
         // すべてのリクエストをエラーで解決
         for (const request of pendingRequests) {
           request.reject(
-            error instanceof Error ? error : new Error('Batch query failed'),
+            caughtError instanceof Error
+              ? caughtError
+              : new Error('Batch query failed'),
           );
         }
 
@@ -311,9 +313,9 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
           setIsLoading(false);
         }
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (requestIdRef.current === requestId) {
-          setError(err);
+          setError(err instanceof Error ? err : new Error(String(err)));
           setIsLoading(false);
         }
       });

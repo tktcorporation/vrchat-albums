@@ -57,7 +57,7 @@ describe('migration service integration', () => {
     await nodeFsPromises.mkdir(mockOldAppPath, { recursive: true });
     await nodeFsPromises.mkdir(mockCurrentAppPath, { recursive: true });
 
-    vi.mocked(app.getPath).mockReturnValue(mockCurrentAppPath);
+    vi.mocked(app['getPath']).mockReturnValue(mockCurrentAppPath);
   });
 
   afterEach(async () => {
@@ -127,7 +127,7 @@ describe('migration service integration', () => {
       );
 
       // Mock successful import
-      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+      vi.mocked(importService['importLogStoreFiles']).mockReturnValue(
         Effect.succeed({
           success: true,
           backup: {
@@ -163,7 +163,7 @@ describe('migration service integration', () => {
       });
 
       // Verify importService was called
-      expect(importService.importLogStoreFiles).toHaveBeenCalledWith(
+      expect(importService['importLogStoreFiles']).toHaveBeenCalledWith(
         [logStorePath],
         expect.any(Function),
       );
@@ -226,7 +226,7 @@ describe('migration service integration', () => {
       // Mock import failure with specific ImportError type
       const { ImportDbSyncFailed } =
         await import('../vrchatLog/importService/errors');
-      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+      vi.mocked(importService['importLogStoreFiles']).mockReturnValue(
         Effect.fail(new ImportDbSyncFailed({ message: 'Import failed' })),
       );
 
@@ -250,7 +250,7 @@ describe('migration service integration', () => {
       );
 
       // Mock successful import
-      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+      vi.mocked(importService['importLogStoreFiles']).mockReturnValue(
         Effect.succeed({
           success: true,
           backup: {
@@ -278,7 +278,7 @@ describe('migration service integration', () => {
       expect(value.details.logStore).toBe(true);
 
       // Verify importService was called with the logStore directory
-      expect(importService.importLogStoreFiles).toHaveBeenCalledWith(
+      expect(importService['importLogStoreFiles']).toHaveBeenCalledWith(
         [logStorePath],
         expect.any(Function),
       );
@@ -294,7 +294,7 @@ describe('migration service integration', () => {
       );
 
       // Mock successful import
-      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+      vi.mocked(importService['importLogStoreFiles']).mockReturnValue(
         Effect.succeed({
           success: true,
           backup: {
@@ -330,7 +330,7 @@ describe('migration service integration', () => {
       await Effect.runPromise(migrationService.performMigrationIfNeeded());
 
       // Verify importService was not called
-      expect(importService.importLogStoreFiles).not.toHaveBeenCalled();
+      expect(importService['importLogStoreFiles']).not.toHaveBeenCalled();
     });
 
     it('should continue app startup even if migration fails', async () => {
@@ -341,7 +341,7 @@ describe('migration service integration', () => {
       // Mock import failure with specific ImportError type
       const { ImportDbSyncFailed } =
         await import('../vrchatLog/importService/errors');
-      vi.mocked(importService.importLogStoreFiles).mockReturnValue(
+      vi.mocked(importService['importLogStoreFiles']).mockReturnValue(
         Effect.fail(new ImportDbSyncFailed({ message: 'Critical failure' })),
       );
 

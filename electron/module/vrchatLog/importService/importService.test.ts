@@ -84,10 +84,10 @@ describe('importService', () => {
       );
 
       vi.mocked(
-        backupServiceModule.backupService.createPreImportBackup,
+        backupServiceModule.backupService['createPreImportBackup'],
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
-        backupServiceModule.backupService.updateBackupMetadata,
+        backupServiceModule.backupService['updateBackupMetadata'],
       ).mockReturnValue(Effect.succeed(undefined));
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
         Effect.succeed(undefined),
@@ -116,7 +116,7 @@ describe('importService', () => {
 
       // バックアップが作成されたことを確認
       expect(
-        backupServiceModule.backupService.createPreImportBackup,
+        backupServiceModule.backupService['createPreImportBackup'],
       ).toHaveBeenCalledWith(mockGetDBLogs);
 
       // DB同期が実行されたことを確認
@@ -175,10 +175,10 @@ describe('importService', () => {
       );
 
       vi.mocked(
-        backupServiceModule.backupService.createPreImportBackup,
+        backupServiceModule.backupService['createPreImportBackup'],
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
-        backupServiceModule.backupService.updateBackupMetadata,
+        backupServiceModule.backupService['updateBackupMetadata'],
       ).mockReturnValue(Effect.succeed(undefined));
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
         Effect.succeed(undefined),
@@ -240,7 +240,7 @@ describe('importService', () => {
         message: 'Backup failed',
       });
       vi.mocked(
-        backupServiceModule.backupService.createPreImportBackup,
+        backupServiceModule.backupService['createPreImportBackup'],
       ).mockReturnValue(Effect.fail(backupError));
 
       const exit = await Effect.runPromiseExit(
@@ -312,10 +312,10 @@ describe('importService', () => {
       );
 
       vi.mocked(
-        backupServiceModule.backupService.createPreImportBackup,
+        backupServiceModule.backupService['createPreImportBackup'],
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
-        backupServiceModule.backupService.updateBackupMetadata,
+        backupServiceModule.backupService['updateBackupMetadata'],
       ).mockReturnValue(Effect.succeed(undefined));
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
         Effect.succeed(undefined),
@@ -370,10 +370,10 @@ describe('importService', () => {
       );
 
       vi.mocked(
-        backupServiceModule.backupService.createPreImportBackup,
+        backupServiceModule.backupService['createPreImportBackup'],
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
-        backupServiceModule.backupService.updateBackupMetadata,
+        backupServiceModule.backupService['updateBackupMetadata'],
       ).mockReturnValue(Effect.succeed(undefined));
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
         Effect.succeed(undefined),
@@ -476,10 +476,10 @@ describe('importService', () => {
       );
 
       vi.mocked(
-        backupServiceModule.backupService.createPreImportBackup,
+        backupServiceModule.backupService['createPreImportBackup'],
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
-        backupServiceModule.backupService.updateBackupMetadata,
+        backupServiceModule.backupService['updateBackupMetadata'],
       ).mockReturnValue(Effect.succeed(undefined));
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
         Effect.succeed(undefined),

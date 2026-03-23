@@ -453,7 +453,7 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
       }
 
       // 非同期で処理開始
-      processPrefetchQueue();
+      void processPrefetchQueue();
     },
     [processPrefetchQueue],
   );

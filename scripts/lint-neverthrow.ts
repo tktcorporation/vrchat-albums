@@ -1405,7 +1405,7 @@ export async function loadConfig(
   }
 
   const configContent = fs.readFileSync(configPath, 'utf-8');
-  return JSON.parse(configContent);
+  return JSON.parse(configContent) as NeverthrowLintConfig;
 }
 
 // Export for testing with virtual files

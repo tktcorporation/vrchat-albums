@@ -51,18 +51,21 @@ const ErrorFallback: React.FC<{
   );
 };
 
+/** 捕捉したエラー情報をコンソールに出力する */
+const onBoundaryError = (error: unknown, info: React.ErrorInfo) => {
+  console.error('エラーバウンダリーでエラーをキャッチしました:', error, info);
+};
+
 /**
  * ReactErrorBoundary を用いて子要素のレンダリングエラーを捕捉するコンポーネント。
  * 捕捉したエラーはログに出力されリロードボタンを提供する。
  */
 export const ErrorBoundary: React.FC<Props> = ({ children }) => {
-  /** 捕捉したエラー情報をコンソールに出力する */
-  const onError = (error: unknown, info: React.ErrorInfo) => {
-    console.error('エラーバウンダリーでエラーをキャッチしました:', error, info);
-  };
-
   return (
-    <ReactErrorBoundary FallbackComponent={ErrorFallback} onError={onError}>
+    <ReactErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onError={onBoundaryError}
+    >
       {children}
     </ReactErrorBoundary>
   );

@@ -89,17 +89,19 @@ const startMemoryMonitoring = (
   const samples: MemorySample[] = [];
   const startTime = Date.now();
 
-  const intervalId = setInterval(async () => {
-    const mem = await getProcessMemory(pid);
-    if (mem) {
-      samples.push({
-        timestamp: Date.now() - startTime,
-        rssMB: mem.rss,
-        heapUsedMB: mem.heap,
-        externalMB: mem.external,
-        label: `t+${Math.floor((Date.now() - startTime) / 1000)}s`,
-      });
-    }
+  const intervalId = setInterval(() => {
+    void (async () => {
+      const mem = await getProcessMemory(pid);
+      if (mem) {
+        samples.push({
+          timestamp: Date.now() - startTime,
+          rssMB: mem.rss,
+          heapUsedMB: mem.heap,
+          externalMB: mem.external,
+          label: `t+${Math.floor((Date.now() - startTime) / 1000)}s`,
+        });
+      }
+    })();
   }, intervalMs);
 
   const stop = (): MemoryReport => {

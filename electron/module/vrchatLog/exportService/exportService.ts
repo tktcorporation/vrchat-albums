@@ -68,7 +68,7 @@ const getElectronDownloadsPath = (): string | null => {
   const electronApp = (() => {
     // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
     try {
-      return require('electron').app;
+      return (require('electron') as typeof import('electron')).app;
     } catch {
       return null;
     }

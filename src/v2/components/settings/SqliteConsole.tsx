@@ -76,8 +76,8 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
 
     // effect-lint-allow-try-catch: React フロントエンド境界
     try {
-      const result = await executeQuery({ query });
-      setResult(JSON.stringify(result, null, 2));
+      const queryResult = await executeQuery({ query });
+      setResult(JSON.stringify(queryResult, null, 2));
     } catch (error) {
       setResult(String(error));
     }
@@ -89,7 +89,7 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
-      handleExecute();
+      void handleExecute();
     }
   };
 
@@ -143,7 +143,7 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
 
         <div className="px-6 py-4 border-b border-border">
           <Button
-            onClick={handleThrowError}
+            onClick={() => void handleThrowError()}
             disabled={isThrowingError}
             variant="destructive"
           >
@@ -191,7 +191,7 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
               />
               <Button
                 size="sm"
-                onClick={handleExecute}
+                onClick={() => void handleExecute()}
                 disabled={isExecutingQuery || !query.trim()}
                 className="absolute bottom-2 right-2"
               >

@@ -39,7 +39,7 @@ export function createQueryStub<TData = unknown, TError = unknown>(
     data: data as TData | undefined,
     error: error,
     // biome-ignore lint/suspicious/noExplicitAny: refetch function has complex overloads that are difficult to type
-    refetch: refetch as any,
+    refetch: refetch as never,
     isFetching,
     isPaused: false,
     isStale: false,

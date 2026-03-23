@@ -120,6 +120,12 @@ const setVRChatPhotoDir =
     set('vrchatPhotoDir', dirPath);
   };
 
+const setVRChatPhotoExtraDirList =
+  (set: (key: SettingStoreKey, value: unknown) => void) =>
+  (dirPaths: string[]) => {
+    set('vrchatPhotoExtraDirList', dirPaths);
+  };
+
 /**
  * 連続して同じワールドに入った場合に、2回目以降のワールド入場ログを削除するかどうか
  */
@@ -276,12 +282,6 @@ const setSettingStore = (name: StoreName) => {
       )
       .otherwise(() => []);
   };
-
-  const setVRChatPhotoExtraDirList =
-    (set: (key: SettingStoreKey, value: unknown) => void) =>
-    (dirPaths: string[]) => {
-      set('vrchatPhotoExtraDirList', dirPaths);
-    };
 
   const _settingStore = {
     __store: store,

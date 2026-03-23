@@ -54,7 +54,7 @@ export class FloatingPromiseLinter {
     // Read tsconfig.json to get proper compiler options
     const configPath = ts.findConfigFile(
       this.projectRoot,
-      ts.sys.fileExists,
+      (p: string) => ts.sys.fileExists(p),
       'tsconfig.json',
     );
 
@@ -69,7 +69,9 @@ export class FloatingPromiseLinter {
     };
 
     if (configPath) {
-      const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+      const configFile = ts.readConfigFile(configPath, (p: string) =>
+        ts.sys.readFile(p),
+      );
       if (configFile.error) {
         consola.warn(
           `Failed to read tsconfig.json: ${ts.flattenDiagnosticMessageText(configFile.error.messageText, '\n')}`,

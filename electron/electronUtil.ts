@@ -115,16 +115,16 @@ function createWindow(): BrowserWindow {
 
   // and load the index.html of the app.
   if (isDev) {
-    mainWindow.loadURL(url);
+    void mainWindow.loadURL(url);
   } else {
-    mainWindow.loadFile(url);
+    void mainWindow.loadFile(url);
   }
 
   // http or httpsのリンクをクリックしたときにデフォルトブラウザで開く
-  const handleUrlOpen = (e: Event, url: string) => {
-    if (url.match(/^http/)) {
+  const handleUrlOpen = (e: Event, linkUrl: string) => {
+    if (linkUrl.match(/^http/)) {
       e.preventDefault();
-      shell.openExternal(url);
+      void shell.openExternal(linkUrl);
     }
   };
   mainWindow.webContents.on('will-navigate', handleUrlOpen);
@@ -358,7 +358,7 @@ const setTray = () => {
         label: 'エラーログを開く',
         click: () => {
           const logPath = app.getPath('logs');
-          shell.openPath(logPath);
+          void shell.openPath(logPath);
         },
       },
       { type: 'separator' },
@@ -415,67 +415,71 @@ const setTimeEventEmitter = (
     1000 * 60 * 60 * 6,
   );
 
-  intervalEventEmitter.on('time', async (now: Date) => {
-    if (!passedSettingStore.getBackgroundFileCreateFlag()) {
-      // Use passedSettingStore
-      logger.debug('バックグラウンド処理が無効になっています');
-      return;
-    }
+  intervalEventEmitter.on(
+    'time',
+    (now: Date) =>
+      void (async () => {
+        if (!passedSettingStore.getBackgroundFileCreateFlag()) {
+          // Use passedSettingStore
+          logger.debug('バックグラウンド処理が無効になっています');
+          return;
+        }
 
-    const either = await Effect.runPromise(
-      Effect.either(syncLogsInBackground()),
-    );
+        const either = await Effect.runPromise(
+          Effect.either(syncLogsInBackground()),
+        );
 
-    if (either._tag === 'Left') {
-      const error = either.left;
-      const errorMessage = match(error)
-        .with(
-          { code: 'LOG_FILE_NOT_FOUND' },
-          () => 'VRChatのログファイルが見つかりませんでした',
-        )
-        .with(
-          { code: 'LOG_FILE_DIR_NOT_FOUND' },
-          () => 'VRChatのログディレクトリが見つかりませんでした',
-        )
-        .with(
-          { code: 'LOG_FILES_NOT_FOUND' },
-          () => 'VRChatのログファイルが存在しません',
-        )
-        .with({ code: 'UNKNOWN' }, () => '不明なエラーが発生しました')
-        .otherwise(() => '予期せぬエラーが発生しました');
+        if (either._tag === 'Left') {
+          const error = either.left;
+          const errorMessage = match(error)
+            .with(
+              { code: 'LOG_FILE_NOT_FOUND' },
+              () => 'VRChatのログファイルが見つかりませんでした',
+            )
+            .with(
+              { code: 'LOG_FILE_DIR_NOT_FOUND' },
+              () => 'VRChatのログディレクトリが見つかりませんでした',
+            )
+            .with(
+              { code: 'LOG_FILES_NOT_FOUND' },
+              () => 'VRChatのログファイルが存在しません',
+            )
+            .with({ code: 'UNKNOWN' }, () => '不明なエラーが発生しました')
+            .otherwise(() => '予期せぬエラーが発生しました');
 
-      logger.error({ message: error });
+          logger.error({ message: error });
 
-      new Notification({
-        title: `joinの記録に失敗しました: ${now.toString()}`,
-        body: errorMessage,
-      }).show();
+          new Notification({
+            title: `joinの記録に失敗しました: ${now.toString()}`,
+            body: errorMessage,
+          }).show();
 
-      return;
-    }
+          return;
+        }
 
-    const {
-      createdVRChatPhotoPathModelList,
-      createdWorldJoinLogModelList,
-      createdPlayerJoinLogModelList,
-    } = either.right;
-    if (
-      createdVRChatPhotoPathModelList.length === 0 &&
-      createdWorldJoinLogModelList.length === 0 &&
-      createdPlayerJoinLogModelList.length === 0
-    ) {
-      return;
-    }
+        const {
+          createdVRChatPhotoPathModelList,
+          createdWorldJoinLogModelList,
+          createdPlayerJoinLogModelList,
+        } = either.right;
+        if (
+          createdVRChatPhotoPathModelList.length === 0 &&
+          createdWorldJoinLogModelList.length === 0 &&
+          createdPlayerJoinLogModelList.length === 0
+        ) {
+          return;
+        }
 
-    const photoCount = createdVRChatPhotoPathModelList.length;
-    const worldJoinCount = createdWorldJoinLogModelList.length;
-    const playerJoinCount = createdPlayerJoinLogModelList.length;
+        const photoCount = createdVRChatPhotoPathModelList.length;
+        const worldJoinCount = createdWorldJoinLogModelList.length;
+        const playerJoinCount = createdPlayerJoinLogModelList.length;
 
-    new Notification({
-      title: `joinの記録に成功しました: ${now.toString()}`,
-      body: `${photoCount}枚の新しい写真を記録しました\n${worldJoinCount}件のワールド参加を記録しました\n${playerJoinCount}件のプレイヤー参加を記録しました`,
-    }).show();
-  });
+        new Notification({
+          title: `joinの記録に成功しました: ${now.toString()}`,
+          body: `${photoCount}枚の新しい写真を記録しました\n${worldJoinCount}件のワールド参加を記録しました\n${playerJoinCount}件のプレイヤー参加を記録しました`,
+        }).show();
+      })(),
+  );
 };
 
 /**

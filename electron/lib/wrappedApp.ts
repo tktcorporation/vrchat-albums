@@ -5,7 +5,7 @@
 export const getAppUserDataPath = () => {
   // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
-    const { app } = require('electron');
+    const { app } = require('electron') as typeof import('electron');
     return app.getPath('userData');
   } catch {
     // テストまたは非Electron環境

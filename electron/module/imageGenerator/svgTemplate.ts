@@ -195,8 +195,8 @@ function generatePlayerElements(
 
   match({ showAllPlayers, remainingCount })
     .when(
-      ({ showAllPlayers, remainingCount }) =>
-        !showAllPlayers && remainingCount > 0,
+      ({ showAllPlayers: showAll, remainingCount: remaining }) =>
+        !showAll && remaining > 0,
       () => {
         const moreText = `+${remainingCount} more`;
         const moreTextWidth = Array.from(moreText).reduce((width, char) => {

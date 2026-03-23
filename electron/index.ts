@@ -180,7 +180,7 @@ const initializeApp = async () => {
     router,
     windows: [mainWindow],
   });
-  electronUtil.setTray();
+  void electronUtil.setTray();
 
   unhandled({
     logger: (error) => logger.error({ message: error }),
@@ -201,11 +201,15 @@ app.on('second-instance', () => {
   mainWindow.focus();
 });
 
-app.on('activate', async () => {
-  const mainWindow = await createOrGetMainWindow();
-  mainWindow.show();
-  mainWindow.focus();
-});
+app.on(
+  'activate',
+  () =>
+    void (async () => {
+      const mainWindow = await createOrGetMainWindow();
+      mainWindow.show();
+      mainWindow.focus();
+    })(),
+);
 
 app.on('window-all-closed', () => {
   if (process.platform === 'darwin') {

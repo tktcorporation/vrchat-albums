@@ -1697,11 +1697,12 @@ export const getBatchThumbnails = async (
         } else {
           // 予期しないエラー（画像処理内部エラー等）
           const dieOpt = Cause.dieOption(exit.cause);
-          const unexpectedError = Option.isSome(dieOpt)
-            ? dieOpt.value instanceof Error
+          const unexpectedError = (() => {
+            if (!Option.isSome(dieOpt)) return new Error('Unknown error');
+            return dieOpt.value instanceof Error
               ? dieOpt.value
-              : new Error(String(dieOpt.value))
-            : new Error('Unknown error');
+              : new Error(String(dieOpt.value));
+          })();
           // Sentryに送信されるのは logger.error() 経由
           logger.error({
             message: 'Unexpected error during batch thumbnail fetch',

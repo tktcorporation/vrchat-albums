@@ -191,7 +191,7 @@ export const getVrcUserInfoByUserName = (
           if (!response.ok) {
             throw new Error(`getVrcUserInfoByUserName: ${response.statusText}`);
           }
-          const json = await response.json();
+          const json: unknown = await response.json();
           const result = UsersSchema.safeParse(json);
           if (!result.success) {
             throw new Error(
@@ -208,7 +208,7 @@ export const getVrcUserInfoByUserName = (
           resolve(result.data[0]);
         });
         if (!isProcessingQueue) {
-          processQueue();
+          void processQueue();
         }
       }),
     catch: (error): Error | 'USER_NOT_FOUND' => {

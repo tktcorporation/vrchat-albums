@@ -324,7 +324,7 @@ describe('DBQueue', () => {
     const queue = getDBQueue();
 
     // タスクを追加
-    queue.add(
+    void queue.add(
       () => new Promise((resolve) => setTimeout(() => resolve('task'), 50)),
     );
 

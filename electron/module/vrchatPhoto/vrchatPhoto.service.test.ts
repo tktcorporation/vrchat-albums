@@ -146,7 +146,7 @@ describe('createVRChatPhotoPathIndex', () => {
     // readdir モック - withFileTypesオプションの有無で振る舞いを変える
     // readdir は複雑なオーバーロードを持つため、any を使ってモック
     (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
-      async (dirPath: PathLike, options?: unknown) => {
+      (async (dirPath: PathLike, options?: unknown) => {
         const pathStr = dirPath.toString();
 
         // withFileTypes: true の場合は Dirent[] を返す
@@ -194,7 +194,7 @@ describe('createVRChatPhotoPathIndex', () => {
           return [extraFileName];
         }
         return [];
-      },
+      }) as never,
     );
 
     // stat モック - mtimeを返す
@@ -412,7 +412,7 @@ describe('createVRChatPhotoPathIndex', () => {
         const originalImplementation =
           originalReaddirMock.getMockImplementation();
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
-          async (dirPath: PathLike, options?: unknown) => {
+          (async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();
             // computeFolderDigest で呼ばれる readdir（withFileTypes なし）
             if (
@@ -427,7 +427,7 @@ describe('createVRChatPhotoPathIndex', () => {
             // それ以外はオリジナルの実装を呼ぶ
             // biome-ignore lint/suspicious/noExplicitAny: readdir mock type
             return originalImplementation?.(dirPath, options as any);
-          },
+          }) as never,
         );
 
         // loggerモジュールをインポート
@@ -458,7 +458,7 @@ describe('createVRChatPhotoPathIndex', () => {
         const originalImplementation =
           originalReaddirMock.getMockImplementation();
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
-          async (dirPath: PathLike, options?: unknown) => {
+          (async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();
             // computeFolderDigest で呼ばれる readdir（withFileTypes なし）
             if (
@@ -472,7 +472,7 @@ describe('createVRChatPhotoPathIndex', () => {
             }
             // biome-ignore lint/suspicious/noExplicitAny: readdir mock type
             return originalImplementation?.(dirPath, options as any);
-          },
+          }) as never,
         );
 
         const { logger } = await import('./../../lib/logger');
@@ -502,7 +502,7 @@ describe('createVRChatPhotoPathIndex', () => {
         const originalImplementation =
           originalReaddirMock.getMockImplementation();
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
-          async (dirPath: PathLike, options?: unknown) => {
+          (async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();
             // computeFolderDigest で呼ばれる readdir（withFileTypes なし）
             if (
@@ -514,7 +514,7 @@ describe('createVRChatPhotoPathIndex', () => {
             }
             // biome-ignore lint/suspicious/noExplicitAny: readdir mock type
             return originalImplementation?.(dirPath, options as any);
-          },
+          }) as never,
         );
 
         // Effect.runPromise は予期しないエラー（die）を FiberFailure でラップするため、
@@ -529,7 +529,7 @@ describe('createVRChatPhotoPathIndex', () => {
       it('サブディレクトリの権限エラーをwarnログ出力してスキップする', async () => {
         // readdir を再モック
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
-          async (dirPath: PathLike, options?: unknown) => {
+          (async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();
 
             // 2024-01フォルダで権限エラーを発生させる
@@ -571,7 +571,7 @@ describe('createVRChatPhotoPathIndex', () => {
               return [extraFileName];
             }
             return [];
-          },
+          }) as never,
         );
 
         const { logger } = await import('./../../lib/logger');
@@ -602,7 +602,7 @@ describe('createVRChatPhotoPathIndex', () => {
         (unexpectedError as NodeJS.ErrnoException).code = 'EMFILE';
 
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
-          async (dirPath: PathLike, options?: unknown) => {
+          (async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();
 
             // ベースディレクトリへのアクセスで想定外エラー
@@ -615,7 +615,7 @@ describe('createVRChatPhotoPathIndex', () => {
               throw unexpectedError;
             }
             return [];
-          },
+          }) as never,
         );
 
         await expect(service.createVRChatPhotoPathIndex(false)).rejects.toThrow(

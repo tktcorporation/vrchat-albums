@@ -42,7 +42,7 @@ const DataExport = memo(() => {
         console.error('Failed to get downloads path:', error);
       }
     };
-    setDefaultOutputPath();
+    void setDefaultOutputPath();
   }, []);
 
   const selectOutputDir = async () => {
@@ -266,7 +266,7 @@ const DataExport = memo(() => {
             <Button
               type="button"
               variant="outline"
-              onClick={selectOutputDir}
+              onClick={() => void selectOutputDir()}
               className="flex-shrink-0"
             >
               参照
