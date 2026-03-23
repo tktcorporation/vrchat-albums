@@ -54,6 +54,7 @@ Your core responsibilities:
    - Summarize what was accomplished at completion
 
 Key principles:
+
 - Always complete the full CI check sequence before committing
 - Respect the explicit instruction boundary for PR creation
 - Maintain code quality and project consistency throughout

@@ -1,5 +1,6 @@
 import * as datefns from 'date-fns';
 import { Effect } from 'effect';
+
 import type { VRChatLogLine, VRChatPlayerId, VRChatPlayerName } from '../model';
 import { OptionalVRChatPlayerIdSchema, VRChatPlayerNameSchema } from '../model';
 

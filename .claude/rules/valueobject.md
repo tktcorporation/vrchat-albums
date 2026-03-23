@@ -29,7 +29,8 @@ export type { MyValueObject };
 ### Zod スキーマ
 
 ```typescript
-export const MyValueObjectSchema = z.string()
+export const MyValueObjectSchema = z
+  .string()
   .min(1)
   .transform((val) => new MyValueObject(val));
 ```
@@ -68,11 +69,11 @@ pnpm lint:valueobjects
 
 ## なぜこのパターンか
 
-| 目的 | 方法 |
-|------|------|
+| 目的                         | 方法                           |
+| ---------------------------- | ------------------------------ |
 | 不正なインスタンス生成を防止 | クラスを直接エクスポートしない |
-| バリデーションを強制 | Zod スキーマ経由のみ許可 |
-| 型安全性の確保 | Branded Types による意味的区別 |
+| バリデーションを強制         | Zod スキーマ経由のみ許可       |
+| 型安全性の確保               | Branded Types による意味的区別 |
 
 ---
 

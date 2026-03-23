@@ -2,6 +2,7 @@ import { Globe2 } from 'lucide-react';
 import { memo } from 'react';
 
 import { cn } from '@/components/lib/utils';
+
 import { TEXT_COLOR, TYPOGRAPHY } from '../constants/ui';
 import { useI18n } from '../i18n/store';
 import type { Language } from '../i18n/types';

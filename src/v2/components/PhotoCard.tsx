@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Circle } from 'lucide-react';
 import React, { memo, useCallback, useRef, useState } from 'react';
+
 import {
   ContextMenu,
   ContextMenuContent,
@@ -8,6 +9,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { trpcReact } from '@/trpc';
+
 import { ICON_SIZE } from '../constants/ui';
 import { useIntersectionObserver } from '../hooks/useIntersectionObserver';
 import { useThumbnail } from '../hooks/useThumbnailCache';

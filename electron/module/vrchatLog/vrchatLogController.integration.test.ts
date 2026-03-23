@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
 import { Effect } from 'effect';
 import { uuidv7 } from 'uuidv7';
 import {
@@ -13,6 +14,7 @@ import {
   it,
   vi,
 } from 'vitest';
+
 import type { ImportBackupMetadata } from './backupService/backupService';
 import { BackupExportFailed, BackupNotFound } from './backupService/errors';
 import {
@@ -225,7 +227,6 @@ import { eventEmitter } from '../../trpc';
 import { initSettingStore } from '../settingStore';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
-
 import { vrchatLogRouter } from './vrchatLogController';
 
 // テスト用のユーザーデータディレクトリを設定
@@ -364,9 +365,8 @@ vi.mock('../../logInfo/service', async (importOriginal) => {
   const original = await importOriginal();
   const { Effect: Eff } = await import('effect');
   const worldJoinLogService = await import('../vrchatWorldJoinLog/service');
-  const playerJoinLogService = await import(
-    '../VRChatPlayerJoinLogModel/playerJoinLog.service'
-  );
+  const playerJoinLogService =
+    await import('../VRChatPlayerJoinLogModel/playerJoinLog.service');
 
   return {
     ...(original as object),

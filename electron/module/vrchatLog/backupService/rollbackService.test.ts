@@ -1,8 +1,10 @@
 import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+
 import { Cause, Effect, Exit, Option } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import * as dbQueueModule from '../../../lib/dbQueue';
 import * as logSyncModule from '../../logSync/service';
 import { LogFilesNotFound } from '../errors';

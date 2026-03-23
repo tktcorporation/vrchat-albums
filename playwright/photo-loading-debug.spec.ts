@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { _electron, expect, test } from '@playwright/test';
 
 // ESモジュール環境で__dirnameの代わりに使用
@@ -265,7 +266,7 @@ test('写真一覧が正常にロードされる', async () => {
     console.log(
       `\n=== Main content loaded in ${metrics.contentLoadTime}ms ===`,
     );
-  } catch (_error) {
+  } catch {
     metrics.contentLoadTime = Date.now() - startTime;
     console.log(`\n=== Timeout after ${metrics.contentLoadTime}ms ===`);
 

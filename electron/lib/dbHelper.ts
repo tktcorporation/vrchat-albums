@@ -1,4 +1,5 @@
 import type { Effect } from 'effect';
+
 import { type DBQueueError, getDBQueue } from './dbQueue';
 
 /**

@@ -1,7 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap");
-@import "tailwindcss";
-@import "tw-animate-css";
+@import url('https://fonts.googleapis.com/css2?family=Inter&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@100..900&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 /* Load JS config for compatibility */
 @config "../tailwind.config.js";
@@ -145,8 +145,8 @@
   body {
     @apply text-foreground;
     font-feature-settings:
-      "rlig" 1,
-      "calt" 1;
+      'rlig' 1,
+      'calt' 1;
     background: transparent;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -158,7 +158,7 @@
 
   /* Glassmorphism background with gradient overlay */
   body::before {
-    content: "";
+    content: '';
     position: fixed;
     top: 0;
     left: 0;
@@ -174,7 +174,7 @@
   }
 
   body::after {
-    content: "";
+    content: '';
     position: fixed;
     top: 0;
     left: 0;
@@ -194,8 +194,8 @@
   }
 
   @font-face {
-    font-family: "Noto Sans CJK JP";
-    src: url("assets/NotoSansCJKjp-Regular.ttf") format("truetype");
+    font-family: 'Noto Sans CJK JP';
+    src: url('assets/NotoSansCJKjp-Regular.ttf') format('truetype');
   }
 
   /* Webkit browsers (Chrome, Safari, etc) */

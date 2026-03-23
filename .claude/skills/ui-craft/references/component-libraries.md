@@ -16,6 +16,7 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 ## 1. コピペ型・AI親和性高（最優先）
 
 ### Magic UI
+
 - URL: https://magicui.design
 - スタック: React + Tailwind + Motion (framer-motion)
 - コンポーネント数: 150+
@@ -31,6 +32,7 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 - いつ使う: ランディングページ、hero セクション、動きのあるUIが必要なとき
 
 ### Aceternity UI
+
 - URL: https://ui.aceternity.com
 - スタック: React + Framer Motion + Tailwind
 - コンポーネント数: 200+
@@ -46,6 +48,7 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 - いつ使う: v0風のモダンUI、印象的なファーストビューが必要なとき
 
 ### UIverse
+
 - URL: https://uiverse.io
 - スタック: HTML/CSS/React
 - 特徴: UIの Pinterest。コミュニティ投稿型のUIパーツ集
@@ -63,6 +66,7 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 ## 2. AI生成ツールのベース
 
 ### shadcn/ui（最重要）
+
 - URL: https://ui.shadcn.com
 - スタック: Radix UI + Tailwind CSS
 - 特徴: コピペ型。CLIで追加。v0/bolt のベース
@@ -83,12 +87,14 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 - いつ使う: ほぼ全ての UI 実装の出発点
 
 ### Radix UI
+
 - URL: https://www.radix-ui.com
 - 特徴: headless UI プリミティブ。shadcn/ui の基盤
 - 得意分野: dialog, dropdown, popover, toast, tooltip, tabs
 - いつ使う: shadcn/ui を使わずに Radix 直接使いたいとき、またはカスタムスタイルが必要なとき
 
 ### Headless UI
+
 - URL: https://headlessui.com
 - 特徴: Tailwind Labs 製。ロジックのみ提供
 - いつ使う: Vue プロジェクト、または Radix の代替が必要なとき
@@ -98,6 +104,7 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 ## 3. 大規模コンポーネントコレクション
 
 ### Mantine
+
 - URL: https://mantine.dev
 - コンポーネント数: 100+
 - 特徴: hooks 充実、dark theme ネイティブ
@@ -105,16 +112,19 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 - いつ使う: shadcn/ui にないコンポーネントが必要なとき（date picker, color picker 等）
 
 ### Chakra UI
+
 - URL: https://chakra-ui.com
 - 特徴: DX 重視、theme system
 - いつ使う: Chakra ベースのプロジェクト
 
 ### MUI (Material UI)
+
 - URL: https://mui.com
 - 特徴: エンタープライズ向け。完成度高い
 - いつ使う: Material Design 準拠が求められるプロジェクト
 
 ### Tremor
+
 - URL: https://tremor.so
 - 特徴: ダッシュボード・データ可視化特化
 - 得意分野: チャート、KPI カード、テーブル、スパークライン
@@ -127,11 +137,13 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 特定のUIパーツを探すときに参照する。
 
 ### awesome-react-components
+
 - URL: https://github.com/brillout/awesome-react-components
 - 特徴: React コンポーネントの巨大キュレーションリスト
 - 使い方: 特定のUI要素（例: drag & drop, virtualized list, color picker）を探すとき
 
 ### awesome-ui-libraries
+
 - URL: https://github.com/dalisoft/awesome-ui-libraries
 - 特徴: フレームワーク横断の UI ライブラリリスト
 
@@ -142,15 +154,18 @@ UIを実装する前にここから適切なライブラリを選び、ベース
 コードではなくデザインパターンの参考。「この画面はどういうレイアウトが一般的か」を知りたいときに使う。
 
 ### Mobbin
+
 - URL: https://mobbin.com
 - 特徴: 実際のアプリのUI/UXスクリーンショット集
 - 使い方: 「onboarding のUIパターンを見たい」「設定画面のベストプラクティスは？」等
 
 ### Pageflows
+
 - URL: https://pageflows.com
 - 特徴: UXフロー（複数画面にまたがるフロー）の参考
 
 ### UI Garage
+
 - URL: https://uigarage.net
 - 特徴: カテゴリ別UIパターン集
 

@@ -1,5 +1,6 @@
 import { Cause, Effect, Exit, Option } from 'effect';
 import { match } from 'ts-pattern';
+
 import { logger } from '../../../lib/logger';
 import type { VRChatLogLine } from '../model';
 import {

@@ -1,5 +1,6 @@
 import { app } from 'electron';
 import z from 'zod';
+
 import { UserFacingError } from './../../../lib/errors';
 import { procedure, router as trpcRouter } from './../../../trpc';
 import type { getSettingStore } from './../../settingStore';

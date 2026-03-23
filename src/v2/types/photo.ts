@@ -1,9 +1,9 @@
+import { logger } from '../lib/logger';
 import {
   type VRChatPhotoFileNameWithExt,
   type VRChatPhotoPath,
   VRChatPhotoPathSchema,
 } from './../../valueObjects';
-import { logger } from '../lib/logger';
 
 /**
  * 写真データの共通プロパティ（基底インターフェース）

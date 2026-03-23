@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ERROR_CODES, UserFacingError } from '../../../lib/errors';
 import { logger } from '../../../lib/logger';
 import * as sequelizeClient from '../../../lib/sequelize';

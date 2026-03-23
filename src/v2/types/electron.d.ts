@@ -31,4 +31,5 @@ declare global {
     };
   }
 }
+
 export type {};

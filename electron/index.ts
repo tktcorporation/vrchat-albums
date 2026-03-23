@@ -1,4 +1,5 @@
 import path from 'node:path';
+
 import {
   type Event,
   type EventHint,
@@ -13,6 +14,7 @@ const isDev = !app.isPackaged;
 
 // Packages
 import { createIPCHandler } from 'trpc-electron/main';
+
 import { scrubEventData } from '../src/lib/utils/masking';
 import { router } from './api';
 import * as electronUtil from './electronUtil';
@@ -56,7 +58,7 @@ export const initializeMainSentry = () => {
     release: __SENTRY_RELEASE__,
     beforeSend: (event: ErrorEvent, _hint: EventHint) => {
       // 開発環境でも規約同意をチェックする
-      if (settingStore.getTermsAccepted() !== true) {
+      if (!settingStore.getTermsAccepted()) {
         if (isDev) {
           logger.info(
             'Sentry event dropped in development mode due to terms not accepted.',

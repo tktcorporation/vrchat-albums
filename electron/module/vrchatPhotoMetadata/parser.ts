@@ -8,6 +8,7 @@
  */
 
 import { Effect } from 'effect';
+
 import { MetadataParseError, NoMetadataFound } from './errors';
 import { type VRChatPhotoMetadata, VRChatPhotoMetadataSchema } from './schema';
 

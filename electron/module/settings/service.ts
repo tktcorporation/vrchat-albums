@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { app } from 'electron';
 import { autoUpdater, type UpdateCheckResult } from 'electron-updater';
+
 import { logger } from '../../lib/logger';
 import type { UpdateError } from './errors';
 import { DownloadFailed, NoUpdateAvailable, UpdateCheckFailed } from './errors';
@@ -57,7 +58,7 @@ export const getElectronUpdaterInfo = (): Effect.Effect<
       logger.debug('Update info:', updateInfo);
       return {
         isUpdateAvailable: updateInfo.updateInfo.version !== app.getVersion(),
-        updateInfo: updateInfo as UpdateCheckResult,
+        updateInfo: updateInfo,
       };
     }),
   );

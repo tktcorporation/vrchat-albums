@@ -1,7 +1,9 @@
 import * as nodeFs from 'node:fs';
 import path from 'node:path';
+
 import * as datefns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
+
 import { logger } from '../../../lib/logger';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import * as fs from '../../../lib/wrappedFs';
@@ -163,7 +165,7 @@ export const appendLoglinesToFile = (props: {
   logLines: VRChatLogLine[];
   logStoreFilePath?: VRChatLogStoreFilePath;
   dedupCache?: DedupCache;
-}): Effect.Effect<void, never> => {
+}): Effect.Effect<void> => {
   if (props.logLines.length === 0) {
     return Effect.succeed(undefined);
   }
@@ -298,5 +300,5 @@ export const appendLoglinesToFile = (props: {
         existingLines.add(line);
       }
     }
-  }) as Effect.Effect<void, never>;
+  }) as Effect.Effect<void>;
 };

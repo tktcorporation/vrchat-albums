@@ -18,8 +18,10 @@
  */
 
 import * as fs from 'node:fs';
+
 import consola from 'consola';
 import { glob } from 'glob';
+
 import { NormalizedPathArraySchema, NormalizedPathSchema } from './lib/paths';
 
 interface LintError {

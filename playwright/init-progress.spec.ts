@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { _electron, expect, test } from '@playwright/test';
 import consola from 'consola';
 
@@ -40,7 +41,7 @@ const launchElectronApp = async () => {
           console.log('Development server is ready');
           return true;
         }
-      } catch (_error) {
+      } catch {
         console.log(`Waiting for server... (attempt ${i + 1}/${maxAttempts})`);
       }
       await new Promise((resolve) =>
@@ -189,7 +190,7 @@ test.describe('初期化プログレス表示', () => {
       // プログレスが記録されていることを確認
       expect(progressSnapshots.length).toBeGreaterThan(0);
       console.log('Progress snapshots captured:', progressSnapshots);
-    } catch (_error) {
+    } catch {
       // ローディング画面が表示されない場合（既に完了している可能性）
       console.log(
         'Loading screen not detected within timeout, may have already completed',
@@ -279,7 +280,9 @@ test.describe('初期化プログレス表示', () => {
         });
         console.log('Debug screenshot saved');
       }
-      throw new Error(`Failed to load main content: ${error}`);
+      throw new Error(`Failed to load main content: ${error}`, {
+        cause: error,
+      });
     }
 
     // クリーンアップ

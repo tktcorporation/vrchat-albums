@@ -1,5 +1,7 @@
 import * as path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
+
 import { TsPatternLinter } from './lint-ts-pattern.js';
 
 describe('ts-pattern Linter', () => {

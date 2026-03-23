@@ -37,16 +37,19 @@
 ## Features
 
 ### Photo Management
+
 - **Auto Import** - Automatically imports photos from your VRChat photos folder
 - **Smart Organization** - Automatically associates photos with VRChat log files and groups them by session
 - **Fast Thumbnails** - Optimized thumbnail display for comfortable browsing of large photo collections
 
 ### World & Friend Information
+
 - **World Info** - Records when and which world each photo was taken in
 - **Friend Tracking** - Records information about friends who were with you
 - **Fast Search** - Instantly search by world name or friend name
 
 ### Backup & Customization
+
 - **Full Backup** - Safely export all your data
 - **Easy Import** - Simple migration to another PC or data restoration
 - **Theme Switching** - Dark mode / Light mode support
@@ -81,13 +84,16 @@ Download `VRChatAlbums-Setup-x.x.x.exe` from the [latest release](https://github
 ## Usage
 
 ### Viewing Photos
+
 - Click thumbnails on the main screen to view details
 - Select multiple photos for batch copy
 
 ### Searching Photos
+
 - Enter world name or friend name in the search bar at the top
 
 ### Backing Up Data
+
 1. Select "Export" from the menu
 2. Specify date range or worlds (leave empty for all data)
 3. Choose the export destination folder and execute
@@ -95,12 +101,15 @@ Download `VRChatAlbums-Setup-x.x.x.exe` from the [latest release](https://github
 ## FAQ
 
 ### Q: My VRChat photos are not showing up
+
 **A:** Check that the VRChat photos folder is correctly set in the settings. The default is `C:\Users\[Username]\Pictures\VRChat`.
 
 ### Q: I get an error saying log files are not found
+
 **A:** If you have never launched VRChat, log files don't exist yet. Please launch VRChat first and try again.
 
 ### Q: Where are my backups saved?
+
 **A:** Backups are saved to the folder you specify during export, in a subfolder with a timestamp.
 
 ## Contributing

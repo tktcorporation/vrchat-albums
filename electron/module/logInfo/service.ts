@@ -1,14 +1,12 @@
 import { performance } from 'node:perf_hooks';
+
 import { col, fn, literal, Op } from '@sequelize/core';
 import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
+
 import { logger } from '../../lib/logger';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
-import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
-import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
-import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
-import * as playerLeaveLogService from '../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import type { VRChatLogFileError } from '../vrchatLog/error';
 import type { VRChatLogError } from '../vrchatLog/errors';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../vrchatLog/model';
@@ -21,6 +19,10 @@ import * as vrchatLogService from '../vrchatLog/service';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import * as vrchatPhotoService from '../vrchatPhoto/vrchatPhoto.service';
 import * as metadataService from '../vrchatPhotoMetadata/service';
+import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
+import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
+import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
+import * as playerLeaveLogService from '../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 import { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import { LogInfoError } from './error';
@@ -78,7 +80,7 @@ function _getLogStoreFilePathsImpl(
           latestPlayerLeaveDate?.leaveDateTime,
         ]
           .filter((d): d is Date => d instanceof Date) // Date型のみをフィルタリング
-          .sort(datefns.compareAsc);
+          .toSorted(datefns.compareAsc);
         logger.debug(`_getLogStoreFilePaths: latest dates: ${dates}`);
 
         // 最新の日付を取得、なければ1年前
@@ -583,7 +585,7 @@ export function loadLogInfoIndexFromVRChatLog({
 export const getWorldNameSuggestions = (
   query: string,
   limit: number,
-): Effect.Effect<string[], never> => {
+): Effect.Effect<string[]> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   return Effect.promise(async () => {
     const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
@@ -611,7 +613,7 @@ export const getWorldNameSuggestions = (
 export const getPlayerNameSuggestions = (
   query: string,
   limit: number,
-): Effect.Effect<string[], never> => {
+): Effect.Effect<string[]> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   return Effect.promise(async () => {
     const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
@@ -637,7 +639,7 @@ export const getPlayerNameSuggestions = (
  */
 export const getFrequentPlayerNames = (
   limit: number,
-): Effect.Effect<string[], never> => {
+): Effect.Effect<string[]> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   return Effect.promise(async () => {
     const playerCounts = await VRChatPlayerJoinLogModel.findAll({
@@ -671,7 +673,7 @@ export const getFrequentPlayerNames = (
 export const searchSessionsByPlayerName = (
   playerName: string,
   options: { limit?: number; maxSessions?: number } = {},
-): Effect.Effect<Date[], never> => {
+): Effect.Effect<Date[]> => {
   return Effect.promise(async () => {
     const startTime = performance.now();
     const { limit = 1000, maxSessions = 100 } = options;
@@ -725,7 +727,7 @@ export const searchSessionsByPlayerName = (
     // ワールド参加ログを時系列順にソート（二分探索用）
     const sortedWorldJoinDates = worldJoinLogs
       .map((log) => log.joinDateTime)
-      .sort((a, b) => a.getTime() - b.getTime());
+      .toSorted((a, b) => a.getTime() - b.getTime());
 
     // 各プレイヤー参加日時に対して、対応するワールド参加日時を探す（インメモリ）
     const sessionJoinDates: Date[] = [];
@@ -765,7 +767,7 @@ export const searchSessionsByPlayerName = (
     );
 
     // 新しい順にソートして返す
-    return sessionJoinDates.sort((a, b) => b.getTime() - a.getTime());
+    return sessionJoinDates.toSorted((a, b) => b.getTime() - a.getTime());
   });
 };
 

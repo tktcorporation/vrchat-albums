@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
 import { uuidv7 } from 'uuidv7';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -166,7 +167,7 @@ describe('vrchatLogController integration stub tests', () => {
       expect(collectedFiles).toHaveLength(3);
 
       // ファイルが年月順にソートできることを確認
-      const sortedFiles = collectedFiles.sort((a, b) => {
+      const sortedFiles = collectedFiles.toSorted((a, b) => {
         const aMatch = a.match(/(\d{4}-\d{2})/);
         const bMatch = b.match(/(\d{4}-\d{2})/);
         return (aMatch?.[0] || '').localeCompare(bMatch?.[0] || '');

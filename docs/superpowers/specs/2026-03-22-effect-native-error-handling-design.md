@@ -28,14 +28,14 @@ Effect TS の思想に乗るなら、E チャネルを最後まで維持し、tR
 
 ### 変換ルール
 
-| 現在 | 新 | 対応する `_tag` |
-|------|-----|----------------|
-| `class LogInfoError { code: 'DATABASE_QUERY_FAILED' }` | `class DatabaseQueryFailed extends Data.TaggedError("DatabaseQueryFailed")<{ message: string }> {}` | `"DatabaseQueryFailed"` |
-| `class LogInfoError { code: 'LOG_FILE_READ_FAILED' }` | `class LogFileReadFailed extends Data.TaggedError("LogFileReadFailed")<{ message: string }> {}` | `"LogFileReadFailed"` |
-| `{ type: 'DB_ERROR', message: string }` | `class DbError extends Data.TaggedError("DbError")<{ message: string }> {}` | `"DbError"` |
-| `{ type: 'NO_METADATA_FOUND' }` | `class NoMetadataFound extends Data.TaggedError("NoMetadataFound")<{ photoPath: string }> {}` | `"NoMetadataFound"` |
-| `{ type: 'PARSE_ERROR', message: string }` | `class MetadataParseError extends Data.TaggedError("MetadataParseError")<{ photoPath: string; message: string }> {}` | `"MetadataParseError"` |
-| 1 クラスに複数 `code` | **廃止**。1 エラー = 1 クラス | — |
+| 現在                                                   | 新                                                                                                                   | 対応する `_tag`         |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `class LogInfoError { code: 'DATABASE_QUERY_FAILED' }` | `class DatabaseQueryFailed extends Data.TaggedError("DatabaseQueryFailed")<{ message: string }> {}`                  | `"DatabaseQueryFailed"` |
+| `class LogInfoError { code: 'LOG_FILE_READ_FAILED' }`  | `class LogFileReadFailed extends Data.TaggedError("LogFileReadFailed")<{ message: string }> {}`                      | `"LogFileReadFailed"`   |
+| `{ type: 'DB_ERROR', message: string }`                | `class DbError extends Data.TaggedError("DbError")<{ message: string }> {}`                                          | `"DbError"`             |
+| `{ type: 'NO_METADATA_FOUND' }`                        | `class NoMetadataFound extends Data.TaggedError("NoMetadataFound")<{ photoPath: string }> {}`                        | `"NoMetadataFound"`     |
+| `{ type: 'PARSE_ERROR', message: string }`             | `class MetadataParseError extends Data.TaggedError("MetadataParseError")<{ photoPath: string; message: string }> {}` | `"MetadataParseError"`  |
+| 1 クラスに複数 `code`                                  | **廃止**。1 エラー = 1 クラス                                                                                        | —                       |
 
 ### 例: vrchatPhotoMetadata
 
@@ -44,17 +44,17 @@ Effect TS の思想に乗るなら、E チャネルを最後まで維持し、tR
 import { Data } from 'effect';
 
 /** DB アクセス時の予期しないエラー */
-export class MetadataDbError extends Data.TaggedError("MetadataDbError")<{
+export class MetadataDbError extends Data.TaggedError('MetadataDbError')<{
   message: string;
 }> {}
 
 /** 写真ファイルに XMP メタデータが存在しない（正常系） */
-export class NoMetadataFound extends Data.TaggedError("NoMetadataFound")<{
+export class NoMetadataFound extends Data.TaggedError('NoMetadataFound')<{
   photoPath: string;
 }> {}
 
 /** XMP メタデータのパースに失敗した（正常系） */
-export class MetadataParseError extends Data.TaggedError("MetadataParseError")<{
+export class MetadataParseError extends Data.TaggedError('MetadataParseError')<{
   photoPath: string;
   message: string;
 }> {}
@@ -77,14 +77,18 @@ export class MetadataParseError extends Data.TaggedError("MetadataParseError")<{
 // extractMetadataFromPhoto は 3 種類のエラーを返しうる
 export const extractMetadataFromPhoto = (
   photoPath: string,
-): Effect.Effect<VRChatPhotoMetadata, MetadataDbError | NoMetadataFound | MetadataParseError> => {
+): Effect.Effect<
+  VRChatPhotoMetadata,
+  MetadataDbError | NoMetadataFound | MetadataParseError
+> => {
   return Effect.gen(function* () {
     const exifData = yield* Effect.tryPromise({
       try: () => readExif(photoPath),
-      catch: (e) => new MetadataDbError({
-        // message はデバッグ用（Sentry ログに出る）。ユーザーには見えない
-        message: `Failed to read EXIF: ${e instanceof Error ? e.message : String(e)}`,
-      }),
+      catch: (e) =>
+        new MetadataDbError({
+          // message はデバッグ用（Sentry ログに出る）。ユーザーには見えない
+          message: `Failed to read EXIF: ${e instanceof Error ? e.message : String(e)}`,
+        }),
     });
     return yield* parsePhotoMetadata(exifData, photoPath);
   });
@@ -96,12 +100,11 @@ export const getMetadataForPhoto = (
 ): Effect.Effect<VRChatPhotoMetadata | null, MetadataDbError> => {
   return Effect.tryPromise({
     try: () => getPhotoMetadataByPhotoPath(photoPath),
-    catch: (e) => new MetadataDbError({
-      message: `Failed to get metadata: ${e instanceof Error ? e.message : String(e)}`,
-    }),
-  }).pipe(
-    Effect.map((record) => record ? toMetadata(record) : null),
-  );
+    catch: (e) =>
+      new MetadataDbError({
+        message: `Failed to get metadata: ${e instanceof Error ? e.message : String(e)}`,
+      }),
+  }).pipe(Effect.map((record) => (record ? toMetadata(record) : null)));
 };
 ```
 
@@ -286,45 +289,45 @@ generateSharePreview: procedure
 
 ### silent error で `null` vs 空コレクション
 
-| 戻り値型 | silent error 時の戻り値 | 理由 |
-|---------|----------------------|------|
-| `T \| null` | `null` | 単一オブジェクト取得系 |
-| `T[]` | `[]` | リスト取得系（空リストは正常） |
-| `Map<K, V>` | `new Map()` | マップ取得系（空マップは正常） |
+| 戻り値型    | silent error 時の戻り値 | 理由                           |
+| ----------- | ----------------------- | ------------------------------ |
+| `T \| null` | `null`                  | 単一オブジェクト取得系         |
+| `T[]`       | `[]`                    | リスト取得系（空リストは正常） |
+| `Map<K, V>` | `new Map()`             | マップ取得系（空マップは正常） |
 
 コレクション型の場合は `null` ではなく空コレクションを返す。
 呼び出し側が `null` チェックなしで `.map()` や `.entries()` を呼べるようにする。
 
 ### 現在の `runEffectForTRPC` との比較
 
-| 観点 | 現在 (`runEffectForTRPC`) | 新 (`runEffect` + pipe) |
-|------|---------------------------|-------------------------|
-| エラーマッピング | 辞書オブジェクト（文字列キー） | `Effect.mapError`（型安全） |
-| silent error | `options.silentErrors` 配列 | `Effect.catchTag` → `succeed(null)` |
-| 型安全性 | ランタイムの文字列マッチ | コンパイル時の型チェック |
-| 網羅性 | 保証なし（default fallback） | 未処理エラーが型に残る |
-| throw | `runEffectForTRPC` 内で throw | `runEffect` 内で `TRPCError` として throw |
+| 観点             | 現在 (`runEffectForTRPC`)      | 新 (`runEffect` + pipe)                   |
+| ---------------- | ------------------------------ | ----------------------------------------- |
+| エラーマッピング | 辞書オブジェクト（文字列キー） | `Effect.mapError`（型安全）               |
+| silent error     | `options.silentErrors` 配列    | `Effect.catchTag` → `succeed(null)`       |
+| 型安全性         | ランタイムの文字列マッチ       | コンパイル時の型チェック                  |
+| 網羅性           | 保証なし（default fallback）   | 未処理エラーが型に残る                    |
+| throw            | `runEffectForTRPC` 内で throw  | `runEffect` 内で `TRPCError` として throw |
 
 ## 5. 廃止されるもの
 
-| ファイル/概念 | 理由 |
-|-------------|------|
-| `effectHelpers.ts` の `runEffectForTRPC` | 新 `runEffect` に置き換え |
-| `errorHelpers.ts` のマッピング辞書群 | `pipe` 内の `mapError` に置き換え |
-| `errorHelpers.ts` の `getErrorKey` | `_tag` で自動判別されるため不要 |
-| `silentErrors` 配列 | `catchTag` で明示的に処理 |
-| エラークラスの `code` フィールド | 1 クラス = 1 エラーなので不要 |
+| ファイル/概念                            | 理由                              |
+| ---------------------------------------- | --------------------------------- |
+| `effectHelpers.ts` の `runEffectForTRPC` | 新 `runEffect` に置き換え         |
+| `errorHelpers.ts` のマッピング辞書群     | `pipe` 内の `mapError` に置き換え |
+| `errorHelpers.ts` の `getErrorKey`       | `_tag` で自動判別されるため不要   |
+| `silentErrors` 配列                      | `catchTag` で明示的に処理         |
+| エラークラスの `code` フィールド         | 1 クラス = 1 エラーなので不要     |
 
 ## 6. 維持されるもの
 
-| コンポーネント | 理由 |
-|-------------|------|
-| `UserFacingError` クラス | ユーザー向けメッセージの構造体として有用 |
-| `ERROR_CODES` / `ERROR_CATEGORIES` | フロントエンドの `parseErrorFromTRPC` が依存 |
-| `findUserFacingError` (trpc.ts) | `TRPCError.cause` から発見可能なのでそのまま動く |
-| `logError` + Toast emit (trpc.ts) | `UserFacingError` の instanceof チェックで動作。変更不要 |
-| `parseErrorFromTRPC` (frontend) | 変更不要 |
-| Toast subscription | 変更不要 |
+| コンポーネント                     | 理由                                                     |
+| ---------------------------------- | -------------------------------------------------------- |
+| `UserFacingError` クラス           | ユーザー向けメッセージの構造体として有用                 |
+| `ERROR_CODES` / `ERROR_CATEGORIES` | フロントエンドの `parseErrorFromTRPC` が依存             |
+| `findUserFacingError` (trpc.ts)    | `TRPCError.cause` から発見可能なのでそのまま動く         |
+| `logError` + Toast emit (trpc.ts)  | `UserFacingError` の instanceof チェックで動作。変更不要 |
+| `parseErrorFromTRPC` (frontend)    | 変更不要                                                 |
+| Toast subscription                 | 変更不要                                                 |
 
 ## 7. エラーフロー図
 
@@ -362,13 +365,13 @@ Effect<T,                  .pipe(
 
 ### エラー種別と Sentry 送信の対応
 
-| エラー種別 | 例 | Sentry 送信 | 仕組み |
-|-----------|-----|-----------|--------|
-| **Defect（予期しない）** | 型エラー、メモリ不足 | **送信する** | `runEffect` が re-throw → `logger.error(Error)` → `captureException` |
-| **予期された + 重要** | DB 障害、ファイル書込失敗 | **送信する** | `mapError(e => UFE({ cause: e }))` → `logger.error(UFE with cause)` → cause を `captureException` |
-| **予期された + 軽微** | ファイル未検出、キャンセル | **送信しない** | `mapError(e => UFE({ cause: e }))` → `logger.error(UFE with cause)` → cause を送信。ただしビジネス判断で cause を省略可 |
-| **Silent（正常系）** | メタデータなし、パースエラー | **送信しない** | `catchTag → succeed(null)` → エラーにならない |
-| **監視対象の警告** | API レート制限、部分的失敗 | **warning で送信** | サービス内で `logger.warnWithSentry()` を直接呼ぶ |
+| エラー種別               | 例                           | Sentry 送信        | 仕組み                                                                                                                  |
+| ------------------------ | ---------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **Defect（予期しない）** | 型エラー、メモリ不足         | **送信する**       | `runEffect` が re-throw → `logger.error(Error)` → `captureException`                                                    |
+| **予期された + 重要**    | DB 障害、ファイル書込失敗    | **送信する**       | `mapError(e => UFE({ cause: e }))` → `logger.error(UFE with cause)` → cause を `captureException`                       |
+| **予期された + 軽微**    | ファイル未検出、キャンセル   | **送信しない**     | `mapError(e => UFE({ cause: e }))` → `logger.error(UFE with cause)` → cause を送信。ただしビジネス判断で cause を省略可 |
+| **Silent（正常系）**     | メタデータなし、パースエラー | **送信しない**     | `catchTag → succeed(null)` → エラーにならない                                                                           |
+| **監視対象の警告**       | API レート制限、部分的失敗   | **warning で送信** | サービス内で `logger.warnWithSentry()` を直接呼ぶ                                                                       |
 
 ### `cause` フィールドの判断基準
 
@@ -397,6 +400,7 @@ Effect.mapError((e) =>
 ```
 
 **ルール**:
+
 - DB エラー、ネットワークエラー、権限エラー → `cause: e`（Sentry 送信）
 - ファイル未検出、ユーザーキャンセル → `cause` 省略可（Sentry 不要）
 - 判断に迷ったら `cause: e` を付ける（過剰な送信は Sentry 側でフィルタ可能）
@@ -425,31 +429,31 @@ if (partialFailures.length > 0) {
 
 ### lint-effect.ts に追加するルール
 
-| ルール名 | 検出対象 | 重要度 | 検出方法 |
-|---------|---------|--------|---------|
-| `no-effect-fail-userfacingerror` | `Effect.fail(UserFacingError.withStructuredInfo(...))` | error | AST: `Effect.fail` の引数が `UserFacingError` のコンストラクタ呼び出し |
-| `no-throw-in-effect-gen` | `Effect.gen` 内での `throw UserFacingError` | error | AST: `Effect.gen` のジェネレータ関数内の throw 文で `UserFacingError` を検出 |
-| `no-legacy-error-class-code` | `class XxxError extends Error { code: ... }` パターン | error | AST: Error を extends するクラスに `code` プロパティがあるか（移行完了後に有効化） |
-| `require-cause-in-mapError` | `mapError` 内の `UserFacingError.withStructuredInfo` に `cause` なし | warning | AST: `Effect.mapError` コールバック内の `withStructuredInfo` 引数オブジェクトに `cause` プロパティがないか |
-| `no-mock-resolved-effect` | `mockResolvedValue(Effect.succeed(...))` | error | AST/テキスト: `mockResolvedValue` の引数に `Effect.succeed`/`Effect.fail` |
-| `no-neverthrow-import` | `from 'neverthrow'` | error | テキスト: 既存ルール（維持） |
-| `no-runEffectForTRPC` | `runEffectForTRPC` の使用 | error | テキスト: 移行完了後に有効化 |
+| ルール名                         | 検出対象                                                             | 重要度  | 検出方法                                                                                                   |
+| -------------------------------- | -------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------- |
+| `no-effect-fail-userfacingerror` | `Effect.fail(UserFacingError.withStructuredInfo(...))`               | error   | AST: `Effect.fail` の引数が `UserFacingError` のコンストラクタ呼び出し                                     |
+| `no-throw-in-effect-gen`         | `Effect.gen` 内での `throw UserFacingError`                          | error   | AST: `Effect.gen` のジェネレータ関数内の throw 文で `UserFacingError` を検出                               |
+| `no-legacy-error-class-code`     | `class XxxError extends Error { code: ... }` パターン                | error   | AST: Error を extends するクラスに `code` プロパティがあるか（移行完了後に有効化）                         |
+| `require-cause-in-mapError`      | `mapError` 内の `UserFacingError.withStructuredInfo` に `cause` なし | warning | AST: `Effect.mapError` コールバック内の `withStructuredInfo` 引数オブジェクトに `cause` プロパティがないか |
+| `no-mock-resolved-effect`        | `mockResolvedValue(Effect.succeed(...))`                             | error   | AST/テキスト: `mockResolvedValue` の引数に `Effect.succeed`/`Effect.fail`                                  |
+| `no-neverthrow-import`           | `from 'neverthrow'`                                                  | error   | テキスト: 既存ルール（維持）                                                                               |
+| `no-runEffectForTRPC`            | `runEffectForTRPC` の使用                                            | error   | テキスト: 移行完了後に有効化                                                                               |
 
 ### TypeScript 型システムで自動強制されるルール（lint 不要）
 
-| ルール | 強制方法 |
-|-------|---------|
-| `runEffect` は `Effect<T, UserFacingError>` のみ受け付ける | ジェネリクス型制約 |
-| `catchTag` で処理したエラーは型から消える | Effect の型推論 |
+| ルール                                                             | 強制方法                |
+| ------------------------------------------------------------------ | ----------------------- |
+| `runEffect` は `Effect<T, UserFacingError>` のみ受け付ける         | ジェネリクス型制約      |
+| `catchTag` で処理したエラーは型から消える                          | Effect の型推論         |
 | `mapError` 後に未処理エラーが残ると `runEffect` でコンパイルエラー | TypeScript の型チェック |
-| `Data.TaggedError` には `_tag` が自動付与される | Effect の型定義 |
+| `Data.TaggedError` には `_tag` が自動付与される                    | Effect の型定義         |
 
 ### Grit パターン（将来的に追加可能）
 
-| パターン名 | 検出対象 |
-|-----------|---------|
+| パターン名               | 検出対象                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
 | `effect_fail_userfacing` | `Effect.fail(new UserFacingError(...))` or `Effect.fail(UserFacingError.withStructuredInfo(...))` |
-| `effect_gen_throw` | generator function 内の `throw` 文 |
+| `effect_gen_throw`       | generator function 内の `throw` 文                                                                |
 
 ### 段階的な有効化
 
@@ -647,7 +651,9 @@ describe('runEffect', () => {
       const unexpectedError = new Error('memory exhausted');
 
       await expect(
-        runEffect(Effect.die(unexpectedError) as Effect.Effect<never, UserFacingError>),
+        runEffect(
+          Effect.die(unexpectedError) as Effect.Effect<never, UserFacingError>,
+        ),
       ).rejects.toBe(unexpectedError);
     });
   });
@@ -790,10 +796,10 @@ describe('getPhotoMetadata', () => {
 
 ### テストカバレッジの判断基準
 
-| テスト対象 | 必須テスト | 理由 |
-|-----------|-----------|------|
-| lint ルール | 正検出 + 偽陽性の非検出 | lint が壊れると設計ルールが崩れる |
-| `runEffect` | 成功/typed error/defect/interrupt | tRPC 境界の唯一の実行ポイント |
-| Sentry 送信パス | cause あり/なし/warnWithSentry | 監視の要。誤送信・未送信は致命的 |
-| サービス層 | エラー型の `_tag` 検証 | `catchTag` の前提条件 |
-| コントローラー層 | silent error + UserFacingError 変換 | ユーザー体験に直結 |
+| テスト対象       | 必須テスト                          | 理由                              |
+| ---------------- | ----------------------------------- | --------------------------------- |
+| lint ルール      | 正検出 + 偽陽性の非検出             | lint が壊れると設計ルールが崩れる |
+| `runEffect`      | 成功/typed error/defect/interrupt   | tRPC 境界の唯一の実行ポイント     |
+| Sentry 送信パス  | cause あり/なし/warnWithSentry      | 監視の要。誤送信・未送信は致命的  |
+| サービス層       | エラー型の `_tag` 検証              | `catchTag` の前提条件             |
+| コントローラー層 | silent error + UserFacingError 変換 | ユーザー体験に直結                |

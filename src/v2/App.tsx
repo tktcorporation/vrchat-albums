@@ -2,10 +2,12 @@ import type { Event, EventHint } from '@sentry/electron/main';
 import { init as initSentry } from '@sentry/electron/renderer';
 import { memo, useEffect, useState } from 'react';
 import { match } from 'ts-pattern';
+
 import { Toaster } from '@/components/ui/toaster';
 import { scrubEventData } from '@/lib/utils/masking';
 import { trpcClient, trpcReact } from '@/trpc';
 import { TrpcWrapper } from '@/trpcWrapper';
+
 import './App.css';
 import { ERROR_CATEGORIES, parseErrorFromTRPC } from './types/errors';
 
@@ -66,7 +68,7 @@ function AppContent() {
               // 開発環境でも規約同意をチェックする
               const currentTermsStatus =
                 await trpcClient.getTermsAccepted.query();
-              if (currentTermsStatus?.accepted !== true) {
+              if (!currentTermsStatus?.accepted) {
                 if (isDev) {
                   console.log(
                     'Sentry event dropped in renderer development mode due to terms not accepted.',

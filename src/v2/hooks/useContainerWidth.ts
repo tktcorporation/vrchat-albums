@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+
 import { toValidWidth, type ValidWidth } from '../types/validWidth';
 
 /**

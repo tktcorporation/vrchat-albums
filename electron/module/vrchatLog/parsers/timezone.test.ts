@@ -1,5 +1,6 @@
 import * as datefns from 'date-fns';
 import { describe, expect, it } from 'vitest';
+
 import { parseLogDateTime } from './baseParser';
 
 describe('タイムゾーン処理の検証', () => {

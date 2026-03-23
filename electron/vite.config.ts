@@ -1,5 +1,6 @@
 import { builtinModules } from 'node:module';
 import { join } from 'node:path';
+
 import { defineConfig } from 'vite';
 
 // Node.js の組み込みモジュールのリストを作成（'node:' プレフィックス付きと無しの両方）

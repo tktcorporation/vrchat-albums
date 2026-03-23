@@ -5,6 +5,7 @@ import { Effect, Exit } from 'effect';
 import { clipboard } from 'electron';
 import * as path from 'pathe';
 import z from 'zod';
+
 import { reloadMainWindow } from '../../../electronUtil';
 import { runEffect } from '../../../lib/effectTRPC';
 import {
@@ -13,13 +14,13 @@ import {
   UserFacingError,
 } from '../../../lib/errors';
 import * as exiftool from '../../../lib/wrappedExifTool';
-import { eventEmitter, procedure, router as trpcRouter } from './../../../trpc';
-import { DirectoryPathSchema } from './../../../valueObjects/index';
 import type {
   DownloadImageError,
   FileIOError,
   OpenPathFailed,
 } from '../errors';
+import { eventEmitter, procedure, router as trpcRouter } from './../../../trpc';
+import { DirectoryPathSchema } from './../../../valueObjects/index';
 import * as utilsService from './../service';
 
 /**

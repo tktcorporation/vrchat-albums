@@ -2,6 +2,7 @@ import { createTRPCProxyClient } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
 import superjson from 'superjson';
 import { ipcLink } from 'trpc-electron/renderer';
+
 import type { AppRouter } from '../electron/api';
 
 /**

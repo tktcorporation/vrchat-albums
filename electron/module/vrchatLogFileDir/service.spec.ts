@@ -1,6 +1,8 @@
 import path from 'node:path';
+
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
+
 import { type getSettingStore, initSettingStoreForTest } from '../settingStore';
 import { getValidVRChatLogFileDir } from './service';
 

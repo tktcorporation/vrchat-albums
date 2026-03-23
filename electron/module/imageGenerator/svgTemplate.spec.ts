@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { generatePreviewSvg } from './svgTemplate';
 
 describe('generatePreviewSvg', () => {

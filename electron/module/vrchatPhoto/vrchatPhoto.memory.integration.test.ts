@@ -14,6 +14,7 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
 import { Transformer } from '@napi-rs/image';
 import {
   afterAll,
@@ -25,6 +26,7 @@ import {
   it,
   vi,
 } from 'vitest';
+
 import * as client from '../../lib/sequelize';
 import {
   type getSettingStore,
@@ -216,9 +218,8 @@ describe('写真インデックス作成のメモリプロファイリング', (
 
   it('createVRChatPhotoPathIndex のメモリ使用量を計測', async () => {
     // サービス関数を動的インポート
-    const { createVRChatPhotoPathIndex, getVRChatPhotoDirPath } = await import(
-      './vrchatPhoto.service'
-    );
+    const { createVRChatPhotoPathIndex, getVRChatPhotoDirPath } =
+      await import('./vrchatPhoto.service');
 
     // 前回のスキャン状態をクリア（初回起動をシミュレート）
     photoFolderScanStates = {};

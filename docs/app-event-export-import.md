@@ -7,12 +7,14 @@ This document describes the planned enhancement for supporting VRChat applicatio
 ## Supported Log Patterns
 
 ### Currently Implemented
+
 1. **World Join**: `[Behaviour] Joining `
 2. **Player Join**: `[Behaviour] OnPlayerJoined `
 3. **Player Leave**: `[Behaviour] OnPlayerLeft `
 4. **App Exit** (partial): `VRCApplication: HandleApplicationQuit` - Detected as world leave event
 
 ### TODO: Future Implementation
+
 1. **App Start Events**
    - Pattern: `VRC Analytics Initialized`
    - Status: TODO - Parser returns null
@@ -34,16 +36,19 @@ This document describes the planned enhancement for supporting VRChat applicatio
 ## Current Implementation
 
 ### Pattern Management
+
 - Centralized pattern definitions in `/electron/module/vrchatLog/constants/logPatterns.ts`
 - All filter patterns are defined in one place to ensure consistency
 - Pattern handling status is tracked via TypeScript types
 
 ### World Leave Detection
+
 - `VRCApplication: HandleApplicationQuit` is detected by `worldLeaveParser`
 - Treated as an application quit reason for world leave
 - Uses ts-pattern for type-safe pattern matching
 
 ### Export/Import Process
+
 - Export: Currently exports world joins, player joins, and player leaves
 - Import: Parses supported patterns and stores them in the database
 - App events (start/version) are filtered but not processed (TODO)

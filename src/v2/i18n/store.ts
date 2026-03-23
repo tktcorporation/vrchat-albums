@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+
 import en from './locales/en';
 import ja from './locales/ja';
 import type { Language, TranslationKey, Translations } from './types';

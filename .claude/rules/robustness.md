@@ -10,12 +10,12 @@
 
 **テストで正しさを検証するのではなく、設計によって正しさを保証する。**
 
-| アプローチ | 説明 | 優先度 |
-|-----------|------|--------|
-| 型による保証 | コンパイル時に不正な状態を検出 | 最優先 |
-| 静的解析 | linterやTypeScriptの厳格な設定で問題を早期発見 | 高 |
-| ランタイム検証 | Zodによる境界でのバリデーション | 中 |
-| テスト | 上記で保証できない振る舞いの検証 | 補完的 |
+| アプローチ     | 説明                                           | 優先度 |
+| -------------- | ---------------------------------------------- | ------ |
+| 型による保証   | コンパイル時に不正な状態を検出                 | 最優先 |
+| 静的解析       | linterやTypeScriptの厳格な設定で問題を早期発見 | 高     |
+| ランタイム検証 | Zodによる境界でのバリデーション                | 中     |
+| テスト         | 上記で保証できない振る舞いの検証               | 補完的 |
 
 ```
 「動かないコードは書けない」設計 > 「動かないコードを見つける」テスト
@@ -60,12 +60,14 @@ match(result)
 ```
 
 **使用すべき場面**:
+
 - Union型の分岐処理
 - エラーハンドリング
 - 状態遷移の処理
 - 複数条件の組み合わせ判定
 
 **例外（通常のif文でよい場合）**:
+
 - 単純なboolean判定（`if (isLoading)`）
 - null/undefinedチェックのみ
 
@@ -102,6 +104,7 @@ const safeParseUser = (input: unknown): Result<User, ValidationError> => {
 ```
 
 **使用すべき場面**:
+
 - API境界（tRPCのinput/output）
 - ファイル読み込み後のデータ検証
 - 設定ファイルのパース
@@ -130,6 +133,7 @@ getPhoto(userId);   // ❌ コンパイルエラー！
 ```
 
 **使用すべき場面**:
+
 - ID型（UserId, PhotoId, WorldId など）
 - パス型（絶対パス、相対パス）
 - 検証済みの値（ValidatedEmail, NormalizedPath など）
@@ -141,16 +145,16 @@ getPhoto(userId);   // ❌ コンパイルエラー！
 ```typescript
 // 型のみをエクスポート
 class MyValueObject extends BaseValueObject<'MyValueObject', string> {}
-export type { MyValueObject };  // ✅ 型のみ
+export type { MyValueObject }; // ✅ 型のみ
 
 // Zodスキーマ経由でインスタンス生成
-export const MyValueObjectSchema = z.string().transform(
-  (val) => new MyValueObject(val)
-);
+export const MyValueObjectSchema = z
+  .string()
+  .transform((val) => new MyValueObject(val));
 
 // 使用側
-const obj = MyValueObjectSchema.parse(value);  // ✅ 正しい
-const obj = new MyValueObject(value);          // ❌ 直接newは禁止
+const obj = MyValueObjectSchema.parse(value); // ✅ 正しい
+const obj = new MyValueObject(value); // ❌ 直接newは禁止
 ```
 
 ---
@@ -175,11 +179,11 @@ const obj = new MyValueObject(value);          // ❌ 直接newは禁止
 
 ### カスタムlinterの活用
 
-| コマンド | 目的 |
-|---------|------|
-| `pnpm lint:neverthrow` | Result型の正しい使用を検証 |
+| コマンド                 | 目的                            |
+| ------------------------ | ------------------------------- |
+| `pnpm lint:neverthrow`   | Result型の正しい使用を検証      |
 | `pnpm lint:valueobjects` | ValueObjectパターンの遵守を検証 |
-| `pnpm lint:ts-pattern` | ts-patternの適切な使用を検証 |
+| `pnpm lint:ts-pattern`   | ts-patternの適切な使用を検証    |
 
 ---
 
@@ -255,13 +259,13 @@ function processUser(user: User | null): Result<ProcessedUser, Error> {
 
 堅牢性とシンプルさがトレードオフになる場合の判断基準:
 
-| 状況 | 推奨アプローチ |
-|------|---------------|
-| 外部入力（API、ファイル） | 堅牢性優先（Zod必須） |
-| 内部のドメインロジック | 型による保証 + ts-pattern |
-| ID型の混同リスク | Branded Types |
-| 状態遷移 | Union型 + exhaustive matching |
-| 単純なユーティリティ | シンプルさ優先 |
+| 状況                      | 推奨アプローチ                |
+| ------------------------- | ----------------------------- |
+| 外部入力（API、ファイル） | 堅牢性優先（Zod必須）         |
+| 内部のドメインロジック    | 型による保証 + ts-pattern     |
+| ID型の混同リスク          | Branded Types                 |
+| 状態遷移                  | Union型 + exhaustive matching |
+| 単純なユーティリティ      | シンプルさ優先                |
 
 ---
 

@@ -27,9 +27,10 @@ pnpm changeset
 ```
 
 形式:
+
 ```markdown
 ---
-"vrchat-albums": minor
+'vrchat-albums': minor
 ---
 
 変更の説明

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createRequire } from 'node:module';
+
 import consola from 'consola';
 
 const require = createRequire(import.meta.url);

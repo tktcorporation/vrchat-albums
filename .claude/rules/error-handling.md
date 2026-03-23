@@ -12,12 +12,12 @@
 
 代わりに、以下の組み合わせでエラーハンドリングを行います:
 
-| 状況 | 使用するパターン |
-|------|-----------------|
-| 同期処理でエラーが発生しうる | `Effect.try()` |
-| 非同期処理でエラーが発生しうる | `Effect.tryPromise()` |
-| Effect のエラーを分岐処理 | `Effect.match` または ts-pattern |
-| 複数の Effect を連結 | `.pipe(Effect.flatMap())`, `.pipe(Effect.map())` |
+| 状況                           | 使用するパターン                                 |
+| ------------------------------ | ------------------------------------------------ |
+| 同期処理でエラーが発生しうる   | `Effect.try()`                                   |
+| 非同期処理でエラーが発生しうる | `Effect.tryPromise()`                            |
+| Effect のエラーを分岐処理      | `Effect.match` または ts-pattern                 |
+| 複数の Effect を連結           | `.pipe(Effect.flatMap())`, `.pipe(Effect.map())` |
 
 ```typescript
 // ✅ 推奨: Effect TS + ts-pattern
@@ -34,7 +34,7 @@ const safeParse = (input: string) =>
 // 非同期処理
 const fetchData = (url: string) =>
   Effect.tryPromise({
-    try: () => fetch(url).then(r => r.json()),
+    try: () => fetch(url).then((r) => r.json()),
     catch: (e): FetchError => ({ type: 'FETCH_ERROR', message: String(e) }),
   });
 
@@ -46,7 +46,7 @@ const program = fetchData('/api/data').pipe(
       match(error)
         .with({ type: 'FETCH_ERROR' }, (e) => showRetryDialog(e))
         .exhaustive(),
-  })
+  }),
 );
 await Effect.runPromise(program);
 ```
@@ -67,7 +67,9 @@ try {
 } catch (error) {
   return match(error)
     .with({ code: 'ETIMEDOUT' }, () => Effect.fail({ type: 'TIMEOUT' }))
-    .otherwise((e) => { throw e; }); // 予期しないエラーは再スロー
+    .otherwise((e) => {
+      throw e;
+    }); // 予期しないエラーは再スロー
 } finally {
   await resource?.release();
 }
@@ -77,10 +79,10 @@ try {
 
 ### Effect TS の使い分け
 
-| エラー種別 | 処理方法 | 理由 |
-|-----------|---------|------|
-| 予期されたエラー | `Effect.Effect<T, E>` で返す | ユーザーが対処可能、呼び出し側でハンドリング |
-| 予期しないエラー | `throw` で再スロー（または Effect の defect として扱う） | Sentryで検知してバグを追跡 |
+| エラー種別       | 処理方法                                                 | 理由                                         |
+| ---------------- | -------------------------------------------------------- | -------------------------------------------- |
+| 予期されたエラー | `Effect.Effect<T, E>` で返す                             | ユーザーが対処可能、呼び出し側でハンドリング |
+| 予期しないエラー | `throw` で再スロー（または Effect の defect として扱う） | Sentryで検知してバグを追跡                   |
 
 ### 予期されたエラーの例
 
@@ -210,10 +212,10 @@ try {
 } catch (error) {
   return match(error)
     .with({ code: 'ENOENT' }, (e) =>
-      Effect.fail({ type: 'FILE_NOT_FOUND', path: e.path })
+      Effect.fail({ type: 'FILE_NOT_FOUND', path: e.path }),
     )
     .with({ code: 'EACCES' }, (e) =>
-      Effect.fail({ type: 'PERMISSION_DENIED', path: e.path })
+      Effect.fail({ type: 'PERMISSION_DENIED', path: e.path }),
     )
     .otherwise((e) => {
       // ✅ 予期しないエラーは再スロー（Sentryに送信される）
@@ -237,10 +239,10 @@ try {
 } catch (error) {
   return match(error)
     .with({ code: 'ENOENT' }, (e) =>
-      Effect.fail({ type: 'FILE_NOT_FOUND', path: e.path })
+      Effect.fail({ type: 'FILE_NOT_FOUND', path: e.path }),
     )
     .with({ code: 'EACCES' }, (e) =>
-      Effect.fail({ type: 'PERMISSION_DENIED', path: e.path })
+      Effect.fail({ type: 'PERMISSION_DENIED', path: e.path }),
     )
     .otherwise((e) => {
       // 予期しないエラーは再スロー
@@ -260,14 +262,20 @@ import { Effect } from 'effect';
 const safeParse = (str: string) =>
   Effect.try({
     try: () => JSON.parse(str),
-    catch: (error): ParseError => ({ type: 'PARSE_ERROR', message: String(error) }),
+    catch: (error): ParseError => ({
+      type: 'PARSE_ERROR',
+      message: String(error),
+    }),
   });
 
 // 非同期関数の場合
 function fetchData(url: string): Effect.Effect<Data, FetchError> {
   return Effect.tryPromise({
-    try: () => fetch(url).then(r => r.json()),
-    catch: (error): FetchError => ({ type: 'FETCH_ERROR', message: String(error) }),
+    try: () => fetch(url).then((r) => r.json()),
+    catch: (error): FetchError => ({
+      type: 'FETCH_ERROR',
+      message: String(error),
+    }),
   });
 }
 ```
@@ -281,7 +289,7 @@ import { Effect, pipe } from 'effect';
 const program = pipe(
   fetchData('/api/user'),
   Effect.flatMap((user) => fetchData(`/api/user/${user.id}/photos`)),
-  Effect.map((photos) => photos.filter(p => p.isPublic)),
+  Effect.map((photos) => photos.filter((p) => p.isPublic)),
   Effect.mapError((error) => ({ ...error, context: 'photo-loading' })),
 );
 ```
@@ -301,20 +309,20 @@ openFile: procedure.input(z.string()).mutation(async (ctx) => {
 
 ## レイヤー別の責務
 
-| レイヤー | 責務 | 使用パターン |
-|---------|------|-------------|
-| Service | エラー分類、予期されたエラーの返却 | `Effect.Effect<T, E>` |
-| tRPC | Effect→UserFacingError変換 | `runEffectForTRPC()` |
-| Frontend | ユーザー向けメッセージ表示 | Toast + `parseErrorFromTRPC()` |
+| レイヤー | 責務                               | 使用パターン                   |
+| -------- | ---------------------------------- | ------------------------------ |
+| Service  | エラー分類、予期されたエラーの返却 | `Effect.Effect<T, E>`          |
+| tRPC     | Effect→UserFacingError変換         | `runEffectForTRPC()`           |
+| Frontend | ユーザー向けメッセージ表示         | Toast + `parseErrorFromTRPC()` |
 
 ---
 
 ## 関連リンター
 
-| コマンド | 説明 |
-|---------|------|
-| `pnpm lint:effect` | Effect型強制、エラーハンドリングパターン検出 |
-| `pnpm lint:ts-pattern` | ts-patternの適切な使用をチェック |
+| コマンド               | 説明                                         |
+| ---------------------- | -------------------------------------------- |
+| `pnpm lint:effect`     | Effect型強制、エラーハンドリングパターン検出 |
+| `pnpm lint:ts-pattern` | ts-patternの適切な使用をチェック             |
 
 ### 設定ファイル
 

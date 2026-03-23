@@ -30,10 +30,7 @@ pnpm lint
       "path": "electron/module/**/service.ts",
       "enforceResult": true,
       "apply": "async-functions",
-      "exceptions": [
-        "getAppVersion",
-        "clearMigrationCache"
-      ]
+      "exceptions": ["getAppVersion", "clearMigrationCache"]
     }
   ]
 }
@@ -42,13 +39,16 @@ pnpm lint
 ### 設定オプション
 
 #### `path`
+
 リンターが検査する対象ファイルのglobパターン。
 
 例：
+
 - `electron/module/**/service.ts` - すべてのサービスファイル
 - `electron/module/logInfo/*.ts` - logInfoモジュール内のすべてのTSファイル
 
 #### `apply`
+
 どの関数を検査対象にするかを指定：
 
 - `"async-functions"` - 非同期関数（`async`キーワードまたは`Promise`を返す関数）のみ
@@ -58,9 +58,11 @@ pnpm lint
 推奨：`"async-functions"`（エラーハンドリングが必要なのは主に非同期処理のため）
 
 #### `exceptions`
+
 検査から除外する関数名のリスト。
 
 例外を追加すべきケース：
+
 - 戻り値が単純な値で、エラーが発生しない関数（例：`getAppVersion`）
 - void を返す副作用のみの関数（例：`clearMigrationCache`）
 - サードパーティAPIの型に合わせる必要がある関数
@@ -77,6 +79,7 @@ pnpm lint
 ### なぜこれが重要なのか？
 
 全てのエラーをneverthrowでラップすると：
+
 - 予期しないエラーがユーザーに静かに返される
 - Sentryに送信されず、バグの検知が遅れる
 - デバッグが困難になる
@@ -225,7 +228,7 @@ try {
   return err(
     match(error)
       .with(P.instanceOf(Error), (err) => err)
-      .otherwise(() => new Error('Unknown error'))
+      .otherwise(() => new Error('Unknown error')),
   );
 }
 ```
@@ -240,10 +243,10 @@ try {
 } catch (error) {
   return match(error)
     .with({ code: 'ENOENT' }, (e) =>
-      err({ type: 'FILE_NOT_FOUND', message: e.message })
+      err({ type: 'FILE_NOT_FOUND', message: e.message }),
     )
     .with({ code: 'EACCES' }, (e) =>
-      err({ type: 'PERMISSION_DENIED', message: e.message })
+      err({ type: 'PERMISSION_DENIED', message: e.message }),
     )
     .otherwise((e) => {
       // 予期しないエラーはre-throw
@@ -318,7 +321,7 @@ function parseJsonBad(str: string): Result<Data, ParseError> {
 // ✅ fromThrowable パターン
 const safeParse = fromThrowable(
   (str: string) => JSON.parse(str),
-  (error): ParseError => ({ type: 'PARSE_ERROR', message: String(error) })
+  (error): ParseError => ({ type: 'PARSE_ERROR', message: String(error) }),
 );
 
 function parseJsonGood(str: string): Result<Data, ParseError> {
@@ -344,8 +347,8 @@ async function fetchDataBad(url: string): Promise<Result<Data, FetchError>> {
 // ✅ ResultAsync.fromPromise パターン
 function fetchDataGood(url: string): ResultAsync<Data, FetchError> {
   return ResultAsync.fromPromise(
-    fetch(url).then(r => r.json()),
-    (error): FetchError => ({ type: 'FETCH_ERROR', message: String(error) })
+    fetch(url).then((r) => r.json()),
+    (error): FetchError => ({ type: 'FETCH_ERROR', message: String(error) }),
   );
 }
 ```
@@ -380,18 +383,14 @@ async function processWithCleanup(): Promise<Result<Data, ProcessError>> {
 import { match } from 'ts-pattern';
 
 async function readFileWithClassification(
-  path: string
+  path: string,
 ): Promise<Result<string, FileError>> {
   try {
     return ok(await fs.readFile(path, 'utf-8'));
   } catch (error) {
     return match(error)
-      .with({ code: 'ENOENT' }, () =>
-        err({ type: 'FILE_NOT_FOUND', path })
-      )
-      .with({ code: 'EACCES' }, () =>
-        err({ type: 'PERMISSION_DENIED', path })
-      )
+      .with({ code: 'ENOENT' }, () => err({ type: 'FILE_NOT_FOUND', path }))
+      .with({ code: 'EACCES' }, () => err({ type: 'PERMISSION_DENIED', path }))
       .otherwise((e) => {
         throw e; // 予期しないエラーは再スロー
       });
@@ -431,14 +430,14 @@ function getLogPath(): string {
 }
 ```
 
-| オプション | デフォルト | 説明 |
-|-----------|----------|------|
-| `enabled` | `false` | 警告を有効にするか |
-| `path` | - | 対象ファイルのglobパターン |
-| `allowWithFinally` | `true` | `finally` ブロックがある場合はスキップ |
-| `allowInsideFromPromise` | `true` | `ResultAsync.fromPromise()` 内はスキップ |
-| `allowWithRethrow` | `true` | 適切な再スローがある場合はスキップ |
-| `allowElectronEnvDetection` | `true` | `require('electron')` を含む環境検出パターンはスキップ |
+| オプション                  | デフォルト | 説明                                                   |
+| --------------------------- | ---------- | ------------------------------------------------------ |
+| `enabled`                   | `false`    | 警告を有効にするか                                     |
+| `path`                      | -          | 対象ファイルのglobパターン                             |
+| `allowWithFinally`          | `true`     | `finally` ブロックがある場合はスキップ                 |
+| `allowInsideFromPromise`    | `true`     | `ResultAsync.fromPromise()` 内はスキップ               |
+| `allowWithRethrow`          | `true`     | 適切な再スローがある場合はスキップ                     |
+| `allowElectronEnvDetection` | `true`     | `require('electron')` を含む環境検出パターンはスキップ |
 
 ## 汎用Errorタイプ警告 {#generic-error-warning}
 
@@ -457,7 +456,10 @@ export function readFile(): Result<string, Error> {
 }
 
 // ❌ Bad: UNEXPECTEDタイプ
-export function process(): Result<void, { type: 'UNEXPECTED'; message: string }> {
+export function process(): Result<
+  void,
+  { type: 'UNEXPECTED'; message: string }
+> {
   if (shouldFail) {
     return err({ type: 'UNEXPECTED', message: 'エラー' });
   }
@@ -485,8 +487,14 @@ export function readFile(path: string): Result<string, ReadFileError> {
 // ✅ Good: エラーメッセージヘルパー関数
 export const getReadFileErrorMessage = (error: ReadFileError): string =>
   match(error)
-    .with({ type: 'FILE_NOT_FOUND' }, (e) => `ファイルが見つかりません: ${e.path}`)
-    .with({ type: 'PERMISSION_DENIED' }, (e) => `アクセスが拒否されました: ${e.path}`)
+    .with(
+      { type: 'FILE_NOT_FOUND' },
+      (e) => `ファイルが見つかりません: ${e.path}`,
+    )
+    .with(
+      { type: 'PERMISSION_DENIED' },
+      (e) => `アクセスが拒否されました: ${e.path}`,
+    )
     .exhaustive();
 ```
 
@@ -501,10 +509,10 @@ export const getReadFileErrorMessage = (error: ReadFileError): string =>
 }
 ```
 
-| オプション | デフォルト | 説明 |
-|-----------|----------|------|
-| `enabled` | `false` | 警告を有効にするか |
-| `path` | - | 対象ファイルのglobパターン |
+| オプション | デフォルト | 説明                       |
+| ---------- | ---------- | -------------------------- |
+| `enabled`  | `false`    | 警告を有効にするか         |
+| `path`     | -          | 対象ファイルのglobパターン |
 
 ## テスト
 

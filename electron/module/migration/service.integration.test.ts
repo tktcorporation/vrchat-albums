@@ -2,9 +2,11 @@ import * as nodeFs from 'node:fs';
 import * as nodeFsPromises from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
+
 import { Effect } from 'effect';
 import { app } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { importService } from '../vrchatLog/importService/importService';
 import * as migrationService from './service';
 
@@ -222,9 +224,8 @@ describe('migration service integration', () => {
       );
 
       // Mock import failure with specific ImportError type
-      const { ImportDbSyncFailed } = await import(
-        '../vrchatLog/importService/errors'
-      );
+      const { ImportDbSyncFailed } =
+        await import('../vrchatLog/importService/errors');
       vi.mocked(importService.importLogStoreFiles).mockReturnValue(
         Effect.fail(new ImportDbSyncFailed({ message: 'Import failed' })),
       );
@@ -338,9 +339,8 @@ describe('migration service integration', () => {
       await nodeFsPromises.mkdir(logStorePath, { recursive: true });
 
       // Mock import failure with specific ImportError type
-      const { ImportDbSyncFailed } = await import(
-        '../vrchatLog/importService/errors'
-      );
+      const { ImportDbSyncFailed } =
+        await import('../vrchatLog/importService/errors');
       vi.mocked(importService.importLogStoreFiles).mockReturnValue(
         Effect.fail(new ImportDbSyncFailed({ message: 'Critical failure' })),
       );

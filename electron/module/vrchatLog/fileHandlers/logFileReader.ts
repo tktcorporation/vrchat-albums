@@ -1,7 +1,9 @@
 import * as nodeFs from 'node:fs';
 import readline from 'node:readline';
+
 import { Cause, Effect, Option } from 'effect';
 import { match, P } from 'ts-pattern';
+
 import { logger } from '../../../lib/logger';
 import * as fs from '../../../lib/wrappedFs';
 import type { VRChatLogFilePath } from '../../vrchatLogFileDir/model';

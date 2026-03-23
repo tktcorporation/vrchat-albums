@@ -1,6 +1,6 @@
-import type * as nodeFs from 'node:fs';
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import * as fs from '../../lib/wrappedFs';
 import { appendLoglinesToFile } from './fileHandlers/logStorageManager';
 import { VRChatLogLineSchema } from './model';
@@ -41,7 +41,7 @@ vi.mock('../../lib/wrappedFs', () => {
 });
 
 vi.mock('node:fs', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof nodeFs;
+  const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
     statSync: vi.fn().mockReturnValue({ size: 100 }), // 小さいサイズを返す

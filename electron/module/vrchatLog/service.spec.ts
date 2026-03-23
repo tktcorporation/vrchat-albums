@@ -1,5 +1,6 @@
 import { Effect, Exit } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import * as fs from '../../lib/wrappedFs';
 import { VRChatLogLineSchema } from './model';
 import * as service from './service';

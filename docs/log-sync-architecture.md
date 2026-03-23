@@ -15,18 +15,21 @@
 3. **キャッシュ無効化**: tRPCクエリキャッシュを無効化し、UIを最新データで更新
 
 この順序が重要な理由：
+
 - 1→2→3の順で処理しないと、新しいワールド参加ログがDBに保存されず、新しい写真が古いワールドグループに誤って割り当てられます。
 
 ## 同期モード
 
 ### FULL（全件処理）
+
 - **使用場面**: 初回起動時、設定画面からの手動更新時
 - **処理内容**: すべてのログファイルを処理し、過去のデータも含めて完全に同期
-- **パラメータ**: 
+- **パラメータ**:
   - `processAll: true`
   - `excludeOldLogLoad: false`
 
 ### INCREMENTAL（差分処理）
+
 - **使用場面**: 通常の更新時、バックグラウンド更新時
 - **処理内容**: 最新のログのみを処理し、パフォーマンスを向上
 - **パラメータ**:
@@ -60,7 +63,11 @@ await syncLogs(LOG_SYNC_MODE.INCREMENTAL);
 ### バックエンド（Electron）
 
 ```typescript
-import { syncLogs, syncLogsInBackground, LOG_SYNC_MODE } from './module/logSync/service';
+import {
+  syncLogs,
+  syncLogsInBackground,
+  LOG_SYNC_MODE,
+} from './module/logSync/service';
 
 // 明示的な同期
 const result = await syncLogs(LOG_SYNC_MODE.FULL);
@@ -72,16 +79,19 @@ const result = await syncLogsInBackground();
 ## 使用箇所
 
 ### 1. PathSettings.tsx（設定画面）
+
 - **モード**: FULL
 - **トリガー**: 「全データ再読み込み」ボタン
 - **理由**: 設定変更後は完全な再同期が必要
 
 ### 2. PhotoGallery/Header.tsx（ギャラリーヘッダー）
+
 - **モード**: INCREMENTAL
 - **トリガー**: リフレッシュボタン
 - **理由**: 通常の更新では最新データのみで十分
 
 ### 3. useStartUpStage.ts（起動処理）
+
 - **モード**: 動的判定
   - 初回起動時（既存ログ0件 or DBエラー）: FULL
   - 通常起動時（既存ログあり）: INCREMENTAL
@@ -89,6 +99,7 @@ const result = await syncLogsInBackground();
 - **判定ロジック**: 既存のワールド参加ログの件数で初回起動を判定
 
 ### 4. electronUtil.ts（バックグラウンド処理）
+
 - **モード**: INCREMENTAL（自動）
 - **トリガー**: 6時間間隔のタイマー
 - **理由**: バックグラウンドでは最新データのみを効率的に処理
@@ -96,9 +107,10 @@ const result = await syncLogsInBackground();
 ## tRPCエンドポイント
 
 ### 統一エンドポイント
+
 ```typescript
 // 新しい統一エンドポイント
-trpcReact.logSync.syncLogs.useMutation()
+trpcReact.logSync.syncLogs.useMutation();
 
 // 使用例
 const mutation = trpcReact.logSync.syncLogs.useMutation({
@@ -114,10 +126,11 @@ await mutation.mutateAsync({ mode: 'FULL' });
 ```
 
 ### 従来のエンドポイント（非推奨）
+
 ```typescript
 // 個別エンドポイント（可能な限り使用を避ける）
-trpcReact.vrchatLog.appendLoglinesToFileFromLogFilePathList.useMutation()
-trpcReact.logInfo.loadLogInfoIndex.useMutation()
+trpcReact.vrchatLog.appendLoglinesToFileFromLogFilePathList.useMutation();
+trpcReact.logInfo.loadLogInfoIndex.useMutation();
 ```
 
 ## クエリ無効化
@@ -157,11 +170,12 @@ const { sync } = useLogSync({
 
 ```typescript
 // ❌ 従来のパターン
-const appendMutation = trpcReact.vrchatLog.appendLoglinesToFileFromLogFilePathList.useMutation({
-  onSuccess: () => {
-    loadInfoMutation.mutate({ excludeOldLogLoad: true });
-  },
-});
+const appendMutation =
+  trpcReact.vrchatLog.appendLoglinesToFileFromLogFilePathList.useMutation({
+    onSuccess: () => {
+      loadInfoMutation.mutate({ excludeOldLogLoad: true });
+    },
+  });
 const loadInfoMutation = trpcReact.logInfo.loadLogInfoIndex.useMutation({
   onSuccess: () => {
     invalidatePhotoGalleryQueries(utils);
@@ -179,9 +193,10 @@ const { sync } = useLogSync({
 ## 初回起動判定ロジック
 
 ### 判定基準
+
 ```typescript
 // 既存のワールド参加ログ件数で判定
-const { data: existingLogCount, isError: isLogCountError } = 
+const { data: existingLogCount, isError: isLogCountError } =
   trpcReact.vrchatWorldJoinLog.getVRChatWorldJoinLogList.useQuery();
 
 const isFirstLaunch = isLogCountError || (existingLogCount ?? 0) === 0;
@@ -189,10 +204,12 @@ const syncMode = isFirstLaunch ? LOG_SYNC_MODE.FULL : LOG_SYNC_MODE.INCREMENTAL;
 ```
 
 ### 判定結果
+
 - **FULL（全件処理）**: DBエラー時 OR 既存ログ0件の場合
 - **INCREMENTAL（差分処理）**: 既存ログが1件以上ある場合
 
 ### キャッシュ戦略
+
 ```typescript
 // 初回起動判定クエリ
 {

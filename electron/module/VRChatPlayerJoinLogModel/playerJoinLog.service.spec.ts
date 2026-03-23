@@ -1,6 +1,7 @@
 import * as datefns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
 import * as client from '../../lib/sequelize';
 import { VRChatPlayerNameSchema } from '../vrchatLog/model';
 import * as service from './playerJoinLog.service';

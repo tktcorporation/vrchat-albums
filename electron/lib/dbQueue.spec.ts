@@ -8,6 +8,7 @@ import {
   it,
   vi,
 } from 'vitest';
+
 import DBQueue, { getDBQueue, resetDBQueue } from './dbQueue';
 import {
   __cleanupTestRDBClient,

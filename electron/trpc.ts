@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events';
-import { initTRPC, TRPCError } from '@trpc/server';
 
+import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 import { match, P } from 'ts-pattern';
 import type { ZodError } from 'zod';
+
 import { UserFacingError } from './lib/errors';
 import { logger } from './lib/logger';
 import * as settingService from './module/settings/service';

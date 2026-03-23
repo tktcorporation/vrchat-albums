@@ -8,11 +8,12 @@ import {
   Share2,
   Users,
 } from 'lucide-react';
-import type { ReactPortal } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+
 import { Badge } from '@/components/ui/badge';
 import { trpcReact } from '@/trpc';
+
 import { ICON_SIZE, SPACING, TEXT_COLOR } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import {
@@ -394,7 +395,7 @@ export const LocationGroupHeader = ({
                         )}
                       </div>
                       {players &&
-                        (createPortal(
+                        createPortal(
                           <div
                             style={{
                               position: 'fixed',
@@ -418,7 +419,7 @@ export const LocationGroupHeader = ({
                             </div>
                           </div>,
                           document.body,
-                        ) as ReactPortal)}
+                        )}
                     </div>
                     <Copy
                       className={`${ICON_SIZE.sm.class} ml-2 text-gray-800 dark:text-white group-hover/players:text-gray-200 transition-colors flex-shrink-0`}

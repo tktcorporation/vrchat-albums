@@ -4,6 +4,7 @@
  */
 
 import type { TRPCClientError } from '@trpc/client';
+
 import type { AppRouter } from '../../../electron/api';
 import type { ErrorCategory, ErrorCode } from './errorConstants';
 

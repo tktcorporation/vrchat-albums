@@ -30,7 +30,7 @@ export class VRChatLogFileError extends Error {
     const result = match(codeOrError)
       .with(P.string, (code) => ({
         message: code,
-        code: code as Code,
+        code: code,
         stack: undefined,
       }))
       .with(P.instanceOf(Error), (error) => ({
@@ -40,7 +40,7 @@ export class VRChatLogFileError extends Error {
       }))
       .with({ code: P.string }, (obj) => ({
         message: obj.message || obj.code,
-        code: obj.code as Code,
+        code: obj.code,
         stack: undefined,
       }))
       .otherwise(() => ({

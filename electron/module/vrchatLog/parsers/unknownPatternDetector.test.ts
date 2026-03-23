@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { VRChatLogLine } from '../model';
 import {
   _resetReportedSkeletons,

@@ -1,4 +1,5 @@
 import * as datefns from 'date-fns';
+
 import type { VRChatLogLine } from '../model';
 
 /**

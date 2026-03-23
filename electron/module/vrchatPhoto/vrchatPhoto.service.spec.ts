@@ -1,7 +1,9 @@
 import * as fsPromises from 'node:fs/promises';
+
 import { Transformer } from '@napi-rs/image';
 import { Cause, Effect, Exit, Option } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
   cleanupThumbnailCache,
   getVRChatPhotoItemData,

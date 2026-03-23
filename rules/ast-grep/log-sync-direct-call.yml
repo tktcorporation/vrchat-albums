@@ -14,6 +14,6 @@ files:
   - electron/module/**/*.ts
 ignores:
   - electron/module/logSync/**
-  - "**/*Controller.ts"
-  - "**/*.test.ts"
-  - "**/*.spec.ts"
+  - '**/*Controller.ts'
+  - '**/*.test.ts'
+  - '**/*.spec.ts'

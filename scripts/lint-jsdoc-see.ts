@@ -8,9 +8,11 @@
  */
 
 import * as fs from 'node:fs';
+
 import consola from 'consola';
 import { glob } from 'glob';
 import path from 'pathe';
+
 import {
   type NormalizedPath,
   NormalizedPathArraySchema,

@@ -1,10 +1,12 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
 import { writeClipboardFilePaths } from 'clip-filepaths';
 import { Effect } from 'effect';
 import { app, clipboard, dialog, nativeImage, shell } from 'electron';
 import { match, P } from 'ts-pattern';
+
 import type { DownloadImageError, FileIOError } from './errors';
 import {
   FileCopyFailed,
@@ -124,7 +126,7 @@ const openPathWithAssociatedApp = openPathWithShell;
  * 画像ファイルを読み込み、クリップボードへ転送する。
  * ShareDialog からのコピー処理で利用される。
  */
-const copyImageDataByPath = (filePath: string): Effect.Effect<void, never> => {
+const copyImageDataByPath = (filePath: string): Effect.Effect<void> => {
   // All errors from readFile and clipboard operations are unexpected
   // and should propagate to Sentry
   return Effect.promise(async () => {
@@ -337,7 +339,7 @@ export const saveFileToPath = (
  */
 const copyMultipleFilesToClipboard = (
   filePaths: string[],
-): Effect.Effect<void, never> => {
+): Effect.Effect<void> => {
   // All errors are unexpected and should propagate
   if (filePaths.length === 0) {
     return Effect.succeed(undefined);

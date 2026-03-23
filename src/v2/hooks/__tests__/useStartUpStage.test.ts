@@ -22,6 +22,7 @@ vi.mock('@/queryClient', () => ({
 
 // テスト内でのtRPCモックのアクセス
 import { trpcReact } from '@/trpc';
+
 import { useStartupStage } from '../useStartUpStage';
 
 // モック型の定義

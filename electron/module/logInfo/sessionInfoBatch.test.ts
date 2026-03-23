@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events';
+
 import { parseISO } from 'date-fns';
 import { Effect, Exit } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
 import * as client from '../../lib/sequelize';
-import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import {
   OptionalVRChatPlayerIdSchema,
   VRChatPlayerNameSchema,
@@ -11,6 +12,7 @@ import {
   VRChatWorldInstanceIdSchema,
   VRChatWorldNameSchema,
 } from '../vrchatLog/model';
+import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 import {
   getPlayerJoinListInSameWorld,
@@ -149,17 +151,19 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             expect(batchPlayers.length).toBe(originalPlayers.length);
 
             // プレイヤーIDが一致することを確認
-            const originalPlayerIds = originalPlayers.map((p) => p.id).sort();
-            const batchPlayerIds = batchPlayers.map((p) => p.id).sort();
+            const originalPlayerIds = originalPlayers
+              .map((p) => p.id)
+              .toSorted();
+            const batchPlayerIds = batchPlayers.map((p) => p.id).toSorted();
             expect(batchPlayerIds).toEqual(originalPlayerIds);
 
             // プレイヤー名も一致することを確認
             const originalPlayerNames = originalPlayers
               .map((p) => p.playerName)
-              .sort();
+              .toSorted();
             const batchPlayerNames = batchPlayers
               .map((p) => p.playerName)
-              .sort();
+              .toSorted();
             expect(batchPlayerNames).toEqual(originalPlayerNames);
           } else {
             // 元のロジックがエラーの場合、バッチも空であるべき
@@ -259,8 +263,10 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             expect(batchPlayers.length).toBe(originalPlayers.length);
 
             if (originalPlayers.length > 0) {
-              const originalPlayerIds = originalPlayers.map((p) => p.id).sort();
-              const batchPlayerIds = batchPlayers.map((p) => p.id).sort();
+              const originalPlayerIds = originalPlayers
+                .map((p) => p.id)
+                .toSorted();
+              const batchPlayerIds = batchPlayers.map((p) => p.id).toSorted();
               expect(batchPlayerIds).toEqual(originalPlayerIds);
             }
           } else {

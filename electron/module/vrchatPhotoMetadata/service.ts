@@ -8,6 +8,7 @@
  */
 
 import { Effect } from 'effect';
+
 import { logger } from '../../lib/logger';
 import { readExif } from '../../lib/wrappedExifTool';
 import {

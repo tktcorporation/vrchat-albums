@@ -1,5 +1,6 @@
 import * as datefns from 'date-fns';
 import { match } from 'ts-pattern';
+
 import type { VRChatLogLine } from '../model';
 import { VRChatLogLineSchema } from '../model';
 
@@ -216,7 +217,7 @@ export const exportLogsToLogStore = (
   logRecords: LogRecord[],
 ): VRChatLogLine[] => {
   // 時系列順にソート
-  const sortedRecords = [...logRecords].sort((a, b) => {
+  const sortedRecords = [...logRecords].toSorted((a, b) => {
     const dateA = getLogDateTime(a);
     const dateB = getLogDateTime(b);
     return datefns.compareAsc(dateA, dateB);

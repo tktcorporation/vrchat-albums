@@ -1,5 +1,7 @@
 import path from 'node:path';
+
 import { Effect } from 'effect';
+
 import { logger } from './../lib/logger';
 import * as utilsService from './electronUtil/service';
 import { getSettingStore } from './settingStore';

@@ -1,6 +1,8 @@
 import { Globe, Search, User, X } from 'lucide-react';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+
 import { trpcReact } from '@/trpc';
+
 import { ICON_SIZE } from '../constants/ui';
 import { useI18n } from '../i18n/store';
 
@@ -55,7 +57,7 @@ const SearchOverlay = memo(
           );
 
           return Object.entries(worldCounts)
-            .sort(([, a], [, b]) => b - a)
+            .toSorted(([, a], [, b]) => b - a)
             .slice(0, 3)
             .map(([worldName]) => worldName);
         },

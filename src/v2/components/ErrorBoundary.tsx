@@ -1,6 +1,7 @@
 import type React from 'react';
 import { ErrorBoundary as ReactErrorBoundary } from 'react-error-boundary';
 import { match, P } from 'ts-pattern';
+
 import { trpcReact } from '@/trpc';
 
 interface Props {

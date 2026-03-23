@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { Photo } from '../../../types/photo';
 import { usePhotoGallery } from '../usePhotoGallery';
 

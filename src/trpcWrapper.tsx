@@ -3,6 +3,7 @@ import type { FC, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import superjson from 'superjson';
 import { ipcLink } from 'trpc-electron/renderer';
+
 import { trpcReact } from './trpc';
 
 const MOCK_API = import.meta.env.VITE_MOCK_API === 'true';
@@ -17,6 +18,7 @@ export const TrpcWrapper: FC<Props> = ({ children }) => {
     return <>{children}</>;
   }
 
+  // oxlint-disable-next-line react/rules-of-hooks -- MOCK_API はビルド時定数のため、条件付き early return の後でも hooks の呼び出し順序は安定している
   const queryClient = useMemo(
     () =>
       new QueryClient({
@@ -36,6 +38,7 @@ export const TrpcWrapper: FC<Props> = ({ children }) => {
       }),
     [],
   );
+  // oxlint-disable-next-line react/rules-of-hooks -- 同上
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
       links: [ipcLink({ transformer: superjson })],

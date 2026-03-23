@@ -1,0 +1,112 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "react",
+    "typescript",
+    "unicorn",
+    "import",
+    "jsdoc",
+    "jsx-a11y",
+    "vitest"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "style": "off",
+    "pedantic": "off",
+    "perf": "warn",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "options": {
+    "typeAware": true,
+    "denyWarnings": false,
+    "reportUnusedDisableDirectives": "warn"
+  },
+  "env": {
+    "browser": true,
+    "es2024": true,
+    "node": true
+  },
+  "globals": {
+    "__SENTRY_RELEASE__": "readonly"
+  },
+  "rules": {
+    "no-unused-vars": "error",
+    "no-undef": "error",
+    "no-unsafe-type-assertion": "off",
+
+    "typescript/no-floating-promises": "warn",
+    "typescript/no-misused-promises": "warn",
+    "typescript/no-unnecessary-type-assertion": "warn",
+    "typescript/no-unsafe-argument": "warn",
+    "typescript/no-unsafe-assignment": "warn",
+    "typescript/no-unsafe-call": "warn",
+    "typescript/no-unsafe-member-access": "warn",
+    "typescript/no-unsafe-return": "warn",
+    "typescript/await-thenable": "warn",
+    "typescript/no-redundant-type-constituents": "warn",
+    "typescript/unbound-method": "warn",
+    "typescript/restrict-template-expressions": "off",
+    "typescript/no-base-to-string": "off",
+
+    "react/exhaustive-deps": "off",
+    "react/rules-of-hooks": "error",
+    "react/react-in-jsx-scope": "off",
+
+    "no-await-in-loop": "off",
+    "no-shadow": "off",
+    "no-unused-expressions": "off",
+    "prefer-add-event-listener": "off",
+    "no-misused-spread": "off",
+
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/prefer-modern-methods": "off",
+
+    "import/no-named-as-default": "off",
+    "import/no-named-as-default-member": "off",
+    "import/no-unassigned-import": "off",
+    "import/no-self-import": "off",
+
+    "jsdoc/check-tag-names": "off",
+    "jsdoc/require-yields": "off",
+
+    "jsx-a11y/use-semantic-elements": "off",
+    "jsx-a11y/role-has-required-aria-props": "off",
+    "jsx-a11y/no-static-element-interactions": "off",
+    "jsx-a11y/aria-unsupported-elements": "off",
+    "jsx-a11y/label-has-associated-control": "off",
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "jsx-a11y/role-supports-aria-props": "off"
+  },
+  "overrides": [
+    {
+      "files": ["*.test.ts", "*.test.tsx", "*.spec.ts", "*.spec.tsx"],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-return": "off",
+        "require-yield": "off",
+        "vitest/hoisted-apis-on-top": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "main",
+    "out",
+    "coverage",
+    "build",
+    "playwright-report",
+    "test-results",
+    "blob-report",
+    "playwright/.cache",
+    ".grit",
+    "*.json",
+    "*.yaml",
+    "*.yml"
+  ]
+}

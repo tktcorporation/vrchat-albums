@@ -1,10 +1,12 @@
 import path from 'node:path';
+
 import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
-import { logger } from './../../lib/logger';
+
 // import type * as vrchatLogService from '../service/vrchatLog/vrchatLog';
 import * as fs from '../../lib/wrappedFs';
 import { getSettingStore } from '../settingStore';
+import { logger } from './../../lib/logger';
 import {
   type NotValidatedVRChatLogFilesDirPath,
   NotValidatedVRChatLogFilesDirPathSchema,
@@ -20,19 +22,17 @@ type VRChatLogFileDirError = 'logFilesNotFound' | 'logFileDirNotFound';
  * 設定ストアに保存されているログディレクトリパスを取得する
  * getValidVRChatLogFileDir から呼び出される内部処理
  */
-const getStoredVRChatLogFilesDirPath = (): Effect.Effect<
-  NotValidatedVRChatLogFilesDirPath | null,
-  never
-> => {
-  return Effect.succeed(
-    match(getSettingStore().getLogFilesDir())
-      .with(null, () => null)
-      .with(P.string, (path) =>
-        NotValidatedVRChatLogFilesDirPathSchema.parse(path),
-      )
-      .exhaustive(),
-  );
-};
+const getStoredVRChatLogFilesDirPath =
+  (): Effect.Effect<NotValidatedVRChatLogFilesDirPath | null> => {
+    return Effect.succeed(
+      match(getSettingStore().getLogFilesDir())
+        .with(null, () => null)
+        .with(P.string, (path) =>
+          NotValidatedVRChatLogFilesDirPathSchema.parse(path),
+        )
+        .exhaustive(),
+    );
+  };
 
 /**
  * 実際に存在するVRChatログディレクトリを検証して返す

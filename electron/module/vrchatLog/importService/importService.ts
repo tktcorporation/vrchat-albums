@@ -6,6 +6,7 @@ type NodeDirent = Dirent;
 
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
+
 import { logger } from '../../../lib/logger';
 import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
 import {

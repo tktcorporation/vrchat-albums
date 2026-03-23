@@ -1,8 +1,10 @@
 import * as crypto from 'node:crypto';
 import type { Dirent, PathLike } from 'node:fs';
 import * as nodefsPromises from 'node:fs/promises';
+
 import * as dateFns from 'date-fns';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { type FolderDigest, FolderDigestSchema } from '../../lib/brandedTypes';
 import {
   getSettingStore,
@@ -68,7 +70,7 @@ const createOldDigest = (suffix: string): FolderDigest => {
 const computeExpectedDigestForFolder = (files: string[]): FolderDigest => {
   const pngFiles = files
     .filter((f) => f.startsWith('VRChat_') && f.endsWith('.png'))
-    .sort();
+    .toSorted();
   return computeTestDigest(pngFiles.join('\n'));
 };
 

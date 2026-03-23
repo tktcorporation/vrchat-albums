@@ -1,6 +1,7 @@
 import { Cause, Effect, Exit, Option } from 'effect';
 import type { UpdateCheckResult } from 'electron-updater';
 import { match, P } from 'ts-pattern';
+
 import { reloadMainWindow } from '../../electronUtil';
 import { runEffect } from '../../lib/effectTRPC';
 import {
@@ -10,13 +11,13 @@ import {
 } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
-import { procedure, router as trpcRouter } from './../../trpc';
 import type { OpenPathFailed } from '../electronUtil/errors';
 import * as electronUtilService from '../electronUtil/service';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
+import { procedure, router as trpcRouter } from './../../trpc';
 import type { UpdateError } from './errors';
 import * as settingService from './service';
 

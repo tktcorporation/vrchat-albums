@@ -42,7 +42,7 @@ function calcColors(data: Uint8ClampedArray, step: number) {
   }
 
   const sortedColors = Object.values(colorBuckets)
-    .sort((a, b) => b.count - a.count)
+    .toSorted((a, b) => b.count - a.count)
     .filter((bucket) => bucket.count > 20);
 
   if (sortedColors.length === 0) {
@@ -68,7 +68,7 @@ function calcColors(data: Uint8ClampedArray, step: number) {
     hueGroups[hueGroup].push(color);
   }
 
-  const hueGroupsArray = Object.values(hueGroups).sort(
+  const hueGroupsArray = Object.values(hueGroups).toSorted(
     (a, b) => b[0].count - a[0].count,
   );
 

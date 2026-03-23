@@ -1,22 +1,21 @@
 {
   "name": "vrchat-albums",
   "version": "0.27.0",
-  "main": "main/index.cjs",
+  "description": "VRChatで撮影した写真を整理・管理するためのデスクトップアプリケーションです。VRChatのログファイルと写真を自動的に関連付けて、いつ、どのワールドで撮影したかを簡単に確認できます。",
+  "keywords": [
+    "electron",
+    "react",
+    "typescript",
+    "vite"
+  ],
   "author": {
     "name": "tktcorporation"
   },
-  "description": "VRChatで撮影した写真を整理・管理するためのデスクトップアプリケーションです。VRChatのログファイルと写真を自動的に関連付けて、いつ、どのワールドで撮影したかを簡単に確認できます。",
-  "keywords": [
-    "vite",
-    "react",
-    "electron",
-    "typescript"
-  ],
   "repository": {
     "url": "https://github.com/tktcorporation/vrchat-albums"
   },
-  "productName": "VRChatAlbums",
   "type": "module",
+  "main": "main/index.cjs",
   "scripts": {
     "postinstall": "simple-git-hooks && pnpm run license-check:generate && pnpm run rebuild-native",
     "rebuild-native": "npx @electron/rebuild -f -w clip-filepaths",
@@ -50,7 +49,7 @@
     "test:playwright": "SENTRY_DSN='' run-s build \"playwright:setup-and-run\" sync-landing-images",
     "playwright:setup-and-run": "playwright install --with-deps && playwright test --timeout=60000",
     "sync-landing-images": "bash scripts/sync-landing-images.sh",
-    "lint": "run-p lint:biome lint:type-check lint:actionlint lint:valueobjects lint:effect lint:ast-grep lint:node-types lint:jsdoc-see lint:ts-pattern lint:logger-level lint:floating-promises",
+    "lint": "run-p lint:oxlint lint:fmt-check lint:type-check lint:actionlint lint:valueobjects lint:effect lint:ast-grep lint:node-types lint:jsdoc-see lint:ts-pattern lint:logger-level lint:floating-promises",
     "lint:valueobjects": "tsx scripts/lint-valueobjects.ts",
     "lint:effect": "tsx scripts/lint-effect.ts",
     "lint:node-types": "tsx scripts/lint-node-types.ts",
@@ -59,7 +58,8 @@
     "lint:logger-level": "tsx scripts/lint-logger-level.ts",
     "lint:floating-promises": "tsx scripts/lint-floating-promises.ts",
     "lint:ast-grep": "ast-grep scan --warning",
-    "lint:biome": "biome check .",
+    "lint:oxlint": "oxlint",
+    "lint:fmt-check": "oxfmt --check .",
     "lint:type-check": "run-p lint:type-check:tsgo:electron lint:type-check:tsgo:src",
     "lint:type-check:tsc": "run-p lint:type-check:tsc:electron lint:type-check:tsc:src",
     "lint:type-check:tsc:electron": "tsc --noEmit -p electron",
@@ -68,36 +68,14 @@
     "lint:type-check:tsgo:electron": "tsgo --noEmit -p electron",
     "lint:type-check:tsgo:src": "tsgo --noEmit",
     "lint:actionlint": "npx @tktco/node-actionlint",
-    "lint:fix": "run-s \"lint:fix:biome\" lint:type-check",
-    "lint:fix:biome": "biome check --write --unsafe .",
-    "lint:fix:tsc": "run-s \"lint:fix:biome\" lint:type-check:tsc",
+    "lint:fix": "run-s lint:fix:fmt lint:fix:oxlint lint:type-check",
+    "lint:fix:fmt": "oxfmt --write .",
+    "lint:fix:oxlint": "oxlint --fix",
+    "lint:fix:tsc": "run-s lint:fix:fmt lint:fix:oxlint lint:type-check:tsc",
     "sentry:sourcemaps": "run-s sentry:sourcemaps:electron sentry:sourcemaps:vite",
     "sentry:sourcemaps:electron": "sentry-cli sourcemaps inject ./main && sentry-cli sourcemaps upload ./main",
     "sentry:sourcemaps:vite": "sentry-cli sourcemaps inject ./src/out && sentry-cli sourcemaps upload ./src/out",
     "knip": "knip --config knip.config.ts"
-  },
-  "simple-git-hooks": {
-    "pre-commit": "pnpm lint:biome && pnpm lint:type-check",
-    "prepare-commit-msg": "bash scripts/hooks/prepare-commit-msg.sh"
-  },
-  "pnpm": {
-    "overrides": {
-      "cacache>glob": "10.5.0"
-    },
-    "onlyBuiltDependencies": [
-      "@ast-grep/cli",
-      "@sentry/cli",
-      "electron",
-      "electron-winstaller",
-      "esbuild",
-      "simple-git-hooks",
-      "sqlite3"
-    ]
-  },
-  "packageManager": "pnpm@10.10.0",
-  "engines": {
-    "node": "22",
-    "pnpm": ">=10"
   },
   "dependencies": {
     "@napi-rs/image": "^1.12.0",
@@ -162,7 +140,6 @@
   "devDependencies": {
     "@antfu/ni": "^28.2.0",
     "@ast-grep/cli": "^0.42.0",
-    "@biomejs/biome": "2.3.10",
     "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.30.0",
     "@electron/rebuild": "^4.0.2",
@@ -185,6 +162,9 @@
     "license-checker": "25.0.1",
     "minimatch": "^10.1.1",
     "npm-run-all2": "~8.0.4",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0",
+    "oxlint-tsgolint": "^0.17.1",
     "playwright": "1.57.0",
     "postcss": "8.5.6",
     "rimraf": "6.1.2",
@@ -194,5 +174,29 @@
     "typescript": "~5.9.3",
     "uuid": "^13.0.0",
     "vitest": "^4.0.17"
-  }
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint:oxlint && pnpm lint:fmt-check && pnpm lint:type-check",
+    "prepare-commit-msg": "bash scripts/hooks/prepare-commit-msg.sh"
+  },
+  "engines": {
+    "node": "22",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@10.10.0",
+  "pnpm": {
+    "overrides": {
+      "cacache>glob": "10.5.0"
+    },
+    "onlyBuiltDependencies": [
+      "@ast-grep/cli",
+      "@sentry/cli",
+      "electron",
+      "electron-winstaller",
+      "esbuild",
+      "simple-git-hooks",
+      "sqlite3"
+    ]
+  },
+  "productName": "VRChatAlbums"
 }

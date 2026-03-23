@@ -8,10 +8,11 @@ import {
   it,
   vi,
 } from 'vitest';
+
 import { clearAllCaches } from '../../lib/queryCache';
 import * as client from '../../lib/sequelize';
-import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import { VRChatPlayerNameSchema } from '../vrchatLog/model';
+import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 
 describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
   beforeAll(async () => {
