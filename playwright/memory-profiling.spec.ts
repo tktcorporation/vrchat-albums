@@ -91,15 +91,19 @@ const startMemoryMonitoring = (
 
   const intervalId = setInterval(() => {
     void (async () => {
-      const mem = await getProcessMemory(pid);
-      if (mem) {
-        samples.push({
-          timestamp: Date.now() - startTime,
-          rssMB: mem.rss,
-          heapUsedMB: mem.heap,
-          externalMB: mem.external,
-          label: `t+${Math.floor((Date.now() - startTime) / 1000)}s`,
-        });
+      try {
+        const mem = await getProcessMemory(pid);
+        if (mem) {
+          samples.push({
+            timestamp: Date.now() - startTime,
+            rssMB: mem.rss,
+            heapUsedMB: mem.heap,
+            externalMB: mem.external,
+            label: `t+${Math.floor((Date.now() - startTime) / 1000)}s`,
+          });
+        }
+      } catch {
+        // メモリサンプリング中のエラーは無視（プロセス終了時等）
       }
     })();
   }, intervalMs);

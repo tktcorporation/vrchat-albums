@@ -1405,7 +1405,17 @@ export async function loadConfig(
   }
 
   const configContent = fs.readFileSync(configPath, 'utf-8');
-  return JSON.parse(configContent) as NeverthrowLintConfig;
+  const parsed: unknown = JSON.parse(configContent);
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    !Array.isArray((parsed as { rules?: unknown }).rules)
+  ) {
+    throw new Error(
+      'Invalid .neverthrowlintrc.json format: missing rules array',
+    );
+  }
+  return parsed as NeverthrowLintConfig;
 }
 
 // Export for testing with virtual files

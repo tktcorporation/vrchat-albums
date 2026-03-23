@@ -61,19 +61,29 @@ export const useMigrationNotice = () => {
   ]);
 
   const handleMigrationComplete = async () => {
-    // Mark the notice as shown after successful migration
-    await setMigrationNoticeShown.mutateAsync();
+    // effect-lint-allow-try-catch: React フロントエンド境界
+    try {
+      // Mark the notice as shown after successful migration
+      await setMigrationNoticeShown.mutateAsync();
 
-    // Refetch migration status to update UI
-    await refetchMigrationStatus();
+      // Refetch migration status to update UI
+      await refetchMigrationStatus();
 
-    // Close the dialog
-    setShowMigrationDialog(false);
+      // Close the dialog
+      setShowMigrationDialog(false);
 
-    toast({
-      title: 'データ移行完了',
-      description: '旧アプリのデータが正常に移行されました。',
-    });
+      toast({
+        title: 'データ移行完了',
+        description: '旧アプリのデータが正常に移行されました。',
+      });
+    } catch (error) {
+      console.error('Migration completion failed:', error);
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: 'データ移行の完了処理中にエラーが発生しました。',
+      });
+    }
   };
 
   const handleMigrationCancel = () => {

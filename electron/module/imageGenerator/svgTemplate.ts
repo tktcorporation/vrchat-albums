@@ -193,18 +193,15 @@ function generatePlayerElements(
     currentLineWidth += playerWidth + 6;
   }
 
-  match({ showAllPlayers, remainingCount })
-    .when(
-      ({ showAllPlayers: showAll, remainingCount: remaining }) =>
-        !showAll && remaining > 0,
-      () => {
-        const moreText = `+${remainingCount} more`;
-        const moreTextWidth = Array.from(moreText).reduce((width, char) => {
-          return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
-        }, 0);
-        const moreWidth = moreTextWidth + 20;
+  // showAllPlayers=false かつ残りプレイヤーがいる場合のみ "+N more" バッジを表示
+  if (!showAllPlayers && remainingCount > 0) {
+    const moreText = `+${remainingCount} more`;
+    const moreTextWidth = Array.from(moreText).reduce((width, char) => {
+      return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
+    }, 0);
+    const moreWidth = moreTextWidth + 20;
 
-        elements.push(`
+    elements.push(`
       <g transform="translate(${x}, ${y})">
         <rect
           width="${moreWidth}"
@@ -224,9 +221,7 @@ function generatePlayerElements(
         >${moreText}</text>
       </g>
     `);
-      },
-    )
-    .otherwise(() => {});
+  }
 
   // プレイヤーリストのコンテナを終了
   elements.push('</g>');

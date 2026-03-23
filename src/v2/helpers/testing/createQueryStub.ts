@@ -38,8 +38,8 @@ export function createQueryStub<TData = unknown, TError = unknown>(
   const baseResult = {
     data: data as TData | undefined,
     error: error,
-    // biome-ignore lint/suspicious/noExplicitAny: refetch function has complex overloads that are difficult to type
-    refetch: refetch as never,
+    // oxlint-disable-next-line typescript-eslint(no-unsafe-assignment) -- refetch function has complex overloads that are difficult to type
+    refetch: refetch as any,
     isFetching,
     isPaused: false,
     isStale: false,

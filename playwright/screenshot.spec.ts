@@ -182,20 +182,6 @@ test('各画面でスクショ', async () => {
   //   window.location.href = `#${routerPath}`;
   // }, routerPath);
 
-  // タイムアウト処理の調整
-  const timeoutDecreaseTwo = TIMEOUT - 5000;
-  void Promise.race([
-    new Promise((resolve) => setTimeout(resolve, timeoutDecreaseTwo)),
-    new Promise((_resolve, reject) => {
-      setTimeout(() => {
-        void (async () => {
-          await screenshot(page, title, 'timeout');
-          reject(new Error('Timeout'));
-        })();
-      }, timeoutDecreaseTwo);
-    }),
-  ]);
-
   await screenshot(page, title, 'initial');
 
   // 「同意する」が表示されればクリック、表示されなければ次へ進む

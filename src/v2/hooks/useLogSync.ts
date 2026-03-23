@@ -39,7 +39,9 @@ export const useLogSync = (options?: UseLogSyncOptions) => {
   const syncLogsMutation = trpcReact.logSync.syncLogs.useMutation({
     onSuccess: () => {
       // キャッシュの無効化
-      void invalidatePhotoGalleryQueries(utils);
+      invalidatePhotoGalleryQueries(utils).catch((error: unknown) => {
+        console.error('Failed to invalidate photo gallery queries:', error);
+      });
       options?.onSuccess?.();
     },
     onError: (error) => {

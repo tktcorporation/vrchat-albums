@@ -131,8 +131,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     // --- Event Handlers ---
 
     /** コンテキストメニュー: 写真パスコピー (単一/複数対応) */
-    const handleCopyPhotoData = (e: React.MouseEvent) => {
-      e.stopPropagation();
+    const handleCopyPhotoData = (_e: React.MouseEvent) => {
       if (selectedPhotos.length > 1 && onCopySelected) {
         // 複数選択時は親コンポーネントのコピー機能を使用（全グループにアクセス可能）
         onCopySelected();
@@ -141,8 +140,10 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         // 選択順序を維持してコピー
         const pathsToCopy = selectedPhotos
           .map((id) => {
-            const p = photos.find((item) => String(item.id) === id);
-            return p && isPhotoLoaded(p) ? p.photoPath.value : undefined;
+            const matchedPhoto = photos.find((item) => String(item.id) === id);
+            return matchedPhoto && isPhotoLoaded(matchedPhoto)
+              ? matchedPhoto.photoPath.value
+              : undefined;
           })
           .filter((path): path is string => path !== undefined);
         console.log('Triggering multiple photo copy:', pathsToCopy);
@@ -153,16 +154,14 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     };
 
     /** コンテキストメニュー: 写真アプリで開く */
-    const handleOpenInPhotoApp = (e: React.MouseEvent) => {
-      e.stopPropagation();
+    const handleOpenInPhotoApp = (_e: React.MouseEvent) => {
       if (photoLoaded) {
         openInPhotoAppMutation.mutate(photo.photoPath.value);
       }
     };
 
     /** コンテキストメニュー: フォルダで表示 */
-    const handleOpenInExplorer = (e: React.MouseEvent) => {
-      e.stopPropagation();
+    const handleOpenInExplorer = (_e: React.MouseEvent) => {
       if (photoLoaded) {
         openDirOnExplorerMutation.mutate(photo.photoPath.value);
       }

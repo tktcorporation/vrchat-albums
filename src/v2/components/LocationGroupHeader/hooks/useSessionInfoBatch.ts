@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { P, match } from 'ts-pattern';
 
 import { trpcClient } from '@/trpc';
 
@@ -279,9 +280,9 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
         // すべてのリクエストをエラーで解決
         for (const request of pendingRequests) {
           request.reject(
-            caughtError instanceof Error
-              ? caughtError
-              : new Error('Batch query failed'),
+            match(caughtError)
+              .with(P.instanceOf(Error), (err) => err)
+              .otherwise(() => new Error('Batch query failed')),
           );
         }
 
@@ -315,7 +316,11 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
       })
       .catch((err: unknown) => {
         if (requestIdRef.current === requestId) {
-          setError(err instanceof Error ? err : new Error(String(err)));
+          setError(
+            match(err)
+              .with(P.instanceOf(Error), (e) => e)
+              .otherwise((e) => new Error(String(e))),
+          );
           setIsLoading(false);
         }
       });

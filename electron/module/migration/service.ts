@@ -274,12 +274,14 @@ export const performMigration = (): Effect.Effect<MigrationResult> => {
             } else {
               // Unexpected error (defect)
               const dieOpt = Cause.dieOption(importExit.cause);
-              const errorMsg = (() => {
-                if (!Option.isSome(dieOpt)) return 'Unknown error';
-                return dieOpt.value instanceof Error
-                  ? dieOpt.value.message
-                  : String(dieOpt.value);
-              })();
+              let errorMsg: string;
+              if (!Option.isSome(dieOpt)) {
+                errorMsg = 'Unknown error';
+              } else if (dieOpt.value instanceof Error) {
+                errorMsg = dieOpt.value.message;
+              } else {
+                errorMsg = String(dieOpt.value);
+              }
               result.errors.push(`LogStore import failed: ${errorMsg}`);
             }
           }

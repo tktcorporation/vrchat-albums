@@ -14,36 +14,52 @@ function Download() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchRelease = async () => {
       try {
         setLoading(true);
         setError(null);
         const res = await fetch(
           'https://api.github.com/repos/tktcorporation/vrchat-albums/releases/latest',
+          { signal: controller.signal },
         );
 
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
 
-        const data = (await res.json()) as Release;
+        const data: unknown = await res.json();
 
-        if (!data.assets || !Array.isArray(data.assets)) {
+        // APIレスポンスの構造を検証
+        if (
+          !data ||
+          typeof data !== 'object' ||
+          !('tag_name' in data) ||
+          typeof (data as { tag_name: unknown }).tag_name !== 'string' ||
+          !('assets' in data) ||
+          !Array.isArray((data as { assets: unknown }).assets)
+        ) {
           throw new Error('Invalid release data format');
         }
 
-        setRelease(data);
+        setRelease(data as Release);
       } catch (err) {
+        if (controller.signal.aborted) return;
         console.error('Failed to fetch release:', err);
         setError(
           'リリース情報の取得に失敗しました。しばらくしてから再度お試しください。',
         );
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     void fetchRelease();
+
+    return () => controller.abort();
   }, []);
 
   const getDownloadLink = (platform: string) => {
