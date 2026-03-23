@@ -8,9 +8,9 @@ import { trpcReact } from './trpc';
 
 const MOCK_API = import.meta.env.VITE_MOCK_API === 'true';
 
-type Props = {
+interface Props {
   children: ReactNode;
-};
+}
 export const TrpcWrapper: FC<Props> = ({ children }) => {
   if (MOCK_API) {
     // console.log('USING MOCK MODE');

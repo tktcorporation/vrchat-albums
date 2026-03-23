@@ -209,7 +209,9 @@ export class MemoryMonitor {
    * サマリーログを出力
    */
   async logSummary(context: string): Promise<void> {
-    if (!this.config.enableLogging) return;
+    if (!this.config.enableLogging) {
+      return;
+    }
 
     const snapshot = getMemorySnapshot();
     const log = await getLazyLogger();
@@ -266,8 +268,6 @@ let globalMonitor: MemoryMonitor | null = null;
  * グローバルメモリモニターを取得（遅延初期化）
  */
 export const getGlobalMemoryMonitor = (): MemoryMonitor => {
-  if (!globalMonitor) {
-    globalMonitor = new MemoryMonitor();
-  }
+  globalMonitor ??= new MemoryMonitor();
   return globalMonitor;
 };

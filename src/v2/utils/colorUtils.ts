@@ -44,11 +44,21 @@ export function rgbToHsl(
 
 const hue2rgb = (p: number, q: number, t: number) => {
   let tNorm = t;
-  if (tNorm < 0) tNorm += 1;
-  if (tNorm > 1) tNorm -= 1;
-  if (tNorm < 1 / 6) return p + (q - p) * 6 * tNorm;
-  if (tNorm < 1 / 2) return q;
-  if (tNorm < 2 / 3) return p + (q - p) * (2 / 3 - tNorm) * 6;
+  if (tNorm < 0) {
+    tNorm += 1;
+  }
+  if (tNorm > 1) {
+    tNorm -= 1;
+  }
+  if (tNorm < 1 / 6) {
+    return p + (q - p) * 6 * tNorm;
+  }
+  if (tNorm < 1 / 2) {
+    return q;
+  }
+  if (tNorm < 2 / 3) {
+    return p + (q - p) * (2 / 3 - tNorm) * 6;
+  }
   return p;
 };
 

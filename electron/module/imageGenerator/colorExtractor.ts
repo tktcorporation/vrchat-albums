@@ -60,13 +60,17 @@ function calcColors(data: Buffer, step: number): DominantColors {
     const b = Math.floor(data[i + 2] / 5) * 5;
     const alpha = data[i + 3] / 255;
 
-    if (alpha < 0.5) continue;
+    if (alpha < 0.5) {
+      continue;
+    }
 
     const hsl = rgbToHsl(r, g, b);
     const [, s, l] = hsl;
 
     // 低彩度や極端な明度の色はスキップ（背景や白/黒に近い色を除外）
-    if (s < 20 || l < 15 || l > 85) continue;
+    if (s < 20 || l < 15 || l > 85) {
+      continue;
+    }
 
     const key = `${r},${g},${b}`;
 

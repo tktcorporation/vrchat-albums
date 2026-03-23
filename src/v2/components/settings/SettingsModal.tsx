@@ -60,7 +60,7 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
       id: 'paths',
       label: t('settings.tabs.dataSource'),
       icon: FolderOpen,
-      component: () => <PathSettings showRefreshAll={true} />,
+      component: () => <PathSettings showRefreshAll />,
     },
     {
       id: 'system',
@@ -111,7 +111,7 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
   ];
 
   const ActiveComponent =
-    tabs.find((tab) => tab.id === activeTab)?.component || tabs[0].component;
+    tabs.find((tab) => tab.id === activeTab)?.component ?? tabs[0].component;
 
   return (
     <Dialog open onOpenChange={() => onClose()}>

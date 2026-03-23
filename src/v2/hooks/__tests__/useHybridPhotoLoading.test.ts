@@ -323,12 +323,12 @@ describe('useHybridPhotoLoading', () => {
     });
 
     it('空のメタデータリストは空の配列を返す', () => {
-      const metadataList: Array<{
+      const metadataList: {
         id: string;
         photoTakenAt: Date;
         width: number;
         height: number;
-      }> = [];
+      }[] = [];
       const pathCache = new Map<string, string>();
 
       const result = createPhotoArray(metadataList, pathCache);

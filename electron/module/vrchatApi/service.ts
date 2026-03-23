@@ -162,7 +162,9 @@ let isProcessingQueue = false;
  * 連続リクエストによる制限回避目的で getVrcUserInfoByUserName から使用
  */
 const processQueue = async () => {
-  if (isProcessingQueue) return;
+  if (isProcessingQueue) {
+    return;
+  }
   isProcessingQueue = true;
   while (requestQueue.length > 0) {
     const request = requestQueue.shift();

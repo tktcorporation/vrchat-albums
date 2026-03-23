@@ -213,22 +213,20 @@ const getDBLogsFromDatabase = async (
         worldInstanceId: log.worldInstanceId,
         joinDateTime: log.joinDateTime,
         createdAt: log.createdAt,
-        updatedAt: log.updatedAt || new Date(),
+        updatedAt: log.updatedAt ?? new Date(),
       },
     });
   }
 
   // プレイヤー参加ログを取得
   let playerJoinStartDate = startDate;
-  if (!playerJoinStartDate) {
-    // 期間指定がない場合は、最古の日付から現在までを取得
-    playerJoinStartDate = new Date('2017-01-01'); // VRChatリリース日程度
-  }
+  // 期間指定がない場合は、最古の日付から現在までを取得
+  playerJoinStartDate ??= new Date('2017-01-01');
 
   const playerJoinLogExit = await Effect.runPromiseExit(
     playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
       startJoinDateTime: playerJoinStartDate,
-      endJoinDateTime: endDate || null,
+      endJoinDateTime: endDate ?? null,
     }),
   );
 

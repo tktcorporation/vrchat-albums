@@ -35,7 +35,9 @@ vi.mock('../vrchatLog/importService/importService', () => ({
   },
   getImportErrorMessage: vi.fn((error: { type: string }) => {
     // テスト用の簡易実装
-    if (error.type === 'DB_SYNC_FAILED') return error.type;
+    if (error.type === 'DB_SYNC_FAILED') {
+      return error.type;
+    }
     return error.type;
   }),
 }));
@@ -208,7 +210,7 @@ describe('migration service integration', () => {
       const markerPath = path.join(mockCurrentAppPath, '.migration-completed');
       expect(nodeFs.existsSync(markerPath)).toBe(true);
 
-      const markerContent = await nodeFsPromises.readFile(markerPath, 'utf-8');
+      const markerContent = await nodeFsPromises.readFile(markerPath, 'utf8');
       const marker = JSON.parse(markerContent);
       expect(marker.fromApp).toBe('vrchat-photo-journey');
       expect(marker.toApp).toBe('VRChatAlbums');

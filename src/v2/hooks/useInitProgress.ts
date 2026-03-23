@@ -15,7 +15,7 @@ export { STAGE_LABELS };
  * ステージ設定（順序と重み付けを統合）
  * 順序はこの配列の順序に従う。重みの合計は100。
  */
-const STAGE_CONFIG: ReadonlyArray<{ stage: InitStage; weight: number }> = [
+const STAGE_CONFIG: readonly { stage: InitStage; weight: number }[] = [
   { stage: 'database_sync', weight: 20 },
   { stage: 'directory_check', weight: 15 },
   { stage: 'log_append', weight: 15 },
@@ -33,11 +33,17 @@ const calculateOverallProgress = (
   stage: InitStage,
   stageProgress: number,
 ): number => {
-  if (stage === 'completed') return 100;
-  if (stage === 'error' || stage === 'ready') return 0;
+  if (stage === 'completed') {
+    return 100;
+  }
+  if (stage === 'error' || stage === 'ready') {
+    return 0;
+  }
 
   const idx = STAGE_CONFIG.findIndex((c) => c.stage === stage);
-  if (idx === -1) return 0;
+  if (idx === -1) {
+    return 0;
+  }
 
   // 前ステージまでの累積
   const prevTotal = STAGE_CONFIG.slice(0, idx).reduce(
@@ -88,7 +94,9 @@ export const useInitProgress = () => {
    * ステージベースの進捗 + ステージ内進捗を組み合わせて計算
    */
   const overallProgress = useMemo(() => {
-    if (!progress?.stage) return 0;
+    if (!progress?.stage) {
+      return 0;
+    }
     return calculateOverallProgress(progress.stage, progress.progress ?? 0);
   }, [progress?.stage, progress?.progress]);
 

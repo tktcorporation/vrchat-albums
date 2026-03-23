@@ -15,13 +15,13 @@ import {
 } from './lib/paths';
 
 export interface NeverthrowLintConfig {
-  rules: Array<{
+  rules: {
     name: string;
     path: string;
     enforceResult: boolean;
     apply: 'async-functions' | 'all-functions' | 'exported-functions';
     exceptions: string[];
-  }>;
+  }[];
   mustUseResult?: {
     enabled: boolean;
     path: string;
@@ -84,7 +84,7 @@ export class NeverthrowLinter {
   private program: ts.Program;
   private checker: ts.TypeChecker;
   private files: NormalizedPath[];
-  private handledVariables: Set<string> = new Set();
+  private handledVariables = new Set<string>();
 
   constructor(
     files: string[],
@@ -394,7 +394,9 @@ export class NeverthrowLinter {
               grandParent.expression === parent
             ) {
               const varInfo = resultVariables.get(node.text);
-              if (varInfo) varInfo.handled = true;
+              if (varInfo) {
+                varInfo.handled = true;
+              }
             }
           }
           // Also mark as handled if chained with other Result methods
@@ -406,7 +408,9 @@ export class NeverthrowLinter {
               this.isResultHandled(grandParent)
             ) {
               const varInfo = resultVariables.get(node.text);
-              if (varInfo) varInfo.handled = true;
+              if (varInfo) {
+                varInfo.handled = true;
+              }
             }
           }
         }
@@ -414,13 +418,17 @@ export class NeverthrowLinter {
         // Mark as handled if returned
         if (ts.isReturnStatement(parent)) {
           const varInfo = resultVariables.get(node.text);
-          if (varInfo) varInfo.handled = true;
+          if (varInfo) {
+            varInfo.handled = true;
+          }
         }
 
         // Mark as handled if passed to function
         if (ts.isCallExpression(parent) && parent.arguments.includes(node)) {
           const varInfo = resultVariables.get(node.text);
-          if (varInfo) varInfo.handled = true;
+          if (varInfo) {
+            varInfo.handled = true;
+          }
         }
       }
       ts.forEachChild(node, checkVariableUsage);
@@ -676,7 +684,7 @@ export class NeverthrowLinter {
           const { line, character } = sourceFile.getLineAndCharacterOfPosition(
             node.getStart(),
           );
-          const functionNameDisplay = functionName || '(anonymous)';
+          const functionNameDisplay = functionName ?? '(anonymous)';
 
           // Avoid duplicate issues for the same position
           const isDuplicate = this.issues.some(
@@ -702,7 +710,7 @@ export class NeverthrowLinter {
           if (hasGenericError) {
             const { line, character } =
               sourceFile.getLineAndCharacterOfPosition(node.getStart());
-            const functionNameDisplay = functionName || '(anonymous)';
+            const functionNameDisplay = functionName ?? '(anonymous)';
 
             const isDuplicate = this.issues.some(
               (issue) =>
@@ -750,7 +758,7 @@ export class NeverthrowLinter {
   ): boolean {
     if (ts.isFunctionDeclaration(node)) {
       return (
-        node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ||
+        node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ??
         false
       );
     }
@@ -762,7 +770,7 @@ export class NeverthrowLinter {
         return (
           parent.modifiers?.some(
             (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-          ) || false
+          ) ?? false
         );
       }
       parent = parent.parent;
@@ -776,7 +784,7 @@ export class NeverthrowLinter {
   ): boolean {
     // Check for async modifier
     const hasAsyncModifier =
-      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ||
+      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ??
       false;
 
     if (hasAsyncModifier) {
@@ -800,10 +808,10 @@ export class NeverthrowLinter {
       const typeText = node.type.getText();
       // Check for neverthrow.Result<T, E> or Result<T, E> or Promise<neverthrow.Result<T, E>>
       const hasResult =
-        /neverthrow\.Result</.test(typeText) ||
+        typeText.includes('neverthrow.Result<') ||
         /\bResult</.test(typeText) ||
-        /ResultAsync</.test(typeText) ||
-        /neverthrow\.ResultAsync</.test(typeText);
+        typeText.includes('ResultAsync<') ||
+        typeText.includes('neverthrow.ResultAsync<');
 
       return hasResult;
     }
@@ -836,7 +844,9 @@ export class NeverthrowLinter {
   private hasGenericErrorType(
     node: ts.FunctionDeclaration | ts.ArrowFunction,
   ): boolean {
-    if (!node.type) return false;
+    if (!node.type) {
+      return false;
+    }
 
     const typeText = node.type.getText();
 
@@ -846,7 +856,9 @@ export class NeverthrowLinter {
       /(?:neverthrow\.)?(?:Result|ResultAsync)<[^,>]+,\s*([^>]+)>/;
     const match = typeText.match(resultPattern);
 
-    if (!match) return false;
+    if (!match) {
+      return false;
+    }
 
     const errorType = match[1].trim();
 
@@ -870,7 +882,9 @@ export class NeverthrowLinter {
     sourceFile: ts.SourceFile,
     functionName: string | undefined,
   ) {
-    if (!node.body) return;
+    if (!node.body) {
+      return;
+    }
 
     const visit = (n: ts.Node) => {
       // Look for try-catch statements
@@ -919,7 +933,7 @@ export class NeverthrowLinter {
           const { line, character } = sourceFile.getLineAndCharacterOfPosition(
             catchBlock.getStart(),
           );
-          const functionNameDisplay = functionName || '(anonymous)';
+          const functionNameDisplay = functionName ?? '(anonymous)';
 
           // Avoid duplicate issues
           const isDuplicate = this.issues.some(
@@ -986,7 +1000,9 @@ export class NeverthrowLinter {
    * This means: has if/match for error classification AND has throw for unexpected errors
    */
   private hasProperRethrow(tryNode: ts.TryStatement): boolean {
-    if (!tryNode.catchClause) return false;
+    if (!tryNode.catchClause) {
+      return false;
+    }
     const catchBlock = tryNode.catchClause.block;
 
     let hasThrow = false;
@@ -1071,7 +1087,9 @@ export class NeverthrowLinter {
    * Pattern: catch { log.warn(...); return fallback; }
    */
   private hasLogAndFallback(tryNode: ts.TryStatement): boolean {
-    if (!tryNode.catchClause) return false;
+    if (!tryNode.catchClause) {
+      return false;
+    }
     const catchBlock = tryNode.catchClause.block;
 
     let hasLogCall = false;
@@ -1117,7 +1135,9 @@ export class NeverthrowLinter {
    * Pattern: catch { return err(...); }
    */
   private hasReturnErrOnCatch(tryNode: ts.TryStatement): boolean {
-    if (!tryNode.catchClause) return false;
+    if (!tryNode.catchClause) {
+      return false;
+    }
     const catchBlock = tryNode.catchClause.block;
 
     let hasReturnErr = false;
@@ -1161,7 +1181,9 @@ export class NeverthrowLinter {
    * Pattern: catch { return match(error).with(...).otherwise(...) }
    */
   private hasMatchWithFallback(tryNode: ts.TryStatement): boolean {
-    if (!tryNode.catchClause) return false;
+    if (!tryNode.catchClause) {
+      return false;
+    }
     const catchBlock = tryNode.catchClause.block;
 
     let hasMatchCall = false;
@@ -1387,7 +1409,7 @@ export async function loadConfig(
   customConfigPath?: string,
 ): Promise<NeverthrowLintConfig> {
   const configPath =
-    customConfigPath || path.join(process.cwd(), '.neverthrowlintrc.json');
+    customConfigPath ?? path.join(process.cwd(), '.neverthrowlintrc.json');
 
   if (!fs.existsSync(configPath)) {
     consola.warn('No .neverthrowlintrc.json found, using default config');
@@ -1404,7 +1426,7 @@ export async function loadConfig(
     };
   }
 
-  const configContent = fs.readFileSync(configPath, 'utf-8');
+  const configContent = fs.readFileSync(configPath, 'utf8');
   return JSON.parse(configContent) as NeverthrowLintConfig;
 }
 
@@ -1417,7 +1439,7 @@ export async function lintNeverthrowFromSource(
   success: boolean;
   message?: string;
 }> {
-  const files = Array.from(sources.keys());
+  const files = [...sources.keys()];
   const linter = new NeverthrowLinter(files, config, sources);
   const issues = linter.lint();
 
@@ -1459,9 +1481,9 @@ export async function lintNeverthrow(config: NeverthrowLintConfig): Promise<{
   }
 
   // Convert Set to Array for processing
-  const patternArray = Array.from(patterns).map((pattern) => {
+  const patternArray = [...patterns].map((pattern) => {
     // Normalize path separators for cross-platform compatibility
-    return pattern.replace(/\\/g, '/');
+    return pattern.replaceAll('\\', '/');
   });
 
   // Check if all patterns are specific files (not glob patterns)
@@ -1561,7 +1583,7 @@ async function main() {
     // Group issues by file
     const issuesByFile = new Map<string, NeverthrowIssue[]>();
     for (const issue of issues) {
-      const existing = issuesByFile.get(issue.file) || [];
+      const existing = issuesByFile.get(issue.file) ?? [];
       existing.push(issue);
       issuesByFile.set(issue.file, existing);
     }

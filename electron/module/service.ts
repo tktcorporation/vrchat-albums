@@ -10,10 +10,10 @@ import * as vrchatLogFileDirService from './vrchatLogFileDir/service';
 /** @deprecated Use tagged errors from vrchatLogFileDir/errors.ts instead */
 export type VRChatLogFilesDirError = 'logFilesNotFound' | 'logFileDirNotFound';
 
-export type VRChatLogFilesDirResult = {
+export interface VRChatLogFilesDirResult {
   storedPath: string | null;
   path: string;
-};
+}
 
 /**
  * VRChat ログディレクトリ設定を取得する（Result型）
@@ -72,7 +72,7 @@ export const setVRChatLogFilesDirByDialog = (): Effect.Effect<
     Effect.map((dirPath) => {
       const settingStore = getSettingStore();
       settingStore.setLogFilesDir(dirPath);
-      return undefined;
+      return;
     }),
   );
 };

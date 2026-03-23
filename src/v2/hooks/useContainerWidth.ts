@@ -66,7 +66,7 @@ export function useContainerWidth(padding = 0): {
   const containerRef = useCallback((node: HTMLElement | null) => {
     if (DEBUG_WIDTH_MEASUREMENT) {
       console.log('[useContainerWidth] Callback ref called:', {
-        nodeExists: !!node,
+        nodeExists: Boolean(node),
         nodeTagName: node?.tagName,
         timestamp: performance.now().toFixed(2),
       });

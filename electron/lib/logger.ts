@@ -83,7 +83,7 @@ const buildErrorInfo = ({ message, stack }: ErrorLogParams): Error => {
         name: baseError.name,
         message: baseError.message,
         stack: s.stack,
-        cause: baseError.cause || s,
+        cause: baseError.cause ?? s,
       });
 
       return errorInfo;

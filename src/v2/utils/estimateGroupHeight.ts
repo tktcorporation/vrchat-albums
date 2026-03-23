@@ -87,9 +87,9 @@ export function estimateGroupHeight(
  * @returns 更新されたキャッシュ
  */
 export function precomputeGroupHeights(
-  groups: Array<{ key: string; photos: Photo[] }>,
+  groups: { key: string; photos: Photo[] }[],
   containerWidth: number,
-  existingCache: Map<string, number> = new Map(),
+  existingCache = new Map<string, number>(),
 ): Map<string, number> {
   // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
   const calculator = new JustifiedLayoutCalculator();

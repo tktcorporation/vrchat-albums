@@ -48,7 +48,9 @@ export interface InstanceTypeResult {
 export const getInstanceTypeWithConfidence = (
   instanceId: string | null,
 ): InstanceTypeResult => {
-  if (!instanceId) return { type: null, confidence: 'low' };
+  if (!instanceId) {
+    return { type: null, confidence: 'low' };
+  }
 
   // セキュリティ：入力値の長さ制限チェック
   if (instanceId.length > MAX_INSTANCE_ID_LENGTH) {
@@ -74,16 +76,21 @@ export const getInstanceTypeWithConfidence = (
   }
 
   // 既知のプライベートインスタンスパターン（高信頼度）
-  if (typePart.startsWith('friends('))
+  if (typePart.startsWith('friends(')) {
     return { type: 'friends', confidence: 'high' };
-  if (typePart.startsWith('hidden('))
+  }
+  if (typePart.startsWith('hidden(')) {
     return { type: 'friends+', confidence: 'high' };
-  if (typePart.startsWith('private('))
+  }
+  if (typePart.startsWith('private(')) {
     return { type: 'invite', confidence: 'high' };
-  if (typePart.startsWith('group('))
+  }
+  if (typePart.startsWith('group(')) {
     return { type: 'group', confidence: 'high' };
-  if (typePart.startsWith('groupPublic('))
+  }
+  if (typePart.startsWith('groupPublic(')) {
     return { type: 'group-public', confidence: 'high' };
+  }
 
   // リージョン情報のみの場合はPublic（中信頼度）
   if (REGION_PATTERN.test(typePart)) {

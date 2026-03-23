@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const XVFB_STARTUP_DELAY_MS = 1000;
 const SERVER_CHECK_INTERVAL_MS = 1000;
 const SERVER_MAX_ATTEMPTS = 10;
-const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY || '4096';
+const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY ?? '4096';
 
 // NOTE: execSyncはXvfb起動に使用 - 固定コマンドのため安全
 // (screenshot.spec.tsと同じパターン)
@@ -168,8 +168,8 @@ test.describe('初期化プログレス表示', () => {
           .locator('[data-testid="progress-message"]')
           .textContent();
         progressSnapshots.push({
-          percent: percentText || '',
-          message: messageText || '',
+          percent: percentText ?? '',
+          message: messageText ?? '',
         });
         console.log(
           `Progress snapshot ${i + 1}: ${percentText} - ${messageText}`,
@@ -332,7 +332,7 @@ test.describe('初期化プログレス表示', () => {
         const progressAttr = await page
           .locator('[data-testid="progress-bar"]')
           .getAttribute('data-progress');
-        const currentProgress = Number.parseInt(progressAttr || '0', 10);
+        const currentProgress = Number.parseInt(progressAttr ?? '0', 10);
 
         if (currentProgress > maxProgressSeen) {
           maxProgressSeen = currentProgress;

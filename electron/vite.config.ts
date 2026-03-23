@@ -10,7 +10,7 @@ const nodeBuiltins = [
 ];
 
 export default defineConfig({
-  mode: process.env.NODE_ENV || 'development',
+  mode: process.env.NODE_ENV ?? 'development',
   root: __dirname,
   define: {
     'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN),

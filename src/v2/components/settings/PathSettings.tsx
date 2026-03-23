@@ -114,7 +114,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   const handleLogInputChange = (value: string) => {
     setLogInputValue(value);
-    setIsLogPathManuallyChanged(value !== (logFilesDir?.path || ''));
+    setIsLogPathManuallyChanged(value !== (logFilesDir?.path ?? ''));
   };
 
   const handleLogPathSave = async () => {
@@ -137,7 +137,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   const handlePhotoInputChange = (value: string) => {
     setPhotoInputValue(value);
-    setIsPhotoPathManuallyChanged(value !== (photoDir?.value || ''));
+    setIsPhotoPathManuallyChanged(value !== (photoDir?.value ?? ''));
   };
 
   const handlePhotoPathSave = async () => {

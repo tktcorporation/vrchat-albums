@@ -117,7 +117,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
               variant="secondary"
               size="sm"
               onClick={onBrowse}
-              disabled={disabled || readOnly}
+              disabled={disabled ?? readOnly}
             >
               <FolderOpen className="h-4 w-4" />
             </Button>

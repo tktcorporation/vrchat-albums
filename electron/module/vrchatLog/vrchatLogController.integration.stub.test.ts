@@ -56,7 +56,7 @@ describe('vrchatLogController integration stub tests', () => {
       );
 
       // ファイルが正しく作成されたことを確認
-      const fileContent = await fs.readFile(testFilePath, 'utf-8');
+      const fileContent = await fs.readFile(testFilePath, 'utf8');
       expect(fileContent).toBe(testLogContent);
 
       // ファイル名のパターンが正しいことを確認
@@ -120,7 +120,7 @@ describe('vrchatLogController integration stub tests', () => {
 
       // メタデータが正しく読み込めることを確認
       const loadedMetadata = JSON.parse(
-        await fs.readFile(metadataPath, 'utf-8'),
+        await fs.readFile(metadataPath, 'utf8'),
       );
       expect(loadedMetadata.id).toBe(backupId);
       expect(loadedMetadata.status).toBe('completed');
@@ -170,7 +170,7 @@ describe('vrchatLogController integration stub tests', () => {
       const sortedFiles = collectedFiles.toSorted((a, b) => {
         const aMatch = a.match(/(\d{4}-\d{2})/);
         const bMatch = b.match(/(\d{4}-\d{2})/);
-        return (aMatch?.[0] || '').localeCompare(bMatch?.[0] || '');
+        return (aMatch?.[0] ?? '').localeCompare(bMatch?.[0] ?? '');
       });
 
       expect(sortedFiles[0]).toContain('2023-10');

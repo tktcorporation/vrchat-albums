@@ -75,7 +75,7 @@ async function generatePlatformIcon(platform: Platform): Promise<void> {
 
   try {
     // 元のSVGを読み込み
-    let svgContent = fs.readFileSync(sourceSvgPath, 'utf-8');
+    let svgContent = fs.readFileSync(sourceSvgPath, 'utf8');
 
     // プラットフォーム用に変換
     svgContent = transformSvgForPlatform(svgContent, platform);

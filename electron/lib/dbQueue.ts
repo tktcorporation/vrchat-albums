@@ -212,7 +212,7 @@ class DBQueue {
   ): Effect.Effect<T, DBQueueError> {
     return this.addWithResult(async () => {
       const client = getRDBClient().__client;
-      return await client.transaction(task);
+      return client.transaction(task);
     });
   }
 

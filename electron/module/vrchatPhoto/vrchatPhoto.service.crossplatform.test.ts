@@ -6,14 +6,14 @@ describe('VRChat Photo Service cross-platform path handling', () => {
     const normalizePathForGlob = (targetDir: string): string => {
       // Convert to POSIX format for glob pattern matching
       // glob always expects forward slashes regardless of platform
-      return targetDir.replace(/\\/g, '/');
+      return targetDir.replaceAll('\\', '/');
     };
 
     it('should convert Windows paths to POSIX format', () => {
-      expect(normalizePathForGlob('C:\\Users\\user\\Pictures\\VRChat')).toBe(
-        'C:/Users/user/Pictures/VRChat',
-      );
-      expect(normalizePathForGlob('D:\\Photos\\VRChat\\2024')).toBe(
+      expect(
+        normalizePathForGlob(String.raw`C:\Users\user\Pictures\VRChat`),
+      ).toBe('C:/Users/user/Pictures/VRChat');
+      expect(normalizePathForGlob(String.raw`D:\Photos\VRChat\2024`)).toBe(
         'D:/Photos/VRChat/2024',
       );
     });
@@ -29,19 +29,19 @@ describe('VRChat Photo Service cross-platform path handling', () => {
 
     it('should handle mixed separators', () => {
       expect(
-        normalizePathForGlob('C:\\Users/user\\Pictures/VRChat\\2024'),
+        normalizePathForGlob(String.raw`C:\Users/user\Pictures/VRChat\2024`),
       ).toBe('C:/Users/user/Pictures/VRChat/2024');
     });
 
     it('should handle UNC paths', () => {
-      expect(normalizePathForGlob('\\\\server\\share\\Photos\\VRChat')).toBe(
-        '//server/share/Photos/VRChat',
-      );
+      expect(
+        normalizePathForGlob(String.raw`\\server\share\Photos\VRChat`),
+      ).toBe('//server/share/Photos/VRChat');
     });
 
     it('should handle paths with spaces', () => {
       expect(
-        normalizePathForGlob('C:\\Program Files\\VRChat Photos\\2024'),
+        normalizePathForGlob(String.raw`C:\Program Files\VRChat Photos\2024`),
       ).toBe('C:/Program Files/VRChat Photos/2024');
     });
 
@@ -81,16 +81,14 @@ describe('VRChat Photo Service cross-platform path handling', () => {
     });
 
     it('should extract folder from Windows paths', () => {
-      const path =
-        'C:\\backups\\vrchat-albums-export_2023-12-01_14-30-45\\2023-11\\logStore-2023-11.txt';
+      const path = String.raw`C:\backups\vrchat-albums-export_2023-12-01_14-30-45\2023-11\logStore-2023-11.txt`;
       expect(extractFolderFromPath(path, 'vrchat-albums-export_')).toBe(
         'vrchat-albums-export_2023-12-01_14-30-45',
       );
     });
 
     it('should handle mixed separators', () => {
-      const path =
-        'C:\\backups/vrchat-albums-export_2023-12-01_14-30-45\\2023-11/logStore-2023-11.txt';
+      const path = String.raw`C:\backups/vrchat-albums-export_2023-12-01_14-30-45\2023-11/logStore-2023-11.txt`;
       expect(extractFolderFromPath(path, 'vrchat-albums-export_')).toBe(
         'vrchat-albums-export_2023-12-01_14-30-45',
       );

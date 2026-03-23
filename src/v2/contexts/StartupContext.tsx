@@ -55,10 +55,18 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
 
   // ステージマッピング
   const stage: Stage = (() => {
-    if (stages.initialization === 'pending') return 'idle';
-    if (stages.initialization === 'inProgress') return 'syncing';
-    if (stages.initialization === 'success') return 'ready';
-    if (stages.initialization === 'error') return 'error';
+    if (stages.initialization === 'pending') {
+      return 'idle';
+    }
+    if (stages.initialization === 'inProgress') {
+      return 'syncing';
+    }
+    if (stages.initialization === 'success') {
+      return 'ready';
+    }
+    if (stages.initialization === 'error') {
+      return 'error';
+    }
     return 'idle';
   })();
 

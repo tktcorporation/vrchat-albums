@@ -28,7 +28,7 @@ export const usePlayerListDisplay = (players: Player[] | null) => {
       tempDiv.style.whiteSpace = 'nowrap';
       tempDiv.style.fontSize = '0.875rem'; // text-sm
       tempDiv.style.pointerEvents = 'none'; // イベントを無効化
-      document.body.appendChild(tempDiv);
+      document.body.append(tempDiv);
       measureElementRef.current = tempDiv;
     }
 
@@ -48,8 +48,9 @@ export const usePlayerListDisplay = (players: Player[] | null) => {
         !playerListContainerRef.current ||
         !Array.isArray(players) ||
         !measureElementRef.current
-      )
+      ) {
         return;
+      }
 
       const containerWidth = playerListContainerRef.current.offsetWidth;
       const separatorWidth = 24; // セパレータ（ / ）の幅

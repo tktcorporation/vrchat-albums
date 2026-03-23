@@ -72,7 +72,9 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
    * 実行ボタンやショートカットキーから呼び出される。
    */
   const handleExecute = async () => {
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      return;
+    }
 
     // effect-lint-allow-try-catch: React フロントエンド境界
     try {

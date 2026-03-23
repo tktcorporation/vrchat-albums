@@ -131,9 +131,7 @@ export const getLogStoreFilePathsInRange = async (
     targetDate = datefns.addMonths(targetDate, 1);
   }
 
-  return Array.from(logFilePathSet).map((p) =>
-    VRChatLogStoreFilePathSchema.parse(p),
-  );
+  return [...logFilePathSet].map((p) => VRChatLogStoreFilePathSchema.parse(p));
 };
 
 /**
@@ -167,7 +165,7 @@ export const appendLoglinesToFile = (props: {
   dedupCache?: DedupCache;
 }): Effect.Effect<void> => {
   if (props.logLines.length === 0) {
-    return Effect.succeed(undefined);
+    return Effect.succeed();
   }
 
   return Effect.gen(function* () {
@@ -178,7 +176,7 @@ export const appendLoglinesToFile = (props: {
       const dateMatch = logLine.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
       if (!dateMatch) {
         const key = datefns.format(new Date(), 'yyyy-MM');
-        const monthLogs = logsByMonth.get(key) || [];
+        const monthLogs = logsByMonth.get(key) ?? [];
         monthLogs.push(logLine);
         logsByMonth.set(key, monthLogs);
         continue;
@@ -188,7 +186,7 @@ export const appendLoglinesToFile = (props: {
       const month = dateMatch[2];
       const key = `${year}-${month}`;
 
-      const monthLogs = logsByMonth.get(key) || [];
+      const monthLogs = logsByMonth.get(key) ?? [];
       monthLogs.push(logLine);
       logsByMonth.set(key, monthLogs);
     }

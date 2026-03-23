@@ -13,8 +13,8 @@ import {
 // fs.writeFile をモック
 vi.mock('fs', () => ({
   promises: {
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(),
+    mkdir: vi.fn().mockResolvedValue(),
   },
 }));
 
@@ -22,8 +22,8 @@ describe('exportService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // モック関数のデフォルト戻り値を再設定
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.writeFile).mockResolvedValue();
+    vi.mocked(fs.mkdir).mockResolvedValue();
   });
 
   describe('getLogStoreExportPath', () => {
@@ -136,7 +136,7 @@ describe('exportService', () => {
       const pathParts = String(mkdirCallPath).split(path.sep);
       expect(pathParts).toContain('test');
       expect(pathParts).toContain('exports');
-      expect(pathParts[pathParts.length - 1]).toBe('2023-10');
+      expect(pathParts.at(-1)).toBe('2023-10');
     });
 
     it('複数月にまたがるデータを月別ファイルにエクスポートできる', async () => {
@@ -210,7 +210,7 @@ describe('exportService', () => {
       );
       expect(mkdirPath1).toContain('2023-09');
       const pathParts1 = String(mkdirPath1).split(path.sep);
-      expect(pathParts1[pathParts1.length - 1]).toBe('2023-09');
+      expect(pathParts1.at(-1)).toBe('2023-09');
 
       // 2つ目のディレクトリパスを確認
       const mkdirPath2 = String(mkdirCalls[1][0]);
@@ -219,7 +219,7 @@ describe('exportService', () => {
       );
       expect(mkdirPath2).toContain('2023-10');
       const pathParts2 = String(mkdirPath2).split(path.sep);
-      expect(pathParts2[pathParts2.length - 1]).toBe('2023-10');
+      expect(pathParts2.at(-1)).toBe('2023-10');
     });
 
     it('データが存在しない場合は空の結果を返す', async () => {

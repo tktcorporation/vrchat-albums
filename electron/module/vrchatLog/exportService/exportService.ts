@@ -75,7 +75,9 @@ const getElectronDownloadsPath = (): string | null => {
     }
   })();
 
-  if (!electronApp) return null;
+  if (!electronApp) {
+    return null;
+  }
 
   // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
   try {
@@ -122,12 +124,12 @@ export const getLogStoreExportPath = (
   basePath?: string,
   exportDateTime?: Date,
 ): string => {
-  const base = basePath || getDefaultLogStorePath();
+  const base = basePath ?? getDefaultLogStorePath();
   const yearMonth = datefns.format(date, 'yyyy-MM');
   const fileName = `logStore-${yearMonth}.txt`;
 
   // エクスポート実行日時のサブフォルダ名を生成
-  const exportTime = exportDateTime || new Date();
+  const exportTime = exportDateTime ?? new Date();
   const exportFolder = generateExportFolderName(exportTime);
 
   return path.join(base, exportFolder, yearMonth, fileName);
@@ -184,7 +186,7 @@ const ensureDirectoryExists = (
   dirPath: string,
 ): Effect.Effect<void, ExportServiceError> =>
   Effect.tryPromise({
-    try: () => fs.mkdir(dirPath, { recursive: true }).then(() => undefined),
+    try: () => fs.mkdir(dirPath, { recursive: true }).then(() => {}),
     catch: (e) =>
       new ExportDirCreateFailed({
         path: dirPath,
@@ -200,7 +202,7 @@ const writeFileSafe = (
   content: string,
 ): Effect.Effect<void, ExportServiceError> =>
   Effect.tryPromise({
-    try: () => fs.writeFile(filePath, content, 'utf-8'),
+    try: () => fs.writeFile(filePath, content, 'utf8'),
     catch: (e) =>
       new ExportFileWriteFailed({
         path: filePath,

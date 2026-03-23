@@ -81,7 +81,7 @@ vi.mock('./exportService/exportService', async (importOriginal) => {
       .mockImplementation(
         ({ outputBasePath, startDate, endDate }, _getDBLogs) => {
           const exportFolderName = 'vrchat-albums-export_2023-12-01_14-30-45';
-          const actualOutputPath = outputBasePath || '/tmp/test-export';
+          const actualOutputPath = outputBasePath ?? '/tmp/test-export';
           const exportDir = path.join(actualOutputPath, exportFolderName);
 
           // Handle different month directories based on test data
@@ -195,10 +195,10 @@ vi.mock('./backupService/backupService', async (importOriginal) => {
       }),
       updateBackupMetadata: vi.fn((backup: ImportBackupMetadata) => {
         const index = backupHistory.findIndex((b) => b.id === backup.id);
-        if (index >= 0) {
+        if (index !== -1) {
           backupHistory[index] = backup;
         }
-        return Effect.succeed(undefined);
+        return Effect.succeed();
       }),
     },
   };
@@ -213,10 +213,10 @@ vi.mock('./backupService/rollbackService', async () => {
         console.log('[Mock] rollbackToBackup called for backup:', backup.id);
         // Update backup status in history
         const index = backupHistory.findIndex((b) => b.id === backup.id);
-        if (index >= 0) {
+        if (index !== -1) {
           backupHistory[index].status = 'rolled_back';
         }
-        return Effect.succeed(undefined);
+        return Effect.succeed();
       }),
     },
   };
@@ -263,7 +263,7 @@ vi.mock('../fileHandlers/logStorageManager', () => {
       const logStoreDir = path.join(testUserDataDir, 'logStore');
 
       if (logLines.length === 0) {
-        return Effect.succeed(undefined);
+        return Effect.succeed();
       }
 
       // Parse log lines to extract world and player join data
@@ -333,7 +333,7 @@ vi.mock('../fileHandlers/logStorageManager', () => {
         .join('\n')}\n`;
       fs.appendFileSync(filePath, content);
 
-      return Effect.succeed(undefined);
+      return Effect.succeed();
     }),
   };
 });

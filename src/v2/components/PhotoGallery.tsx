@@ -35,9 +35,9 @@ export interface PhotoGalleryData {
  */
 const PhotoGallery = memo((props: PhotoGalleryProps) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState<'world' | 'player' | undefined>(
-    undefined,
-  );
+  const [searchType, setSearchType] = useState<
+    'world' | 'player' | undefined
+  >();
   const debouncedSearchQuery = useDebounce(searchQuery, 300); // 300ms のデバウンス
   const [showSettings, setShowSettings] = useState(false);
   const { t } = useI18n();

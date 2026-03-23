@@ -107,7 +107,7 @@ function createWindow(): BrowserWindow {
   //   mainWindow.webContents.openDevTools();
   // }
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT ?? 3000;
   const url = isDev
     ? `http://localhost:${port}`
     : join(__dirname, '../src/out/index.html');
@@ -121,7 +121,7 @@ function createWindow(): BrowserWindow {
 
   // http or httpsのリンクをクリックしたときにデフォルトブラウザで開く
   const handleUrlOpen = (e: Event, linkUrl: string) => {
-    if (linkUrl.match(/^http/)) {
+    if (linkUrl.startsWith('http')) {
       e.preventDefault();
       void shell.openExternal(linkUrl);
     }
@@ -305,7 +305,9 @@ const setTray = () => {
   let tray: Tray | null = null;
 
   const createTray = async () => {
-    if (tray !== null) return;
+    if (tray !== null) {
+      return;
+    }
 
     const appPath = app.isPackaged ? process.resourcesPath : app.getAppPath();
     const iconPath = join(appPath, 'assets', 'icon.png');
@@ -347,7 +349,9 @@ const setTray = () => {
         label: 'ウィンドウを表示',
         click: () => {
           const window = createOrGetWindow();
-          if (window.isMinimized()) window.restore();
+          if (window.isMinimized()) {
+            window.restore();
+          }
           window.show();
           window.focus();
         },
@@ -376,7 +380,9 @@ const setTray = () => {
       // トレイアイコンクリック時にウィンドウを表示
       tray.on('click', () => {
         const window = createOrGetWindow();
-        if (window.isMinimized()) window.restore();
+        if (window.isMinimized()) {
+          window.restore();
+        }
         window.show();
         window.focus();
       });

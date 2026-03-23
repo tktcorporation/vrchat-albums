@@ -584,7 +584,7 @@ const getDefaultVRChatPhotoDir = (): VRChatPhotoDirPath => {
       ? path.join(picturesPath, 'VRChat')
       : path.join(process.env.USERPROFILE, 'Pictures', 'VRChat');
   } else {
-    logFilesDir = path.join(process.env.HOME || '', 'Pictures', 'VRChat');
+    logFilesDir = path.join(process.env.HOME ?? '', 'Pictures', 'VRChat');
   }
 
   return VRChatPhotoDirPathSchema.parse(logFilesDir);
@@ -856,7 +856,7 @@ const getChangedFoldersWithFiles = async (
 
     // デバッグ: savedState lookup 結果
     logger.debug(
-      `[DigestCheck] folder=${folderPath}, savedStateExists=${!!savedState}, savedDigest=${savedState?.digest ?? 'none'}, currentDigest=${currentDigest}`,
+      `[DigestCheck] folder=${folderPath}, savedStateExists=${Boolean(savedState)}, savedDigest=${savedState?.digest ?? 'none'}, currentDigest=${currentDigest}`,
     );
 
     // ダイジェストが一致すればスキップ（FolderDigest同士は直接比較可能）
@@ -1055,14 +1055,14 @@ async function processPhotoBatch(
   photoPaths: string[],
   memoryMonitor?: MemoryMonitor,
 ): Promise<
-  Array<{ photoPath: string; takenAt: Date; width: number; height: number }>
+  { photoPath: string; takenAt: Date; width: number; height: number }[]
 > {
-  const results: Array<{
+  const results: {
     photoPath: string;
     takenAt: Date;
     width: number;
     height: number;
-  }> = [];
+  }[] = [];
 
   // 並列処理数をメモリ使用量に基づいて動的に決定
   const monitor = memoryMonitor ?? getGlobalMemoryMonitor();
@@ -1160,8 +1160,8 @@ async function processPhotoBatch(
           message: `Missing dimension metadata for photo, using defaults`,
           details: {
             photoPath,
-            hasHeight: !!metadata.height,
-            hasWidth: !!metadata.width,
+            hasHeight: Boolean(metadata.height),
+            hasWidth: Boolean(metadata.width),
             defaultsUsed: { height, width },
           },
         });
@@ -1638,11 +1638,11 @@ export interface BatchThumbnailResult {
   /** 成功したサムネイル（photoPath -> base64Data） */
   success: Map<string, string>;
   /** 失敗したパスと理由 */
-  failed: Array<{
+  failed: {
     photoPath: string;
     reason: 'file_not_found' | 'unexpected_error';
     message: string;
-  }>;
+  }[];
 }
 
 /**
@@ -1700,7 +1700,9 @@ export const getBatchThumbnails = async (
           // 予期しないエラー（画像処理内部エラー等）
           const dieOpt = Cause.dieOption(exit.cause);
           const unexpectedError = (() => {
-            if (!Option.isSome(dieOpt)) return new Error('Unknown error');
+            if (!Option.isSome(dieOpt)) {
+              return new Error('Unknown error');
+            }
             return dieOpt.value instanceof Error
               ? dieOpt.value
               : new Error(String(dieOpt.value));

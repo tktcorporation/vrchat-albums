@@ -17,7 +17,7 @@ function maskFilePaths(str: string | undefined): string | undefined {
   let newStr = str.replaceAll(/(\/Users\/)[^/]+(\/)/g, '$1[REDACTED_USER]$2');
   newStr = newStr.replaceAll(/(\/home\/)[^/]+(\/)/g, '$1[REDACTED_USER]$2');
   // Windows Paths
-  newStr = newStr.replace(
+  newStr = newStr.replaceAll(
     /([A-Za-z]:\\Users\\)[^\\]+(\\)/g,
     '$1[REDACTED_USER]$2',
   );

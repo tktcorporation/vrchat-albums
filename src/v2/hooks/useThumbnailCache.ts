@@ -349,7 +349,9 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
       // 既にキャッシュにあるものとペンディング中のものを除外
       const pathsToFetch = filterPathsNeedingFetch(paths);
 
-      if (pathsToFetch.length === 0) return;
+      if (pathsToFetch.length === 0) {
+        return;
+      }
 
       // ペンディングに追加
       for (const path of pathsToFetch) {
@@ -442,7 +444,9 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
       // 既にキャッシュにあるものを除外
       const pathsToQueue = filterPathsNeedingFetch(paths);
 
-      if (pathsToQueue.length === 0) return;
+      if (pathsToQueue.length === 0) {
+        return;
+      }
 
       // キューに追加（重複を避ける）
       const existingInQueue = new Set(prefetchQueueRef.current);
@@ -487,7 +491,9 @@ export function useThumbnail(photoPath: string, enabled = true) {
 
   // キャッシュから取得を試みる
   useEffect(() => {
-    if (!enabled || !photoPath) return;
+    if (!enabled || !photoPath) {
+      return;
+    }
 
     const cached = getThumbnail(photoPath);
     if (cached) {
@@ -501,11 +507,15 @@ export function useThumbnail(photoPath: string, enabled = true) {
 
   // キャッシュ更新イベントを購読
   useEffect(() => {
-    if (!enabled || !photoPath) return;
+    if (!enabled || !photoPath) {
+      return;
+    }
 
     // 既にキャッシュにある場合は購読不要
     const cached = getThumbnail(photoPath);
-    if (cached) return;
+    if (cached) {
+      return;
+    }
 
     // キャッシュ更新を待つ
     return subscribeToCacheUpdate(photoPath, setThumbnailState);

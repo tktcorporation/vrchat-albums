@@ -231,7 +231,9 @@ export class JustifiedLayoutCalculator {
    * 行配列からグリッドの総高さを計算
    */
   private calculateGridHeightFromRows(rows: LayoutPhoto[][]): number {
-    if (rows.length === 0) return 0;
+    if (rows.length === 0) {
+      return 0;
+    }
 
     let height = 0;
     for (let i = 0; i < rows.length; i++) {

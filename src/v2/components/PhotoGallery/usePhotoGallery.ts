@@ -90,7 +90,9 @@ export function usePhotoGallery(
     );
 
   const photoList: Photo[] = useMemo(() => {
-    if (!photoListRaw) return [];
+    if (!photoListRaw) {
+      return [];
+    }
     const mappedList = photoListRaw.map((p) => {
       const parseResult = VRChatPhotoPathSchema.safeParse(p.photoPath);
       if (!parseResult.success) {
@@ -124,11 +126,17 @@ export function usePhotoGallery(
   // プレイヤー名での検索を効率的に行う
   const isPlayerSearch = useMemo(() => {
     // 明示的に検索タイプが指定されている場合はそれを使用
-    if (searchType === 'player') return true;
-    if (searchType === 'world') return false;
+    if (searchType === 'player') {
+      return true;
+    }
+    if (searchType === 'world') {
+      return false;
+    }
 
     // タイプが指定されていない場合は従来のヒューリスティック
-    if (!searchQuery) return false;
+    if (!searchQuery) {
+      return false;
+    }
 
     // まずワールド名で部分一致があるかチェック
     const query = searchQuery.toLowerCase();
@@ -153,12 +161,16 @@ export function usePhotoGallery(
 
   // プレイヤー検索結果を日時のSetに変換（高速な検索のため）
   const playerSearchSessionSet = useMemo(() => {
-    if (!playerSearchSessions) return null;
+    if (!playerSearchSessions) {
+      return null;
+    }
     return new Set(playerSearchSessions.map((date) => date.toISOString()));
   }, [playerSearchSessions]);
 
   const filteredGroupedPhotos = useMemo(() => {
-    if (!searchQuery) return originalGroupedPhotos;
+    if (!searchQuery) {
+      return originalGroupedPhotos;
+    }
 
     const query = searchQuery.toLowerCase();
     const filtered: GroupedPhotos = {};

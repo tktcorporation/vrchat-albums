@@ -34,9 +34,9 @@ import { SettingsInfoBox, SettingsSection } from './common';
 const getFilenameFromPath = (filePath: string): string => {
   // Split by both forward slashes and backslashes
   const parts = filePath.split(/[/\\]/);
-  const filename = parts[parts.length - 1];
+  const filename = parts.at(-1);
   // If filename is empty (path ends with separator), try the second to last part
-  return filename || parts[parts.length - 2] || filePath;
+  return filename ?? parts.at(-2) ?? filePath;
 };
 
 /**
@@ -121,7 +121,7 @@ const DataImport = memo(() => {
     e.preventDefault();
     setIsDragOver(false);
 
-    const files = Array.from(e.dataTransfer.files);
+    const files = [...e.dataTransfer.files];
     // Electron adds 'path' property to File objects for drag & drop
     const filePaths = files.map(
       (file) => (file as File & { path: string }).path,
@@ -342,7 +342,7 @@ const DataImport = memo(() => {
         </div>
 
         {(() => {
-          if (isLoadingHistory)
+          if (isLoadingHistory) {
             return (
               <div className="text-center py-4">
                 <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
@@ -350,7 +350,8 @@ const DataImport = memo(() => {
                 </div>
               </div>
             );
-          if (importHistory && importHistory.length > 0)
+          }
+          if (importHistory && importHistory.length > 0) {
             return (
               <div className={SPACING.stack.default}>
                 {importHistory.map((backup) => (
@@ -431,6 +432,7 @@ const DataImport = memo(() => {
                 ))}
               </div>
             );
+          }
           return (
             <div className="text-center py-8">
               <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>

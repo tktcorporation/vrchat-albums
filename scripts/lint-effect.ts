@@ -71,8 +71,12 @@ function checkNoNeverthrowImports(filePath: string, content: string) {
  * サービス層の ResultAsync/Result 残存チェック
  */
 function checkServiceReturnsEffect(filePath: string, content: string) {
-  if (!filePath.endsWith('service.ts')) return;
-  if (filePath.includes('.test.') || filePath.includes('.spec.')) return;
+  if (!filePath.endsWith('service.ts')) {
+    return;
+  }
+  if (filePath.includes('.test.') || filePath.includes('.spec.')) {
+    return;
+  }
 
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -107,7 +111,9 @@ function checkServiceReturnsEffect(filePath: string, content: string) {
  */
 function checkNoEffectFailUserFacingError(filePath: string, content: string) {
   // テストファイルは除外
-  if (filePath.includes('.test.') || filePath.includes('.spec.')) return;
+  if (filePath.includes('.test.') || filePath.includes('.spec.')) {
+    return;
+  }
 
   const lines = content.split('\n');
 
@@ -129,8 +135,12 @@ function checkNoEffectFailUserFacingError(filePath: string, content: string) {
 
     if (inRunEffect) {
       for (const char of line) {
-        if (char === '(') runEffectDepth++;
-        if (char === ')') runEffectDepth--;
+        if (char === '(') {
+          runEffectDepth++;
+        }
+        if (char === ')') {
+          runEffectDepth--;
+        }
       }
       // runEffect(...) の括弧がすべて閉じたら追跡終了
       // runEffectDepth は runEffect( の行で 0 から開始するため、
@@ -141,7 +151,9 @@ function checkNoEffectFailUserFacingError(filePath: string, content: string) {
     }
 
     // runEffect 内は除外
-    if (inRunEffect) continue;
+    if (inRunEffect) {
+      continue;
+    }
 
     // Effect.fail( の開始を検出
     if (!inEffectFail && line.includes('Effect.fail(')) {
@@ -168,8 +180,12 @@ function checkNoEffectFailUserFacingError(filePath: string, content: string) {
     if (inEffectFail) {
       // 括弧の深さを追跡
       for (const char of line) {
-        if (char === '(') parenDepth++;
-        if (char === ')') parenDepth--;
+        if (char === '(') {
+          parenDepth++;
+        }
+        if (char === ')') {
+          parenDepth--;
+        }
       }
 
       // Effect.fail の引数内に UserFacingError が見つかった場合
@@ -205,7 +221,9 @@ function checkNoEffectFailUserFacingError(filePath: string, content: string) {
  */
 function checkNoMockResolvedEffect(filePath: string, content: string) {
   // テストファイルのみ対象
-  if (!filePath.includes('.test.') && !filePath.includes('.spec.')) return;
+  if (!filePath.includes('.test.') && !filePath.includes('.spec.')) {
+    return;
+  }
 
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -254,7 +272,9 @@ function checkNoRunEffectForTRPC(filePath: string, content: string) {
  */
 function checkCauseInErrorHandler(filePath: string, content: string) {
   // テストファイルは除外
-  if (filePath.includes('.test.') || filePath.includes('.spec.')) return;
+  if (filePath.includes('.test.') || filePath.includes('.spec.')) {
+    return;
+  }
 
   const lines = content.split('\n');
   let inErrorHandler = false;
@@ -300,8 +320,12 @@ function checkCauseInErrorHandler(filePath: string, content: string) {
 
       // ブレース追跡でブロック終了を検出
       for (const char of line) {
-        if (char === '(') braceDepth++;
-        if (char === ')') braceDepth--;
+        if (char === '(') {
+          braceDepth++;
+        }
+        if (char === ')') {
+          braceDepth--;
+        }
       }
 
       if (braceDepth <= 0 && i > errorHandlerStartLine) {
@@ -337,9 +361,13 @@ function checkCauseInErrorHandler(filePath: string, content: string) {
  */
 function checkNoTryCatch(filePath: string, content: string) {
   // テストファイルは除外
-  if (filePath.includes('.test.') || filePath.includes('.spec.')) return;
+  if (filePath.includes('.test.') || filePath.includes('.spec.')) {
+    return;
+  }
   // lint スクリプト自体は除外
-  if (filePath.includes('scripts/lint-')) return;
+  if (filePath.includes('scripts/lint-')) {
+    return;
+  }
 
   const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
@@ -385,7 +413,7 @@ async function main() {
 
   for (const filePath of allPaths) {
     const normalizedPath = NormalizedPathSchema.parse(filePath);
-    const content = fs.readFileSync(normalizedPath, 'utf-8');
+    const content = fs.readFileSync(normalizedPath, 'utf8');
 
     checkNoNeverthrowImports(normalizedPath, content);
     checkServiceReturnsEffect(normalizedPath, content);

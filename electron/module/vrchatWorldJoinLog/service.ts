@@ -95,7 +95,7 @@ export const findLatestWorldJoinLog = (): Effect.Effect<
   return enqueueTask(() => model.findLatestWorldJoinLog());
 };
 
-type VRChatWorldJoinLogWithSource = {
+interface VRChatWorldJoinLogWithSource {
   id: string;
   worldId: string;
   worldName: string;
@@ -103,7 +103,7 @@ type VRChatWorldJoinLogWithSource = {
   joinDateTime: Date;
   createdAt: Date;
   updatedAt: Date | null;
-};
+}
 
 /**
  * 通常のログと写真から取得したログをマージします

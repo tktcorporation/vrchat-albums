@@ -174,7 +174,7 @@ export class BackupService {
       ),
       Effect.tap(() => {
         logger.info(`Backup metadata updated: ${metadata.id}`);
-        return Effect.succeed(undefined);
+        return Effect.succeed();
       }),
     );
   }
@@ -232,7 +232,7 @@ export class BackupService {
 
         // 個別のメタデータ読み込み失敗は警告のみで継続
         const readExit = yield* Effect.tryPromise({
-          try: () => fs.readFile(metadataPath, 'utf-8'),
+          try: () => fs.readFile(metadataPath, 'utf8'),
           catch: (e) => e,
         }).pipe(Effect.either);
 

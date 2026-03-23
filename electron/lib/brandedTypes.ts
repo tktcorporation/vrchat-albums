@@ -77,7 +77,9 @@ export const OptionalVRChatPlayerIdSchema = z
   .string()
   .nullable()
   .transform((value) => {
-    if (!value) return null;
+    if (!value) {
+      return null;
+    }
     return VRChatPlayerIdSchema.parse(value);
   });
 

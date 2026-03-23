@@ -45,7 +45,7 @@ describe('BoldPreviewSvg', () => {
       <BoldPreviewSvg
         worldName="Test World"
         players={players}
-        showAllPlayers={true}
+        showAllPlayers
       />,
     );
 
@@ -64,7 +64,7 @@ describe('BoldPreviewSvg', () => {
       <BoldPreviewSvg
         worldName="Test World"
         players={players}
-        showAllPlayers={true}
+        showAllPlayers
       />,
     );
 
@@ -105,7 +105,7 @@ describe('BoldPreviewSvg', () => {
       <BoldPreviewSvg
         worldName="Test World"
         players={players}
-        showAllPlayers={true}
+        showAllPlayers
       />,
     );
 

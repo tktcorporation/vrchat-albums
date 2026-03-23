@@ -206,10 +206,10 @@ export const getMetadataForPhotos = (
 export const getPhotosByWorldId = (
   worldId: string,
 ): Effect.Effect<
-  Array<{
+  {
     photoPath: string;
     worldDisplayName: string | null;
-  }>,
+  }[],
   MetadataDbError
 > =>
   Effect.gen(function* () {

@@ -24,13 +24,13 @@ vi.mock('../../lib/wrappedApp', () => ({
 // node:fsのモック
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),
-  mkdirSync: vi.fn().mockReturnValue(undefined),
+  mkdirSync: vi.fn().mockReturnValue(),
   readdirSync: vi.fn().mockReturnValue([]),
   promises: {
-    mkdir: vi.fn().mockResolvedValue(undefined),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    unlink: vi.fn().mockResolvedValue(undefined),
-    rmdir: vi.fn().mockResolvedValue(undefined),
+    mkdir: vi.fn().mockResolvedValue(),
+    writeFile: vi.fn().mockResolvedValue(),
+    unlink: vi.fn().mockResolvedValue(),
+    rmdir: vi.fn().mockResolvedValue(),
   },
   statSync: vi.fn().mockReturnValue({ size: 100 }),
 }));
@@ -38,10 +38,10 @@ vi.mock('node:fs', () => ({
 // fs操作のモック
 vi.mock('../../lib/wrappedFs', () => ({
   existsSyncSafe: vi.fn().mockReturnValue(false),
-  mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
-  appendFileAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
-  writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
-  unlinkAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+  mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed()),
+  appendFileAsync: vi.fn().mockReturnValue(Effect.succeed()),
+  writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed()),
+  unlinkAsync: vi.fn().mockReturnValue(Effect.succeed()),
   readFileSyncSafe: vi.fn().mockImplementation(() => {
     return Effect.succeed(Buffer.from('test content'));
   }),

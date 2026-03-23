@@ -66,7 +66,7 @@ export class JsDocSeeLinter {
       return this.sourceMap.get(filePath);
     }
     try {
-      return fs.readFileSync(filePath, 'utf-8');
+      return fs.readFileSync(filePath, 'utf8');
     } catch {
       return undefined;
     }

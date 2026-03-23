@@ -28,7 +28,9 @@ let fontFilePaths: string[] = [];
  * 3. テスト環境: 同じ相対パスで解決（Electron require が失敗するため catch で処理）
  */
 const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
-  if (fontsLoaded) return Effect.succeed(fontFilePaths);
+  if (fontsLoaded) {
+    return Effect.succeed(fontFilePaths);
+  }
 
   const fontsDir = (() => {
     // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）

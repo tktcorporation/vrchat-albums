@@ -23,14 +23,14 @@ export const createVRChatPlayerJoinLogModel = (
 /**
  * プレイヤー参加ログのデータ型
  */
-type PlayerJoinLogData = {
+interface PlayerJoinLogData {
   id: string;
   playerId: string | null;
   playerName: string;
   joinDateTime: Date;
   createdAt: Date;
   updatedAt: Date;
-};
+}
 
 /**
  * 参加日時の範囲からVRChatのプレイヤー参加ログを取得する
@@ -135,7 +135,7 @@ export const getLatestDetectedDate = (): Effect.Effect<
  * @returns 日時範囲ごとのプレイヤー参加ログのマップ
  */
 export const getVRChatPlayerJoinLogListByMultipleDateRanges = (
-  dateRanges: Array<{ start: Date; end: Date | undefined; key: string }>,
+  dateRanges: { start: Date; end: Date | undefined; key: string }[],
 ): Effect.Effect<
   Record<string, PlayerJoinLogData[]>,
   PlayerJoinLogServiceError
@@ -164,7 +164,7 @@ export const getVRChatPlayerJoinLogListByMultipleDateRanges = (
           }),
       ),
     ) as Effect.Effect<
-      Array<model.VRChatPlayerJoinLogModel & { range_key: string }>,
+      (model.VRChatPlayerJoinLogModel & { range_key: string })[],
       PlayerJoinLogServiceError
     >;
 

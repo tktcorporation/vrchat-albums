@@ -198,7 +198,9 @@ process.on('unhandledRejection', (error) => logger.error({ message: error }));
 
 app.on('second-instance', () => {
   const mainWindow = electronUtil.createOrGetWindow();
-  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
   mainWindow.focus();
 });
 

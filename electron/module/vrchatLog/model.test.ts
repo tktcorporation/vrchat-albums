@@ -103,8 +103,8 @@ describe('VRChatログ関連のvalueObjects', () => {
       try {
         VRChatWorldInstanceIdSchema.parse(invalidId);
         expect.fail('Should have thrown');
-      } catch (e) {
-        expect((e as Error).message).toContain(invalidId);
+      } catch (error) {
+        expect((error as Error).message).toContain(invalidId);
       }
     });
 

@@ -14,7 +14,7 @@ export const updaterRouter = router({
       return exit.value;
     }
     // エラーの場合もログはサービス側で記録済み、ここでは何もしない
-    return undefined;
+    return;
   }),
 
   quitAndInstall: procedure.mutation(async () => {

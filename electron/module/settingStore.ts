@@ -315,7 +315,7 @@ const setSettingStore = (name: StoreName) => {
             'height' in b,
           (b) => b,
         )
-        .otherwise(() => undefined);
+        .otherwise(() => {});
     },
     getTermsAccepted: getTermsAccepted(getB),
     setTermsAccepted: setTermsAccepted(set),

@@ -49,7 +49,7 @@ const TestComponent = () => {
   return (
     <div>
       <div data-testid="stage">{stage}</div>
-      <div data-testid="error">{error || 'no-error'}</div>
+      <div data-testid="error">{error ?? 'no-error'}</div>
       <div data-testid="isReady">{isReady ? 'true' : 'false'}</div>
       <button type="button" data-testid="retry" onClick={retry}>
         Retry

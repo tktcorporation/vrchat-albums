@@ -34,7 +34,7 @@ export default ({ command }: ConfigEnv): UserConfig => {
         sourcemap: true,
       },
       server: {
-        port: process.env.PORT === undefined ? 3000 : +process.env.PORT,
+        port: process.env.PORT === undefined ? 3000 : Number(process.env.PORT),
         host: true,
       },
       optimizeDeps: {
@@ -83,7 +83,7 @@ export default ({ command }: ConfigEnv): UserConfig => {
       sourcemap: true,
     },
     server: {
-      port: process.env.PORT === undefined ? 3000 : +process.env.PORT,
+      port: process.env.PORT === undefined ? 3000 : Number(process.env.PORT),
     },
     optimizeDeps: {
       exclude: ['path', 'clip-filepaths'],

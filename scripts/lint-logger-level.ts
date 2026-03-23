@@ -181,7 +181,9 @@ export class LoggerLevelLinter {
   }
 
   private hasUnexpectedErrorReason(returnStmt: ts.ReturnStatement): boolean {
-    if (!returnStmt.expression) return false;
+    if (!returnStmt.expression) {
+      return false;
+    }
 
     const checkNode = (node: ts.Node): boolean => {
       if (

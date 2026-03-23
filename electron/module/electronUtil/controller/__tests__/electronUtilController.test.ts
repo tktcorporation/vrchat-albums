@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { electronUtilRouter } from '../electronUtilController';
 
 // パスの正規化のためのヘルパー関数を追加
-const normalizePath = (p: string) => p.replace(/\\/g, '/');
+const normalizePath = (p: string) => p.replaceAll('\\', '/');
 
 vi.mock('node:fs/promises');
 
@@ -46,9 +46,9 @@ describe('electronUtilController', () => {
     (fs.mkdtemp as ReturnType<typeof vi.fn>).mockResolvedValue(
       path.join(os.tmpdir(), 'test-dir'),
     );
-    (fs.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (fs.copyFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (fs.rm as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (fs.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue();
+    (fs.copyFile as ReturnType<typeof vi.fn>).mockResolvedValue();
+    (fs.rm as ReturnType<typeof vi.fn>).mockResolvedValue();
   });
 
   describe('downloadImageAsPng', () => {

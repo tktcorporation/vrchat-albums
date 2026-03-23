@@ -283,23 +283,25 @@ export class ImportService {
 
       // ファイル名の形式確認（logStore-YYYY-MM.txt形式）
       const fileName = path.basename(filePath);
-      if (!fileName.match(/^logStore-\d{4}-\d{2}\.txt$/)) {
+      if (!/^logStore-\d{4}-\d{2}\.txt$/.test(fileName)) {
         logger.warn(`File name does not match expected pattern: ${fileName}`);
         // 警告として記録するが、処理は継続
       }
 
       // ファイル内容のサンプル検証（最初の数行をチェック）
       // readFile エラーは予期しないエラーなので throw
-      const content = await fs.readFile(filePath, 'utf-8');
+      const content = await fs.readFile(filePath, 'utf8');
       const lines = content.split('\n').slice(0, 10); // 最初の10行をチェック
 
       for (const line of lines) {
-        if (line.trim() === '') continue;
+        if (line.trim() === '') {
+          continue;
+        }
 
         const parseResult = VRChatLogLineSchema.safeParse(line);
         if (!parseResult.success) {
           logger.warn(
-            `Invalid log line format in ${fileName}: ${line.substring(0, 100)}...`,
+            `Invalid log line format in ${fileName}: ${line.slice(0, 100)}...`,
           );
           // 一部の行が無効でも処理は継続（警告のみ）
         }
@@ -330,7 +332,7 @@ export class ImportService {
 
         // ファイル読み込み・解析（予期しないエラーは throw）
         const content = yield* Effect.tryPromise({
-          try: () => fs.readFile(filePath, 'utf-8'),
+          try: () => fs.readFile(filePath, 'utf8'),
           catch: (e) => {
             throw e; // Unexpected error
           },
@@ -351,9 +353,7 @@ export class ImportService {
           } else {
             invalidLineCount++;
             // 無効な行は警告として記録し、スキップ
-            logger.warn(
-              `Skipping invalid log line: ${line.substring(0, 100)}...`,
-            );
+            logger.warn(`Skipping invalid log line: ${line.slice(0, 100)}...`);
           }
         }
 
@@ -370,11 +370,11 @@ export class ImportService {
       // 重複を確認（同一内容の行をカウント）
       const uniqueLines = new Map<string, number>();
       for (const logLine of allLogLines) {
-        const count = uniqueLines.get(logLine) || 0;
+        const count = uniqueLines.get(logLine) ?? 0;
         uniqueLines.set(logLine, count + 1);
       }
 
-      const duplicateCount = Array.from(uniqueLines.values()).reduce(
+      const duplicateCount = [...uniqueLines.values()].reduce(
         (sum, count) => sum + (count > 1 ? count - 1 : 0),
         0,
       );

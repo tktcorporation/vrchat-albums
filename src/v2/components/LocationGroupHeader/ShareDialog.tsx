@@ -63,8 +63,8 @@ export const ShareDialog = ({
 
   // 画像のBase64変換をバックエンドに依頼
   const { data: base64Data, isLoading } =
-    trpcReact.vrchatApi.convertImageToBase64.useQuery(imageUrl || '', {
-      enabled: !!imageUrl && isOpen,
+    trpcReact.vrchatApi.convertImageToBase64.useQuery(imageUrl ?? '', {
+      enabled: Boolean(imageUrl) && isOpen,
       staleTime: 1000 * 60 * 5, // 5分間キャッシュ
       gcTime: 1000 * 60 * 30, // 30分間キャッシュを保持
     });
@@ -83,7 +83,9 @@ export const ShareDialog = ({
    * Main プロセスの resvg-js ベースパイプラインに委譲する。
    */
   const generatePreview = useCallback(async () => {
-    if (!base64Data || !worldName) return;
+    if (!base64Data || !worldName) {
+      return;
+    }
     setIsGeneratingPreview(true);
     // effect-lint-allow-try-catch: React フロントエンド境界
     try {
@@ -122,14 +124,16 @@ export const ShareDialog = ({
 
   /** 生成済みの画像をクリップボードへコピーする */
   const handleCopyShareImageToClipboard = async () => {
-    if (!previewBase64) return;
+    if (!previewBase64) {
+      return;
+    }
     await downloadOrCopyImageAsPng({
       pngBase64: previewBase64,
-      filenameWithoutExt: worldName || 'image',
+      filenameWithoutExt: worldName ?? 'image',
       downloadOrCopyMutation: {
         mutateAsync: async (params) => {
           await copyImageMutation.mutateAsync(params);
-          return undefined;
+          return;
         },
       },
     });
@@ -137,7 +141,9 @@ export const ShareDialog = ({
 
   /** 生成済みの画像をダウンロードする */
   const handleDownloadShareImagePng = async () => {
-    if (!previewBase64) return;
+    if (!previewBase64) {
+      return;
+    }
     await downloadImageMutation.mutateAsync({
       worldId,
       joinDateTime,
@@ -190,7 +196,7 @@ export const ShareDialog = ({
                         {previewBase64 && (
                           <img
                             src={`data:image/png;base64,${previewBase64}`}
-                            alt={worldName || 'Preview'}
+                            alt={worldName ?? 'Preview'}
                             className="h-96	 max-h-full w-auto"
                           />
                         )}

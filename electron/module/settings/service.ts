@@ -6,10 +6,10 @@ import { logger } from '../../lib/logger';
 import type { UpdateError } from './errors';
 import { DownloadFailed, NoUpdateAvailable, UpdateCheckFailed } from './errors';
 
-export type UpdaterInfo = {
+export interface UpdaterInfo {
   isUpdateAvailable: boolean;
   updateInfo: UpdateCheckResult | null;
-};
+}
 
 /**
  * アプリのバージョン文字列を取得するユーティリティ。

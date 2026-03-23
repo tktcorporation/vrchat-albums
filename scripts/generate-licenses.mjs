@@ -28,7 +28,9 @@ licenseChecker.init(
     }
 
     for (const pkg of Object.values(packages)) {
-      if (pkg.path) pkg.path = path.relative(rootDir, pkg.path);
+      if (pkg.path) {
+        pkg.path = path.relative(rootDir, pkg.path);
+      }
       if (pkg.licenseFile) {
         pkg.licenseFile = path.relative(rootDir, pkg.licenseFile);
       }

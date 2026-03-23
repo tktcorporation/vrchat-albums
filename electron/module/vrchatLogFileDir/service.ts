@@ -84,10 +84,10 @@ export const getValidVRChatLogFileDir = (): Effect.Effect<
   });
 };
 
-export type VRChatLogFileDirResult = {
+export interface VRChatLogFileDirResult {
   storedPath: NotValidatedVRChatLogFilesDirPath | null;
   path: NotValidatedVRChatLogFilesDirPath | VRChatLogFilesDirPath;
-};
+}
 
 /**
  * ログディレクトリ検証結果を返す（Result型）
@@ -125,7 +125,7 @@ const getDefaultVRChatVRChatLogFilesDir =
     } else {
       // 仮置き
       VRChatlogFilesDir = path.join(
-        process.env.HOME || '',
+        process.env.HOME ?? '',
         'Library',
         'Application Support',
         'com.vrchat.VRChat',

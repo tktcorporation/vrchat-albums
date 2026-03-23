@@ -124,7 +124,9 @@ export class RollbackService {
             }
             // Defect - rethrow
             const dieOpt = Cause.dieOption(validationExit.cause);
-            if (Option.isSome(dieOpt)) throw dieOpt.value;
+            if (Option.isSome(dieOpt)) {
+              throw dieOpt.value;
+            }
             throw new Error('Unknown effect failure');
           }
 
@@ -142,7 +144,9 @@ export class RollbackService {
               return { _tag: 'err' as const, error: failOpt.value };
             }
             const dieOpt = Cause.dieOption(restoreExit.cause);
-            if (Option.isSome(dieOpt)) throw dieOpt.value;
+            if (Option.isSome(dieOpt)) {
+              throw dieOpt.value;
+            }
             throw new Error('Unknown effect failure');
           }
 
@@ -156,7 +160,9 @@ export class RollbackService {
               return { _tag: 'err' as const, error: failOpt.value };
             }
             const dieOpt = Cause.dieOption(rebuildExit.cause);
-            if (Option.isSome(dieOpt)) throw dieOpt.value;
+            if (Option.isSome(dieOpt)) {
+              throw dieOpt.value;
+            }
             throw new Error('Unknown effect failure');
           }
 

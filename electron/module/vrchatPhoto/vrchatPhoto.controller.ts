@@ -92,7 +92,7 @@ export const vrchatPhotoRouter = () =>
           .optional(),
       )
       .query(async (ctx) => {
-        return await getVRChatLogFilePathModelList(ctx.input);
+        return getVRChatLogFilePathModelList(ctx.input);
       }),
     getVrchatPhotoPathCount: procedure
       .input(
@@ -109,12 +109,12 @@ export const vrchatPhotoRouter = () =>
         return vrchatPhotoService.getVRChatPhotoPathCount(ctx.input);
       }),
     getCountByYearMonthList: procedure.query(async () => {
-      return await getCountByYearMonthList();
+      return getCountByYearMonthList();
     }),
     getVRChatPhotoItemDataMutation: procedure
       .input(z.object({ photoPath: z.string(), width: z.number().optional() }))
       .mutation(async (ctx) => {
-        return await runEffect(
+        return runEffect(
           vrchatPhotoService.getVRChatPhotoItemData(ctx.input).pipe(
             Effect.mapError((e) =>
               UserFacingError.withStructuredInfo({
@@ -204,7 +204,7 @@ export const vrchatPhotoRouter = () =>
           ctx.input.ids,
         );
         // Map を配列に変換（tRPC での転送用）
-        return Array.from(pathMap.entries()).map(([id, photoPath]) => ({
+        return [...pathMap.entries()].map(([id, photoPath]) => ({
           id,
           photoPath,
         }));
@@ -229,12 +229,10 @@ export const vrchatPhotoRouter = () =>
         );
         // Map を配列に変換（tRPC での転送用）
         return {
-          success: Array.from(result.success.entries()).map(
-            ([photoPath, data]) => ({
-              photoPath,
-              data,
-            }),
-          ),
+          success: [...result.success.entries()].map(([photoPath, data]) => ({
+            photoPath,
+            data,
+          })),
           failed: result.failed,
         };
       }),

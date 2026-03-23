@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 
 interface Release {
   tag_name: string;
-  assets: Array<{
+  assets: {
     name: string;
     browser_download_url: string;
-  }>;
+  }[];
 }
 
 function Download() {
@@ -33,8 +33,8 @@ function Download() {
         }
 
         setRelease(data);
-      } catch (err) {
-        console.error('Failed to fetch release:', err);
+      } catch (error) {
+        console.error('Failed to fetch release:', error);
         setError(
           'リリース情報の取得に失敗しました。しばらくしてから再度お試しください。',
         );
@@ -47,17 +47,25 @@ function Download() {
   }, []);
 
   const getDownloadLink = (platform: string) => {
-    if (!release) return '#';
+    if (!release) {
+      return '#';
+    }
 
     const asset = release.assets.find((a) => {
       const name = a.name.toLowerCase();
-      if (platform === 'windows' && name.endsWith('.exe')) return true;
-      if (platform === 'mac' && name.endsWith('.dmg')) return true;
-      if (platform === 'linux' && name.endsWith('.appimage')) return true;
+      if (platform === 'windows' && name.endsWith('.exe')) {
+        return true;
+      }
+      if (platform === 'mac' && name.endsWith('.dmg')) {
+        return true;
+      }
+      if (platform === 'linux' && name.endsWith('.appimage')) {
+        return true;
+      }
       return false;
     });
 
-    return asset?.browser_download_url || '#';
+    return asset?.browser_download_url ?? '#';
   };
 
   return (
