@@ -25,6 +25,7 @@
     ".grit",
     "pnpm-lock.yaml",
     "src/assets/licenses.json",
+    "CHANGELOG.md",
     ".github/workflows",
     "*.d.ts"
   ]
