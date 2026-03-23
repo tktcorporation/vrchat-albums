@@ -121,8 +121,8 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
     // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       await setLogPathDirectlyMutation.mutateAsync(logInputValue, {
-        onSuccess: async () => {
-          await refetchLogFilesDir();
+        onSuccess: () => {
+          void refetchLogFilesDir();
           setIsLogPathManuallyChanged(false);
         },
         onError: (error) => {
@@ -143,8 +143,8 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
     // effect-lint-allow-try-catch: React フロントエンド境界
     try {
       await setPhotoPathDirectlyMutation.mutateAsync(photoInputValue, {
-        onSuccess: async () => {
-          await refetchPhotoDir();
+        onSuccess: () => {
+          void refetchPhotoDir();
           setIsPhotoPathManuallyChanged(false);
         },
         onError: (error) => {
@@ -206,8 +206,8 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
             label={t('settings.paths.photoDirectory')}
             value={photoInputValue}
             onChange={handlePhotoInputChange}
-            onBrowse={handleBrowsePhotoDirectory}
-            onSave={handlePhotoPathSave}
+            onBrowse={() => void handleBrowsePhotoDirectory()}
+            onSave={() => void handlePhotoPathSave()}
             isManuallyChanged={isPhotoPathManuallyChanged}
             error={photoValidationErrorMessage}
             placeholder="/path/to/photos"
@@ -239,7 +239,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
               ))}
               <Button
                 type="button"
-                onClick={handleBrowseExtraDirectory}
+                onClick={() => void handleBrowseExtraDirectory()}
                 aria-label={t('settings.paths.addExtraDirectory')}
                 variant="secondary"
                 size="sm"
@@ -256,8 +256,8 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
             label={t('settings.paths.logFile')}
             value={logInputValue}
             onChange={handleLogInputChange}
-            onBrowse={handleBrowseLogFile}
-            onSave={handleLogPathSave}
+            onBrowse={() => void handleBrowseLogFile()}
+            onSave={() => void handleLogPathSave()}
             isManuallyChanged={isLogPathManuallyChanged}
             error={logValidationErrorMessage}
             placeholder="/path/to/photo-logs.json"
@@ -279,7 +279,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={handleRefreshAll}
+                    onClick={() => void handleRefreshAll()}
                     disabled={isRefreshing}
                     aria-label={t('common.refresh')}
                   >

@@ -96,7 +96,7 @@ export const useMigrationNotice = () => {
       <MigrationDialog
         open={showMigrationDialog}
         onClose={handleMigrationCancel}
-        onMigrationComplete={handleMigrationComplete}
+        onMigrationComplete={() => void handleMigrationComplete()}
       />
     ),
   };

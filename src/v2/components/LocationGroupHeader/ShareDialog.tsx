@@ -116,7 +116,7 @@ export const ShareDialog = ({
   // base64Dataが変更されたら、プレビューを生成
   useEffect(() => {
     if (base64Data) {
-      generatePreview();
+      void generatePreview();
     }
   }, [generatePreview, base64Data]);
 
@@ -155,7 +155,7 @@ export const ShareDialog = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleCopyShareImageToClipboard}
+              onClick={() => void handleCopyShareImageToClipboard()}
               disabled={isLoading}
               className="p-2 rounded-lg bg-background/20 hover:bg-background/30 border border-border/30 text-muted-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               title={t('locationHeader.copyToClipboard')}
@@ -164,7 +164,7 @@ export const ShareDialog = ({
             </button>
             <button
               type="button"
-              onClick={handleDownloadShareImagePng}
+              onClick={() => void handleDownloadShareImagePng()}
               disabled={isLoading}
               className="p-2 rounded-lg bg-background/20 hover:bg-background/30 border border-border/30 text-muted-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               title={t('locationHeader.downloadImage')}
@@ -202,7 +202,7 @@ export const ShareDialog = ({
               <ContextMenuContent className="bg-popover/95 backdrop-blur-md border border-border/30 shadow-lg">
                 <ContextMenuItem
                   className="hover:bg-muted/50 focus:bg-muted/60 flex items-center gap-2"
-                  onClick={handleCopyShareImageToClipboard}
+                  onClick={() => void handleCopyShareImageToClipboard()}
                   disabled={isLoading}
                 >
                   <Copy className={ICON_SIZE.sm.class} />
@@ -210,7 +210,7 @@ export const ShareDialog = ({
                 </ContextMenuItem>
                 <ContextMenuItem
                   className="hover:bg-muted/50 focus:bg-muted/60 flex items-center gap-2"
-                  onClick={handleDownloadShareImagePng}
+                  onClick={() => void handleDownloadShareImagePng()}
                   disabled={isLoading}
                 >
                   <Download className={ICON_SIZE.sm.class} />

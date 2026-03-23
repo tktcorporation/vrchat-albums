@@ -43,7 +43,7 @@ function Download() {
       }
     };
 
-    fetchRelease();
+    void fetchRelease();
   }, []);
 
   const getDownloadLink = (platform: string) => {

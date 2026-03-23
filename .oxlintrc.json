@@ -11,10 +11,10 @@
   ],
   "categories": {
     "correctness": "error",
-    "suspicious": "warn",
+    "suspicious": "error",
     "style": "off",
     "pedantic": "off",
-    "perf": "warn",
+    "perf": "error",
     "restriction": "off",
     "nursery": "off"
   },
@@ -34,41 +34,42 @@
   "rules": {
     "no-unused-vars": "error",
     "no-undef": "error",
-    "no-unsafe-type-assertion": "off",
 
-    "typescript/no-floating-promises": "warn",
-    "typescript/no-misused-promises": "warn",
-    "typescript/no-unnecessary-type-assertion": "warn",
+    "no-unsafe-type-assertion": "warn",
+    "no-await-in-loop": "warn",
+    "no-shadow": "warn",
+    "no-unused-expressions": "warn",
+    "no-misused-spread": "warn",
+
+    "prefer-add-event-listener": "off",
+
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
     "typescript/no-unsafe-argument": "warn",
     "typescript/no-unsafe-assignment": "warn",
     "typescript/no-unsafe-call": "warn",
     "typescript/no-unsafe-member-access": "warn",
     "typescript/no-unsafe-return": "warn",
-    "typescript/await-thenable": "warn",
+    "typescript/await-thenable": "error",
     "typescript/no-redundant-type-constituents": "warn",
     "typescript/unbound-method": "warn",
-    "typescript/restrict-template-expressions": "off",
-    "typescript/no-base-to-string": "off",
+    "typescript/restrict-template-expressions": "warn",
+    "typescript/no-base-to-string": "warn",
 
-    "react/exhaustive-deps": "off",
+    "react/exhaustive-deps": "warn",
     "react/rules-of-hooks": "error",
     "react/react-in-jsx-scope": "off",
 
-    "no-await-in-loop": "off",
-    "no-shadow": "off",
-    "no-unused-expressions": "off",
-    "prefer-add-event-listener": "off",
-    "no-misused-spread": "off",
-
-    "unicorn/consistent-function-scoping": "off",
+    "unicorn/consistent-function-scoping": "warn",
     "unicorn/prefer-modern-methods": "off",
 
-    "import/no-named-as-default": "off",
-    "import/no-named-as-default-member": "off",
+    "import/no-named-as-default": "warn",
+    "import/no-named-as-default-member": "warn",
     "import/no-unassigned-import": "off",
-    "import/no-self-import": "off",
+    "import/no-self-import": "error",
 
-    "jsdoc/check-tag-names": "off",
+    "jsdoc/check-tag-names": "warn",
     "jsdoc/require-yields": "off",
 
     "jsx-a11y/use-semantic-elements": "off",
@@ -88,6 +89,7 @@
         "typescript/no-unsafe-member-access": "off",
         "typescript/no-unsafe-argument": "off",
         "typescript/no-unsafe-return": "off",
+        "typescript/no-misused-promises": "off",
         "require-yield": "off",
         "vitest/hoisted-apis-on-top": "off"
       }

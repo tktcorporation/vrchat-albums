@@ -115,16 +115,16 @@ function createWindow(): BrowserWindow {
 
   // and load the index.html of the app.
   if (isDev) {
-    mainWindow.loadURL(url);
+    void mainWindow.loadURL(url);
   } else {
-    mainWindow.loadFile(url);
+    void mainWindow.loadFile(url);
   }
 
   // http or httpsのリンクをクリックしたときにデフォルトブラウザで開く
   const handleUrlOpen = (e: Event, url: string) => {
     if (url.match(/^http/)) {
       e.preventDefault();
-      shell.openExternal(url);
+      void shell.openExternal(url);
     }
   };
   mainWindow.webContents.on('will-navigate', handleUrlOpen);
@@ -300,9 +300,7 @@ const setTray = () => {
   const createTray = async () => {
     if (tray !== null) return;
 
-    const appPath = app.isPackaged
-      ? process.resourcesPath
-      : `${app.getAppPath()}`;
+    const appPath = app.isPackaged ? process.resourcesPath : app.getAppPath();
     const iconPath = join(appPath, 'assets', 'icon.png');
 
     // アイコンパスの存在確認
@@ -352,7 +350,7 @@ const setTray = () => {
         label: 'エラーログを開く',
         click: () => {
           const logPath = app.getPath('logs');
-          shell.openPath(logPath);
+          void shell.openPath(logPath);
         },
       },
       { type: 'separator' },
@@ -409,6 +407,7 @@ const setTimeEventEmitter = (
     1000 * 60 * 60 * 6,
   );
 
+  // oxlint-disable-next-line typescript/no-misused-promises -- EventEmitter handler needs async for background sync
   intervalEventEmitter.on('time', async (now: Date) => {
     if (!passedSettingStore.getBackgroundFileCreateFlag()) {
       // Use passedSettingStore

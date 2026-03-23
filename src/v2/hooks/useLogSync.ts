@@ -39,7 +39,7 @@ export const useLogSync = (options?: UseLogSyncOptions) => {
   const syncLogsMutation = trpcReact.logSync.syncLogs.useMutation({
     onSuccess: () => {
       // キャッシュの無効化
-      invalidatePhotoGalleryQueries(utils);
+      void invalidatePhotoGalleryQueries(utils);
       options?.onSuccess?.();
     },
     onError: (error) => {

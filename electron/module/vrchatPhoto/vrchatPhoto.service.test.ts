@@ -145,6 +145,7 @@ describe('createVRChatPhotoPathIndex', () => {
 
     // readdir モック - withFileTypesオプションの有無で振る舞いを変える
     // readdir は複雑なオーバーロードを持つため、any を使ってモック
+
     (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
       async (dirPath: PathLike, options?: unknown) => {
         const pathStr = dirPath.toString();
@@ -411,6 +412,7 @@ describe('createVRChatPhotoPathIndex', () => {
         const originalReaddirMock = vi.mocked(nodefsPromises.readdir);
         const originalImplementation =
           originalReaddirMock.getMockImplementation();
+
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
           async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();
@@ -457,6 +459,7 @@ describe('createVRChatPhotoPathIndex', () => {
         const originalReaddirMock = vi.mocked(nodefsPromises.readdir);
         const originalImplementation =
           originalReaddirMock.getMockImplementation();
+
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
           async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();
@@ -501,6 +504,7 @@ describe('createVRChatPhotoPathIndex', () => {
         const originalReaddirMock = vi.mocked(nodefsPromises.readdir);
         const originalImplementation =
           originalReaddirMock.getMockImplementation();
+
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
           async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();
@@ -528,6 +532,7 @@ describe('createVRChatPhotoPathIndex', () => {
     describe('getPhotoFolders エラー（readdir）', () => {
       it('サブディレクトリの権限エラーをwarnログ出力してスキップする', async () => {
         // readdir を再モック
+
         (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
           async (dirPath: PathLike, options?: unknown) => {
             const pathStr = dirPath.toString();

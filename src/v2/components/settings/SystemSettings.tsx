@@ -50,7 +50,7 @@ const SystemSettings = memo(() => {
         });
       },
       onSettled: () => {
-        utils.backgroundSettings.getIsAppAutoStartEnabled.invalidate();
+        void utils.backgroundSettings.getIsAppAutoStartEnabled.invalidate();
       },
     });
 
@@ -60,7 +60,7 @@ const SystemSettings = memo(() => {
     trpcReact.backgroundSettings.setIsBackgroundFileCreationEnabled.useMutation(
       {
         onSuccess: () => {
-          utils.backgroundSettings.getIsBackgroundFileCreationEnabled.invalidate();
+          void utils.backgroundSettings.getIsBackgroundFileCreationEnabled.invalidate();
         },
       },
     );
@@ -71,7 +71,7 @@ const SystemSettings = memo(() => {
     trpcReact.backgroundSettings.setWorldJoinImageGenerationEnabled.useMutation(
       {
         onSuccess: () => {
-          utils.backgroundSettings.getWorldJoinImageGenerationEnabled.invalidate();
+          void utils.backgroundSettings.getWorldJoinImageGenerationEnabled.invalidate();
         },
       },
     );

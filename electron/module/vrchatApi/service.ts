@@ -208,7 +208,7 @@ export const getVrcUserInfoByUserName = (
           resolve(result.data[0]);
         });
         if (!isProcessingQueue) {
-          processQueue();
+          void processQueue();
         }
       }),
     catch: (error): Error | 'USER_NOT_FOUND' => {

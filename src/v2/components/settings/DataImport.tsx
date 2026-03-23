@@ -153,7 +153,7 @@ const DataImport = memo(() => {
           duration: 5000,
         });
         setSelectedPaths([]);
-        refetchHistory();
+        void refetchHistory();
       },
       onError: (error) => {
         toast({
@@ -175,7 +175,7 @@ const DataImport = memo(() => {
             'データが復帰されました。アプリケーションを再起動することをお勧めします。',
           duration: 8000,
         });
-        refetchHistory();
+        void refetchHistory();
       },
       onError: (error) => {
         toast({
@@ -241,7 +241,7 @@ const DataImport = memo(() => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={selectFiles}
+                onClick={() => void selectFiles()}
                 size="sm"
               >
                 <FileText className="h-4 w-4 mr-2" />
@@ -250,7 +250,7 @@ const DataImport = memo(() => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={selectDirectory}
+                onClick={() => void selectDirectory()}
                 size="sm"
               >
                 <FolderOpen className="h-4 w-4 mr-2" />
@@ -333,7 +333,7 @@ const DataImport = memo(() => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetchHistory()}
+            onClick={() => void refetchHistory()}
             disabled={isLoadingHistory}
           >
             <RotateCcw className="h-4 w-4 mr-2" />

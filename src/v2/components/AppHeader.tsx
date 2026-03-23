@@ -155,7 +155,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleRefresh}
+                onClick={() => void handleRefresh()}
                 disabled={loadingState?.isRefreshing || isSyncing}
                 className="h-7 w-7 p-0"
                 title={t('common.refresh')}

@@ -32,4 +32,5 @@ declare global {
   }
 }
 
+// oxlint-disable-next-line require-module-specifiers -- empty export needed for TypeScript module augmentation (declare global)
 export type {};

@@ -370,11 +370,11 @@ export const LocationGroupHeader = ({
                       onMouseEnter={() => setIsHovered(true)}
                       onMouseLeave={() => setIsHovered(false)}
                       onMouseMove={handleMouseMove}
-                      onClick={handleCopyPlayers}
+                      onClick={() => void handleCopyPlayers()}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          handleCopyPlayers();
+                          void handleCopyPlayers();
                         }
                       }}
                       role="button"
@@ -458,5 +458,5 @@ export const LocationGroupHeader = ({
   );
 };
 
-// Re-export for backward compatibility
-export { LocationGroupHeader as default } from './index';
+// Default export for backward compatibility
+export default LocationGroupHeader;

@@ -704,7 +704,7 @@ describe('vrchatLogController integration - Import and Rollback', () => {
         orderByJoinDateTime: 'asc',
       });
       // インポートされたデータが存在することを確認
-      await playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
+      playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
         startJoinDateTime: new Date('2023-01-01'),
         endJoinDateTime: new Date('2024-01-01'),
       });

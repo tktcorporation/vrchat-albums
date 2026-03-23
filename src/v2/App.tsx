@@ -149,7 +149,7 @@ function AppContent() {
         });
     };
 
-    checkTermsAndInitializeSentry();
+    void checkTermsAndInitializeSentry();
   }, [termsStatus, initializeSentryMain]); // initializeSentryMain と termsStatus を依存配列に含める
 
   /**
@@ -173,7 +173,7 @@ function AppContent() {
         <AppHeader showGalleryControls={false} />
         <TermsModal
           open={showTerms}
-          onAccept={handleTermsAccept}
+          onAccept={() => void handleTermsAccept()}
           isUpdate={isUpdate}
           canClose={false}
         />

@@ -179,7 +179,7 @@ test('写真一覧が正常にロードされる', async () => {
 
   try {
     const page = await electronApp.firstWindow({ timeout: 30000 });
-    console.log('First window obtained, URL:', await page.url());
+    console.log('First window obtained, URL:', page.url());
   } catch (e) {
     console.error('Failed to get first window:', e);
     throw e;

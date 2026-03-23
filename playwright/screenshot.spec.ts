@@ -184,12 +184,13 @@ test('各画面でスクショ', async () => {
 
   // タイムアウト処理の調整
   const timeoutDecreaseTwo = TIMEOUT - 5000;
-  Promise.race([
+  void Promise.race([
     new Promise((resolve) => setTimeout(resolve, timeoutDecreaseTwo)),
     new Promise((_resolve, reject) => {
-      setTimeout(async () => {
-        await screenshot(page, title, 'timeout');
-        reject(new Error('Timeout'));
+      setTimeout(() => {
+        void screenshot(page, title, 'timeout').then(() => {
+          reject(new Error('Timeout'));
+        });
       }, timeoutDecreaseTwo);
     }),
   ]);

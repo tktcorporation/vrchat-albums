@@ -141,7 +141,7 @@ class PlayerInfoBatchManager {
       const startTime = performance.now();
 
       if (this.executeBatch) {
-        this.executeBatch().finally(() => {
+        void this.executeBatch().finally(() => {
           const executionTime = performance.now() - startTime;
           console.debug(
             `[PlayerInfoBatch] Split batch #${currentBatchCount} completed in ${executionTime.toFixed(
@@ -175,7 +175,7 @@ class PlayerInfoBatchManager {
     const startTime = performance.now();
 
     if (this.executeBatch) {
-      this.executeBatch().finally(() => {
+      void this.executeBatch().finally(() => {
         const executionTime = performance.now() - startTime;
         console.debug(
           `[PlayerInfoBatch] Batch #${currentBatchCount} completed in ${executionTime.toFixed(
