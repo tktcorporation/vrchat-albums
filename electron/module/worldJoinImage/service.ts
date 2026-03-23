@@ -110,7 +110,7 @@ const generateSingleWorldJoinImage = (
           headers: { 'User-Agent': userAgent },
           responseType: 'arrayBuffer',
           timeout: 30_000,
-        }) as Promise<ArrayBuffer>,
+        }),
       catch: (error) =>
         ({
           type: 'SKIPPABLE_ERROR' as const,

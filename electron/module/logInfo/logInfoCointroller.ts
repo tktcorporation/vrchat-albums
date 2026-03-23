@@ -75,7 +75,7 @@ const fetchAndMergeSortedWorldJoinLogs = (
     });
 
     // 指定された順序でソート
-    const sortedLogs = mergedLogs.sort((a, b) =>
+    const sortedLogs = mergedLogs.toSorted((a, b) =>
       sortOrder === 'desc'
         ? b.joinDateTime.getTime() - a.joinDateTime.getTime()
         : a.joinDateTime.getTime() - b.joinDateTime.getTime(),
@@ -669,7 +669,9 @@ export const logInfoRouter = () =>
           const sortedLogs = [
             ...logsBeforeRequest,
             ...(nextLogResult.length > 0 ? [nextLogResult[0]] : []),
-          ].sort((a, b) => b.joinDateTime.getTime() - a.joinDateTime.getTime());
+          ].toSorted(
+            (a, b) => b.joinDateTime.getTime() - a.joinDateTime.getTime(),
+          );
 
           const worldLogTime = performance.now() - worldLogStartTime;
           logger.debug(
@@ -702,7 +704,7 @@ export const logInfoRouter = () =>
             // 次のワールド参加ログを検索（時系列順で最初に見つかるもの）
             const nextWorldJoin = sortedLogs
               .filter((log) => log.joinDateTime > recentWorldJoin.joinDateTime)
-              .sort(
+              .toSorted(
                 (a, b) => a.joinDateTime.getTime() - b.joinDateTime.getTime(),
               )[0];
 

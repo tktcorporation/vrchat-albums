@@ -61,7 +61,7 @@ export const vrchatWorldJoinLogRouter = () =>
           });
 
           // 日時でソート
-          return mergedLogs.sort((a, b) => {
+          return mergedLogs.toSorted((a, b) => {
             const comparison =
               a.joinDateTime.getTime() - b.joinDateTime.getTime();
             return input.orderByJoinDateTime === 'asc'

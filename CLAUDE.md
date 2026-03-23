@@ -181,4 +181,4 @@ git push -u origin feat/xxx
 - TypeScript Compiler API: `scripts/lint-*.ts`
 - ast-grep: `rules/ast-grep/*.yml`
 
-※ ESLint は使わない（Biome 移行済み）
+※ ESLint は使わない（oxlint + oxfmt 移行済み）

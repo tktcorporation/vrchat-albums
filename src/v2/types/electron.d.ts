@@ -31,4 +31,4 @@ declare global {
     };
   }
 }
-export type {};
+

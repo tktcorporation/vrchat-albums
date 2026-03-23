@@ -57,7 +57,7 @@ const SearchOverlay = memo(
           );
 
           return Object.entries(worldCounts)
-            .sort(([, a], [, b]) => b - a)
+            .toSorted(([, a], [, b]) => b - a)
             .slice(0, 3)
             .map(([worldName]) => worldName);
         },

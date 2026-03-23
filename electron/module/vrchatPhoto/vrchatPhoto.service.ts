@@ -549,7 +549,7 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
   );
 
   // 古いファイルから削除
-  const sortedFiles = validFiles.sort((a, b) => a.mtime - b.mtime);
+  const sortedFiles = validFiles.toSorted((a, b) => a.mtime - b.mtime);
   let currentSize = totalSizeMB;
   const targetSize = MAX_CACHE_SIZE_MB * 0.5; // 50%まで削減
 
@@ -690,7 +690,7 @@ const computeFolderDigest = (
     });
 
     // VRChat写真ファイルのみをフィルタリングしてソート
-    const pngFiles = files.filter((f) => isVRChatPhotoFile(f)).sort();
+    const pngFiles = files.filter((f) => isVRChatPhotoFile(f)).toSorted();
 
     // ファイル名リストをハッシュ化（ファイル内容は読まない）
     const hash = yield* Effect.tryPromise({

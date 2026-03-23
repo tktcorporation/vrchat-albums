@@ -80,7 +80,7 @@ function _getLogStoreFilePathsImpl(
           latestPlayerLeaveDate?.leaveDateTime,
         ]
           .filter((d): d is Date => d instanceof Date) // Date型のみをフィルタリング
-          .sort(datefns.compareAsc);
+          .toSorted(datefns.compareAsc);
         logger.debug(`_getLogStoreFilePaths: latest dates: ${dates}`);
 
         // 最新の日付を取得、なければ1年前
@@ -727,7 +727,7 @@ export const searchSessionsByPlayerName = (
     // ワールド参加ログを時系列順にソート（二分探索用）
     const sortedWorldJoinDates = worldJoinLogs
       .map((log) => log.joinDateTime)
-      .sort((a, b) => a.getTime() - b.getTime());
+      .toSorted((a, b) => a.getTime() - b.getTime());
 
     // 各プレイヤー参加日時に対して、対応するワールド参加日時を探す（インメモリ）
     const sessionJoinDates: Date[] = [];
@@ -767,7 +767,7 @@ export const searchSessionsByPlayerName = (
     );
 
     // 新しい順にソートして返す
-    return sessionJoinDates.sort((a, b) => b.getTime() - a.getTime());
+    return sessionJoinDates.toSorted((a, b) => b.getTime() - a.getTime());
   });
 };
 

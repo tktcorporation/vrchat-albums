@@ -167,7 +167,7 @@ describe('vrchatLogController integration stub tests', () => {
       expect(collectedFiles).toHaveLength(3);
 
       // ファイルが年月順にソートできることを確認
-      const sortedFiles = collectedFiles.sort((a, b) => {
+      const sortedFiles = collectedFiles.toSorted((a, b) => {
         const aMatch = a.match(/(\d{4}-\d{2})/);
         const bMatch = b.match(/(\d{4}-\d{2})/);
         return (aMatch?.[0] || '').localeCompare(bMatch?.[0] || '');

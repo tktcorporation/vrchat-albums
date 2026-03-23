@@ -165,7 +165,7 @@ export const appendLoglinesToFile = (props: {
   logLines: VRChatLogLine[];
   logStoreFilePath?: VRChatLogStoreFilePath;
   dedupCache?: DedupCache;
-}): Effect.Effect<void, never> => {
+}): Effect.Effect<void> => {
   if (props.logLines.length === 0) {
     return Effect.succeed(undefined);
   }
@@ -300,5 +300,5 @@ export const appendLoglinesToFile = (props: {
         existingLines.add(line);
       }
     }
-  }) as Effect.Effect<void, never>;
+  }) as Effect.Effect<void>;
 };

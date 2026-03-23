@@ -151,17 +151,19 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             expect(batchPlayers.length).toBe(originalPlayers.length);
 
             // プレイヤーIDが一致することを確認
-            const originalPlayerIds = originalPlayers.map((p) => p.id).sort();
-            const batchPlayerIds = batchPlayers.map((p) => p.id).sort();
+            const originalPlayerIds = originalPlayers
+              .map((p) => p.id)
+              .toSorted();
+            const batchPlayerIds = batchPlayers.map((p) => p.id).toSorted();
             expect(batchPlayerIds).toEqual(originalPlayerIds);
 
             // プレイヤー名も一致することを確認
             const originalPlayerNames = originalPlayers
               .map((p) => p.playerName)
-              .sort();
+              .toSorted();
             const batchPlayerNames = batchPlayers
               .map((p) => p.playerName)
-              .sort();
+              .toSorted();
             expect(batchPlayerNames).toEqual(originalPlayerNames);
           } else {
             // 元のロジックがエラーの場合、バッチも空であるべき
@@ -261,8 +263,10 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             expect(batchPlayers.length).toBe(originalPlayers.length);
 
             if (originalPlayers.length > 0) {
-              const originalPlayerIds = originalPlayers.map((p) => p.id).sort();
-              const batchPlayerIds = batchPlayers.map((p) => p.id).sort();
+              const originalPlayerIds = originalPlayers
+                .map((p) => p.id)
+                .toSorted();
+              const batchPlayerIds = batchPlayers.map((p) => p.id).toSorted();
               expect(batchPlayerIds).toEqual(originalPlayerIds);
             }
           } else {

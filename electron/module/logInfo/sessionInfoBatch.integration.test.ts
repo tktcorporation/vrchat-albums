@@ -121,7 +121,7 @@ describe('SessionInfoBatch world change behavior', () => {
     expect(worldASession).toBeDefined();
     expect(worldASession.worldName).toBe('World A');
     expect(worldASession.players).toHaveLength(2);
-    expect(worldASession.players.map((p) => p.playerName).sort()).toEqual([
+    expect(worldASession.players.map((p) => p.playerName).toSorted()).toEqual([
       'Player1',
       'Player2',
     ]);

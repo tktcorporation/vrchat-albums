@@ -148,7 +148,7 @@ export type LogInfoPartialSuccessResult = PartialSuccessResult<
  */
 export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
   logFilePathList: (VRChatLogFilePath | VRChatLogStoreFilePath)[],
-): Effect.Effect<LogInfoPartialSuccessResult, never> =>
+): Effect.Effect<LogInfoPartialSuccessResult> =>
   Effect.tryPromise({
     try: async (): Promise<LogInfoPartialSuccessResult> => {
       const logLineListResult =
@@ -177,7 +177,7 @@ export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
       // Error type is `never` - unexpected errors should propagate
       throw e;
     },
-  }) as Effect.Effect<LogInfoPartialSuccessResult, never>;
+  });
 
 // ファイルハンドラー機能の再エクスポート
 export {

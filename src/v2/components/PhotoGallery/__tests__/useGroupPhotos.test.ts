@@ -126,7 +126,7 @@ describe('groupPhotosBySession', () => {
     expect(groups[0].photos).toHaveLength(1); // 最新のセッション（1秒前の写真）
     expect(groups[0].photos[0].id).toBe('1');
     expect(groups[1].photos).toHaveLength(2); // 古いセッション（3秒前と5秒前の写真）
-    expect(groups[1].photos.map((p) => p.id).sort()).toEqual(['2', '3']);
+    expect(groups[1].photos.map((p) => p.id).toSorted()).toEqual(['2', '3']);
   });
 
   it('写真とセッションの時間が完全に一致する場合', () => {
@@ -168,8 +168,8 @@ describe('groupPhotosBySession', () => {
     const groups = groupPhotosBySession(photos, joinLogs);
 
     expect(groups).toHaveLength(2);
-    expect(groups[0].photos.map((p) => p.id).sort()).toEqual(['1', '2']); // 最新のセッションに2枚
-    expect(groups[1].photos.map((p) => p.id).sort()).toEqual(['3', '4']); // 古いセッションに2枚
+    expect(groups[0].photos.map((p) => p.id).toSorted()).toEqual(['1', '2']); // 最新のセッションに2枚
+    expect(groups[1].photos.map((p) => p.id).toSorted()).toEqual(['3', '4']); // 古いセッションに2枚
   });
 
   it('大量の写真を正しく処理できる', () => {

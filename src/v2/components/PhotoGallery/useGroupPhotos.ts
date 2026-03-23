@@ -58,8 +58,8 @@ function buildSessions(
   const sessions: Session[] = [];
 
   // 新しい順のログを古い順に処理（時系列順）
-  const chronologicalJoins = [...joinLogs].reverse();
-  const chronologicalLeaves = [...leaveLogs].sort(
+  const chronologicalJoins = [...joinLogs].toReversed();
+  const chronologicalLeaves = [...leaveLogs].toSorted(
     (a, b) => a.leaveDateTime.getTime() - b.leaveDateTime.getTime(),
   );
 
@@ -99,7 +99,7 @@ function buildSessions(
   }
 
   // 新しい順に戻す
-  return sessions.reverse();
+  return sessions.toReversed();
 }
 
 /**
@@ -177,7 +177,7 @@ export function groupPhotosBySession(
   const sessions = buildSessions(joinLogs);
 
   // 写真を新しい順にソート
-  const sortedPhotos = [...photos].sort(
+  const sortedPhotos = [...photos].toSorted(
     (a, b) => b.takenAt.getTime() - a.takenAt.getTime(),
   );
 
@@ -195,7 +195,7 @@ export function groupPhotosBySession(
 
   // セッションからGroupedPhoto形式に変換
   const groups: GroupedPhoto[] = sessions.map((session) => ({
-    photos: session.photos.sort(
+    photos: session.photos.toSorted(
       (a, b) => b.takenAt.getTime() - a.takenAt.getTime(),
     ),
     worldInfo: {

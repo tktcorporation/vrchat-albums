@@ -101,7 +101,7 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
       groupToDates.set(index, date);
     });
 
-    const sortedDates = Array.from(dateToGroups.keys()).sort().reverse();
+    const sortedDates = Array.from(dateToGroups.keys()).toSorted().toReversed();
 
     return { dateToGroups, sortedDates, groupToDates };
   }, [groups]);
@@ -179,7 +179,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
     });
 
     let lastYear: string | null = null;
-    const sortedYearMonths = Array.from(monthMap.keys()).sort().reverse();
+    const sortedYearMonths = Array.from(monthMap.keys())
+      .toSorted()
+      .toReversed();
 
     return sortedYearMonths.flatMap((yearMonth) => {
       const [year, month] = yearMonth.split('-');

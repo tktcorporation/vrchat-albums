@@ -70,7 +70,7 @@ const createOldDigest = (suffix: string): FolderDigest => {
 const computeExpectedDigestForFolder = (files: string[]): FolderDigest => {
   const pngFiles = files
     .filter((f) => f.startsWith('VRChat_') && f.endsWith('.png'))
-    .sort();
+    .toSorted();
   return computeTestDigest(pngFiles.join('\n'));
 };
 
