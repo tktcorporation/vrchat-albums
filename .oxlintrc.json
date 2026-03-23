@@ -120,6 +120,7 @@
     "no-undefined": "off",
     "max-params": "off",
     "react/no-array-index-key": "off",
+    "vitest/prefer-called-once": "off",
     "vitest/prefer-to-be-truthy": "off",
     "vitest/prefer-to-be-falsy": "off",
     "vitest/prefer-describe-function-title": "off",
