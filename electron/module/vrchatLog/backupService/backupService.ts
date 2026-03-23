@@ -174,7 +174,7 @@ export class BackupService {
       ),
       Effect.tap(() => {
         logger.info(`Backup metadata updated: ${metadata.id}`);
-        return Effect.succeed();
+        return Effect.succeed(undefined);
       }),
     );
   }

@@ -87,7 +87,7 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fsPromises.access).mockResolvedValue();
+    vi.mocked(fsPromises.access).mockResolvedValue(undefined);
 
     const result = await Effect.runPromise(
       generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
@@ -130,8 +130,8 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(generateWorldJoinImage).mockReturnValue(
       Effect.succeed(Buffer.from('fake-jpeg')),
     );
-    vi.mocked(fsPromises.mkdir).mockResolvedValue();
-    vi.mocked(fsPromises.writeFile).mockResolvedValue();
+    vi.mocked(fsPromises.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fsPromises.writeFile).mockResolvedValue(undefined);
 
     const result = await Effect.runPromise(
       generateMissingWorldJoinImages({ photoDirPath: '/photos' }),

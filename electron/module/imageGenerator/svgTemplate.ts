@@ -7,7 +7,7 @@ function escapeXml(str: string): string {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
-    .replaceAll('\'', '&apos;');
+    .replaceAll("'", '&apos;');
 }
 
 /** rgb(N, N, N) 形式の色文字列であることを検証する（SVG 属性インジェクション防止） */
@@ -35,6 +35,7 @@ function assertValidBase64(value: string): string {
  * CJK 文字は 14px 幅、ASCII 文字は 7px 幅として計算し、パディング 20px を加算。
  */
 function estimatePlayerNameWidth(playerName: string): number {
+  // oxlint-disable-next-line no-misused-spread -- プレイヤー名はVRChatの仕様上ASCII・CJKが主体でemoji対応不要
   const nameWidth = [...playerName].reduce((width, char) => {
     return width + (/[\u3000-\u9FFF]/.test(char) ? 14 : 7);
   }, 0);
@@ -201,6 +202,7 @@ function generatePlayerElements(
         !showAll && remaining > 0,
       () => {
         const moreText = `+${remainingCount} more`;
+        // oxlint-disable-next-line no-misused-spread -- "+N more" テキストはASCIIのみ
         const moreTextWidth = [...moreText].reduce((width, char) => {
           return width + (/[\u3000-\u9FFF]/.test(char) ? 14 : 7);
         }, 0);

@@ -11,7 +11,7 @@ describe('renderSvgToPng', () => {
     const value = await Effect.runPromise(renderSvgToPng(svg));
     expect(value[0]).toBe(0x89); // PNG magic byte
     expect(value[1]).toBe(0x50);
-    expect(value[2]).toBe(0x4E);
+    expect(value[2]).toBe(0x4e);
     expect(value[3]).toBe(0x47);
   });
 
@@ -64,7 +64,7 @@ describe('renderSvgToJpeg', () => {
       <rect width="100" height="100" fill="blue"/>
     </svg>`;
     const value = await Effect.runPromise(renderSvgToJpeg(svg, 85));
-    expect(value[0]).toBe(0xFF); // JPEG magic byte
-    expect(value[1]).toBe(0xD8);
+    expect(value[0]).toBe(0xff); // JPEG magic byte
+    expect(value[1]).toBe(0xd8);
   });
 });

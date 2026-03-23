@@ -200,7 +200,7 @@ const VirtualizedGallery = memo(
       }
 
       const firstIndex = virtualItems[0].index;
-      const lastIndex = virtualItems.at(-1).index;
+      const lastIndex = virtualItems.at(-1)!.index;
       const prefetchStart = Math.max(0, firstIndex - 2);
       const prefetchEnd = Math.min(filteredGroups.length, lastIndex + 5);
 
@@ -237,8 +237,8 @@ const VirtualizedGallery = memo(
                 ? prev
                 : current;
             });
-            const index = topEntry.target.dataset.index;
-            if (index !== null) {
+            const index = (topEntry.target as HTMLElement).dataset.index;
+            if (index != null) {
               setCurrentGroupIndex(Number.parseInt(index, 10));
             }
           }

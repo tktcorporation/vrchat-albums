@@ -410,7 +410,7 @@ export const settingsRouter = () =>
           message: 'Application data initialization failed',
           stack: match(error)
             .with(P.instanceOf(Error), (err) => err)
-            .otherwise(() => {}),
+            .otherwise(() => undefined),
         });
 
         // エラーメッセージを抽出

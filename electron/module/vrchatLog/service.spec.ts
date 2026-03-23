@@ -14,10 +14,10 @@ vi.mock('../../lib/appPath', () => ({
 vi.mock('../../lib/wrappedFs', () => {
   return {
     existsSyncSafe: vi.fn().mockReturnValue(false),
-    mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed()),
-    appendFileAsync: vi.fn().mockReturnValue(Effect.succeed()),
-    writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed()),
-    unlinkAsync: vi.fn().mockReturnValue(Effect.succeed()),
+    mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    appendFileAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    unlinkAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
     readFileSyncSafe: vi
       .fn()
       .mockReturnValue(Effect.succeed(Buffer.from('test content'))),
@@ -62,7 +62,7 @@ describe('appendLoglinesToFile', () => {
 
     // appendLoglinesToFile関数をモック
     vi.spyOn(service, 'appendLoglinesToFile').mockImplementation((_props) => {
-      return Effect.succeed();
+      return Effect.succeed(undefined);
     });
   });
 

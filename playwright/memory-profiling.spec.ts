@@ -122,7 +122,7 @@ const startMemoryMonitoring = (
     const peakHeap = Math.max(...samples.map((s) => s.heapUsedMB));
     const avgRss =
       samples.reduce((sum, s) => sum + s.rssMB, 0) / samples.length;
-    const memoryGrowth = samples.at(-1).rssMB - samples[0].rssMB;
+    const memoryGrowth = samples.at(-1)!.rssMB - samples[0].rssMB;
 
     return {
       samples,

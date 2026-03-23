@@ -253,7 +253,7 @@ describe('vrchatLogController', () => {
 
       // getDBLogsFromDatabase関数が期待される引数で呼ばれることを確認
       expect(capturedGetDBLogs).toBeDefined();
-      expectTypeOf(capturedGetDBLogs).toBeFunction();
+      expect(typeof capturedGetDBLogs).toBe('function');
     });
   });
 });

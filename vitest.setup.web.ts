@@ -2,13 +2,10 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
 // Sentryのモック設定
-vi.mock<typeof import('@sentry/electron/main')>(
-  '@sentry/electron/main',
-  () => ({
-    captureException: vi.fn(),
-    init: vi.fn(),
-  }),
-);
+vi.mock('@sentry/electron/main', () => ({
+  captureException: vi.fn(),
+  init: vi.fn(),
+}));
 
 // React Testing Libraryのクリーンアップ
 afterEach(() => {
@@ -16,7 +13,7 @@ afterEach(() => {
 });
 
 // electronモジュールのモック
-vi.mock<typeof import('electron')>('electron', () => {
+vi.mock('electron', () => {
   const mockApp = {
     getPath: vi.fn(),
     getName: vi.fn(),
@@ -61,24 +58,15 @@ vi.mock<typeof import('electron')>('electron', () => {
 });
 
 // vi.mock section after existing mocks
-vi.mock<typeof import('electron-trpc/renderer')>(
-  'electron-trpc/renderer',
-  () => {
-    /** No-op TRPC link mock to prevent tests from requiring Electron context */
-    // oxlint-disable-next-line eslint-plugin-unicorn(consistent-function-scoping) -- vi.mockはホイスティングされるため、外部スコープの変数を参照できない
-    const mockIpcLink = () => {
-      return (_runtime: unknown) =>
-        ({
-          next,
-          op,
-        }: {
-          next: (operation: unknown) => unknown;
-          op: unknown;
-        }) =>
-          next(op);
-    };
-    return {
-      ipcLink: mockIpcLink,
-    };
-  },
-);
+vi.mock('electron-trpc/renderer', () => {
+  /** No-op TRPC link mock to prevent tests from requiring Electron context */
+  // oxlint-disable-next-line eslint-plugin-unicorn(consistent-function-scoping) -- vi.mockはホイスティングされるため、外部スコープの変数を参照できない
+  const mockIpcLink = () => {
+    return (_runtime: unknown) =>
+      ({ next, op }: { next: (operation: unknown) => unknown; op: unknown }) =>
+        next(op);
+  };
+  return {
+    ipcLink: mockIpcLink,
+  };
+});

@@ -46,9 +46,9 @@ describe('electronUtilController', () => {
     (fs.mkdtemp as ReturnType<typeof vi.fn>).mockResolvedValue(
       path.join(os.tmpdir(), 'test-dir'),
     );
-    (fs.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue();
-    (fs.copyFile as ReturnType<typeof vi.fn>).mockResolvedValue();
-    (fs.rm as ReturnType<typeof vi.fn>).mockResolvedValue();
+    (fs.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (fs.copyFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (fs.rm as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
   });
 
   describe('downloadImageAsPng', () => {

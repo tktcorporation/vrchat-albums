@@ -30,7 +30,7 @@ describe('generateSharePreview', () => {
         showAllPlayers: false,
       }),
     );
-    expectTypeOf(value).toBeString();
+    expect(typeof value).toBe('string');
   });
 
   it('should pass showAllPlayers to SVG template', async () => {
