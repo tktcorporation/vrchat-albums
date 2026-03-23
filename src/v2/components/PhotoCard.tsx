@@ -43,6 +43,15 @@ interface PhotoCardProps {
   onCopySelected?: () => void;
 }
 
+/** コンテキストメニュー項目共通のアクションラッパー */
+const handleMenuAction = (
+  e: React.MouseEvent,
+  handler: (e: React.MouseEvent) => void,
+) => {
+  e.stopPropagation();
+  handler(e);
+};
+
 /**
  * グリッド内に表示される個々の写真カードコンポーネント。
  * 写真の表示、ホバーエフェクト、選択状態の表示、クリック/右クリックによるインタラクションを担当します。
@@ -132,7 +141,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         // 選択順序を維持してコピー
         const pathsToCopy = selectedPhotos
           .map((id) => {
-            const p = photos.find((p) => String(p.id) === id);
+            const p = photos.find((item) => String(item.id) === id);
             return p && isPhotoLoaded(p) ? p.photoPath.value : undefined;
           })
           .filter((path): path is string => path !== undefined);
@@ -211,15 +220,6 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         setSelectedPhotos,
       ],
     );
-
-    /** コンテキストメニュー項目共通のアクションラッパー */
-    const handleMenuAction = (
-      e: React.MouseEvent,
-      handler: (e: React.MouseEvent) => void,
-    ) => {
-      e.stopPropagation();
-      handler(e);
-    };
 
     // --- Render ---
     return (

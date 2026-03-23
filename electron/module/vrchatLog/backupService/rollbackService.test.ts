@@ -135,7 +135,7 @@ describe('rollbackService', () => {
 
       // バックアップ状態更新
       vi.mocked(
-        backupServiceModule.backupService.updateBackupMetadata,
+        backupServiceModule.backupService['updateBackupMetadata'],
       ).mockReturnValue(Effect.succeed(undefined));
 
       await Effect.runPromise(rollbackService.rollbackToBackup(mockBackup));
@@ -162,7 +162,7 @@ describe('rollbackService', () => {
 
       // バックアップ状態が更新されたことを確認
       expect(
-        backupServiceModule.backupService.updateBackupMetadata,
+        backupServiceModule.backupService['updateBackupMetadata'],
       ).toHaveBeenCalledWith(
         expect.objectContaining({
           ...mockBackup,
@@ -403,7 +403,7 @@ describe('rollbackService', () => {
         }),
       );
       vi.mocked(
-        backupServiceModule.backupService.updateBackupMetadata,
+        backupServiceModule.backupService['updateBackupMetadata'],
       ).mockReturnValue(Effect.succeed(undefined));
 
       await Effect.runPromise(rollbackService.rollbackToBackup(mockBackup));

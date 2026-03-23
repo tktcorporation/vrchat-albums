@@ -305,6 +305,6 @@ export const closeExiftoolInstance = async () => {
 };
 
 // 終了時のクリーンアップ処理
-process.on('exit', () => closeExiftoolInstance());
+process.on('exit', () => void closeExiftoolInstance());
 process.on('SIGINT', () => process.exit());
 process.on('SIGTERM', () => process.exit());

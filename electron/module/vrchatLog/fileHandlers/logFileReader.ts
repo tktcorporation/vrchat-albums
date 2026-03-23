@@ -48,15 +48,16 @@ const createBatchConfig = (props: {
   return { concurrency, maxMemoryUsageMB, maxLinesInMemory };
 };
 
+/** メモリ使用量を MB 単位で返す（createMemoryMonitor 内部で使用） */
+const checkMemoryUsage = () => {
+  const memUsage = process.memoryUsage();
+  return memUsage.heapUsed / 1024 / 1024;
+};
+
 /**
  * メモリ監視ユーティリティを作成
  */
 const createMemoryMonitor = (): MemoryMonitor => {
-  const checkMemoryUsage = () => {
-    const memUsage = process.memoryUsage();
-    return memUsage.heapUsed / 1024 / 1024;
-  };
-
   const checkMemoryLimit = (maxMemoryUsageMB: number) => {
     const currentUsage = checkMemoryUsage();
     return match(currentUsage > maxMemoryUsageMB)

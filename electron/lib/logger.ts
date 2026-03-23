@@ -12,7 +12,7 @@ import { UserFacingError } from './errors';
 const getLogFilePath = (): string => {
   // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
-    const { app } = require('electron');
+    const { app } = require('electron') as typeof import('electron');
     return path.join(app.getPath('logs'), 'app.log');
   } catch {
     // テストまたは非Electron環境
@@ -31,7 +31,7 @@ log.transports.file.maxSize = 5 * 1024 * 1024;
 const getIsProduction = (): boolean => {
   // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
-    const { app } = require('electron');
+    const { app } = require('electron') as typeof import('electron');
     return app.isPackaged;
   } catch {
     return false;
@@ -75,7 +75,9 @@ const buildErrorInfo = ({ message, stack }: ErrorLogParams): Error => {
     .with(undefined, () => baseError)
     .otherwise((s) => {
       // Original errorのプロパティを保持しつつstackを更新
-      const errorInfo = Object.create(Object.getPrototypeOf(baseError));
+      const errorInfo = Object.create(
+        Object.getPrototypeOf(baseError) as object | null,
+      ) as Error;
       Object.assign(errorInfo, baseError, {
         name: baseError.name,
         message: baseError.message,
@@ -87,9 +89,9 @@ const buildErrorInfo = ({ message, stack }: ErrorLogParams): Error => {
     });
 };
 
-const info = log.info;
-const debug = log.debug;
-const warn = log.warn;
+const info: typeof log.info = log.info.bind(log);
+const debug: typeof log.debug = log.debug.bind(log);
+const warn: typeof log.warn = log.warn.bind(log);
 
 /**
  * 同期的に try-catch を Either で返すヘルパー。
@@ -129,8 +131,8 @@ const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
   });
   const termsAccepted = Either.match(termsResult, {
     onRight: (accepted) => accepted,
-    onLeft: (error) => {
-      log.warn('Failed to get terms accepted:', error);
+    onLeft: (termsError) => {
+      log.warn('Failed to get terms accepted:', termsError);
       return false;
     },
   });
@@ -183,8 +185,8 @@ const error = ({ message, stack, details }: ErrorLogParams): void => {
   });
   const termsAccepted = Either.match(termsResult, {
     onRight: (accepted) => accepted,
-    onLeft: (error) => {
-      log.warn('Failed to get terms accepted:', error);
+    onLeft: (termsError) => {
+      log.warn('Failed to get terms accepted:', termsError);
       return false;
     },
   });

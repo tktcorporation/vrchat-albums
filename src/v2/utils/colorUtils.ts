@@ -42,6 +42,16 @@ export function rgbToHsl(
   return [h * 360, s * 100, l * 100];
 }
 
+const hue2rgb = (p: number, q: number, t: number) => {
+  let tNorm = t;
+  if (tNorm < 0) tNorm += 1;
+  if (tNorm > 1) tNorm -= 1;
+  if (tNorm < 1 / 6) return p + (q - p) * 6 * tNorm;
+  if (tNorm < 1 / 2) return q;
+  if (tNorm < 2 / 3) return p + (q - p) * (2 / 3 - tNorm) * 6;
+  return p;
+};
+
 /**
  * HSL 値を RGB 値に変換するユーティリティ関数
  * @param h - 色相 (0から360)
@@ -65,16 +75,6 @@ export function hslToRgb(
   if (sNorm === 0) {
     r = g = b = lNorm; // achromatic
   } else {
-    const hue2rgb = (p: number, q: number, t: number) => {
-      let tNorm = t;
-      if (tNorm < 0) tNorm += 1;
-      if (tNorm > 1) tNorm -= 1;
-      if (tNorm < 1 / 6) return p + (q - p) * 6 * tNorm;
-      if (tNorm < 1 / 2) return q;
-      if (tNorm < 2 / 3) return p + (q - p) * (2 / 3 - tNorm) * 6;
-      return p;
-    };
-
     const q = lNorm < 0.5 ? lNorm * (1 + sNorm) : lNorm + sNorm - lNorm * sNorm;
     const p = 2 * lNorm - q;
     r = hue2rgb(p, q, hNorm + 1 / 3);

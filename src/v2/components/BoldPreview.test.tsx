@@ -4,8 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BoldPreviewSvg } from './BoldPreview';
 
 // jsdomではレイアウト計算が正確に行われないため、getBoundingClientRectをモック化
-const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+// beforeAll内で置き換え前に参照をキャプチャすることで、置き換え後の無限再帰を防ぐ
+let originalGetBoundingClientRect: typeof Element.prototype.getBoundingClientRect;
 beforeAll(() => {
+  // oxlint-disable-next-line typescript-eslint(unbound-method) -- 置き換え前の参照キャプチャが目的。.call(this)で正しくバインドして使用する
+  originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
   Element.prototype.getBoundingClientRect = function () {
     if (this.textContent?.includes('Player')) {
       // プレイヤー名の要素には固定の幅を返す

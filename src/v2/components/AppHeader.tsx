@@ -34,6 +34,21 @@ interface AppHeaderProps {
   showGalleryControls?: boolean;
 }
 
+/** ウィンドウを最小化する */
+const handleMinimize = () => {
+  window.Main?.Minimize();
+};
+
+/** ウィンドウを最大化する */
+const handleMaximize = () => {
+  window.Main?.Maximize();
+};
+
+/** アプリケーションを終了する */
+const handleClose = () => {
+  window.Main?.Close();
+};
+
 /**
  * ウィンドウ操作ボタン、検索機能、ギャラリー操作を統合したアプリヘッダー。
  * スペース効率を重視した統合設計。
@@ -82,21 +97,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     checkForUpdates.mutate();
     // oxlint-disable-next-line react/exhaustive-deps -- 起動時に一度だけ実行。mutate の参照変化で再実行させたくない
   }, []);
-
-  /** ウィンドウを最小化する */
-  const handleMinimize = () => {
-    window.Main?.Minimize();
-  };
-
-  /** ウィンドウを最大化する */
-  const handleMaximize = () => {
-    window.Main?.Maximize();
-  };
-
-  /** アプリケーションを終了する */
-  const handleClose = () => {
-    window.Main?.Close();
-  };
 
   /** ログ同期をトリガーしてギャラリーを更新する */
   const handleRefresh = async () => {
@@ -156,7 +156,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleRefresh}
+                onClick={() => void handleRefresh()}
                 disabled={loadingState?.isRefreshing || isSyncing}
                 className="h-7 w-7 p-0"
                 title={t('common.refresh')}

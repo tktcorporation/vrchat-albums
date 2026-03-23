@@ -27,7 +27,10 @@ const exposeElectronTRPC = () => {
     sendMessage: (operation) =>
       ipcRenderer.send(ELECTRON_TRPC_CHANNEL, operation),
     onMessage: (callback) =>
-      ipcRenderer.on(ELECTRON_TRPC_CHANNEL, (_event, args) => callback(args)),
+      ipcRenderer.on(
+        ELECTRON_TRPC_CHANNEL,
+        (_event, args: TRPCResponseMessage) => callback(args),
+      ),
   };
   contextBridge.exposeInMainWorld('electronTRPC', electronTRPC);
 };
@@ -114,7 +117,17 @@ const myOn = {
     ) => void,
   ) => {
     const key = 'status-to-use-vrchat-log-files-dir';
-    ipcRenderer.on(key, (_, data) => callback(data));
+    ipcRenderer.on(
+      key,
+      (
+        _,
+        data:
+          | 'ready'
+          | 'logFilesDirNotSet'
+          | 'logFilesNotFound'
+          | 'logFileDirNotFound',
+      ) => callback(data),
+    );
     return () => {
       ipcRenderer.removeAllListeners(key);
     };
@@ -127,7 +140,17 @@ const myOn = {
     }) => void,
   ) => {
     const key = 'vrchat-photo-dir-with-error';
-    ipcRenderer.on(key, (_, data) => callback(data));
+    ipcRenderer.on(
+      key,
+      (
+        _,
+        data: {
+          storedPath: string | null;
+          path: string;
+          error: null | 'photoYearMonthDirsNotFound' | 'photoDirReadError';
+        },
+      ) => callback(data),
+    );
     return () => {
       ipcRenderer.removeAllListeners(key);
     };

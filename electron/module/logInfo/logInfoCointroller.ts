@@ -684,11 +684,13 @@ export const logInfoRouter = () =>
           const sessionMappingStartTime = performance.now();
           for (const joinDateTime of ctx.input) {
             const dateKey = joinDateTime.toISOString();
-            const searchEndTime = new Date(joinDateTime.getTime() + 1000);
+            const perSessionSearchEndTime = new Date(
+              joinDateTime.getTime() + 1000,
+            );
 
             // 指定時刻以前の最新ログを検索（元のfindRecentMergedWorldJoinLogと同じロジック）
             const recentWorldJoin = sortedLogs.find(
-              (log) => log.joinDateTime <= searchEndTime,
+              (log) => log.joinDateTime <= perSessionSearchEndTime,
             );
 
             if (!recentWorldJoin) {

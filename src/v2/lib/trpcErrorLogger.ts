@@ -52,7 +52,7 @@ export function logTRPCFetchError(
         error: trpcError,
         details: {
           ...details,
-          code: trpcError.data?.code,
+          code: (trpcError.data as { code?: string } | undefined)?.code,
         },
       });
     })

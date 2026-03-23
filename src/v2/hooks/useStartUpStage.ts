@@ -114,8 +114,8 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
         // effect-lint-allow-try-catch: React フロントエンド境界
         try {
           await invalidatePhotoGalleryQueries(utils);
-        } catch (error) {
-          console.warn('Failed to invalidate query cache:', error);
+        } catch (cacheError) {
+          console.warn('Failed to invalidate query cache:', cacheError);
         }
 
         updateStage('initialization', 'success');
@@ -123,9 +123,9 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
         // 初期化完了を通知
         callbacks?.onComplete?.();
       },
-      onError: (error: unknown) => {
+      onError: (syncError: unknown) => {
         // 重複実行エラーの場合は無視
-        const shouldIgnore = match(error)
+        const shouldIgnore = match(syncError)
           .when(
             (e) =>
               e instanceof Error &&
@@ -136,12 +136,12 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
 
         if (shouldIgnore) return;
 
-        const errorMessage = match(error)
+        const errorMessage = match(syncError)
           .with(P.instanceOf(Error), (e) => e.message)
           .otherwise(() => 'アプリケーション初期化に失敗しました');
 
         // tRPCエラーオブジェクト全体を保持
-        updateStage('initialization', 'error', errorMessage, error);
+        updateStage('initialization', 'error', errorMessage, syncError);
       },
     });
 

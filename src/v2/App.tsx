@@ -128,7 +128,7 @@ function AppContent() {
 
       match({ accepted, version, currentVersion })
         .when(
-          ({ accepted }) => !accepted,
+          (ctx) => !ctx.accepted,
           () => {
             setShowTerms(true);
             setIsUpdate(false);
@@ -136,7 +136,7 @@ function AppContent() {
           },
         )
         .when(
-          ({ version, currentVersion }) => version !== currentVersion,
+          (ctx) => ctx.version !== ctx.currentVersion,
           () => {
             setShowTerms(true);
             setIsUpdate(true);
@@ -149,7 +149,7 @@ function AppContent() {
         });
     };
 
-    checkTermsAndInitializeSentry();
+    void checkTermsAndInitializeSentry();
   }, [termsStatus, initializeSentryMain]); // initializeSentryMain と termsStatus を依存配列に含める
 
   /**
@@ -173,7 +173,7 @@ function AppContent() {
         <AppHeader showGalleryControls={false} />
         <TermsModal
           open={showTerms}
-          onAccept={handleTermsAccept}
+          onAccept={() => void handleTermsAccept()}
           isUpdate={isUpdate}
           canClose={false}
         />
@@ -260,12 +260,11 @@ const ToasterWrapper = () => {
               description:
                 structuredMessage.errorInfo?.userMessage ||
                 structuredMessage.message,
-              title:
-                variant === 'destructive'
-                  ? 'エラー'
-                  : variant === 'warning'
-                    ? '警告'
-                    : undefined,
+              title: (() => {
+                if (variant === 'destructive') return 'エラー';
+                if (variant === 'warning') return '警告';
+                return undefined;
+              })(),
             });
           },
         )
@@ -330,11 +329,11 @@ const Contents = memo(() => {
 
   if (stage === 'error') {
     // 型安全なエラー解析 - tRPCエラーオブジェクトがある場合は優先的に使用
-    const errorInfo = originalError
-      ? parseErrorFromTRPC(originalError)
-      : error
-        ? parseErrorFromTRPC(error)
-        : null;
+    const errorInfo = (() => {
+      if (originalError) return parseErrorFromTRPC(originalError);
+      if (error) return parseErrorFromTRPC(error);
+      return null;
+    })();
 
     // ts-patternを使用した型安全なエラー判定
     const errorDisplayType = match(errorInfo?.category)

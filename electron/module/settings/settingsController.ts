@@ -335,12 +335,12 @@ export const settingsRouter = () =>
             const logSyncError = failOpt.value;
             // ログ同期エラーの場合、詳細なエラータイプを特定
             // Data.TaggedError は _tag、旧エラークラスは code を持つ
-            const errorTag =
-              '_tag' in logSyncError
-                ? logSyncError._tag
-                : 'code' in logSyncError
-                  ? (logSyncError as { code: string }).code
-                  : 'UNKNOWN';
+            const errorTag = (() => {
+              if ('_tag' in logSyncError) return logSyncError._tag;
+              if ('code' in logSyncError)
+                return (logSyncError as { code: string }).code;
+              return 'UNKNOWN';
+            })();
 
             // VRChatログディレクトリが見つからない場合は、設定が必要なエラーとして処理
             const isSetupRequired = match(errorTag)

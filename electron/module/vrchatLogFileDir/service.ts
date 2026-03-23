@@ -27,8 +27,8 @@ const getStoredVRChatLogFilesDirPath =
     return Effect.succeed(
       match(getSettingStore().getLogFilesDir())
         .with(null, () => null)
-        .with(P.string, (path) =>
-          NotValidatedVRChatLogFilesDirPathSchema.parse(path),
+        .with(P.string, (dirPath) =>
+          NotValidatedVRChatLogFilesDirPathSchema.parse(dirPath),
         )
         .exhaustive(),
     );
@@ -53,7 +53,7 @@ export const getValidVRChatLogFileDir = (): Effect.Effect<
     const storedVRChatLogFilesDirPath = yield* getStoredVRChatLogFilesDirPath();
     const vrChatlogFilesDir = match(storedVRChatLogFilesDirPath)
       .with(null, () => getDefaultVRChatVRChatLogFilesDir())
-      .with(P.not(null), (path) => path)
+      .with(P.not(null), (storedPath) => storedPath)
       .exhaustive();
     const logFileNamesResult = yield* Effect.either(
       getVRChatLogFilePathList(vrChatlogFilesDir),

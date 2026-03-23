@@ -153,7 +153,7 @@ const DataImport = memo(() => {
           duration: 5000,
         });
         setSelectedPaths([]);
-        refetchHistory();
+        void refetchHistory();
       },
       onError: (error) => {
         toast({
@@ -175,7 +175,7 @@ const DataImport = memo(() => {
             'データが復帰されました。アプリケーションを再起動することをお勧めします。',
           duration: 8000,
         });
-        refetchHistory();
+        void refetchHistory();
       },
       onError: (error) => {
         toast({
@@ -241,7 +241,7 @@ const DataImport = memo(() => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={selectFiles}
+                onClick={() => void selectFiles()}
                 size="sm"
               >
                 <FileText className="h-4 w-4 mr-2" />
@@ -250,7 +250,7 @@ const DataImport = memo(() => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={selectDirectory}
+                onClick={() => void selectDirectory()}
                 size="sm"
               >
                 <FolderOpen className="h-4 w-4 mr-2" />
@@ -333,7 +333,7 @@ const DataImport = memo(() => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => refetchHistory()}
+            onClick={() => void refetchHistory()}
             disabled={isLoadingHistory}
           >
             <RotateCcw className="h-4 w-4 mr-2" />
@@ -341,98 +341,104 @@ const DataImport = memo(() => {
           </Button>
         </div>
 
-        {isLoadingHistory ? (
-          <div className="text-center py-4">
-            <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
-              履歴を読み込み中...
-            </div>
-          </div>
-        ) : importHistory && importHistory.length > 0 ? (
-          <div className={SPACING.stack.default}>
-            {importHistory.map((backup) => (
-              <div
-                key={backup.id}
-                className={`flex items-center justify-between p-4 border border-border rounded-lg ${SURFACE_COLOR.muted}`}
-              >
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <div
-                      className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.primary}`}
-                    >
-                      {backup.exportFolderPath}
-                    </div>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        backup.status === 'completed'
-                          ? STATUS_BADGE.success
-                          : STATUS_BADGE.muted
-                      }`}
-                    >
-                      {backup.status === 'completed'
-                        ? '適用済み'
-                        : 'ロールバック済み'}
-                    </span>
-                  </div>
+        {(() => {
+          if (isLoadingHistory)
+            return (
+              <div className="text-center py-4">
+                <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
+                  履歴を読み込み中...
+                </div>
+              </div>
+            );
+          if (importHistory && importHistory.length > 0)
+            return (
+              <div className={SPACING.stack.default}>
+                {importHistory.map((backup) => (
                   <div
-                    className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted} space-y-0.5`}
+                    key={backup.id}
+                    className={`flex items-center justify-between p-4 border border-border rounded-lg ${SURFACE_COLOR.muted}`}
                   >
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-3 w-3" />
-                        <span>
-                          バックアップ:{' '}
-                          {format(
-                            new Date(backup.backupTimestamp),
-                            'yyyy/MM/dd HH:mm:ss',
-                          )}
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <div
+                          className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.primary}`}
+                        >
+                          {backup.exportFolderPath}
+                        </div>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            backup.status === 'completed'
+                              ? STATUS_BADGE.success
+                              : STATUS_BADGE.muted
+                          }`}
+                        >
+                          {backup.status === 'completed'
+                            ? '適用済み'
+                            : 'ロールバック済み'}
                         </span>
                       </div>
-                      <div>
-                        インポート:{' '}
-                        {format(
-                          new Date(backup.importTimestamp),
-                          'yyyy/MM/dd HH:mm:ss',
+                      <div
+                        className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted} space-y-0.5`}
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-1">
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              バックアップ:{' '}
+                              {format(
+                                new Date(backup.backupTimestamp),
+                                'yyyy/MM/dd HH:mm:ss',
+                              )}
+                            </span>
+                          </div>
+                          <div>
+                            インポート:{' '}
+                            {format(
+                              new Date(backup.importTimestamp),
+                              'yyyy/MM/dd HH:mm:ss',
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          {backup.totalLogLines.toLocaleString()}行 •{' '}
+                          {backup.exportedFiles.length}ファイル
+                        </div>
+                        {backup.sourceFiles.length > 0 && (
+                          <div className="text-primary">
+                            インポート元:{' '}
+                            {backup.sourceFiles
+                              .map((f) => getFilenameFromPath(f))
+                              .join(', ')}
+                          </div>
                         )}
                       </div>
                     </div>
-                    <div>
-                      {backup.totalLogLines.toLocaleString()}行 •{' '}
-                      {backup.exportedFiles.length}ファイル
+                    <div className="flex items-center space-x-2">
+                      {backup.status === 'completed' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRollback(backup.id)}
+                          disabled={isRollingBack}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <AlertTriangle className="h-4 w-4 mr-1" />
+                          この時点に戻す
+                        </Button>
+                      )}
                     </div>
-                    {backup.sourceFiles.length > 0 && (
-                      <div className="text-primary">
-                        インポート元:{' '}
-                        {backup.sourceFiles
-                          .map((f) => getFilenameFromPath(f))
-                          .join(', ')}
-                      </div>
-                    )}
                   </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  {backup.status === 'completed' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRollback(backup.id)}
-                      disabled={isRollingBack}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <AlertTriangle className="h-4 w-4 mr-1" />
-                      この時点に戻す
-                    </Button>
-                  )}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
-              インポート履歴がありません
+            );
+          return (
+            <div className="text-center py-8">
+              <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
+                インポート履歴がありません
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </SettingsSection>
   );
