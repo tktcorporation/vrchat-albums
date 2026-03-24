@@ -1,5 +1,6 @@
 import { captureException, captureMessage } from '@sentry/electron/main';
 import { Effect, Either } from 'effect';
+import type Electron from 'electron';
 import * as log from 'electron-log';
 import path from 'pathe';
 import { stackWithCauses } from 'pony-cause';
@@ -12,7 +13,7 @@ import { UserFacingError } from './errors';
 const getLogFilePath = (): string => {
   // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
-    const { app } = require('electron') as typeof import('electron');
+    const { app } = require('electron') as typeof Electron;
     return path.join(app.getPath('logs'), 'app.log');
   } catch {
     // テストまたは非Electron環境
@@ -31,7 +32,7 @@ log.transports.file.maxSize = 5 * 1024 * 1024;
 const getIsProduction = (): boolean => {
   // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
-    const { app } = require('electron') as typeof import('electron');
+    const { app } = require('electron') as typeof Electron;
     return app.isPackaged;
   } catch {
     return false;
@@ -82,7 +83,7 @@ const buildErrorInfo = ({ message, stack }: ErrorLogParams): Error => {
         name: baseError.name,
         message: baseError.message,
         stack: s.stack,
-        cause: baseError.cause || s,
+        cause: baseError.cause ?? s,
       });
 
       return errorInfo;
@@ -115,7 +116,7 @@ const trySyncEither = <A>(fn: () => A): Either.Either<A, unknown> => {
 const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
   const messageString = match(message)
     .with(P.instanceOf(Error), (e) => e.message)
-    .otherwise((m) => String(m));
+    .otherwise(String);
 
   // ローカルログ出力
   log.warn(

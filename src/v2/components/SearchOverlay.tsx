@@ -48,12 +48,12 @@ const SearchOverlay = memo(
         enabled: isOpen,
         select: (data) => {
           // ワールド参加回数でソートしてよく訪れるワールドを作成
-          const worldCounts = data.reduce(
+          const worldCounts = data.reduce<Record<string, number>>(
             (acc, log) => {
               acc[log.worldName] = (acc[log.worldName] || 0) + 1;
               return acc;
             },
-            {} as Record<string, number>,
+            {},
           );
 
           return Object.entries(worldCounts)
@@ -220,7 +220,9 @@ const SearchOverlay = memo(
       setHighlightedIndex(0);
     }, [suggestions.length]);
 
-    if (!isOpen) return null;
+    if (!isOpen) {
+      return null;
+    }
 
     const isLoading = isLoadingWorlds || isLoadingPlayers;
 
@@ -229,7 +231,9 @@ const SearchOverlay = memo(
         className="fixed inset-0 z-50 bg-black/20 dark:bg-black/40 backdrop-blur-sm"
         onClick={handleBackdropClick}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') handleClose();
+          if (e.key === 'Escape') {
+            handleClose();
+          }
         }}
         role="dialog"
         aria-modal="true"
@@ -276,13 +280,14 @@ const SearchOverlay = memo(
             {/* 検索候補部分 */}
             <div className="max-h-80 overflow-y-auto scrollbar-hide">
               {(() => {
-                if (isLoading && debouncedQuery.length > 0)
+                if (isLoading && debouncedQuery.length > 0) {
                   return (
                     <div className="p-6 text-center text-muted-foreground/80">
                       検索中...
                     </div>
                   );
-                if (suggestions.length === 0)
+                }
+                if (suggestions.length === 0) {
                   return (
                     <div className="p-6 text-center text-muted-foreground/80">
                       {debouncedQuery.length > 0
@@ -290,6 +295,7 @@ const SearchOverlay = memo(
                         : 'よく利用する項目を読み込み中...'}
                     </div>
                   );
+                }
                 return (
                   <div className="p-2">
                     {debouncedQuery.length === 0 && (

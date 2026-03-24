@@ -52,12 +52,18 @@ export interface ParseResult {
  * 型付きエラー（Fail チャネル）のみを抽出し、Defect はそのまま throw する
  */
 const extractFailure = <E>(exit: Exit.Exit<unknown, E>): E | null => {
-  if (Exit.isSuccess(exit)) return null;
+  if (Exit.isSuccess(exit)) {
+    return null;
+  }
   const failOpt = Cause.failureOption(exit.cause);
-  if (Option.isSome(failOpt)) return failOpt.value;
+  if (Option.isSome(failOpt)) {
+    return failOpt.value;
+  }
   // Defect の場合はそのまま throw
   const dieOpt = Cause.dieOption(exit.cause);
-  if (Option.isSome(dieOpt)) throw dieOpt.value;
+  if (Option.isSome(dieOpt)) {
+    throw dieOpt.value;
+  }
   return null;
 };
 
@@ -113,7 +119,9 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
         worldJoinIndices.push(index);
       } else {
         const worldError = extractFailure<WorldJoinParseError>(exit);
-        if (!worldError) continue;
+        if (!worldError) {
+          continue;
+        }
 
         const errorMessage = match(worldError)
           .with(
@@ -172,7 +180,9 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
         logInfos.push(exit.value);
       } else {
         const playerError = extractFailure<PlayerActionParseError>(exit);
-        if (!playerError) continue;
+        if (!playerError) {
+          continue;
+        }
 
         // ログ行からプレイヤー名とIDを抽出（デバッグ用）
         const playerNameMatch = l.match(
@@ -232,7 +242,9 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
         logInfos.push(exit.value);
       } else {
         const leaveError = extractFailure<PlayerActionParseError>(exit);
-        if (!leaveError) continue;
+        if (!leaveError) {
+          continue;
+        }
 
         // ログ行からプレイヤー名とIDを抽出（デバッグ用）
         const playerNameMatch = l.match(

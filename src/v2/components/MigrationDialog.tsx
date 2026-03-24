@@ -41,12 +41,15 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
     onSuccess: (result) => {
       // 移行された項目をリストアップ
       const migratedItems = [];
-      if (result.details.database)
+      if (result.details.database) {
         migratedItems.push(t('migration.items.database'));
-      if (result.details.logStore)
+      }
+      if (result.details.logStore) {
         migratedItems.push(t('migration.items.logStore'));
-      if (result.details.settings)
+      }
+      if (result.details.settings) {
         migratedItems.push(t('migration.items.settings'));
+      }
 
       toast({
         title: t('migration.toast.success'),

@@ -41,7 +41,7 @@ const setupTestPhotos = () => {
 const XVFB_STARTUP_DELAY_MS = 1000;
 const SERVER_CHECK_INTERVAL_MS = 1000;
 const SERVER_MAX_ATTEMPTS = 10;
-const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY || '4096';
+const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY ?? '4096';
 
 interface PerformanceMetrics {
   photosLoaded: boolean;
@@ -180,9 +180,9 @@ test('写真一覧が正常にロードされる', async () => {
   try {
     const page = await electronApp.firstWindow({ timeout: 30000 });
     console.log('First window obtained, URL:', await page.url());
-  } catch (e) {
-    console.error('Failed to get first window:', e);
-    throw e;
+  } catch (error) {
+    console.error('Failed to get first window:', error);
+    throw error;
   }
   const page = await electronApp.firstWindow({ timeout: 1000 }); // Already got it, quick retry
 

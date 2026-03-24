@@ -146,7 +146,9 @@ export class ValueObjectLinter {
     node: ts.ClassDeclaration,
     sourceFile: ts.SourceFile,
   ) {
-    if (!node.name) return;
+    if (!node.name) {
+      return;
+    }
 
     const className = node.name.text;
     const extendsBaseValueObject = this.extendsBaseValueObject(node);
@@ -187,15 +189,21 @@ export class ValueObjectLinter {
   }
 
   private extendsBaseValueObject(node: ts.ClassDeclaration): boolean {
-    if (!node.name) return false;
+    if (!node.name) {
+      return false;
+    }
 
     // Get the symbol of the class
     const symbol = this.checker.getSymbolAtLocation(node.name);
-    if (!symbol) return false;
+    if (!symbol) {
+      return false;
+    }
 
     // Get the type of the class
     const type = this.checker.getTypeOfSymbolAtLocation(symbol, node);
-    if (!type) return false;
+    if (!type) {
+      return false;
+    }
 
     // Check if this type extends BaseValueObject
     return this.isBaseValueObjectType(type);
@@ -269,9 +277,11 @@ export class ValueObjectLinter {
     node: ts.ClassDeclaration,
     sourceFile: ts.SourceFile,
   ) {
-    if (!node.heritageClauses) return;
+    if (!node.heritageClauses) {
+      return;
+    }
 
-    const className = node.name?.text || '';
+    const className = node.name?.text ?? '';
 
     for (const clause of node.heritageClauses) {
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
@@ -416,7 +426,7 @@ export async function lintValueObjectsFromSource(
   success: boolean;
   message?: string;
 }> {
-  const files = Array.from(sources.keys());
+  const files = [...sources.keys()];
   const linter = new ValueObjectLinter(files, sources);
   const issues = linter.lint();
 
@@ -455,25 +465,21 @@ export async function lintValueObjects(
     });
   } else {
     // Find all TypeScript files that might contain ValueObjects
-    let patterns: string[];
-
-    if (testMode) {
-      // In test mode, ONLY scan the test directory
-      patterns = ['test-valueobjects/**/*.ts'];
-    } else {
-      patterns = [
-        'electron/**/*.ts',
-        'src/**/*.ts',
-        '!electron/**/*.test.ts',
-        '!electron/**/*.spec.ts',
-        '!src/**/*.test.ts',
-        '!src/**/*.spec.ts',
-        '!node_modules/**/*',
-        '!dist/**/*',
-        '!main/**/*',
-        '!out/**/*',
-      ];
-    }
+    // In test mode, ONLY scan the test directory
+    const patterns: string[] = testMode
+      ? ['test-valueobjects/**/*.ts']
+      : [
+          'electron/**/*.ts',
+          'src/**/*.ts',
+          '!electron/**/*.test.ts',
+          '!electron/**/*.spec.ts',
+          '!src/**/*.test.ts',
+          '!src/**/*.spec.ts',
+          '!node_modules/**/*',
+          '!dist/**/*',
+          '!main/**/*',
+          '!out/**/*',
+        ];
 
     files = await glob(patterns, {
       cwd: process.cwd(),

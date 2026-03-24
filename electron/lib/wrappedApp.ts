@@ -1,3 +1,4 @@
+import type Electron from 'electron';
 /**
  * Get the path to the user data directory.
  * ex. C:\Users\username\AppData\Roaming\app-name
@@ -5,7 +6,7 @@
 export const getAppUserDataPath = () => {
   // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
-    const { app } = require('electron') as typeof import('electron');
+    const { app } = require('electron') as typeof Electron;
     return app.getPath('userData');
   } catch {
     // テストまたは非Electron環境

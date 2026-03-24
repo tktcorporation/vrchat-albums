@@ -42,7 +42,7 @@ export function BoldPreviewSvg({
   const containerRef = useRef<HTMLDivElement>(null);
   const tempContainerRef = useRef<HTMLDivElement>(null);
   const internalPreviewRef = useRef<SVGSVGElement>(null);
-  const previewRef = externalPreviewRef || internalPreviewRef;
+  const previewRef = externalPreviewRef ?? internalPreviewRef;
 
   const imageSource = imageBase64
     ? `data:image/png;base64,${imageBase64}`
@@ -61,7 +61,9 @@ export function BoldPreviewSvg({
   }, [imageSource]);
 
   useEffect(() => {
-    if (!tempContainerRef.current || !players) return;
+    if (!tempContainerRef.current || !players) {
+      return;
+    }
 
     const containerWidth = 740;
     const gap = 8;
@@ -80,7 +82,7 @@ export function BoldPreviewSvg({
     tempDiv.style.whiteSpace = 'nowrap';
     tempDiv.style.fontSize = '14px';
     tempDiv.style.fontWeight = '500';
-    document.body.appendChild(tempDiv);
+    document.body.append(tempDiv);
 
     for (const player of players) {
       tempDiv.textContent = player.playerName;
@@ -100,7 +102,7 @@ export function BoldPreviewSvg({
       }
     }
 
-    document.body.removeChild(tempDiv);
+    tempDiv.remove();
     setVisiblePlayers(visible);
     setHiddenCount(showAllPlayers ? 0 : players.length - visible.length);
   }, [players, showAllPlayers]);
@@ -109,8 +111,10 @@ export function BoldPreviewSvg({
    * 同ファイル内でプレビューサイズを決定するためにのみ使用される。
    */
   const calculatePreviewHeight = () => {
-    if (!showAllPlayers) return 600;
-    const playerCount = players?.length || 0;
+    if (!showAllPlayers) {
+      return 600;
+    }
+    const playerCount = players?.length ?? 0;
     const playersPerRow = Math.floor((740 - 100) / (100 + 8));
     const additionalRows = Math.max(
       0,
@@ -240,7 +244,7 @@ export function BoldPreviewSvg({
             dominantBaseline="hanging"
             filter="url(#soft-shadow)"
           >
-            {worldName || 'Unknown World'}
+            {worldName ?? 'Unknown World'}
           </text>
           <rect
             x="0"
@@ -266,7 +270,7 @@ export function BoldPreviewSvg({
             dominantBaseline="hanging"
             letterSpacing="0.05em"
           >
-            PLAYERS ({players?.length || 0})
+            PLAYERS ({players?.length ?? 0})
           </text>
         </g>
 

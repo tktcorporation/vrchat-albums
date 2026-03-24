@@ -119,10 +119,10 @@ export class QueryCache {
   getStats(): {
     size: number;
     hitRate: number;
-    topKeys: Array<{ key: string; hits: number }>;
+    topKeys: { key: string; hits: number }[];
   } {
     let totalHits = 0;
-    const entries: Array<{ key: string; hits: number }> = [];
+    const entries: { key: string; hits: number }[] = [];
 
     for (const [key, entry] of this.cache.entries()) {
       totalHits += entry.hits;

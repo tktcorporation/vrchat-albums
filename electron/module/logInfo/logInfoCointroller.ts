@@ -467,7 +467,7 @@ export const logInfoRouter = () =>
         );
       }),
     getVRCWorldJoinLogList: procedure.query(async () => {
-      return await runEffect(getVRCWorldJoinLogList());
+      return runEffect(getVRCWorldJoinLogList());
     }),
     /**
      * よく遊ぶプレイヤー名のリストを取得する
@@ -478,7 +478,7 @@ export const logInfoRouter = () =>
       .input(z.object({ limit: z.number().min(1).max(20).default(5) }))
       .query(async ({ input }) => {
         // getFrequentPlayerNames は Effect<string[], never> を返す（エラーなし）
-        return await Effect.runPromise(getFrequentPlayerNames(input.limit));
+        return Effect.runPromise(getFrequentPlayerNames(input.limit));
       }),
     getRecentVRChatWorldJoinLogByVRChatPhotoName: procedure
       .input(VRChatPhotoFileNameWithExtSchema)
@@ -536,7 +536,7 @@ export const logInfoRouter = () =>
       )
       .query(async ({ input }) => {
         // getWorldNameSuggestions は Effect<string[], never> を返す（エラーなし）
-        return await Effect.runPromise(
+        return Effect.runPromise(
           getWorldNameSuggestions(input.query, input.limit),
         );
       }),
@@ -556,7 +556,7 @@ export const logInfoRouter = () =>
       )
       .query(async ({ input }) => {
         // getPlayerNameSuggestions は Effect<string[], never> を返す（エラーなし）
-        return await Effect.runPromise(
+        return Effect.runPromise(
           getPlayerNameSuggestions(input.query, input.limit),
         );
       }),
@@ -603,14 +603,14 @@ export const logInfoRouter = () =>
             worldId: string | null;
             worldName: string | null;
             worldInstanceId: string | null;
-            players: Array<{
+            players: {
               id: string;
               playerId: string | null;
               playerName: string;
               joinDateTime: Date;
               createdAt: Date;
               updatedAt: Date;
-            }>;
+            }[];
           }
         >;
 
@@ -621,14 +621,14 @@ export const logInfoRouter = () =>
         }
 
         // 効率的なワールド参加ログの一括取得
-        const sessionRanges: Array<{
+        const sessionRanges: {
           dateKey: string;
           start: Date;
           end: Date | undefined;
           worldId: string;
           worldName: string;
           worldInstanceId: string;
-        }> = [];
+        }[] = [];
 
         // effect-lint-allow-try-catch: tRPC procedure 境界
         try {
@@ -814,9 +814,7 @@ export const logInfoRouter = () =>
               error,
             )
               .with(P.instanceOf(Error), (err) => err.message)
-              .otherwise((err) => String(err))} (requested sessions: ${
-              ctx.input.length
-            })`,
+              .otherwise(String)} (requested sessions: ${ctx.input.length})`,
             userMessage: 'セッション情報の取得中にエラーが発生しました。',
             cause: error instanceof Error ? error : new Error(String(error)),
           });

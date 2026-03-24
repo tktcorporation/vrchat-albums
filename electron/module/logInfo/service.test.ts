@@ -28,7 +28,7 @@ vi.mock('../vrchatLog/service', () => ({
       // 日付範囲に応じて複数のファイルパスを返すようにモックを修正
       const paths: ReturnType<typeof VRChatLogStoreFilePathSchema.parse>[] = [];
       let currentDate = new Date(startDate);
-      const endDate = _currentDate || new Date();
+      const endDate = _currentDate ?? new Date();
 
       // 開始日から終了日まで1ヶ月ずつ増やしながらパスを生成
       while (

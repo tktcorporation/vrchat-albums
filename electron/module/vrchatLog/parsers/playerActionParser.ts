@@ -45,7 +45,7 @@ const parsePlayerInfo = (
 
   // プレイヤーIDの検証
   const playerIdResult = OptionalVRChatPlayerIdSchema.safeParse(
-    playerId || null,
+    playerId ?? null,
   );
   if (!playerIdResult.success) {
     return Effect.fail('INVALID_PLAYER_ID');
@@ -116,7 +116,7 @@ export const extractPlayerLeaveInfoFromLog = (
   const [, date, time, playerName, playerId] = matches;
 
   // 日付のパース（ピリオドをハイフンに変換）
-  const processedDate = date.replace(/\./g, '-');
+  const processedDate = date.replaceAll('.', '-');
   const leaveDate = Effect.try({
     try: () =>
       datefns.parse(

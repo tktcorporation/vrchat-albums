@@ -131,9 +131,7 @@ export const getLogStoreFilePathsInRange = async (
     targetDate = datefns.addMonths(targetDate, 1);
   }
 
-  return Array.from(logFilePathSet).map((p) =>
-    VRChatLogStoreFilePathSchema.parse(p),
-  );
+  return [...logFilePathSet].map((p) => VRChatLogStoreFilePathSchema.parse(p));
 };
 
 /**
@@ -178,7 +176,7 @@ export const appendLoglinesToFile = (props: {
       const dateMatch = logLine.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
       if (!dateMatch) {
         const key = datefns.format(new Date(), 'yyyy-MM');
-        const monthLogs = logsByMonth.get(key) || [];
+        const monthLogs = logsByMonth.get(key) ?? [];
         monthLogs.push(logLine);
         logsByMonth.set(key, monthLogs);
         continue;
@@ -188,7 +186,7 @@ export const appendLoglinesToFile = (props: {
       const month = dateMatch[2];
       const key = `${year}-${month}`;
 
-      const monthLogs = logsByMonth.get(key) || [];
+      const monthLogs = logsByMonth.get(key) ?? [];
       monthLogs.push(logLine);
       logsByMonth.set(key, monthLogs);
     }
@@ -281,14 +279,14 @@ export const appendLoglinesToFile = (props: {
       const newLog = `${newLines.join('\n')}\n`;
 
       // ファイルが存在しない場合は新規作成、存在する場合は追記
-      if (!isExists) {
-        yield* fs.writeFileSyncSafe(logStoreFilePath.value, newLog).pipe(
+      if (isExists) {
+        yield* fs.appendFileAsync(logStoreFilePath.value, newLog).pipe(
           Effect.catchAll((e) => {
             throw e;
           }),
         );
       } else {
-        yield* fs.appendFileAsync(logStoreFilePath.value, newLog).pipe(
+        yield* fs.writeFileSyncSafe(logStoreFilePath.value, newLog).pipe(
           Effect.catchAll((e) => {
             throw e;
           }),

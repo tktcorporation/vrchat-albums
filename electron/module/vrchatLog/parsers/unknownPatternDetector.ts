@@ -56,11 +56,15 @@ export const detectUnknownPatterns = (
   for (const line of logLines) {
     // 1. 広域フィルタにマッチするか
     const matchesBroad = DETECTION_BROAD_PATTERNS.some((p) => line.includes(p));
-    if (!matchesBroad) continue;
+    if (!matchesBroad) {
+      continue;
+    }
 
     // 2. 既知パターンのいずれかにマッチするなら既知 → スキップ
     const matchesKnown = KNOWN_PATTERNS.some((p) => line.includes(p));
-    if (matchesKnown) continue;
+    if (matchesKnown) {
+      continue;
+    }
 
     // 3. パターンの骨格を抽出して重複排除
     const skeleton = extractPatternSkeleton(line);
@@ -98,7 +102,9 @@ export const detectUnknownPatterns = (
  */
 export const extractPatternSkeleton = (line: string): string => {
   const matched = line.match(/\[Behaviour\]\s+([^\s]+)/);
-  if (!matched) return '[Behaviour] <unparsed>';
+  if (!matched) {
+    return '[Behaviour] <unparsed>';
+  }
   return `[Behaviour] ${matched[1]}`;
 };
 

@@ -66,7 +66,7 @@ export function useContainerWidth(padding = 0): {
   const containerRef = useCallback((node: HTMLElement | null) => {
     if (DEBUG_WIDTH_MEASUREMENT) {
       console.log('[useContainerWidth] Callback ref called:', {
-        nodeExists: !!node,
+        nodeExists: Boolean(node),
         nodeTagName: node?.tagName,
         timestamp: performance.now().toFixed(2),
       });
@@ -104,15 +104,7 @@ export function useContainerWidth(padding = 0): {
         });
       }
 
-      if (validWidth !== null) {
-        if (DEBUG_WIDTH_MEASUREMENT) {
-          console.log(
-            '[useContainerWidth] ✅ Width measured successfully:',
-            adjustedWidth,
-          );
-        }
-        setState({ status: 'ready', width: validWidth });
-      } else {
+      if (validWidth === null) {
         // 幅が 0 以下の場合は measuring 状態を維持
         // ResizeObserver がサイズ変更を検知したら再測定される
         if (DEBUG_WIDTH_MEASUREMENT) {
@@ -120,6 +112,14 @@ export function useContainerWidth(padding = 0): {
             '[useContainerWidth] ⚠️ Invalid width, waiting for resize...',
           );
         }
+      } else {
+        if (DEBUG_WIDTH_MEASUREMENT) {
+          console.log(
+            '[useContainerWidth] ✅ Width measured successfully:',
+            adjustedWidth,
+          );
+        }
+        setState({ status: 'ready', width: validWidth });
       }
     };
 

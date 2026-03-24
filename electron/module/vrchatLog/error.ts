@@ -39,7 +39,7 @@ export class VRChatLogFileError extends Error {
         stack: error.stack,
       }))
       .with({ code: P.string }, (obj) => ({
-        message: obj.message || obj.code,
+        message: obj.message ?? obj.code,
         code: obj.code,
         stack: undefined,
       }))

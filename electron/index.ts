@@ -28,7 +28,8 @@ import { initSettingStore } from './module/settingStore';
 const settingStore = initSettingStore();
 initializeSettingStoreForUtil();
 
-export let isSentryInitializedMain = false; // Sentry初期化フラグ exportする
+let isSentryInitializedMain = false;
+export const getIsSentryInitializedMain = () => isSentryInitializedMain; // Sentry初期化フラグ exportする
 
 export interface ErrorEvent extends Event {
   type: undefined;
@@ -197,7 +198,9 @@ process.on('unhandledRejection', (error) => logger.error({ message: error }));
 
 app.on('second-instance', () => {
   const mainWindow = electronUtil.createOrGetWindow();
-  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
   mainWindow.focus();
 });
 

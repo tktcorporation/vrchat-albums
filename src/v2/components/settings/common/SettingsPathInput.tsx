@@ -74,7 +74,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
       onChange(event.target.value);
     };
 
-    const inputId = `path-input-${label.replace(/\s+/g, '-').toLowerCase()}`;
+    const inputId = `path-input-${label.replaceAll(/\s+/g, '-').toLowerCase()}`;
 
     return (
       <div className={cn(SPACING.stack.default, className)}>
@@ -117,7 +117,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
               variant="secondary"
               size="sm"
               onClick={onBrowse}
-              disabled={disabled || readOnly}
+              disabled={disabled ?? readOnly}
             >
               <FolderOpen className="h-4 w-4" />
             </Button>

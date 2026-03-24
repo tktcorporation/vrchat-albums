@@ -19,6 +19,7 @@ const ja: Translations = {
     },
     contextMenu: {
       copyPhotoData: 'コピー',
+      selectPhoto: '写真を選択',
       openInPhotoApp: '写真アプリで開く',
       showInExplorer: 'フォルダで表示',
       shareImage: '写真をシェア',

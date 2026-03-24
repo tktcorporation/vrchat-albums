@@ -115,9 +115,7 @@ const createTempFile = (
 let exiftoolInstance: exiftool.ExifTool | null = null;
 
 const getExiftoolInstance = async () => {
-  if (!exiftoolInstance) {
-    exiftoolInstance = new exiftool.ExifTool();
-  }
+  exiftoolInstance ??= new exiftool.ExifTool();
   return exiftoolInstance;
 };
 

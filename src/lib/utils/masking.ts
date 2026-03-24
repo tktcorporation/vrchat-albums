@@ -14,10 +14,10 @@ function maskFilePaths(str: string | undefined): string | undefined {
     return str;
   }
   // macOS / Linux Paths
-  let newStr = str.replace(/(\/Users\/)[^/]+(\/)/g, '$1[REDACTED_USER]$2');
-  newStr = newStr.replace(/(\/home\/)[^/]+(\/)/g, '$1[REDACTED_USER]$2');
+  let newStr = str.replaceAll(/(\/Users\/)[^/]+(\/)/g, '$1[REDACTED_USER]$2');
+  newStr = newStr.replaceAll(/(\/home\/)[^/]+(\/)/g, '$1[REDACTED_USER]$2');
   // Windows Paths
-  newStr = newStr.replace(
+  newStr = newStr.replaceAll(
     /([A-Za-z]:\\Users\\)[^\\]+(\\)/g,
     '$1[REDACTED_USER]$2',
   );

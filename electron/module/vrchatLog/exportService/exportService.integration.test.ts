@@ -103,7 +103,7 @@ describe('exportService integration', () => {
       expect(fileExists).toBe(true);
 
       // ファイル内容を確認
-      const fileContent = await fs.readFile(exportedFilePath, 'utf-8');
+      const fileContent = await fs.readFile(exportedFilePath, 'utf8');
       const lines = fileContent.split('\n');
 
       expect(lines).toHaveLength(4);
@@ -149,14 +149,14 @@ describe('exportService integration', () => {
       const actualFilePath = result.exportedFiles[0];
       // クロスプラットフォーム対応: パスを分割して検証
       const pathParts = actualFilePath.split(path.sep);
-      expect(pathParts[pathParts.length - 1]).toBe('single-export.txt');
-      expect(pathParts[pathParts.length - 2]).toMatch(
+      expect(pathParts.at(-1)).toBe('single-export.txt');
+      expect(pathParts.at(-2)).toMatch(
         /^vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/,
       );
       expect(result.totalLogLines).toBe(4);
 
       // ファイル内容を確認
-      const fileContent = await fs.readFile(actualFilePath, 'utf-8');
+      const fileContent = await fs.readFile(actualFilePath, 'utf8');
       expect(fileContent).toContain('Test World');
     } finally {
       try {

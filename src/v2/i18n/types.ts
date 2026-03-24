@@ -32,6 +32,7 @@ export interface Translations {
     };
     contextMenu: {
       copyPhotoData: string;
+      selectPhoto: string;
       openInPhotoApp: string;
       showInExplorer: string;
       shareImage: string;

@@ -54,7 +54,7 @@ interface MemoryReport {
 }
 
 // テスト写真の枚数（環境変数で上書き可能）
-const PHOTO_COUNT = Number.parseInt(process.env.PHOTO_COUNT || '500', 10);
+const PHOTO_COUNT = Number.parseInt(process.env.PHOTO_COUNT ?? '500', 10);
 
 // 4K解像度（実際のVRChat写真に近い）
 const PHOTO_WIDTH = 3840;

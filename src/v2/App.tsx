@@ -115,7 +115,9 @@ function AppContent() {
      * termsStatus が取得できたタイミングで useEffect から呼ばれる。
      */
     const checkTermsAndInitializeSentry = async () => {
-      if (!termsStatus) return; // termsStatusが取得できるまで待つ
+      if (!termsStatus) {
+        return;
+      } // termsStatusが取得できるまで待つ
 
       // Sentryの初期化（レンダラープロセス側）を試みる
       // 実際の初期化やイベント送信は、DSNの有無やbeforeSendフックで制御される
@@ -225,7 +227,9 @@ interface StructuredToastMessage {
 function getToastVariant(
   category?: string,
 ): 'default' | 'destructive' | 'warning' {
-  if (!category) return 'default';
+  if (!category) {
+    return 'default';
+  }
 
   return match(category)
     .with(ERROR_CATEGORIES.FILE_NOT_FOUND, () => 'warning' as const)
@@ -258,12 +262,16 @@ const ToasterWrapper = () => {
             toast({
               variant,
               description:
-                structuredMessage.errorInfo?.userMessage ||
+                structuredMessage.errorInfo?.userMessage ??
                 structuredMessage.message,
               title: (() => {
-                if (variant === 'destructive') return 'エラー';
-                if (variant === 'warning') return '警告';
-                return undefined;
+                if (variant === 'destructive') {
+                  return 'エラー';
+                }
+                if (variant === 'warning') {
+                  return '警告';
+                }
+                return;
               })(),
             });
           },
@@ -330,8 +338,12 @@ const Contents = memo(() => {
   if (stage === 'error') {
     // 型安全なエラー解析 - tRPCエラーオブジェクトがある場合は優先的に使用
     const errorInfo = (() => {
-      if (originalError) return parseErrorFromTRPC(originalError);
-      if (error) return parseErrorFromTRPC(error);
+      if (originalError) {
+        return parseErrorFromTRPC(originalError);
+      }
+      if (error) {
+        return parseErrorFromTRPC(error);
+      }
       return null;
     })();
 

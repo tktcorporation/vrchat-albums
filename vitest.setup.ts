@@ -3,9 +3,7 @@ import { afterAll, afterEach, vi } from 'vitest';
 
 // テスト環境で npm_package_version が設定されていない場合のフォールバック
 // getAppVersion() が App version is undefined エラーを投げるのを防ぐ
-if (!process.env.npm_package_version) {
-  process.env.npm_package_version = '0.0.0-test';
-}
+process.env.npm_package_version ??= '0.0.0-test';
 
 import * as client from './electron/lib/sequelize';
 

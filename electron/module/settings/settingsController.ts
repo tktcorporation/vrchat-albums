@@ -25,7 +25,9 @@ import * as settingService from './service';
  * UpdateError → UserFacingError 変換ヘルパー（ネットワークエラーカテゴリ）
  */
 const mapUpdateError = (e: UpdateError | UserFacingError): UserFacingError => {
-  if (e instanceof UserFacingError) return e;
+  if (e instanceof UserFacingError) {
+    return e;
+  }
   return UserFacingError.withStructuredInfo({
     code: ERROR_CODES.UNKNOWN,
     category: ERROR_CATEGORIES.NETWORK_ERROR,
@@ -336,9 +338,12 @@ export const settingsRouter = () =>
             // ログ同期エラーの場合、詳細なエラータイプを特定
             // Data.TaggedError は _tag、旧エラークラスは code を持つ
             const errorTag = (() => {
-              if ('_tag' in logSyncError) return logSyncError._tag;
-              if ('code' in logSyncError)
+              if ('_tag' in logSyncError) {
+                return logSyncError._tag;
+              }
+              if ('code' in logSyncError) {
                 return (logSyncError as { code: string }).code;
+              }
               return 'UNKNOWN';
             })();
 

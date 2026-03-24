@@ -98,7 +98,9 @@ export function useHybridPhotoLoading(
   const utils = trpcReact.useUtils();
 
   const photoMetadata = useMemo<PhotoMetadata[]>(() => {
-    if (!metadataRaw) return [];
+    if (!metadataRaw) {
+      return [];
+    }
     return metadataRaw.map((m) => ({
       id: m.id,
       photoTakenAt: new Date(m.photoTakenAt),
@@ -126,7 +128,9 @@ export function useHybridPhotoLoading(
         (id) => !pathCacheRef.current.has(id) && !pendingIdsRef.current.has(id),
       );
 
-      if (uncachedIds.length === 0) return;
+      if (uncachedIds.length === 0) {
+        return;
+      }
 
       // バッチサイズで分割
       for (let i = 0; i < uncachedIds.length; i += batchSize) {

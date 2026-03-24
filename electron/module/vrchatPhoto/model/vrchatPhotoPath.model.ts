@@ -193,11 +193,11 @@ export const getCountByYearMonthList = async (): Promise<
 
   return converted.map(({ yearMonth, photoCount }) => {
     if (typeof yearMonth !== 'string') {
-      throw new Error(`assertion error: ${String(yearMonth)}`);
+      throw new TypeError(`assertion error: ${String(yearMonth)}`);
     }
     const [year, month] = yearMonth.split('-').map(Number);
     if (typeof photoCount !== 'number') {
-      throw new Error(`assertion error: ${String(photoCount)}`);
+      throw new TypeError(`assertion error: ${String(photoCount)}`);
     }
     return { photoTakenYear: year, photoTakenMonth: month, photoCount };
   });

@@ -78,7 +78,7 @@ export const LocationGroupHeader = ({
   // Priority based on scroll position - elements higher up get higher priority
   const queryPriority = Math.max(
     0,
-    10 - Math.floor((containerRef.current?.offsetTop || 0) / 500),
+    10 - Math.floor((containerRef.current?.offsetTop ?? 0) / 500),
   );
   const canExecuteQuery = useQueryQueue(
     isVisible && shouldLoadDetails,
@@ -128,7 +128,9 @@ export const LocationGroupHeader = ({
   // Event handlers
   /** プレイヤー名一覧をクリップボードへコピーする */
   const handleCopyPlayers = async () => {
-    if (!players) return;
+    if (!players) {
+      return;
+    }
     const playerNames = players.map((p) => p.playerName);
     await copyPlayersToClipboard(playerNames);
     handleCopyPlayersUI();
@@ -259,7 +261,7 @@ export const LocationGroupHeader = ({
                 >
                   <img
                     src={details.thumbnailImageUrl}
-                    alt={details?.name || worldName || 'World'}
+                    alt={(details?.name || worldName) ?? 'World'}
                     className="w-full h-full object-cover"
                     loading="lazy"
                   />
@@ -290,7 +292,7 @@ export const LocationGroupHeader = ({
                     }}
                   >
                     <span className="line-clamp-1 text-start">
-                      {details?.name || worldName}
+                      {details?.name ?? worldName}
                     </span>
                     <ExternalLink
                       className={`${ICON_SIZE.sm.class} ml-2 transition-opacity flex-shrink-0`}
@@ -317,11 +319,11 @@ export const LocationGroupHeader = ({
                   {details?.unityPackages &&
                     details.unityPackages.length > 0 && (
                       <div className="flex items-center gap-1.5">
-                        {Array.from(
-                          new Set(
+                        {[
+                          ...new Set(
                             details.unityPackages.map((pkg) => pkg.platform),
                           ),
-                        ).map((platform) => (
+                        ].map((platform) => (
                           <PlatformBadge key={platform} platform={platform} />
                         ))}
                       </div>
@@ -339,7 +341,7 @@ export const LocationGroupHeader = ({
               {/* 2行目: プレイヤーリスト */}
               <div className="flex items-center gap-2 w-full">
                 {(() => {
-                  if (isPlayersLoading || players === null)
+                  if (isPlayersLoading || players === null) {
                     return (
                       // ローディング中 or 未取得: スケルトン表示
                       <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0">
@@ -359,7 +361,8 @@ export const LocationGroupHeader = ({
                         </div>
                       </div>
                     );
-                  if (players.length > 0)
+                  }
+                  if (players.length > 0) {
                     return (
                       // プレイヤーあり（取得済み、データあり）: リスト表示
                       <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 hover:bg-white/40 dark:bg-black/30 dark:hover:bg-black/40 px-3 py-1 rounded-full transition-all duration-300 border border-white/20 dark:border-gray-700/30 hover:border-white/30 dark:hover:border-gray-700/40 group/players flex-1 min-w-0">
@@ -372,34 +375,27 @@ export const LocationGroupHeader = ({
                         <div className="text-gray-500 dark:text-gray-400">
                           |
                         </div>
-                        <div
+                        <button
+                          type="button"
                           ref={playerListContainerRef}
-                          className="relative cursor-pointer flex-1 min-w-0"
+                          className="relative cursor-pointer flex-1 min-w-0 appearance-none border-none bg-transparent p-0 text-left"
                           onMouseEnter={() => setIsHovered(true)}
                           onMouseLeave={() => setIsHovered(false)}
                           onMouseMove={handleMouseMove}
                           onClick={() => void handleCopyPlayers()}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              void handleCopyPlayers();
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
                           title={t('locationHeader.clickToCopy')}
                         >
                           <div className="flex items-center gap-2 w-full">
-                            {!isCopied ? (
-                              <PlayerList
-                                players={players}
-                                maxVisiblePlayers={maxVisiblePlayers}
-                              />
-                            ) : (
+                            {isCopied ? (
                               <span className="text-green-400 flex items-center gap-2">
                                 <CheckIcon className={ICON_SIZE.sm.class} />
                                 {t('locationHeader.copied')}
                               </span>
+                            ) : (
+                              <PlayerList
+                                players={players}
+                                maxVisiblePlayers={maxVisiblePlayers}
+                              />
                             )}
                           </div>
                           {players &&
@@ -428,12 +424,13 @@ export const LocationGroupHeader = ({
                               </div>,
                               document.body,
                             )}
-                        </div>
+                        </button>
                         <Copy
                           className={`${ICON_SIZE.sm.class} ml-2 text-gray-800 dark:text-white group-hover/players:text-gray-200 transition-colors flex-shrink-0`}
                         />
                       </div>
                     );
+                  }
                   return (
                     // プレイヤーなし（取得済み、データなし = 0人）: 「プレイヤー情報なし」表示
                     <div className="flex gap-2 items-center text-xs text-gray-800 dark:text-white backdrop-blur-sm bg-white/30 dark:bg-black/30 px-3 py-1 rounded-full border border-white/20 dark:border-gray-700/30 flex-1 min-w-0">
@@ -458,10 +455,10 @@ export const LocationGroupHeader = ({
       <ShareDialog
         isOpen={isShareModalOpen}
         onClose={closeShareModal}
-        worldName={details?.name || worldName}
+        worldName={details?.name ?? worldName}
         worldId={worldId}
         joinDateTime={joinDateTime}
-        imageUrl={details?.imageUrl || null}
+        imageUrl={details?.imageUrl ?? null}
         players={players}
       />
     </div>

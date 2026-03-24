@@ -25,26 +25,26 @@ function transformSvgForPlatform(
     // viewBoxは同じ、内部要素を変換
 
     // 背景のrectを80%サイズに変換（1024 -> 820, offset 102）
-    transformedContent = transformedContent.replace(
-      /<rect x="0" y="0" width="1024" height="1024" rx="234"/g,
+    transformedContent = transformedContent.replaceAll(
+      '<rect x="0" y="0" width="1024" height="1024" rx="234"',
       '<rect x="102" y="102" width="820" height="820" rx="187"',
     );
 
     // ハイライトのrectも調整
-    transformedContent = transformedContent.replace(
-      /<rect x="0" y="0" width="1024" height="512" rx="234"/g,
+    transformedContent = transformedContent.replaceAll(
+      '<rect x="0" y="0" width="1024" height="512" rx="234"',
       '<rect x="102" y="102" width="820" height="410" rx="187"',
     );
 
     // キャラクターのスケールを調整（2.7 -> 2.16 = 80%）
-    transformedContent = transformedContent.replace(
-      /scale\(2\.7\)/g,
+    transformedContent = transformedContent.replaceAll(
+      'scale(2.7)',
       'scale(2.16)',
     );
 
     // コメントを更新
-    transformedContent = transformedContent.replace(
-      /<!-- メイン背景（角丸とシャドウ） - Windows用フルサイズ -->/g,
+    transformedContent = transformedContent.replaceAll(
+      '<!-- メイン背景（角丸とシャドウ） - Windows用フルサイズ -->',
       '<!-- メイン背景（角丸とシャドウ） - macOS用80%サイズ -->',
     );
   }
@@ -75,7 +75,7 @@ async function generatePlatformIcon(platform: Platform): Promise<void> {
 
   try {
     // 元のSVGを読み込み
-    let svgContent = fs.readFileSync(sourceSvgPath, 'utf-8');
+    let svgContent = fs.readFileSync(sourceSvgPath, 'utf8');
 
     // プラットフォーム用に変換
     svgContent = transformSvgForPlatform(svgContent, platform);

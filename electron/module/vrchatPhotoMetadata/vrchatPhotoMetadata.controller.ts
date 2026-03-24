@@ -71,12 +71,10 @@ export const vrchatPhotoMetadataRouter = () =>
           return [];
         }
         // Map → 配列に変換 (tRPC転送用)
-        return Array.from(metadataMap.entries()).map(
-          ([photoPath, metadata]) => ({
-            photoPath,
-            ...metadata,
-          }),
-        );
+        return [...metadataMap.entries()].map(([photoPath, metadata]) => ({
+          photoPath,
+          ...metadata,
+        }));
       }),
 
     /**

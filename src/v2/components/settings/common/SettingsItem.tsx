@@ -53,7 +53,7 @@ const SettingsItem = memo<SettingsItemProps>(
         <div className="flex-1 min-w-0 mr-4">
           <div
             className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}
-            id={`settings-item-${label.replace(/\s+/g, '-').toLowerCase()}`}
+            id={`settings-item-${label.replaceAll(/\s+/g, '-').toLowerCase()}`}
           >
             {label}
           </div>

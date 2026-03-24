@@ -60,9 +60,11 @@ async function getInitializeAppDataFunction() {
   return async () => {
     // Callerを作成してmutationを呼び出す
     const caller = router.createCaller({
-      eventEmitter: new (await import('node:events')).EventEmitter(),
+      eventEmitter: await import('node:events').then(
+        (m) => new m.EventEmitter(),
+      ),
     });
-    return await caller.initializeAppData();
+    return caller.initializeAppData();
   };
 }
 
@@ -100,10 +102,9 @@ describe('settingsController.initializeAppData', () => {
   });
 
   it('正常な初期化処理が完了する', async () => {
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
-    if (!initializeAppData)
-      throw new Error('initializeAppData not initialized');
+    }
     const result = await initializeAppData();
 
     expect(result).toEqual({ success: true });
@@ -137,8 +138,9 @@ describe('settingsController.initializeAppData', () => {
       [],
     );
 
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     await initializeAppData();
 
     expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
@@ -158,8 +160,9 @@ describe('settingsController.initializeAppData', () => {
       existingLogs,
     );
 
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     await initializeAppData();
 
     expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.INCREMENTAL);
@@ -175,8 +178,9 @@ describe('settingsController.initializeAppData', () => {
       new Error('Database connection error'),
     );
 
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     await initializeAppData();
 
     expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
@@ -196,8 +200,9 @@ describe('settingsController.initializeAppData', () => {
       }),
     );
 
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
 
     // UserFacingErrorがスローされることを確認
     let thrownError: Error | null = null;
@@ -234,8 +239,9 @@ describe('settingsController.initializeAppData', () => {
       }),
     );
 
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
 
     // UserFacingErrorがスローされることを確認
     let thrownError: Error | null = null;
@@ -263,8 +269,9 @@ describe('settingsController.initializeAppData', () => {
       }),
     );
 
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     const result = await initializeAppData();
 
     expect(result).toEqual({ success: true });
@@ -283,8 +290,9 @@ describe('settingsController.initializeAppData', () => {
       new Error('Database sync failed'),
     );
 
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
 
     let thrownError: Error | null = null;
     try {
@@ -309,8 +317,9 @@ describe('settingsController.initializeAppData', () => {
     // 文字列エラー（Error オブジェクトではない）
     mockSequelizeClient.syncRDBClient.mockRejectedValue('String error');
 
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
 
     let thrownError: Error | null = null;
     try {
@@ -330,13 +339,15 @@ describe('settingsController.initializeAppData', () => {
 
   it('重複実行防止が機能する', async () => {
     // 最初の実行
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     const firstPromise = initializeAppData();
 
     // 2回目の実行（重複）
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     const secondResult = await initializeAppData();
 
     // 2回目は重複として処理される
@@ -355,13 +366,15 @@ describe('settingsController.initializeAppData', () => {
 
   it('正常完了後はフラグがリセットされる', async () => {
     // 最初の実行を完了
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     await initializeAppData();
 
     // 2回目の実行は正常に動作する（重複扱いにならない）
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     const result = await initializeAppData();
     expect(result).toEqual({ success: true });
   });
@@ -373,8 +386,9 @@ describe('settingsController.initializeAppData', () => {
     );
 
     try {
-      if (!initializeAppData)
+      if (!initializeAppData) {
         throw new Error('initializeAppData not initialized');
+      }
       await initializeAppData();
     } catch {
       // エラーは期待される
@@ -382,8 +396,9 @@ describe('settingsController.initializeAppData', () => {
 
     // エラー後に再実行可能
     mockSequelizeClient.syncRDBClient.mockResolvedValue(undefined);
-    if (!initializeAppData)
+    if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
+    }
     const result = await initializeAppData();
     expect(result).toEqual({ success: true });
   });

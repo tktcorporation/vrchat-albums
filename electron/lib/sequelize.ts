@@ -199,7 +199,7 @@ export const syncRDBClient = async (options?: { checkRequired: boolean }) => {
   const checkRequired = options?.checkRequired ?? true;
   const appVersion = settingService.getAppVersion();
   const migrationRequired = match(checkRequired)
-    .with(true, async () => await checkMigrationRDBClient(appVersion))
+    .with(true, async () => checkMigrationRDBClient(appVersion))
     .with(false, () => true);
 
   if (!migrationRequired) {

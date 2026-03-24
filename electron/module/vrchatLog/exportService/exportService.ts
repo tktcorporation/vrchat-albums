@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import * as datefns from 'date-fns';
 import { Effect } from 'effect';
+import type Electron from 'electron';
 import { match } from 'ts-pattern';
 
 import {
@@ -68,13 +69,15 @@ const getElectronDownloadsPath = (): string | null => {
   const electronApp = (() => {
     // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
     try {
-      return (require('electron') as typeof import('electron')).app;
+      return (require('electron') as typeof Electron).app;
     } catch {
       return null;
     }
   })();
 
-  if (!electronApp) return null;
+  if (!electronApp) {
+    return null;
+  }
 
   // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
   try {
@@ -121,12 +124,12 @@ export const getLogStoreExportPath = (
   basePath?: string,
   exportDateTime?: Date,
 ): string => {
-  const base = basePath || getDefaultLogStorePath();
+  const base = basePath ?? getDefaultLogStorePath();
   const yearMonth = datefns.format(date, 'yyyy-MM');
   const fileName = `logStore-${yearMonth}.txt`;
 
   // エクスポート実行日時のサブフォルダ名を生成
-  const exportTime = exportDateTime || new Date();
+  const exportTime = exportDateTime ?? new Date();
   const exportFolder = generateExportFolderName(exportTime);
 
   return path.join(base, exportFolder, yearMonth, fileName);
@@ -183,7 +186,7 @@ const ensureDirectoryExists = (
   dirPath: string,
 ): Effect.Effect<void, ExportServiceError> =>
   Effect.tryPromise({
-    try: () => fs.mkdir(dirPath, { recursive: true }).then(() => undefined),
+    try: () => fs.mkdir(dirPath, { recursive: true }).then(() => {}),
     catch: (e) =>
       new ExportDirCreateFailed({
         path: dirPath,
@@ -199,7 +202,7 @@ const writeFileSafe = (
   content: string,
 ): Effect.Effect<void, ExportServiceError> =>
   Effect.tryPromise({
-    try: () => fs.writeFile(filePath, content, 'utf-8'),
+    try: () => fs.writeFile(filePath, content, 'utf8'),
     catch: (e) =>
       new ExportFileWriteFailed({
         path: filePath,

@@ -69,7 +69,7 @@ class PathObject extends BaseValueObject<'PathObject', string> {
    * glob用にフォワードスラッシュに正規化
    */
   toGlobPattern(): string {
-    return this.value.replace(/\\/g, '/');
+    return this.value.replaceAll('\\', '/');
   }
 
   /**
@@ -91,7 +91,7 @@ class AbsolutePathObject extends PathObject {
     super(absolutePath);
   }
 
-  resolve(): AbsolutePathObject {
+  resolve(): this {
     return this; // 既に絶対パスなのでそのまま返す
   }
 }
@@ -107,12 +107,12 @@ class ExportPathObject extends PathObject {
    */
   extractExportFolderName(): string | null {
     // すべてのパス区切り文字をスラッシュに統一して処理
-    const normalizedPath = this.value.replace(/\\/g, '/');
+    const normalizedPath = this.value.replaceAll('\\', '/');
     const parts = normalizedPath.split('/');
     const exportFolder = parts.find((part) =>
       part.startsWith('vrchat-albums-export_'),
     );
-    return exportFolder || null;
+    return exportFolder ?? null;
   }
 
   /**
@@ -123,7 +123,7 @@ class ExportPathObject extends PathObject {
     const timestamp = now
       .toISOString()
       .replace(/T/, '_')
-      .replace(/:/g, '-')
+      .replaceAll(':', '-')
       .slice(0, -5);
     const dirname = `${prefix}_${timestamp}`;
     return new ExportPathObject(path.join(this.value, dirname));
@@ -147,7 +147,7 @@ class BackupPathObject extends PathObject {
    * インポートバックアップ用のプレフィックスを追加
    */
   withImportBackupPrefix(): BackupPathObject {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-');
     const backupName = `backup_${timestamp}`;
     return new BackupPathObject(path.join(this.value, backupName));
   }

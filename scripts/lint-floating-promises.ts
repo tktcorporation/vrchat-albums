@@ -137,13 +137,17 @@ export class FloatingPromiseLinter {
 
   lint(): FloatingPromiseLintResult {
     for (const sourceFile of this.program.getSourceFiles()) {
-      if (sourceFile.isDeclarationFile) continue;
+      if (sourceFile.isDeclarationFile) {
+        continue;
+      }
 
       // Windows互換性のためパスを正規化
       const normalizedResult = NormalizedPathSchema.safeParse(
         sourceFile.fileName,
       );
-      if (!normalizedResult.success) continue;
+      if (!normalizedResult.success) {
+        continue;
+      }
 
       if (this.files.includes(normalizedResult.data)) {
         this.lintFile(sourceFile);
@@ -333,7 +337,7 @@ if (isDirectRun) {
     // Group by file
     const byFile = new Map<string, FloatingPromiseIssue[]>();
     for (const issue of result.issues) {
-      const existing = byFile.get(issue.file) || [];
+      const existing = byFile.get(issue.file) ?? [];
       existing.push(issue);
       byFile.set(issue.file, existing);
     }

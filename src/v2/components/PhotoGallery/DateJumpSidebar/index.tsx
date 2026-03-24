@@ -67,7 +67,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
 
   // スクロール状態の検知
   useEffect(() => {
-    if (!scrollContainer) return;
+    if (!scrollContainer) {
+      return;
+    }
 
     const handleScroll = () => {
       setIsScrolling(true);
@@ -95,13 +97,13 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
 
     groups.forEach((group, index) => {
       const date = format(group.joinDateTime, 'yyyy-MM-dd');
-      const existing = dateToGroups.get(date) || [];
+      const existing = dateToGroups.get(date) ?? [];
       existing.push(index);
       dateToGroups.set(date, existing);
       groupToDates.set(index, date);
     });
 
-    const sortedDates = Array.from(dateToGroups.keys()).toSorted().toReversed();
+    const sortedDates = [...dateToGroups.keys()].toSorted().toReversed();
 
     return { dateToGroups, sortedDates, groupToDates };
   }, [groups]);
@@ -114,7 +116,7 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
     // 最大写真枚数を計算
     const maxPhotoCount = Math.max(
       ...dateIndex.sortedDates.map((date) => {
-        const groupIndices = dateIndex.dateToGroups.get(date) || [];
+        const groupIndices = dateIndex.dateToGroups.get(date) ?? [];
         return groupIndices.reduce(
           (sum, idx) => sum + groups[idx].photos.length,
           0,
@@ -124,7 +126,7 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
 
     return dateIndex.sortedDates.map((date) => {
       const [year, month, day] = date.split('-');
-      const groupIndices = dateIndex.dateToGroups.get(date) || [];
+      const groupIndices = dateIndex.dateToGroups.get(date) ?? [];
       const photoCount = groupIndices.reduce(
         (sum, idx) => sum + groups[idx].photos.length,
         0,
@@ -168,8 +170,8 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
     >();
 
     dateSummaries.forEach((summary, index) => {
-      const yearMonth = summary.date.substring(0, 7); // 'YYYY-MM'
-      const existing = monthMap.get(yearMonth) || {
+      const yearMonth = summary.date.slice(0, 7); // 'YYYY-MM'
+      const existing = monthMap.get(yearMonth) ?? {
         photoCount: 0,
         dateIndices: [],
       };
@@ -179,14 +181,14 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
     });
 
     let lastYear: string | null = null;
-    const sortedYearMonths = Array.from(monthMap.keys())
-      .toSorted()
-      .toReversed();
+    const sortedYearMonths = [...monthMap.keys()].toSorted().toReversed();
 
     return sortedYearMonths.flatMap((yearMonth) => {
       const [year, month] = yearMonth.split('-');
       const data = monthMap.get(yearMonth);
-      if (!data) return [];
+      if (!data) {
+        return [];
+      }
 
       const isFirstOfYear = year !== lastYear;
       lastYear = year;
@@ -210,15 +212,21 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
   const currentDate = useMemo(() => {
     return match(currentGroupIndex)
       .with(undefined, () => null)
-      .otherwise((idx) => dateIndex.groupToDates.get(idx) || null);
+      .otherwise((idx) => dateIndex.groupToDates.get(idx) ?? null);
   }, [currentGroupIndex, dateIndex]);
 
   // 水平ラインインジケーターの位置（currentDateと同期）
   const indicatorPosition = useMemo(() => {
-    if (!currentDate) return 10;
+    if (!currentDate) {
+      return 10;
+    }
     const index = dateSummaries.findIndex((s) => s.date === currentDate);
-    if (index < 0) return 10;
-    if (dateSummaries.length <= 1) return 50;
+    if (index === -1) {
+      return 10;
+    }
+    if (dateSummaries.length <= 1) {
+      return 50;
+    }
     const paddingPercent = 10;
     const usableRange = 100 - paddingPercent * 2;
     return paddingPercent + (index / (dateSummaries.length - 1)) * usableRange;
@@ -227,7 +235,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
   // 日付の位置を計算（パディングを考慮した配置）
   const getDatePosition = useCallback(
     (index: number) => {
-      if (dateSummaries.length <= 1) return 50;
+      if (dateSummaries.length <= 1) {
+        return 50;
+      }
       const paddingPercent = 10;
       const usableRange = 100 - paddingPercent * 2;
       return (
@@ -240,7 +250,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
   // Y座標から最も近い日付インデックスを取得
   const getClosestDateIndex = useCallback(
     (clientY: number) => {
-      if (!sidebarRef.current || dateSummaries.length === 0) return 0;
+      if (!sidebarRef.current || dateSummaries.length === 0) {
+        return 0;
+      }
 
       const rect = sidebarRef.current.getBoundingClientRect();
       const clickY = clientY - rect.top;
@@ -289,7 +301,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
   // タッチ開始
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLDivElement>) => {
-      if (e.touches.length !== 1) return;
+      if (e.touches.length !== 1) {
+        return;
+      }
       e.preventDefault();
       setIsDragging(true);
       setIsHovering(true);
@@ -305,7 +319,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
 
   // ドラッグ・タッチ中の移動（グローバル）
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging) {
+      return;
+    }
 
     const handleMouseMove = (e: globalThis.MouseEvent) => {
       handleScrub(e.clientY);
@@ -316,7 +332,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
+      if (e.touches.length !== 1) {
+        return;
+      }
       const touch = e.touches[0];
       handleScrub(touch.clientY);
       if (sidebarRef.current) {
@@ -355,7 +373,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
   const handleSidebarClick = useCallback(
     (e: MouseEvent<HTMLDivElement>) => {
       // ドラッグ中はクリックとして処理しない
-      if (isDragging) return;
+      if (isDragging) {
+        return;
+      }
 
       const closestIndex = getClosestDateIndex(e.clientY);
       const summary = dateSummaries[closestIndex];
@@ -378,14 +398,18 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
 
   // 現在のインデックス（キーボードナビゲーション用）
   const currentDateIndex = useMemo(() => {
-    if (!currentDate) return 0;
+    if (!currentDate) {
+      return 0;
+    }
     return dateSummaries.findIndex((s) => s.date === currentDate);
   }, [currentDate, dateSummaries]);
 
   // キーボードナビゲーション
   const handleKeyNavigation = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (dateSummaries.length === 0) return;
+      if (dateSummaries.length === 0) {
+        return;
+      }
 
       let targetIndex: number | null = null;
 
@@ -434,7 +458,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
 
   // スクロールバーのARIA値（パーセント）
   const ariaValueNow = useMemo(() => {
-    if (dateSummaries.length <= 1) return 0;
+    if (dateSummaries.length <= 1) {
+      return 0;
+    }
     return Math.round((currentDateIndex / (dateSummaries.length - 1)) * 100);
   }, [currentDateIndex, dateSummaries.length]);
 
@@ -473,7 +499,9 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
         }
       }}
       onMouseMove={(e) => {
-        if (!sidebarRef.current || dateSummaries.length === 0) return;
+        if (!sidebarRef.current || dateSummaries.length === 0) {
+          return;
+        }
 
         const rect = sidebarRef.current.getBoundingClientRect();
         const mouseY = e.clientY - rect.top;
@@ -579,8 +607,12 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
                   className={cn(
                     'w-1 h-1 rounded-full transition-all duration-300',
                     (() => {
-                      if (isCurrentDate) return 'bg-primary scale-150';
-                      if (isHovered) return 'bg-foreground/80 scale-125';
+                      if (isCurrentDate) {
+                        return 'bg-primary scale-150';
+                      }
+                      if (isHovered) {
+                        return 'bg-foreground/80 scale-125';
+                      }
                       return 'bg-foreground/30';
                     })(),
                   )}

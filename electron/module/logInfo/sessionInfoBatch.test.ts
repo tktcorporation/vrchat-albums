@@ -37,7 +37,7 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
    * getPlayerJoinListInSameWorld は Effect を返すので Effect.runPromise で実行
    */
   const getPlayerJoinListInSameWorldOriginal = async (datetime: Date) => {
-    return await Effect.runPromise(getPlayerJoinListInSameWorld(datetime));
+    return Effect.runPromise(getPlayerJoinListInSameWorld(datetime));
   };
 
   /**
@@ -144,7 +144,10 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
             await getPlayerJoinListInSameWorldOriginal(testDate);
           const batchPlayers = await getPlayersFromSessionBatch(testDate);
 
-          if (originalResult !== null) {
+          if (originalResult === null) {
+            // 元のロジックがエラーの場合、バッチも空であるべき
+            expect(batchPlayers).toEqual([]);
+          } else {
             const originalPlayers = originalResult;
 
             // プレイヤー数が一致することを確認
@@ -165,9 +168,6 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
               .map((p) => p.playerName)
               .toSorted();
             expect(batchPlayerNames).toEqual(originalPlayerNames);
-          } else {
-            // 元のロジックがエラーの場合、バッチも空であるべき
-            expect(batchPlayers).toEqual([]);
           }
         }
       }
@@ -257,7 +257,9 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
           console.log('Batch players:', batchPlayers);
 
           // このケースでは結果が一致することを確認
-          if (originalResult !== null) {
+          if (originalResult === null) {
+            expect(batchPlayers).toEqual([]);
+          } else {
             const originalPlayers = originalResult;
 
             expect(batchPlayers.length).toBe(originalPlayers.length);
@@ -269,8 +271,6 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
               const batchPlayerIds = batchPlayers.map((p) => p.id).toSorted();
               expect(batchPlayerIds).toEqual(originalPlayerIds);
             }
-          } else {
-            expect(batchPlayers).toEqual([]);
           }
         }
       }

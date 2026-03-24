@@ -27,7 +27,9 @@ const t = initTRPC.context<{ eventEmitter: EventEmitter }>().create({
 
     // ネストされたUserFacingErrorも含めて検索
     const findUserFacingError = (err: unknown): UserFacingError | null => {
-      if (err instanceof UserFacingError) return err;
+      if (err instanceof UserFacingError) {
+        return err;
+      }
       if (err && typeof err === 'object' && 'cause' in err) {
         return findUserFacingError((err as { cause: unknown }).cause);
       }
@@ -147,7 +149,7 @@ const logError = (
   originalError?: Error,
 ) => {
   const errorToLog =
-    originalError ||
+    originalError ??
     match(err)
       .with(P.instanceOf(Error), (e) => e)
       .otherwise(() => new Error(String(err)));
@@ -225,20 +227,20 @@ const errorHandler = t.middleware(async (opts) => {
       logError(originalError, requestInfo, originalError);
     }
     return result;
-  } catch (cause) {
-    const error = match(cause)
+  } catch (caughtError) {
+    const normalizedError = match(caughtError)
       .with(P.instanceOf(Error), (err) => err)
-      .otherwise(() => new Error(String(cause)));
+      .otherwise(() => new Error(String(caughtError)));
     const requestInfo = `${opts.type} ${opts.path} ${JSON.stringify(
       opts.input,
     )}`;
 
-    logError(error, requestInfo, error);
+    logError(normalizedError, requestInfo, normalizedError);
 
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
-      message: error.message,
-      cause: error,
+      message: normalizedError.message,
+      cause: normalizedError,
     });
   }
 });

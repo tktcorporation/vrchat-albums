@@ -3,11 +3,11 @@ import { Op } from '@sequelize/core';
 import { VRChatPlayerLeaveLogModel } from './playerLeaveLog.model';
 
 export const createVRChatPlayerLeaveLogModel = async (
-  leaveLogList: Array<{
+  leaveLogList: {
     leaveDate: Date;
     playerName: string;
     playerId: string | null;
-  }>,
+  }[],
 ): Promise<VRChatPlayerLeaveLogModel[]> => {
   const newLogs = leaveLogList.map((logInfo) => ({
     leaveDateTime: logInfo.leaveDate,
@@ -31,7 +31,7 @@ export const createVRChatPlayerLeaveLogModel = async (
 };
 
 export const findLatestPlayerLeaveLog = async () => {
-  return await VRChatPlayerLeaveLogModel.findOne({
+  return VRChatPlayerLeaveLogModel.findOne({
     order: [['leaveDateTime', 'DESC']],
   });
 };

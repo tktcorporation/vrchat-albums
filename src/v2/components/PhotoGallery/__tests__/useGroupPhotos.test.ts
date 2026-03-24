@@ -131,9 +131,9 @@ describe('groupPhotosBySession', () => {
 
   it('写真とセッションの時間が完全に一致する場合', () => {
     const now = new Date();
-    const photos = [createPhoto('1', new Date(now.getTime()))];
+    const photos = [createPhoto('1', new Date(now))];
 
-    const joinLogs = [createWorldJoinLog('world1', new Date(now.getTime()))];
+    const joinLogs = [createWorldJoinLog('world1', new Date(now))];
 
     const groups = groupPhotosBySession(photos, joinLogs);
 

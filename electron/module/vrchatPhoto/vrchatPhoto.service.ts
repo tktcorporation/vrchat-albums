@@ -7,6 +7,7 @@ import { performance } from 'node:perf_hooks';
 import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
+import type Electron from 'electron';
 import { xxhash128 } from 'hash-wasm';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
@@ -73,7 +74,7 @@ let consecutiveCacheFailures = 0;
  *
  * @returns Electron appモジュール、または利用不可時はnull
  */
-const getElectronApp = (): typeof import('electron').app | null => {
+const getElectronApp = (): typeof Electron.app | null => {
   // テスト環境ではElectronを試行しない（想定された動作）
   if (isTestEnvironment()) {
     logger.debug('Test environment detected, skipping Electron module');
@@ -82,7 +83,7 @@ const getElectronApp = (): typeof import('electron').app | null => {
 
   // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
   try {
-    const { app } = require('electron') as typeof import('electron');
+    const { app } = require('electron') as typeof Electron;
     return app;
   } catch (error) {
     // 開発/プロダクション環境でのElectronロード失敗は予期しない
@@ -583,7 +584,7 @@ const getDefaultVRChatPhotoDir = (): VRChatPhotoDirPath => {
       ? path.join(picturesPath, 'VRChat')
       : path.join(process.env.USERPROFILE, 'Pictures', 'VRChat');
   } else {
-    logFilesDir = path.join(process.env.HOME || '', 'Pictures', 'VRChat');
+    logFilesDir = path.join(process.env.HOME ?? '', 'Pictures', 'VRChat');
   }
 
   return VRChatPhotoDirPathSchema.parse(logFilesDir);
@@ -855,7 +856,7 @@ const getChangedFoldersWithFiles = async (
 
     // デバッグ: savedState lookup 結果
     logger.debug(
-      `[DigestCheck] folder=${folderPath}, savedStateExists=${!!savedState}, savedDigest=${savedState?.digest ?? 'none'}, currentDigest=${currentDigest}`,
+      `[DigestCheck] folder=${folderPath}, savedStateExists=${Boolean(savedState)}, savedDigest=${savedState?.digest ?? 'none'}, currentDigest=${currentDigest}`,
     );
 
     // ダイジェストが一致すればスキップ（FolderDigest同士は直接比較可能）
@@ -1054,14 +1055,14 @@ async function processPhotoBatch(
   photoPaths: string[],
   memoryMonitor?: MemoryMonitor,
 ): Promise<
-  Array<{ photoPath: string; takenAt: Date; width: number; height: number }>
+  { photoPath: string; takenAt: Date; width: number; height: number }[]
 > {
-  const results: Array<{
+  const results: {
     photoPath: string;
     takenAt: Date;
     width: number;
     height: number;
-  }> = [];
+  }[] = [];
 
   // 並列処理数をメモリ使用量に基づいて動的に決定
   const monitor = memoryMonitor ?? getGlobalMemoryMonitor();
@@ -1159,8 +1160,8 @@ async function processPhotoBatch(
           message: `Missing dimension metadata for photo, using defaults`,
           details: {
             photoPath,
-            hasHeight: !!metadata.height,
-            hasWidth: !!metadata.width,
+            hasHeight: Boolean(metadata.height),
+            hasWidth: Boolean(metadata.width),
             defaultsUsed: { height, width },
           },
         });
@@ -1174,7 +1175,8 @@ async function processPhotoBatch(
       };
     });
 
-    const subResults = (await Promise.all(photoInfoPromises)).filter(
+    const resolvedPhotoInfos = await Promise.all(photoInfoPromises);
+    const subResults = resolvedPhotoInfos.filter(
       (
         info,
       ): info is {
@@ -1636,11 +1638,11 @@ export interface BatchThumbnailResult {
   /** 成功したサムネイル（photoPath -> base64Data） */
   success: Map<string, string>;
   /** 失敗したパスと理由 */
-  failed: Array<{
+  failed: {
     photoPath: string;
     reason: 'file_not_found' | 'unexpected_error';
     message: string;
-  }>;
+  }[];
 }
 
 /**
@@ -1698,7 +1700,9 @@ export const getBatchThumbnails = async (
           // 予期しないエラー（画像処理内部エラー等）
           const dieOpt = Cause.dieOption(exit.cause);
           const unexpectedError = (() => {
-            if (!Option.isSome(dieOpt)) return new Error('Unknown error');
+            if (!Option.isSome(dieOpt)) {
+              return new Error('Unknown error');
+            }
             return dieOpt.value instanceof Error
               ? dieOpt.value
               : new Error(String(dieOpt.value));

@@ -25,9 +25,10 @@ interface LibraryMetadata {
 const LicenseInfo = memo(() => {
   const { t } = useI18n();
 
-  const licenseFileRawData = licenseJsonFile as {
-    [key: string]: Omit<LibraryMetadata, 'name'>;
-  };
+  const licenseFileRawData = licenseJsonFile as Record<
+    string,
+    Omit<LibraryMetadata, 'name'>
+  >;
 
   const libraries = Object.keys(licenseFileRawData).map((key) => ({
     ...licenseFileRawData[key],

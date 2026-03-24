@@ -105,10 +105,10 @@ export const createVRChatPlayerJoinLog = async (
       playerName: logInfo.playerName,
     }));
 
-  if (newLogsExcludeDup.length < 1) {
+  if (newLogsExcludeDup.length === 0) {
     return [];
   }
-  return await VRChatPlayerJoinLogModel.bulkCreate(newLogsExcludeDup);
+  return VRChatPlayerJoinLogModel.bulkCreate(newLogsExcludeDup);
 };
 
 /**
@@ -175,8 +175,8 @@ export const getVRChatPlayerJoinLogListByJoinDateTime = async (
  * @returns 各日時範囲のキーが含まれたプレイヤー参加ログの配列
  */
 export const getVRChatPlayerJoinLogListByMultipleDateRanges = async (
-  dateRanges: Array<{ start: Date; end: Date | null; key: string }>,
-): Promise<Array<VRChatPlayerJoinLogModel & { range_key: string }>> => {
+  dateRanges: { start: Date; end: Date | null; key: string }[],
+): Promise<(VRChatPlayerJoinLogModel & { range_key: string })[]> => {
   if (dateRanges.length === 0) {
     return [];
   }
@@ -217,7 +217,7 @@ export const getVRChatPlayerJoinLogListByMultipleDateRanges = async (
 
     return {
       ...log.dataValues,
-      range_key: matchingRange?.key || 'unknown',
+      range_key: matchingRange?.key ?? 'unknown',
     } as VRChatPlayerJoinLogModel & { range_key: string };
   });
 

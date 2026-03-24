@@ -114,7 +114,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   const handleLogInputChange = (value: string) => {
     setLogInputValue(value);
-    setIsLogPathManuallyChanged(value !== (logFilesDir?.path || ''));
+    setIsLogPathManuallyChanged(value !== (logFilesDir?.path ?? ''));
   };
 
   const handleLogPathSave = async () => {
@@ -137,7 +137,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   const handlePhotoInputChange = (value: string) => {
     setPhotoInputValue(value);
-    setIsPhotoPathManuallyChanged(value !== (photoDir?.value || ''));
+    setIsPhotoPathManuallyChanged(value !== (photoDir?.value ?? ''));
   };
 
   const handlePhotoPathSave = async () => {
@@ -219,11 +219,11 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
           {/* Extra Directories */}
           <div className={SPACING.stack.default}>
-            <label
+            <span
               className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
             >
               追加で読み込ませる写真フォルダ
-            </label>
+            </span>
             <div className={SPACING.stack.default}>
               {extraDirs.map((dir: string, index: number) => (
                 <div key={`extra-dir-${dir}`} className="flex gap-2">

@@ -14,7 +14,7 @@ export const usePlayerListDisplay = (players: Player[] | null) => {
   const [isCopied, setIsCopied] = useState(false);
 
   const playerListRef = useRef<HTMLSpanElement>(null);
-  const playerListContainerRef = useRef<HTMLDivElement>(null);
+  const playerListContainerRef = useRef<HTMLButtonElement>(null);
   // パフォーマンス改善: 幅計算用の一時DOM要素をキャッシュ
   const measureElementRef = useRef<HTMLDivElement | null>(null);
 
@@ -28,14 +28,14 @@ export const usePlayerListDisplay = (players: Player[] | null) => {
       tempDiv.style.whiteSpace = 'nowrap';
       tempDiv.style.fontSize = '0.875rem'; // text-sm
       tempDiv.style.pointerEvents = 'none'; // イベントを無効化
-      document.body.appendChild(tempDiv);
+      document.body.append(tempDiv);
       measureElementRef.current = tempDiv;
     }
 
     // クリーンアップ時に要素を削除
     return () => {
       if (measureElementRef.current) {
-        document.body.removeChild(measureElementRef.current);
+        measureElementRef.current.remove();
         measureElementRef.current = null;
       }
     };
@@ -48,8 +48,9 @@ export const usePlayerListDisplay = (players: Player[] | null) => {
         !playerListContainerRef.current ||
         !Array.isArray(players) ||
         !measureElementRef.current
-      )
+      ) {
         return;
+      }
 
       const containerWidth = playerListContainerRef.current.offsetWidth;
       const separatorWidth = 24; // セパレータ（ / ）の幅

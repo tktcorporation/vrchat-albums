@@ -275,7 +275,9 @@ export const performMigration = (): Effect.Effect<MigrationResult> => {
               // Unexpected error (defect)
               const dieOpt = Cause.dieOption(importExit.cause);
               const errorMsg = (() => {
-                if (!Option.isSome(dieOpt)) return 'Unknown error';
+                if (!Option.isSome(dieOpt)) {
+                  return 'Unknown error';
+                }
                 return dieOpt.value instanceof Error
                   ? dieOpt.value.message
                   : String(dieOpt.value);
@@ -307,7 +309,7 @@ export const performMigration = (): Effect.Effect<MigrationResult> => {
           2,
         );
 
-        await nodeFsPromises.writeFile(markerPath, markerContent, 'utf-8').then(
+        await nodeFsPromises.writeFile(markerPath, markerContent, 'utf8').then(
           () => {
             result.migrated = true;
           },

@@ -23,14 +23,14 @@ export const createVRChatPlayerJoinLogModel = (
 /**
  * プレイヤー参加ログのデータ型
  */
-type PlayerJoinLogData = {
+interface PlayerJoinLogData {
   id: string;
   playerId: string | null;
   playerName: string;
   joinDateTime: Date;
   createdAt: Date;
   updatedAt: Date;
-};
+}
 
 /**
  * 参加日時の範囲からVRChatのプレイヤー参加ログを取得する
@@ -58,12 +58,13 @@ export const getVRChatPlayerJoinLogListByJoinDateTime = (props: {
   return Effect.gen(function* () {
     let modelList: model.VRChatPlayerJoinLogModel[];
 
-    // 終了日時が指定されていない場合は無制限に取得
-    if (!props.endJoinDateTime) {
+    // 終了日時が指定されている場合はその範囲で取得、なければ無制限
+    if (props.endJoinDateTime) {
+      const endDate: Date = props.endJoinDateTime;
       modelList = yield* enqueueTask(() =>
         model.getVRChatPlayerJoinLogListByJoinDateTime({
           gteJoinDateTime: props.startJoinDateTime,
-          ltJoinDateTime: null,
+          ltJoinDateTime: endDate,
           getUntilDays: null,
         }),
       ).pipe(
@@ -78,11 +79,10 @@ export const getVRChatPlayerJoinLogListByJoinDateTime = (props: {
         PlayerJoinLogServiceError
       >;
     } else {
-      const endDate: Date = props.endJoinDateTime;
       modelList = yield* enqueueTask(() =>
         model.getVRChatPlayerJoinLogListByJoinDateTime({
           gteJoinDateTime: props.startJoinDateTime,
-          ltJoinDateTime: endDate,
+          ltJoinDateTime: null,
           getUntilDays: null,
         }),
       ).pipe(
@@ -135,7 +135,7 @@ export const getLatestDetectedDate = (): Effect.Effect<
  * @returns 日時範囲ごとのプレイヤー参加ログのマップ
  */
 export const getVRChatPlayerJoinLogListByMultipleDateRanges = (
-  dateRanges: Array<{ start: Date; end: Date | undefined; key: string }>,
+  dateRanges: { start: Date; end: Date | undefined; key: string }[],
 ): Effect.Effect<
   Record<string, PlayerJoinLogData[]>,
   PlayerJoinLogServiceError
@@ -164,7 +164,7 @@ export const getVRChatPlayerJoinLogListByMultipleDateRanges = (
           }),
       ),
     ) as Effect.Effect<
-      Array<model.VRChatPlayerJoinLogModel & { range_key: string }>,
+      (model.VRChatPlayerJoinLogModel & { range_key: string })[],
       PlayerJoinLogServiceError
     >;
 

@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import { Transformer } from '@napi-rs/image';
 import { Resvg } from '@resvg/resvg-js';
 import { Effect } from 'effect';
+import type Electron from 'electron';
 import * as path from 'pathe';
 
 import type { ImageGenerationError } from './errors';
@@ -27,12 +28,14 @@ let fontFilePaths: string[] = [];
  * 3. テスト環境: 同じ相対パスで解決（Electron require が失敗するため catch で処理）
  */
 const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
-  if (fontsLoaded) return Effect.succeed(fontFilePaths);
+  if (fontsLoaded) {
+    return Effect.succeed(fontFilePaths);
+  }
 
   const fontsDir = (() => {
     // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
     try {
-      const { app } = require('electron') as typeof import('electron');
+      const { app } = require('electron') as typeof Electron;
       return path.join(
         app.isPackaged
           ? process.resourcesPath

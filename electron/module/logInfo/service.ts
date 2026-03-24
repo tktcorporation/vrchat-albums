@@ -459,12 +459,18 @@ export function loadLogInfoIndexFromVRChatLog({
         } ms`,
       );
 
-      results.createdWorldJoinLogModelList =
-        results.createdWorldJoinLogModelList.concat(worldJoinResults);
-      results.createdPlayerJoinLogModelList =
-        results.createdPlayerJoinLogModelList.concat(playerJoinResults);
-      results.createdPlayerLeaveLogModelList =
-        results.createdPlayerLeaveLogModelList.concat(playerLeaveResults);
+      results.createdWorldJoinLogModelList = [
+        ...results.createdWorldJoinLogModelList,
+        ...worldJoinResults,
+      ];
+      results.createdPlayerJoinLogModelList = [
+        ...results.createdPlayerJoinLogModelList,
+        ...playerJoinResults,
+      ];
+      results.createdPlayerLeaveLogModelList = [
+        ...results.createdPlayerLeaveLogModelList,
+        ...playerLeaveResults,
+      ];
       // TODO: アプリイベントの処理は今後実装
       // if (appEventResult.isOk()) {
       //   results.createdAppEventCount += appEventResult.value.length;

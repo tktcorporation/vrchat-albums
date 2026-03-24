@@ -85,7 +85,9 @@ export const appendLoglinesToFileFromLogFilePathList = async (
 
   // DBから最新のログ日時を取得（processAllがfalseの場合のみ）
   let startDate = new Date(0); // デフォルトは最古の日時
-  if (!processAll) {
+  if (processAll) {
+    logger.info('Processing all logs (processAll=true)');
+  } else {
     const latestWorldJoinLogExit = await Effect.runPromiseExit(
       worldJoinLogService.findLatestWorldJoinLog(),
     );
@@ -98,8 +100,6 @@ export const appendLoglinesToFileFromLogFilePathList = async (
     } else {
       logger.info('No existing logs found in DB, processing all logs');
     }
-  } else {
-    logger.info('Processing all logs (processAll=true)');
   }
 
   // すべてのログファイルパスを取得
@@ -213,22 +213,20 @@ const getDBLogsFromDatabase = async (
         worldInstanceId: log.worldInstanceId,
         joinDateTime: log.joinDateTime,
         createdAt: log.createdAt,
-        updatedAt: log.updatedAt || new Date(),
+        updatedAt: log.updatedAt ?? new Date(),
       },
     });
   }
 
   // プレイヤー参加ログを取得
   let playerJoinStartDate = startDate;
-  if (!playerJoinStartDate) {
-    // 期間指定がない場合は、最古の日付から現在までを取得
-    playerJoinStartDate = new Date('2017-01-01'); // VRChatリリース日程度
-  }
+  // 期間指定がない場合は、最古の日付から現在までを取得
+  playerJoinStartDate ??= new Date('2017-01-01');
 
   const playerJoinLogExit = await Effect.runPromiseExit(
     playerJoinLogService.getVRChatPlayerJoinLogListByJoinDateTime({
       startJoinDateTime: playerJoinStartDate,
-      endJoinDateTime: endDate || null,
+      endJoinDateTime: endDate ?? null,
     }),
   );
 

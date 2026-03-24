@@ -46,7 +46,6 @@ vi.mock('node:readline', () => ({
     [Symbol.asyncIterator]: async function* () {
       // 空のイテレータを返す
       yield null;
-      return;
     },
     close: vi.fn(),
   }),

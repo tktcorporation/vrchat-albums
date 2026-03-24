@@ -47,14 +47,16 @@ describe('PathObject', () => {
     });
 
     it('glob用にフォワードスラッシュに正規化できる', () => {
-      const windowsPath = PathObjectSchema.parse('C:\\path\\to\\file.txt');
+      const windowsPath = PathObjectSchema.parse(
+        String.raw`C:\path\to\file.txt`,
+      );
       expect(windowsPath.toGlobPattern()).toBe('C:/path/to/file.txt');
     });
   });
 
   describe('クロスプラットフォーム対応', () => {
     it('Windows形式のパスを正しく処理できる', () => {
-      const windowsPath = 'C:\\Users\\Test\\Documents\\file.txt';
+      const windowsPath = String.raw`C:\Users\Test\Documents\file.txt`;
       const pathObj = PathObjectSchema.parse(windowsPath);
       const normalized = pathObj.normalize();
 
@@ -67,7 +69,7 @@ describe('PathObject', () => {
     });
 
     it('混在パス区切り文字を処理できる', () => {
-      const mixedPath = 'C:\\Users\\Test/Documents/file.txt';
+      const mixedPath = String.raw`C:\Users\Test/Documents/file.txt`;
       const pathObj = PathObjectSchema.parse(mixedPath);
       const normalized = pathObj.normalize();
 
@@ -109,7 +111,7 @@ describe('ExportPathObject', () => {
 
   it('Windows形式のパスからもエクスポートフォルダ名を抽出できる', () => {
     const exportPath = ExportPathObjectSchema.parse(
-      'C:\\Downloads\\vrchat-albums-export_2023-12-01_14-30-45\\2023-11\\logStore.txt',
+      String.raw`C:\Downloads\vrchat-albums-export_2023-12-01_14-30-45\2023-11\logStore.txt`,
     );
     expect(exportPath.extractExportFolderName()).toBe(
       'vrchat-albums-export_2023-12-01_14-30-45',
@@ -118,7 +120,7 @@ describe('ExportPathObject', () => {
 
   it('混在パス区切り文字からもエクスポートフォルダ名を抽出できる', () => {
     const exportPath = ExportPathObjectSchema.parse(
-      'C:\\Downloads\\backups/vrchat-albums-export_2023-12-01_14-30-45/2023-11/logStore.txt',
+      String.raw`C:\Downloads\backups/vrchat-albums-export_2023-12-01_14-30-45/2023-11/logStore.txt`,
     );
     expect(exportPath.extractExportFolderName()).toBe(
       'vrchat-albums-export_2023-12-01_14-30-45',
@@ -168,7 +170,7 @@ describe('VRChatPhotoPathObject', () => {
 
   it('Windows形式のパスでもglobパターンを正しく生成できる', () => {
     const photoPath = VRChatPhotoPathObjectSchema.parse(
-      'C:\\Users\\Test\\Pictures',
+      String.raw`C:\Users\Test\Pictures`,
     );
     const pattern = photoPath.toPhotoGlobPattern();
     expect(pattern).toBe('C:/Users/Test/Pictures/**/VRChat_*_wrld_*');

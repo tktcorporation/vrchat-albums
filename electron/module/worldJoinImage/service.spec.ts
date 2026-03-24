@@ -141,7 +141,7 @@ describe('generateMissingWorldJoinImages', () => {
     expect(result.errors).toBe(0);
 
     // Verify generateWorldJoinImage was called with correct arguments
-    expect(generateWorldJoinImage).toHaveBeenCalledOnce();
+    expect(generateWorldJoinImage).toHaveBeenCalledTimes(1);
     const genCall = vi.mocked(generateWorldJoinImage).mock.calls[0][0];
     expect(genCall.worldName).toBe('Test World');
     expect(genCall.imageBase64).toBe(
@@ -150,7 +150,7 @@ describe('generateMissingWorldJoinImages', () => {
     expect(genCall.joinDateTime).toEqual(new Date('2024-01-15T12:00:00'));
 
     // Verify setExifToBuffer was called with correct EXIF metadata
-    expect(setExifToBuffer).toHaveBeenCalledOnce();
+    expect(setExifToBuffer).toHaveBeenCalledTimes(1);
     const exifCall = vi.mocked(setExifToBuffer).mock.calls[0];
     expect(exifCall[0]).toEqual(Buffer.from('fake-jpeg'));
     expect(exifCall[1].description).toBe('Test World');
@@ -158,13 +158,13 @@ describe('generateMissingWorldJoinImages', () => {
     expect(exifCall[1].timezoneOffset).toMatch(/^[+-]\d{2}:\d{2}$/);
 
     // Verify mkdir was called with { recursive: true }
-    expect(fsPromises.mkdir).toHaveBeenCalledOnce();
+    expect(fsPromises.mkdir).toHaveBeenCalledTimes(1);
     expect(vi.mocked(fsPromises.mkdir).mock.calls[0][1]).toEqual({
       recursive: true,
     });
 
     // Verify writeFile was called with path containing YYYY-MM directory and proper filename
-    expect(fsPromises.writeFile).toHaveBeenCalledOnce();
+    expect(fsPromises.writeFile).toHaveBeenCalledTimes(1);
     const writePath = vi.mocked(fsPromises.writeFile).mock
       .calls[0][0] as string;
     expect(writePath).toMatch(/\/photos\/2024-01\//);

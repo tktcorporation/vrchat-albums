@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { electronUtilRouter } from '../electronUtilController';
 
 // パスの正規化のためのヘルパー関数を追加
-const normalizePath = (p: string) => p.replace(/\\/g, '/');
+const normalizePath = (p: string) => p.replaceAll('\\', '/');
 
 vi.mock('node:fs/promises');
 

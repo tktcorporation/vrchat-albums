@@ -169,39 +169,41 @@ export class LoggerLevelLinter {
 
   private isLoggerWarnCall(node: ts.CallExpression): boolean {
     const expr = node.expression;
-    if (ts.isPropertyAccessExpression(expr)) {
-      if (expr.name.text === 'warn') {
-        if (
-          ts.isIdentifier(expr.expression) &&
-          expr.expression.text === 'logger'
-        ) {
-          return true;
-        }
-      }
+    if (
+      ts.isPropertyAccessExpression(expr) &&
+      expr.name.text === 'warn' &&
+      ts.isIdentifier(expr.expression) &&
+      expr.expression.text === 'logger'
+    ) {
+      return true;
     }
     return false;
   }
 
   private hasUnexpectedErrorReason(returnStmt: ts.ReturnStatement): boolean {
-    if (!returnStmt.expression) return false;
+    if (!returnStmt.expression) {
+      return false;
+    }
 
     const checkNode = (node: ts.Node): boolean => {
-      if (ts.isPropertyAssignment(node)) {
-        if (ts.isIdentifier(node.name) && node.name.text === 'reason') {
+      if (
+        ts.isPropertyAssignment(node) &&
+        ts.isIdentifier(node.name) &&
+        node.name.text === 'reason'
+      ) {
+        if (
+          ts.isStringLiteral(node.initializer) &&
+          node.initializer.text === 'unexpected_error'
+        ) {
+          return true;
+        }
+        if (ts.isAsExpression(node.initializer)) {
+          const innerExpr = node.initializer.expression;
           if (
-            ts.isStringLiteral(node.initializer) &&
-            node.initializer.text === 'unexpected_error'
+            ts.isStringLiteral(innerExpr) &&
+            innerExpr.text === 'unexpected_error'
           ) {
             return true;
-          }
-          if (ts.isAsExpression(node.initializer)) {
-            const innerExpr = node.initializer.expression;
-            if (
-              ts.isStringLiteral(innerExpr) &&
-              innerExpr.text === 'unexpected_error'
-            ) {
-              return true;
-            }
           }
         }
       }

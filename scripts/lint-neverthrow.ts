@@ -15,13 +15,13 @@ import {
 } from './lib/paths';
 
 export interface NeverthrowLintConfig {
-  rules: Array<{
+  rules: {
     name: string;
     path: string;
     enforceResult: boolean;
     apply: 'async-functions' | 'all-functions' | 'exported-functions';
     exceptions: string[];
-  }>;
+  }[];
   mustUseResult?: {
     enabled: boolean;
     path: string;
@@ -84,7 +84,7 @@ export class NeverthrowLinter {
   private program: ts.Program;
   private checker: ts.TypeChecker;
   private files: NormalizedPath[];
-  private handledVariables: Set<string> = new Set();
+  private handledVariables = new Set<string>();
 
   constructor(
     files: string[],
@@ -278,11 +278,13 @@ export class NeverthrowLinter {
     }
 
     // Case 2: Assigned to a variable - track it
-    if (ts.isVariableDeclaration(parent) && parent.initializer === node) {
-      if (ts.isIdentifier(parent.name)) {
-        // We'll check variable usage in a second pass
-        return true; // Don't report here, will be checked via variable tracking
-      }
+    if (
+      ts.isVariableDeclaration(parent) &&
+      parent.initializer === node &&
+      ts.isIdentifier(parent.name)
+    ) {
+      // We'll check variable usage in a second pass
+      return true; // Don't report here, will be checked via variable tracking
     }
 
     // Case 3: Returned from function
@@ -392,7 +394,9 @@ export class NeverthrowLinter {
               grandParent.expression === parent
             ) {
               const varInfo = resultVariables.get(node.text);
-              if (varInfo) varInfo.handled = true;
+              if (varInfo) {
+                varInfo.handled = true;
+              }
             }
           }
           // Also mark as handled if chained with other Result methods
@@ -400,12 +404,12 @@ export class NeverthrowLinter {
             const grandParent = parent.parent;
             if (
               ts.isCallExpression(grandParent) &&
-              grandParent.expression === parent
+              grandParent.expression === parent &&
+              this.isResultHandled(grandParent)
             ) {
-              // Check if the chain eventually gets handled
-              if (this.isResultHandled(grandParent)) {
-                const varInfo = resultVariables.get(node.text);
-                if (varInfo) varInfo.handled = true;
+              const varInfo = resultVariables.get(node.text);
+              if (varInfo) {
+                varInfo.handled = true;
               }
             }
           }
@@ -414,13 +418,17 @@ export class NeverthrowLinter {
         // Mark as handled if returned
         if (ts.isReturnStatement(parent)) {
           const varInfo = resultVariables.get(node.text);
-          if (varInfo) varInfo.handled = true;
+          if (varInfo) {
+            varInfo.handled = true;
+          }
         }
 
         // Mark as handled if passed to function
         if (ts.isCallExpression(parent) && parent.arguments.includes(node)) {
           const varInfo = resultVariables.get(node.text);
-          if (varInfo) varInfo.handled = true;
+          if (varInfo) {
+            varInfo.handled = true;
+          }
         }
       }
       ts.forEachChild(node, checkVariableUsage);
@@ -509,17 +517,15 @@ export class NeverthrowLinter {
         // 1. Inside a function that returns ResultAsync
         // 2. Used as arguments to ResultAsync.fromPromise() or similar
         // 3. Callbacks passed to other function calls (common pattern for utility functions)
-        if (insideResultAsyncFunction && ts.isArrowFunction(node)) {
+        if (
+          insideResultAsyncFunction &&
+          ts.isArrowFunction(node) &&
+          (this.isInsideNeverthrowCall(node) || this.isCallbackArgument(node))
+        ) {
           // This is a nested async function inside a ResultAsync-returning function
-          // Skip checking it as it's likely an IIFE or callback for ResultAsync
-          if (
-            this.isInsideNeverthrowCall(node) ||
-            this.isCallbackArgument(node)
-          ) {
-            // Recurse but still mark as inside ResultAsync function
-            ts.forEachChild(node, (child) => visit(child, true));
-            return;
-          }
+          // Recurse but still mark as inside ResultAsync function
+          ts.forEachChild(node, (child) => visit(child, true));
+          return;
         }
 
         if (returnsResultAsync) {
@@ -678,7 +684,7 @@ export class NeverthrowLinter {
           const { line, character } = sourceFile.getLineAndCharacterOfPosition(
             node.getStart(),
           );
-          const functionNameDisplay = functionName || '(anonymous)';
+          const functionNameDisplay = functionName ?? '(anonymous)';
 
           // Avoid duplicate issues for the same position
           const isDuplicate = this.issues.some(
@@ -704,7 +710,7 @@ export class NeverthrowLinter {
           if (hasGenericError) {
             const { line, character } =
               sourceFile.getLineAndCharacterOfPosition(node.getStart());
-            const functionNameDisplay = functionName || '(anonymous)';
+            const functionNameDisplay = functionName ?? '(anonymous)';
 
             const isDuplicate = this.issues.some(
               (issue) =>
@@ -752,7 +758,7 @@ export class NeverthrowLinter {
   ): boolean {
     if (ts.isFunctionDeclaration(node)) {
       return (
-        node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ||
+        node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ??
         false
       );
     }
@@ -764,7 +770,7 @@ export class NeverthrowLinter {
         return (
           parent.modifiers?.some(
             (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-          ) || false
+          ) ?? false
         );
       }
       parent = parent.parent;
@@ -778,7 +784,7 @@ export class NeverthrowLinter {
   ): boolean {
     // Check for async modifier
     const hasAsyncModifier =
-      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ||
+      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ??
       false;
 
     if (hasAsyncModifier) {
@@ -802,10 +808,10 @@ export class NeverthrowLinter {
       const typeText = node.type.getText();
       // Check for neverthrow.Result<T, E> or Result<T, E> or Promise<neverthrow.Result<T, E>>
       const hasResult =
-        /neverthrow\.Result</.test(typeText) ||
+        typeText.includes('neverthrow.Result<') ||
         /\bResult</.test(typeText) ||
-        /ResultAsync</.test(typeText) ||
-        /neverthrow\.ResultAsync</.test(typeText);
+        typeText.includes('ResultAsync<') ||
+        typeText.includes('neverthrow.ResultAsync<');
 
       return hasResult;
     }
@@ -838,7 +844,9 @@ export class NeverthrowLinter {
   private hasGenericErrorType(
     node: ts.FunctionDeclaration | ts.ArrowFunction,
   ): boolean {
-    if (!node.type) return false;
+    if (!node.type) {
+      return false;
+    }
 
     const typeText = node.type.getText();
 
@@ -848,7 +856,9 @@ export class NeverthrowLinter {
       /(?:neverthrow\.)?(?:Result|ResultAsync)<[^,>]+,\s*([^>]+)>/;
     const match = typeText.match(resultPattern);
 
-    if (!match) return false;
+    if (!match) {
+      return false;
+    }
 
     const errorType = match[1].trim();
 
@@ -872,7 +882,9 @@ export class NeverthrowLinter {
     sourceFile: ts.SourceFile,
     functionName: string | undefined,
   ) {
-    if (!node.body) return;
+    if (!node.body) {
+      return;
+    }
 
     const visit = (n: ts.Node) => {
       // Look for try-catch statements
@@ -921,7 +933,7 @@ export class NeverthrowLinter {
           const { line, character } = sourceFile.getLineAndCharacterOfPosition(
             catchBlock.getStart(),
           );
-          const functionNameDisplay = functionName || '(anonymous)';
+          const functionNameDisplay = functionName ?? '(anonymous)';
 
           // Avoid duplicate issues
           const isDuplicate = this.issues.some(
@@ -988,7 +1000,9 @@ export class NeverthrowLinter {
    * This means: has if/match for error classification AND has throw for unexpected errors
    */
   private hasProperRethrow(tryNode: ts.TryStatement): boolean {
-    if (!tryNode.catchClause) return false;
+    if (!tryNode.catchClause) {
+      return false;
+    }
     const catchBlock = tryNode.catchClause.block;
 
     let hasThrow = false;
@@ -1073,7 +1087,9 @@ export class NeverthrowLinter {
    * Pattern: catch { log.warn(...); return fallback; }
    */
   private hasLogAndFallback(tryNode: ts.TryStatement): boolean {
-    if (!tryNode.catchClause) return false;
+    if (!tryNode.catchClause) {
+      return false;
+    }
     const catchBlock = tryNode.catchClause.block;
 
     let hasLogCall = false;
@@ -1119,32 +1135,36 @@ export class NeverthrowLinter {
    * Pattern: catch { return err(...); }
    */
   private hasReturnErrOnCatch(tryNode: ts.TryStatement): boolean {
-    if (!tryNode.catchClause) return false;
+    if (!tryNode.catchClause) {
+      return false;
+    }
     const catchBlock = tryNode.catchClause.block;
 
     let hasReturnErr = false;
 
     const visit = (n: ts.Node) => {
-      if (ts.isReturnStatement(n) && n.expression) {
+      if (
+        ts.isReturnStatement(n) &&
+        n.expression &&
+        ts.isCallExpression(n.expression)
+      ) {
         // Check for return err(...) or return neverthrow.err(...)
-        if (ts.isCallExpression(n.expression)) {
-          const callExpr = n.expression;
-          const callee = callExpr.expression;
+        const callExpr = n.expression;
+        const callee = callExpr.expression;
 
-          // Check for err(...)
-          if (ts.isIdentifier(callee) && callee.text === 'err') {
-            hasReturnErr = true;
-          }
+        // Check for err(...)
+        if (ts.isIdentifier(callee) && callee.text === 'err') {
+          hasReturnErr = true;
+        }
 
-          // Check for neverthrow.err(...)
-          if (
-            ts.isPropertyAccessExpression(callee) &&
-            ts.isIdentifier(callee.expression) &&
-            callee.expression.text === 'neverthrow' &&
-            callee.name.text === 'err'
-          ) {
-            hasReturnErr = true;
-          }
+        // Check for neverthrow.err(...)
+        if (
+          ts.isPropertyAccessExpression(callee) &&
+          ts.isIdentifier(callee.expression) &&
+          callee.expression.text === 'neverthrow' &&
+          callee.name.text === 'err'
+        ) {
+          hasReturnErr = true;
         }
       }
       if (!hasReturnErr) {
@@ -1161,7 +1181,9 @@ export class NeverthrowLinter {
    * Pattern: catch { return match(error).with(...).otherwise(...) }
    */
   private hasMatchWithFallback(tryNode: ts.TryStatement): boolean {
-    if (!tryNode.catchClause) return false;
+    if (!tryNode.catchClause) {
+      return false;
+    }
     const catchBlock = tryNode.catchClause.block;
 
     let hasMatchCall = false;
@@ -1387,7 +1409,7 @@ export async function loadConfig(
   customConfigPath?: string,
 ): Promise<NeverthrowLintConfig> {
   const configPath =
-    customConfigPath || path.join(process.cwd(), '.neverthrowlintrc.json');
+    customConfigPath ?? path.join(process.cwd(), '.neverthrowlintrc.json');
 
   if (!fs.existsSync(configPath)) {
     consola.warn('No .neverthrowlintrc.json found, using default config');
@@ -1404,7 +1426,7 @@ export async function loadConfig(
     };
   }
 
-  const configContent = fs.readFileSync(configPath, 'utf-8');
+  const configContent = fs.readFileSync(configPath, 'utf8');
   return JSON.parse(configContent) as NeverthrowLintConfig;
 }
 
@@ -1417,7 +1439,7 @@ export async function lintNeverthrowFromSource(
   success: boolean;
   message?: string;
 }> {
-  const files = Array.from(sources.keys());
+  const files = [...sources.keys()];
   const linter = new NeverthrowLinter(files, config, sources);
   const issues = linter.lint();
 
@@ -1459,9 +1481,9 @@ export async function lintNeverthrow(config: NeverthrowLintConfig): Promise<{
   }
 
   // Convert Set to Array for processing
-  const patternArray = Array.from(patterns).map((pattern) => {
+  const patternArray = [...patterns].map((pattern) => {
     // Normalize path separators for cross-platform compatibility
-    return pattern.replace(/\\/g, '/');
+    return pattern.replaceAll('\\', '/');
   });
 
   // Check if all patterns are specific files (not glob patterns)
@@ -1561,7 +1583,7 @@ async function main() {
     // Group issues by file
     const issuesByFile = new Map<string, NeverthrowIssue[]>();
     for (const issue of issues) {
-      const existing = issuesByFile.get(issue.file) || [];
+      const existing = issuesByFile.get(issue.file) ?? [];
       existing.push(issue);
       issuesByFile.set(issue.file, existing);
     }

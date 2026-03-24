@@ -25,12 +25,12 @@ const __dirname = path.dirname(__filename);
 const XVFB_STARTUP_DELAY_MS = 1000;
 const SERVER_CHECK_INTERVAL_MS = 1000;
 const SERVER_MAX_ATTEMPTS = 10;
-const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY || '4096';
+const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY ?? '4096';
 const MEMORY_SAMPLE_INTERVAL_MS = 500;
 
 // 生成するテスト写真の枚数（環境変数で上書き可能）
 const TEST_PHOTO_COUNT = Number.parseInt(
-  process.env.GENERATE_TEST_PHOTOS || '100',
+  process.env.GENERATE_TEST_PHOTOS ?? '100',
   10,
 );
 
@@ -60,7 +60,7 @@ const getProcessMemory = async (
   try {
     if (process.platform === 'linux') {
       // /proc/[pid]/statmから取得（より正確）
-      const statm = await fs.readFile(`/proc/${pid}/statm`, 'utf-8');
+      const statm = await fs.readFile(`/proc/${pid}/statm`, 'utf8');
       const [_size, resident] = statm.split(' ').map(Number);
       const pageSize = 4096; // Linux default page size
       return {
@@ -71,7 +71,7 @@ const getProcessMemory = async (
     }
     // macOS/Windowsの場合
     const { execSync } = childProcess;
-    const output = execSync(`ps -o rss= -p ${pid}`, { encoding: 'utf-8' });
+    const output = execSync(`ps -o rss= -p ${pid}`, { encoding: 'utf8' });
     const rss = Number.parseInt(output.trim(), 10) / 1024; // KB to MB
     return { rss, heap: 0, external: 0 };
   } catch {
@@ -122,7 +122,7 @@ const startMemoryMonitoring = (
     const peakHeap = Math.max(...samples.map((s) => s.heapUsedMB));
     const avgRss =
       samples.reduce((sum, s) => sum + s.rssMB, 0) / samples.length;
-    const memoryGrowth = samples[samples.length - 1].rssMB - samples[0].rssMB;
+    const memoryGrowth = samples.at(-1)!.rssMB - samples[0].rssMB;
 
     return {
       samples,
@@ -157,10 +157,10 @@ const generateTestPhotos = async (
     const date = new Date(baseDate.getTime() + i * 1000);
     const dateStr = date
       .toISOString()
-      .replace(/[-:]/g, '-')
+      .replaceAll(/[-:]/g, '-')
       .replace('T', '_')
       .slice(0, 23);
-    const fileName = `VRChat_${dateStr.replace(/\./g, '.')}_test${i}.png`;
+    const fileName = `VRChat_${dateStr}_test${i}.png`;
     const filePath = path.join(dir, fileName);
 
     // 1920x1080のダミー画像を生成（RGBA ピクセルから PNG を生成）

@@ -162,7 +162,9 @@ let isProcessingQueue = false;
  * 連続リクエストによる制限回避目的で getVrcUserInfoByUserName から使用
  */
 const processQueue = async () => {
-  if (isProcessingQueue) return;
+  if (isProcessingQueue) {
+    return;
+  }
   isProcessingQueue = true;
   while (requestQueue.length > 0) {
     const request = requestQueue.shift();
@@ -202,7 +204,7 @@ export const getVrcUserInfoByUserName = (
             result.data.length === 0 ||
             result.data[0].displayName !== userName
           ) {
-            reject('USER_NOT_FOUND' as const);
+            reject(new Error('USER_NOT_FOUND'));
             return;
           }
           resolve(result.data[0]);
@@ -212,7 +214,7 @@ export const getVrcUserInfoByUserName = (
         }
       }),
     catch: (error): Error | 'USER_NOT_FOUND' => {
-      if (error === 'USER_NOT_FOUND') {
+      if (error instanceof Error && error.message === 'USER_NOT_FOUND') {
         return 'USER_NOT_FOUND';
       }
       return error instanceof Error ? error : new Error(String(error));

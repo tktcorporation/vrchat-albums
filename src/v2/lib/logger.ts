@@ -91,7 +91,9 @@ const log = (
  * デバッグログ（開発時のみ出力）
  */
 const debug = (params: LogParams | string): void => {
-  if (!isDevelopment()) return;
+  if (!isDevelopment()) {
+    return;
+  }
   log('debug', params, console.debug);
 };
 

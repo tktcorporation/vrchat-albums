@@ -30,6 +30,6 @@ export const emitStageStart = (
     stage,
     progress: 0,
     message,
-    details: total !== undefined ? { current: 0, total } : undefined,
+    details: total === undefined ? undefined : { current: 0, total },
   });
 };

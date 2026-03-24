@@ -3,11 +3,11 @@ import { match } from 'ts-pattern';
 /** SVG/XML 特殊文字をエスケープする（インジェクション防止） */
 function escapeXml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }
 
 /** rgb(N, N, N) 形式の色文字列であることを検証する（SVG 属性インジェクション防止） */
@@ -35,8 +35,9 @@ function assertValidBase64(value: string): string {
  * CJK 文字は 14px 幅、ASCII 文字は 7px 幅として計算し、パディング 20px を加算。
  */
 function estimatePlayerNameWidth(playerName: string): number {
-  const nameWidth = Array.from(playerName).reduce((width, char) => {
-    return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
+  // oxlint-disable-next-line no-misused-spread -- プレイヤー名はVRChatの仕様上ASCII・CJKが主体でemoji対応不要
+  const nameWidth = [...playerName].reduce((width, char) => {
+    return width + (/[\u3000-\u9FFF]/.test(char) ? 14 : 7);
   }, 0);
   return nameWidth + 20;
 }
@@ -73,7 +74,9 @@ function generatePlayerElements(
   showAllPlayers: boolean,
   subHeaderFontSize: string,
 ): { elements: string; height: number } {
-  if (!players || players.length === 0) return { elements: '', height: 0 };
+  if (!players || players.length === 0) {
+    return { elements: '', height: 0 };
+  }
 
   const elements: string[] = [];
 
@@ -133,14 +136,14 @@ function generatePlayerElements(
         if (currentWidth + width <= effectiveWidth) {
           tempPlayers.push(players[index]);
           currentWidth += width + 6;
-        } else if (!isSecondRow) {
+        } else if (isSecondRow) {
+          // 2行目も埋まったら終了
+          break;
+        } else {
           // 1行目が埋まったら2行目へ
           isSecondRow = true;
           currentWidth = width + 6;
           tempPlayers.push(players[index]);
-        } else {
-          // 2行目も埋まったら終了
-          break;
         }
       }
 
@@ -199,8 +202,9 @@ function generatePlayerElements(
         !showAll && remaining > 0,
       () => {
         const moreText = `+${remainingCount} more`;
-        const moreTextWidth = Array.from(moreText).reduce((width, char) => {
-          return width + (/[\u3000-\u9fff]/.test(char) ? 14 : 7);
+        // oxlint-disable-next-line no-misused-spread -- "+N more" テキストはASCIIのみ
+        const moreTextWidth = [...moreText].reduce((width, char) => {
+          return width + (/[\u3000-\u9FFF]/.test(char) ? 14 : 7);
         }, 0);
         const moreWidth = moreTextWidth + 20;
 

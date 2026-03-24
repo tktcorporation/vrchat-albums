@@ -7,7 +7,9 @@ import { hslToRgb, rgbToHsl } from './colorUtils';
 function getPixelData(img: HTMLImageElement): ImageData {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Failed to get canvas context');
+  if (!ctx) {
+    throw new Error('Failed to get canvas context');
+  }
 
   canvas.width = img.width;
   canvas.height = img.height;
@@ -17,7 +19,7 @@ function getPixelData(img: HTMLImageElement): ImageData {
 }
 
 function calcColors(data: Uint8ClampedArray, step: number) {
-  const colorBuckets: { [key: string]: ColorBucket } = {};
+  const colorBuckets: Record<string, ColorBucket> = {};
 
   for (let i = 0; i < data.length; i += step) {
     const r = Math.floor(data[i] / 5) * 5;
@@ -25,12 +27,16 @@ function calcColors(data: Uint8ClampedArray, step: number) {
     const b = Math.floor(data[i + 2] / 5) * 5;
     const alpha = data[i + 3] / 255;
 
-    if (alpha < 0.5) continue;
+    if (alpha < 0.5) {
+      continue;
+    }
 
     const hsl = rgbToHsl(r, g, b);
     const [, s, l] = hsl;
 
-    if (s < 20 || l < 15 || l > 85) continue;
+    if (s < 20 || l < 15 || l > 85) {
+      continue;
+    }
 
     const key = `${r},${g},${b}`;
 
@@ -59,7 +65,7 @@ function calcColors(data: Uint8ClampedArray, step: number) {
     };
   }
 
-  const hueGroups: { [key: number]: ColorBucket[] } = {};
+  const hueGroups: Record<number, ColorBucket[]> = {};
   for (const color of sortedColors) {
     const hueGroup = Math.floor(color.hsl[0] / 30);
     if (!hueGroups[hueGroup]) {

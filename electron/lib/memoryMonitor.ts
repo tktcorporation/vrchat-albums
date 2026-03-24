@@ -5,15 +5,16 @@
  * Sharpなどのネイティブライブラリ（libvips）のメモリ使用量も含めて監視する
  */
 
+import type { logger as LoggerType } from './logger';
 // 遅延インポート用の変数
 // テスト環境でのElectron/GLib競合を避けるため、必要時にのみロード
-let lazyLogger: typeof import('./logger').logger | null = null;
+let lazyLogger: typeof LoggerType | null = null;
 
 /**
  * ロガーを遅延取得する
  * Playwrightテスト時のGLib競合を防ぐため、トップレベルインポートを避ける
  */
-const getLazyLogger = async (): Promise<typeof import('./logger').logger> => {
+const getLazyLogger = async (): Promise<typeof LoggerType> => {
   if (!lazyLogger) {
     const { logger } = await import('./logger');
     lazyLogger = logger;
@@ -208,7 +209,9 @@ export class MemoryMonitor {
    * サマリーログを出力
    */
   async logSummary(context: string): Promise<void> {
-    if (!this.config.enableLogging) return;
+    if (!this.config.enableLogging) {
+      return;
+    }
 
     const snapshot = getMemorySnapshot();
     const log = await getLazyLogger();
@@ -265,8 +268,6 @@ let globalMonitor: MemoryMonitor | null = null;
  * グローバルメモリモニターを取得（遅延初期化）
  */
 export const getGlobalMemoryMonitor = (): MemoryMonitor => {
-  if (!globalMonitor) {
-    globalMonitor = new MemoryMonitor();
-  }
+  globalMonitor ??= new MemoryMonitor();
   return globalMonitor;
 };

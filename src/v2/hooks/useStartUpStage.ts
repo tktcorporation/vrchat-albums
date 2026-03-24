@@ -72,11 +72,11 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
 
       match(status)
         .when(
-          (s) => s === 'error' && !!errorMsg,
+          (s) => s === 'error' && Boolean(errorMsg),
           () => {
             const processError = {
               stage,
-              message: errorMsg || '',
+              message: errorMsg ?? '',
               originalError,
             };
             setError(processError);
@@ -134,7 +134,9 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
           )
           .otherwise(() => false);
 
-        if (shouldIgnore) return;
+        if (shouldIgnore) {
+          return;
+        }
 
         const errorMessage = match(syncError)
           .with(P.instanceOf(Error), (e) => e.message)

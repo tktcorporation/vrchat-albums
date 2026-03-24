@@ -247,7 +247,7 @@ export function createPhotoArray(
   options: CreatePhotoArrayOptions = {},
 ): Photo[] {
   const { onInvalidPath } = options;
-  const invalidPaths: Array<{ id: string; path: string }> = [];
+  const invalidPaths: { id: string; path: string }[] = [];
 
   const photos = metadataList
     .map((metadata) => {

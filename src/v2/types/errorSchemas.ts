@@ -93,15 +93,21 @@ export function extractStructuredError(error: unknown) {
   // 柔軟なパターン: 任意の深さでstructuredErrorを探す
   if (error && typeof error === 'object') {
     const findStructuredError = (obj: unknown, depth = 0): unknown => {
-      if (depth > 5 || !obj || typeof obj !== 'object') return undefined;
+      if (depth > 5 || !obj || typeof obj !== 'object') {
+        return undefined;
+      }
       const record = obj as Record<string, unknown>;
       if ('structuredError' in record && record.structuredError) {
         const result = StructuredErrorSchema.safeParse(record.structuredError);
-        if (result.success) return result.data;
+        if (result.success) {
+          return result.data;
+        }
       }
       for (const value of Object.values(record)) {
         const found = findStructuredError(value, depth + 1);
-        if (found) return found;
+        if (found) {
+          return found;
+        }
       }
       return undefined;
     };
@@ -111,5 +117,5 @@ export function extractStructuredError(error: unknown) {
     }
   }
 
-  return undefined;
+  return;
 }

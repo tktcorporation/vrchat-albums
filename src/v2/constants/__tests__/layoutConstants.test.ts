@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import { LAYOUT_CONSTANTS } from '../layoutConstants';
 
@@ -13,35 +13,35 @@ describe('LAYOUT_CONSTANTS', () => {
 
   it('TARGET_ROW_HEIGHT が正の値である', () => {
     expect(LAYOUT_CONSTANTS.TARGET_ROW_HEIGHT).toBeGreaterThan(0);
-    expect(typeof LAYOUT_CONSTANTS.TARGET_ROW_HEIGHT).toBe('number');
+    expectTypeOf(LAYOUT_CONSTANTS.TARGET_ROW_HEIGHT).toBeNumber();
   });
 
   it('GAP が非負の値である', () => {
     expect(LAYOUT_CONSTANTS.GAP).toBeGreaterThanOrEqual(0);
-    expect(typeof LAYOUT_CONSTANTS.GAP).toBe('number');
+    expectTypeOf(LAYOUT_CONSTANTS.GAP).toBeNumber();
   });
 
   it('HEADER_HEIGHT が正の値である', () => {
     expect(LAYOUT_CONSTANTS.HEADER_HEIGHT).toBeGreaterThan(0);
-    expect(typeof LAYOUT_CONSTANTS.HEADER_HEIGHT).toBe('number');
+    expectTypeOf(LAYOUT_CONSTANTS.HEADER_HEIGHT).toBeNumber();
   });
 
   it('SPACING が非負の値である', () => {
     expect(LAYOUT_CONSTANTS.SPACING).toBeGreaterThanOrEqual(0);
-    expect(typeof LAYOUT_CONSTANTS.SPACING).toBe('number');
+    expectTypeOf(LAYOUT_CONSTANTS.SPACING).toBeNumber();
   });
 
   it('MAX_LAST_ROW_SCALE が適切な範囲の値である', () => {
     expect(LAYOUT_CONSTANTS.MAX_LAST_ROW_SCALE).toBeGreaterThan(1);
     expect(LAYOUT_CONSTANTS.MAX_LAST_ROW_SCALE).toBeLessThanOrEqual(3);
-    expect(typeof LAYOUT_CONSTANTS.MAX_LAST_ROW_SCALE).toBe('number');
+    expectTypeOf(LAYOUT_CONSTANTS.MAX_LAST_ROW_SCALE).toBeNumber();
   });
 
   it('定数オブジェクトの型がreadonly constである', () => {
     // TypeScriptレベルでの読み取り専用性を確認
     // 実行時のエラーではなく、型レベルでの制約をテスト
     expect(LAYOUT_CONSTANTS).toBeDefined();
-    expect(typeof LAYOUT_CONSTANTS).toBe('object');
+    expectTypeOf(LAYOUT_CONSTANTS).toBeObject();
   });
 
   it('期待される値が設定されている', () => {

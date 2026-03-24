@@ -75,7 +75,7 @@ const getDownloadsPath = (): string => {
  * VRChat ログフォルダなどの設定入力で利用される。
  */
 const openElectronDialog = (
-  properties: Array<'openDirectory' | 'openFile' | 'multiSelections'>,
+  properties: ('openDirectory' | 'openFile' | 'multiSelections')[],
 ): Effect.Effect<string[], OperationCanceled> => {
   return Effect.gen(function* () {
     const result = yield* Effect.promise(() =>
@@ -105,7 +105,7 @@ const openGetDirDialog = (): Effect.Effect<string, OperationCanceled> => {
  * @deprecated Use openElectronDialog instead
  */
 const openGetFileDialog = (
-  properties: Array<'openDirectory' | 'openFile' | 'multiSelections'>,
+  properties: ('openDirectory' | 'openFile' | 'multiSelections')[],
 ): Effect.Effect<string[], OperationCanceled> => {
   return openElectronDialog(properties);
 };

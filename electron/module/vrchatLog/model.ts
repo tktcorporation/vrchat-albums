@@ -52,7 +52,7 @@ class VRChatLogStoreFilePath extends BaseValueObject<
     // レガシーファイルの場合はnullを返す
     if (
       this.value.endsWith('/logStore.txt') ||
-      this.value.endsWith('\\logStore.txt')
+      this.value.endsWith(String.raw`\logStore.txt`)
     ) {
       return null;
     }
@@ -73,7 +73,9 @@ class VRChatLogStoreFilePath extends BaseValueObject<
    */
   public getTimestamp(): Date | null {
     const match = this.value.match(/logStore-\d{4}-\d{2}-(\d{14})\.txt$/);
-    if (!match) return null;
+    if (!match) {
+      return null;
+    }
 
     return datefns.parse(match[1], 'yyyyMMddHHmmss', new Date());
   }
@@ -127,14 +129,26 @@ class VRChatWorldInstanceId extends BaseValueObject<
     }
 
     // インスタンスタイプを判定
-    if (typePart.startsWith('friends(')) return 'friends';
-    if (typePart.startsWith('hidden(')) return 'friends+';
-    if (typePart.startsWith('private(')) return 'invite';
-    if (typePart.startsWith('group(')) return 'group';
-    if (typePart.startsWith('groupPublic(')) return 'group-public';
+    if (typePart.startsWith('friends(')) {
+      return 'friends';
+    }
+    if (typePart.startsWith('hidden(')) {
+      return 'friends+';
+    }
+    if (typePart.startsWith('private(')) {
+      return 'invite';
+    }
+    if (typePart.startsWith('group(')) {
+      return 'group';
+    }
+    if (typePart.startsWith('groupPublic(')) {
+      return 'group-public';
+    }
 
     // リージョン情報のみの場合はPublic
-    if (typePart.match(/^[a-z]{2,3}(\([a-z0-9]+\))?$/)) return 'public';
+    if (/^[a-z]{2,3}(\([a-z0-9]+\))?$/.test(typePart)) {
+      return 'public';
+    }
 
     // その他の場合
     return 'unknown';

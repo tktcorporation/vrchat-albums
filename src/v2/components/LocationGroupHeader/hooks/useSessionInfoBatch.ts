@@ -224,7 +224,9 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
   useEffect(() => {
     globalPlayerBatchManager.setBatchExecutor(async () => {
       const pendingRequests = globalPlayerBatchManager.getPendingRequests();
-      if (pendingRequests.length === 0) return;
+      if (pendingRequests.length === 0) {
+        return;
+      }
 
       const joinDateTimes = pendingRequests.map((req) => req.joinDateTime);
 
@@ -313,9 +315,9 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
           setIsLoading(false);
         }
       })
-      .catch((err: unknown) => {
+      .catch((error: unknown) => {
         if (requestIdRef.current === requestId) {
-          setError(err instanceof Error ? err : new Error(String(err)));
+          setError(error instanceof Error ? error : new Error(String(error)));
           setIsLoading(false);
         }
       });

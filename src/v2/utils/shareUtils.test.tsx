@@ -48,8 +48,8 @@ describe('shareUtils', () => {
             mutateAsync: copyImageMutation,
           },
         });
-      } catch (e) {
-        thrownError = e as Error;
+      } catch (error) {
+        thrownError = error as Error;
       }
 
       expect(thrownError).toBeInstanceOf(Error);

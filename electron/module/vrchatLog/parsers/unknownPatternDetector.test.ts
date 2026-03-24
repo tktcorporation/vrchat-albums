@@ -127,7 +127,7 @@ describe('detectAndReportUnknownPatterns', () => {
 
     detectAndReportUnknownPatterns(lines);
 
-    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(logger.warn).toHaveBeenCalledTimes(1);
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         details: expect.objectContaining({
@@ -145,7 +145,7 @@ describe('detectAndReportUnknownPatterns', () => {
     ].map(asLogLine);
 
     detectAndReportUnknownPatterns(lines);
-    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledTimes(1);
 
     vi.clearAllMocks();
 
@@ -164,7 +164,7 @@ describe('detectAndReportUnknownPatterns', () => {
         asLogLine,
       ),
     );
-    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledTimes(1);
 
     vi.clearAllMocks();
 
