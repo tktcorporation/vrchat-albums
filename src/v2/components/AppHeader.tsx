@@ -157,7 +157,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => void handleRefresh()}
-                disabled={loadingState?.isRefreshing ?? isSyncing}
+                disabled={loadingState?.isRefreshing || isSyncing}
                 className="h-7 w-7 p-0"
                 title={t('common.refresh')}
               >

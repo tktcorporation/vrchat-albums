@@ -36,7 +36,7 @@ const getFilenameFromPath = (filePath: string): string => {
   const parts = filePath.split(/[/\\]/);
   const filename = parts.at(-1);
   // If filename is empty (path ends with separator), try the second to last part
-  return filename ?? parts.at(-2) ?? filePath;
+  return filename || parts.at(-2) || filePath;
 };
 
 /**
