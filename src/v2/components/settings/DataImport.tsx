@@ -36,6 +36,7 @@ const getFilenameFromPath = (filePath: string): string => {
   const parts = filePath.split(/[/\\]/);
   const filename = parts.at(-1);
   // If filename is empty (path ends with separator), try the second to last part
+  // biome-ignore lint: empty string is falsy and should fall through
   return filename || parts.at(-2) || filePath;
 };
 
@@ -222,10 +223,10 @@ const DataImport = memo(() => {
 
           {/* ドロップエリア */}
           <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            className={`border border-dashed rounded-lg p-6 text-center transition-colors ${
               isDragOver
                 ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                : 'border-border'
+                : 'border-border/50 bg-muted/30'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -323,7 +324,7 @@ const DataImport = memo(() => {
       </div>
 
       {/* インポート履歴・ロールバック */}
-      <div className="border-t border-border pt-6">
+      <div className="pt-8">
         <div className="flex items-center justify-between mb-4">
           <h4
             className={`${TYPOGRAPHY.heading.subsection} ${TEXT_COLOR.primary}`}
@@ -357,7 +358,7 @@ const DataImport = memo(() => {
                 {importHistory.map((backup) => (
                   <div
                     key={backup.id}
-                    className={`flex items-center justify-between p-4 border border-border rounded-lg ${SURFACE_COLOR.muted}`}
+                    className={`flex items-center justify-between p-4 rounded-lg ${SURFACE_COLOR.muted}`}
                   >
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">

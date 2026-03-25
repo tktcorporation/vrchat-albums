@@ -269,7 +269,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
           {/* Refresh All Section */}
           {showRefreshAll && (
-            <div className="pt-4 border-t border-border">
+            <div className="pt-6">
               <div className={SPACING.stack.default}>
                 <p
                   className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}

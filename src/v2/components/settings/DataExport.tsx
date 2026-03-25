@@ -166,10 +166,10 @@ const DataExport = memo(() => {
                 key={value}
                 onClick={() => handlePresetSelect(value)}
                 className={cn(
-                  'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors',
+                  'flex items-center justify-center gap-2 p-3 rounded-lg transition-colors',
                   selectedPreset === value
-                    ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                    : 'border-border hover:border-primary/50',
+                    ? 'bg-primary/10 dark:bg-primary/20 ring-1 ring-primary/40'
+                    : 'bg-muted/50 hover:bg-muted',
                 )}
               >
                 <Icon
