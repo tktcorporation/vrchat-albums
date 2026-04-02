@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.28.0
+
+### Minor Changes
+
+- [#751](https://github.com/tktcorporation/vrchat-albums/pull/751) [`de1efd7`](https://github.com/tktcorporation/vrchat-albums/commit/de1efd74119d465d0e2cfb8db3b0a0caa5623e68) Thanks [@tktcorporation](https://github.com/tktcorporation)! - World Join 画像に EXIF メタデータ（サムネイル、撮影日時、説明）を埋め込む機能を追加
+
+- [#736](https://github.com/tktcorporation/vrchat-albums/pull/736) [`ac7393e`](https://github.com/tktcorporation/vrchat-albums/commit/ac7393e2436bd03462439d83f5c8d4c410f23f95) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Effect TS エラーハンドリング改善: try-catch を Effect パターンに変換し、no-try-catch lint ルールを追加
+
+- [#734](https://github.com/tktcorporation/vrchat-albums/pull/734) [`d302147`](https://github.com/tktcorporation/vrchat-albums/commit/d30214741353f5a7d2ff32ad04e1d98673bcb182) Thanks [@tktcorporation](https://github.com/tktcorporation)! - neverthrow を Effect TS に全面移行。サービス層・コントローラー層・テストの全 73 ファイルを Effect パターンに変換し、型安全なエラーハンドリングと遅延評価の恩恵を得られるようにした。
+
+- [#756](https://github.com/tktcorporation/vrchat-albums/pull/756) [`6e43ffb`](https://github.com/tktcorporation/vrchat-albums/commit/6e43ffbe96a680e66c9067c23401165a34d43c61) Thanks [@tktcorporation](https://github.com/tktcorporation)! - oxlint の style/pedantic カテゴリを有効化し、より厳格な lint 設定に移行
+
+- [#731](https://github.com/tktcorporation/vrchat-albums/pull/731) [`3a38917`](https://github.com/tktcorporation/vrchat-albums/commit/3a389171ba14a7808856b07b9ee8cce144c31a38) Thanks [@tktcorporation](https://github.com/tktcorporation)! - World Join 画像自動生成機能を追加。ワールド参加時にワールド情報とプレイヤー一覧を含む画像を自動生成し、VRChat 写真フォルダに保存します。resvg-js による画像生成パイプラインの統一も含みます。
+
+### Patch Changes
+
+- [#749](https://github.com/tktcorporation/vrchat-albums/pull/749) [`2e2e511`](https://github.com/tktcorporation/vrchat-albums/commit/2e2e511c6274f6821e6ec9ee8d9320d95897ad58) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Electron モジュールの遅延取得ヘルパーを集約し、リンタールールを追加
+
+- [#757](https://github.com/tktcorporation/vrchat-albums/pull/757) [`106bf48`](https://github.com/tktcorporation/vrchat-albums/commit/106bf484b6ccefa3428d5ff40e96e50258bb2967) Thanks [@tktcorporation](https://github.com/tktcorporation)! - oxlint の重要なルールを厳格化: no-floating-promises と no-misused-promises を error に昇格し、新たに react/no-array-index-key, jsdoc/check-tag-names, jsx-a11y/no-static-element-interactions, no-anonymous-default-export を warn で有効化
+
+- [#754](https://github.com/tktcorporation/vrchat-albums/pull/754) [`b8a9b0d`](https://github.com/tktcorporation/vrchat-albums/commit/b8a9b0db3f8cc8cc57679c47541c395ed4817a4b) Thanks [@tktcorporation](https://github.com/tktcorporation)! - World Join 画像の EXIF 書き込み失敗を修正。JPEG バッファに対して .png 拡張子の一時ファイルを使用していたため exiftool がフォーマット不一致エラーを返していた問題を、マジックバイトから拡張子を自動判定するように修正。
+
+- [#748](https://github.com/tktcorporation/vrchat-albums/pull/748) [`a810f30`](https://github.com/tktcorporation/vrchat-albums/commit/a810f3012d3abe72de0bf17b2330d513726b4485) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix: PR [#744](https://github.com/tktcorporation/vrchat-albums/issues/744) (oxlint 移行) で巻き戻った logSync の修正を再適用
+
+  - [#742](https://github.com/tktcorporation/vrchat-albums/issues/742): World Join 画像生成で写真ディレクトリのデフォルトフォールバックを復元
+  - [#738](https://github.com/tktcorporation/vrchat-albums/issues/738): INCREMENTAL モードでの preLoadedLogLines 最適化を復元
+
+- [#752](https://github.com/tktcorporation/vrchat-albums/pull/752) [`9322492`](https://github.com/tktcorporation/vrchat-albums/commit/9322492e318b873ae6b5294aab2938ee114d6cad) Thanks [@tktcorporation](https://github.com/tktcorporation)! - CHANGELOG.md を oxfmt の ignorePatterns に追加し、changeset-release ワークフローの失敗を修正
+
+- [#755](https://github.com/tktcorporation/vrchat-albums/pull/755) [`a3769c8`](https://github.com/tktcorporation/vrchat-albums/commit/a3769c81b9c56f874056892c7082ac2624d075e0) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Fix all 167 oxlint warnings across 57 files (no-shadow, no-nested-ternary, consistent-function-scoping, no-floating-promises, no-misused-promises, unbound-method, no-unsafe-\*)
+
+- [#741](https://github.com/tktcorporation/vrchat-albums/pull/741) [`94c7ca2`](https://github.com/tktcorporation/vrchat-albums/commit/94c7ca2c446cd1be5f136d126f6ab7aa6273a600) Thanks [@tktcorporation](https://github.com/tktcorporation)! - getSessionInfoBatchEffect のエラー型を never に修正し、tRPC 側の不要な mapError を削除
+
+- [#745](https://github.com/tktcorporation/vrchat-albums/pull/745) [`e50ff87`](https://github.com/tktcorporation/vrchat-albums/commit/e50ff87625c29759f9a82d26cdafec94f557983e) Thanks [@tktcorporation](https://github.com/tktcorporation)! - World Join 画像ダウンロード時に User-Agent ヘッダーを追加し、VRChat CDN からの取得失敗を修正
+
+- [#742](https://github.com/tktcorporation/vrchat-albums/pull/742) [`0a064bd`](https://github.com/tktcorporation/vrchat-albums/commit/0a064bdf091397d6214c60dd53cfdad0dae6bd8f) Thanks [@tktcorporation](https://github.com/tktcorporation)! - World Join 画像生成で写真ディレクトリ未設定時にデフォルトパスへのフォールバックが効かないバグを修正
+
+- [#750](https://github.com/tktcorporation/vrchat-albums/pull/750) [`44cd063`](https://github.com/tktcorporation/vrchat-albums/commit/44cd0631d173fab6e11b5dd6e919208665032011) Thanks [@tktcorporation](https://github.com/tktcorporation)! - push 前の検証を強制する hookify ルールを追加
+
+- [#744](https://github.com/tktcorporation/vrchat-albums/pull/744) [`64dfe3d`](https://github.com/tktcorporation/vrchat-albums/commit/64dfe3d34676bcce54f558d4e261d36c071a8fbb) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Biome から oxlint + oxfmt へ移行
+
+- [#738](https://github.com/tktcorporation/vrchat-albums/pull/738) [`f798b1f`](https://github.com/tktcorporation/vrchat-albums/commit/f798b1f132c19efab765f2bd5f36605a7644e306) Thanks [@tktcorporation](https://github.com/tktcorporation)! - ログ同期の起動時パフォーマンスを最適化: 重複判定キャッシュ導入、ホットパスの Zod オーバーヘッド除去、INCREMENTAL モードでのファイル二重読み込み回避
+
+- [#743](https://github.com/tktcorporation/vrchat-albums/pull/743) [`401d494`](https://github.com/tktcorporation/vrchat-albums/commit/401d4942b211d58ae393c3b6d697917c14492741) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 未知の [Behaviour] ログパターン検出を専用モジュールへ分離し、重複集約により不要な Sentry ノイズを削減
+
+- [#747](https://github.com/tktcorporation/vrchat-albums/pull/747) [`f70aec8`](https://github.com/tktcorporation/vrchat-albums/commit/f70aec89c7c9513cb65a55d13980be6c0d644904) Thanks [@tktcorporation](https://github.com/tktcorporation)! - oxlint ルールの強化: 移行時にオフにされたルールを再有効化し、堅牢性に寄与するルールを error に昇格
+
+- [#737](https://github.com/tktcorporation/vrchat-albums/pull/737) [`77edd71`](https://github.com/tktcorporation/vrchat-albums/commit/77edd71d5a263ba4512d74d2dba9bf0c4ca41e1c) Thanks [@tktcorporation](https://github.com/tktcorporation)! - knip で検出された未使用コードを削除し、CI でエラーとして検出するように変更
+
 ## 0.27.0
 
 ### Minor Changes
