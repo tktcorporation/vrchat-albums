@@ -95,6 +95,7 @@ export const showItemInFolder = (filePath: string): void => {
 export const showOpenDialog = async (_options: {
   properties?: ('openDirectory' | 'openFile' | 'multiSelections')[];
 }): Promise<{ canceled: boolean; filePaths: string[] }> => {
+  // effect-lint-allow-try-catch: Electrobun API 呼び出しは失敗しうるインフラ操作
   try {
     const result = await Utils.openFileDialog({});
     if (!result || result.length === 0) {

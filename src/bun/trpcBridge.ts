@@ -31,6 +31,7 @@ export const createTRPCBridge = () => {
      * 入力・出力は superjson でシリアライズ/デシリアライズする。
      */
     call: async (params: TRPCCallParams): Promise<TRPCCallResponse> => {
+      // effect-lint-allow-try-catch: tRPC caller 実行は失敗しうるインフラ操作
       try {
         const { path, type: _type, input } = params;
         const parsedInput = input ? superjson.parse(input) : undefined;

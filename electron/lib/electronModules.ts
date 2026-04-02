@@ -48,6 +48,7 @@ export const getDialog = () => ({
     defaultPath?: string;
     filters?: { name: string; extensions: string[] }[];
   }): Promise<{ canceled: boolean; filePath?: string }> => {
+    // effect-lint-allow-try-catch: ダイアログ操作は失敗しうるインフラ操作
     try {
       const result = await compat.showOpenDialog({
         properties: ['openDirectory'],

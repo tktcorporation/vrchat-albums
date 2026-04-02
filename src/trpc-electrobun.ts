@@ -27,6 +27,7 @@ const electrobunLink: TRPCLink<AppRouter> = () => {
       const { path, type, input } = op;
 
       const doRequest = async () => {
+        // effect-lint-allow-try-catch: RPC ブリッジ呼び出しは失敗しうるインフラ操作
         try {
           const electrobun = (window as unknown as Record<string, unknown>)
             .__electrobun as

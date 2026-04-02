@@ -19,6 +19,7 @@ import { match, P } from 'ts-pattern';
  * そうでなければフォールバック。
  */
 const getLogFilePath = (): string => {
+  // effect-lint-allow-try-catch: Electrobun 環境検出パターン
   try {
     // Electrobun 環境
     const { Utils } = require('electrobun/bun');
@@ -32,6 +33,7 @@ const getLogFilePath = (): string => {
 const logFilePath = getLogFilePath();
 
 // ログディレクトリの作成
+// effect-lint-allow-try-catch: ディレクトリ作成は失敗しうるインフラ操作
 try {
   fs.mkdirSync(path.dirname(logFilePath), { recursive: true });
 } catch {
@@ -48,6 +50,7 @@ const consola = createConsola({
 const writeToFile = (level: string, message: string): void => {
   const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
   const line = `${timestamp} [${level}] ${message}\n`;
+  // effect-lint-allow-try-catch: ファイル書き込みは失敗しうるインフラ操作
   try {
     fs.appendFileSync(logFilePath, line, 'utf8');
   } catch {

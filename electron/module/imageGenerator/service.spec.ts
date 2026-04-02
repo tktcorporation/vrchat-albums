@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 vi.mock('./renderSvg', () => ({
   renderSvgToPng: vi

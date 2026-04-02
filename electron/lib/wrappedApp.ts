@@ -16,6 +16,7 @@ import * as compat from './electrobunCompat';
  * ex. %APPDATA%/com.tktcorporation.vrchat-albums/ (Windows)
  */
 export const getAppUserDataPath = (): string => {
+  // effect-lint-allow-try-catch: Electrobun 環境検出パターン
   try {
     return compat.getAppUserDataPath();
   } catch {

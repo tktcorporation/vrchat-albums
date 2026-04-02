@@ -24,6 +24,7 @@ export class JsonStore {
   }
 
   private getDefaultDir(): string {
+    // effect-lint-allow-try-catch: Electrobun 環境検出パターン
     try {
       const { Utils } = require('electrobun/bun');
       return Utils.paths.userData;
@@ -35,6 +36,7 @@ export class JsonStore {
   }
 
   private load(): Record<string, unknown> {
+    // effect-lint-allow-try-catch: ファイル読み込みは失敗しうるインフラ操作
     try {
       if (fs.existsSync(this.path)) {
         const content = fs.readFileSync(this.path, 'utf8');
@@ -47,6 +49,7 @@ export class JsonStore {
   }
 
   private save(): void {
+    // effect-lint-allow-try-catch: ファイル書き込みは失敗しうるインフラ操作
     try {
       const dir = path.dirname(this.path);
       fs.mkdirSync(dir, { recursive: true });
