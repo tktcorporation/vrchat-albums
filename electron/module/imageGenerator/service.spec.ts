@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 vi.mock('./renderSvg', () => ({
   renderSvgToPng: vi
@@ -30,7 +30,7 @@ describe('generateSharePreview', () => {
         showAllPlayers: false,
       }),
     );
-    expect(typeof value).toBe('string');
+    expectTypeOf(value).toBeString();
   });
 
   it('should pass showAllPlayers to SVG template', async () => {

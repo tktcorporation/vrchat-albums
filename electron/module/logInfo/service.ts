@@ -800,8 +800,9 @@ export const findLatestWorldJoinBefore = (
   }
 
   // 最大値以上の場合は最大値を返す
-  if (targetTime >= sortedDates[sortedDates.length - 1].getTime()) {
-    return sortedDates[sortedDates.length - 1];
+  // biome-ignore lint: sortedDates is non-empty (checked at line 793)
+  if (targetTime >= sortedDates.at(-1)!.getTime()) {
+    return sortedDates.at(-1) ?? null;
   }
 
   // 二分探索

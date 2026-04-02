@@ -170,7 +170,7 @@ const logError = (
           errorInfo: {
             code: userErr.code,
             category: userErr.category,
-            userMessage: userErr.userMessage || userErr.message,
+            userMessage: userErr.userMessage ?? userErr.message,
           },
         };
         eventEmitter.emit('toast', structuredToastMessage);

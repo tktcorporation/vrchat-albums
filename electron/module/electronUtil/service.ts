@@ -350,7 +350,7 @@ const copyMultipleFilesToClipboard = (
 ): Effect.Effect<void> => {
   // All errors are unexpected and should propagate
   if (filePaths.length === 0) {
-    return Effect.succeed(undefined);
+    return Effect.void;
   }
   return Effect.sync(() => {
     writeClipboardFilePaths(filePaths);

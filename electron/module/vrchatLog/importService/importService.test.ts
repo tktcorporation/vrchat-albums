@@ -88,9 +88,9 @@ describe('importService', () => {
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService['updateBackupMetadata'],
-      ).mockReturnValue(Effect.succeed(undefined));
+      ).mockReturnValue(Effect.void);
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
-        Effect.succeed(undefined),
+        Effect.void,
       );
       vi.mocked(logSyncModule.syncLogs).mockReturnValue(
         Effect.succeed({
@@ -179,9 +179,9 @@ describe('importService', () => {
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService['updateBackupMetadata'],
-      ).mockReturnValue(Effect.succeed(undefined));
+      ).mockReturnValue(Effect.void);
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
-        Effect.succeed(undefined),
+        Effect.void,
       );
       vi.mocked(logSyncModule.syncLogs).mockReturnValue(
         Effect.succeed({
@@ -316,9 +316,9 @@ describe('importService', () => {
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService['updateBackupMetadata'],
-      ).mockReturnValue(Effect.succeed(undefined));
+      ).mockReturnValue(Effect.void);
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
-        Effect.succeed(undefined),
+        Effect.void,
       );
       vi.mocked(logSyncModule.syncLogs).mockReturnValue(
         Effect.succeed({
@@ -374,9 +374,9 @@ describe('importService', () => {
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService['updateBackupMetadata'],
-      ).mockReturnValue(Effect.succeed(undefined));
+      ).mockReturnValue(Effect.void);
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
-        Effect.succeed(undefined),
+        Effect.void,
       );
       vi.mocked(logSyncModule.syncLogs).mockReturnValue(
         Effect.succeed({
@@ -480,9 +480,9 @@ describe('importService', () => {
       ).mockReturnValue(Effect.succeed(mockBackup));
       vi.mocked(
         backupServiceModule.backupService['updateBackupMetadata'],
-      ).mockReturnValue(Effect.succeed(undefined));
+      ).mockReturnValue(Effect.void);
       vi.mocked(logStorageManagerModule.appendLoglinesToFile).mockReturnValue(
-        Effect.succeed(undefined),
+        Effect.void,
       );
       vi.mocked(logSyncModule.syncLogs).mockReturnValue(
         Effect.succeed({
