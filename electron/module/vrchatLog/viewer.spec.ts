@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import { getData } from '../../lib/getData';
 import type { VRChatWorldInfoFromApi } from '../vrchatApi/service';
@@ -50,6 +50,6 @@ describe('viewer_api', () => {
     );
     expect(worldInfo).toBeDefined();
     expect(worldInfo.id).toBe(worldId);
-    expect(typeof worldInfo.name).toBe('string');
+    expectTypeOf(worldInfo.name).toBeString();
   }, 2000);
 });

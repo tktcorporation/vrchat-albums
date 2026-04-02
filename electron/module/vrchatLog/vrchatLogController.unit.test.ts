@@ -55,7 +55,7 @@ vi.mock('../fileHandlers/logStorageManager', () => {
   const { Effect } = require('effect');
   return {
     // appendLoglinesToFile returns Effect<void, never>
-    appendLoglinesToFile: vi.fn(() => Effect.succeed(undefined)),
+    appendLoglinesToFile: vi.fn(() => Effect.void),
     getLogStoreDir: vi.fn(() => '/tmp/test-logStore'),
     initLogStoreDir: vi.fn(),
   };

@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import type {
   DBLogProvider,
@@ -253,7 +253,7 @@ describe('vrchatLogController', () => {
 
       // getDBLogsFromDatabase関数が期待される引数で呼ばれることを確認
       expect(capturedGetDBLogs).toBeDefined();
-      expect(typeof capturedGetDBLogs).toBe('function');
+      expectTypeOf(capturedGetDBLogs!).toBeFunction();
     });
   });
 });

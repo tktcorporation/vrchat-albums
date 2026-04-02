@@ -40,7 +40,7 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "clean:debug": "bash debug/cleanDevFiles.sh",
-    "find-deadcode": "ts-prune",
+    "find-deadcode": "knip --include unlisted",
     "license-check:generate": "node scripts/generate-licenses.mjs",
     "license-check:validate": "license-checker --production --failOn 'GPL;GPL-2.0;GPL-3.0;LGPL;LGPL-3.0;AGPL;AGPL-3.0;AGPL-3.0-only;'",
     "test": "vitest run",
@@ -160,7 +160,7 @@
     "jsdom": "~27.4.0",
     "knip": "5.78.0",
     "license-checker": "25.0.1",
-    "minimatch": "^10.1.1",
+    "minimatch": "^10.2.3",
     "npm-run-all2": "~8.0.4",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0",
@@ -169,7 +169,6 @@
     "postcss": "8.5.6",
     "rimraf": "6.1.2",
     "simple-git-hooks": "2.13.1",
-    "ts-prune": "0.10.3",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "uuid": "^13.0.0",
@@ -186,7 +185,16 @@
   "packageManager": "pnpm@10.10.0",
   "pnpm": {
     "overrides": {
-      "cacache>glob": "10.5.0"
+      "cacache>glob": "10.5.0",
+      "@isaacs/brace-expansion": ">=5.0.1",
+      "rollup": ">=4.59.0",
+      "lodash": ">=4.18.0",
+      "@xmldom/xmldom": ">=0.8.12",
+      "dottie": ">=2.0.7",
+      "undici": ">=6.24.0",
+      "picomatch": ">=4.0.4",
+      "flatted": ">=3.4.2",
+      "smol-toml": ">=1.6.1"
     },
     "onlyBuiltDependencies": [
       "@ast-grep/cli",
