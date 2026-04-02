@@ -38,10 +38,10 @@ vi.mock('node:fs', () => ({
 // fs操作のモック
 vi.mock('../../lib/wrappedFs', () => ({
   existsSyncSafe: vi.fn().mockReturnValue(false),
-  mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed()),
-  appendFileAsync: vi.fn().mockReturnValue(Effect.succeed()),
-  writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed()),
-  unlinkAsync: vi.fn().mockReturnValue(Effect.succeed()),
+  mkdirSyncSafe: vi.fn().mockReturnValue(Effect.void),
+  appendFileAsync: vi.fn().mockReturnValue(Effect.void),
+  writeFileSyncSafe: vi.fn().mockReturnValue(Effect.void),
+  unlinkAsync: vi.fn().mockReturnValue(Effect.void),
   readFileSyncSafe: vi.fn().mockImplementation(() => {
     return Effect.succeed(Buffer.from('test content'));
   }),

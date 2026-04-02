@@ -81,10 +81,10 @@ const generateMemoryReport = (snapshots: MemorySnapshot[]): MemoryReport => {
   const peakRss = Math.max(...snapshots.map((s) => s.rssMB));
   const peakHeap = Math.max(...snapshots.map((s) => s.heapUsedMB));
   const rssGrowth =
-    snapshots.length > 1 ? snapshots.at(-1).rssMB - snapshots[0].rssMB : 0;
+    snapshots.length > 1 ? snapshots.at(-1)!.rssMB - snapshots[0].rssMB : 0;
   const heapGrowth =
     snapshots.length > 1
-      ? snapshots.at(-1).heapUsedMB - snapshots[0].heapUsedMB
+      ? snapshots.at(-1)!.heapUsedMB - snapshots[0].heapUsedMB
       : 0;
 
   return { snapshots, peakRss, peakHeap, rssGrowth, heapGrowth };
