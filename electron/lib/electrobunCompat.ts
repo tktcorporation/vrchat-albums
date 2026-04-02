@@ -128,8 +128,7 @@ export const showNotification = (options: {
  * Electron の clipboard に相当。
  */
 export const clipboard = {
-  readText: async (): Promise<string> =>
-    (await Utils.clipboardReadText()) ?? '',
+  readText: (): string => Utils.clipboardReadText() ?? '',
   writeText: (text: string): void => {
     Utils.clipboardWriteText(text);
   },

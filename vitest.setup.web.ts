@@ -2,7 +2,7 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
 // @sentry/browser のモック設定
-vi.mock<typeof import('@sentry/browser')>('@sentry/browser', () => ({
+vi.mock('@sentry/browser', () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
   init: vi.fn(),
@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 // Electrobun モジュールのモック
-vi.mock<typeof import('electrobun/bun')>('electrobun/bun', () => ({
+vi.mock('electrobun/bun', () => ({
   Utils: {
     paths: {
       userData: '/tmp/test-user-data',
@@ -26,12 +26,12 @@ vi.mock<typeof import('electrobun/bun')>('electrobun/bun', () => ({
   BrowserView: { defineRPC: vi.fn() },
 }));
 
-vi.mock<typeof import('electrobun/view')>('electrobun/view', () => ({
+vi.mock('electrobun/view', () => ({
   Electroview: vi.fn().mockReturnValue({ rpc: { request: {}, send: {} } }),
 }));
 
 // Electron モジュールのモック（後方互換性）
-vi.mock<typeof import('electron')>('electron', () => {
+vi.mock('electron', () => {
   const mockApp = {
     getPath: vi.fn(),
     getName: vi.fn(),

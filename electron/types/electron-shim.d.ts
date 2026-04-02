@@ -99,6 +99,7 @@ declare module 'electron' {
   };
   class BrowserWindow {
     constructor(options: Record<string, unknown>);
+    static getAllWindows(): BrowserWindow[];
   }
 
   export {

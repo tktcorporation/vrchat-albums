@@ -35,7 +35,8 @@ const mainRPC = BrowserView.defineRPC<AppRPCSchema>({
         console.log(`[RPC] Received message: ${messageName}`, payload);
       },
       windowAction: ({ action }) => {
-        const win = BrowserWindow.getAllWindows()[0];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const win = (BrowserWindow as any).getAllWindows()[0];
         if (!win) {
           return;
         }
@@ -74,6 +75,8 @@ const createMainWindow = () => {
   const win = new BrowserWindow({
     title: 'VRChat Albums',
     frame: {
+      x: 0,
+      y: 0,
       width: 1024,
       height: 768,
     },

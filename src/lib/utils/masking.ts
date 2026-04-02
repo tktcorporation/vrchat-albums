@@ -1,12 +1,4 @@
-/**
- * Sentry イベント型のスタブ。
- * Electrobun 移行後、@sentry/electron は利用不可。
- * @sentry/browser への移行時に正式な型に置き換え。
- */
-interface ErrorEvent {
-  type: undefined;
-  [key: string]: unknown;
-}
+import type { ErrorEvent } from '@sentry/browser';
 
 /**
  * 文字列中のファイルパスに含まれる可能性のあるユーザー名をマスクします。

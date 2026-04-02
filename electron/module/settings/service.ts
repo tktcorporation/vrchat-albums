@@ -9,8 +9,11 @@
 import { Effect } from 'effect';
 
 import { logger } from '../../lib/logger';
-import type { UpdateError, UpdateCheckFailed } from './errors';
-import { NoUpdateAvailable } from './errors';
+import {
+  type UpdateError,
+  UpdateCheckFailed,
+  NoUpdateAvailable,
+} from './errors';
 
 export interface UpdaterInfo {
   isUpdateAvailable: boolean;
@@ -100,10 +103,10 @@ export const getElectronUpdaterInfo = (): Effect.Effect<
         updateInfo: null,
       };
     },
-    catch: (e): UpdateCheckFailed => ({
-      type: 'UpdateCheckFailed',
-      message: e instanceof Error ? e.message : String(e),
-    }),
+    catch: (e) =>
+      new UpdateCheckFailed({
+        message: e instanceof Error ? e.message : String(e),
+      }),
   });
 };
 
@@ -122,5 +125,5 @@ export const installUpdate = (): Effect.Effect<void, UpdateError> => {
   }
 
   updater.downloadUpdate();
-  return Effect.succeed();
+  return Effect.void;
 };

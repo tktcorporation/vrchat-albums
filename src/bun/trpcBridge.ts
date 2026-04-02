@@ -8,13 +8,19 @@
  *
  * 参照: electron/api.ts (tRPC ルーター定義)
  */
-import { createCallerFactory } from '@trpc/server';
+import { initTRPC } from '@trpc/server';
 import superjson from 'superjson';
 
 import { router } from '../../electron/api';
 import type { TRPCCallParams, TRPCCallResponse } from '../../shared/rpc/types';
 
-const createCaller = createCallerFactory()(router);
+/**
+ * tRPC の createCallerFactory は initTRPC 経由で取得する。
+ * @trpc/server の直接エクスポートには含まれないため。
+ */
+const t = initTRPC.create({ transformer: superjson });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const createCaller = t.createCallerFactory(router as any);
 
 /**
  * tRPC ブリッジを生成する。

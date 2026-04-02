@@ -8,7 +8,7 @@ process.env.npm_package_version ??= '0.0.0-test';
 import * as client from './electron/lib/sequelize';
 
 // @sentry/node のモック設定
-vi.mock<typeof import('@sentry/node')>('@sentry/node', () => ({
+vi.mock('@sentry/node', () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
   init: vi.fn(),
@@ -24,7 +24,7 @@ afterAll(async () => {
 });
 
 // Electrobun モジュールのモック
-vi.mock<typeof import('electrobun/bun')>('electrobun/bun', () => {
+vi.mock('electrobun/bun', () => {
   const mockUtils = {
     paths: {
       userData: '/tmp/test-user-data',
@@ -61,7 +61,9 @@ vi.mock<typeof import('electrobun/bun')>('electrobun/bun', () => {
     unminimize: vi.fn(),
     unmaximize: vi.fn(),
   });
-  mockBrowserWindow.getAllWindows = vi.fn().mockReturnValue([]);
+  (mockBrowserWindow as unknown as Record<string, unknown>).getAllWindows = vi
+    .fn()
+    .mockReturnValue([]);
 
   const mockBrowserView = {
     defineRPC: vi.fn().mockReturnValue({}),
@@ -86,7 +88,7 @@ vi.mock<typeof import('electrobun/bun')>('electrobun/bun', () => {
   };
 });
 
-vi.mock<typeof import('electrobun/view')>('electrobun/view', () => ({
+vi.mock('electrobun/view', () => ({
   Electroview: vi.fn().mockReturnValue({
     rpc: {
       request: {},
@@ -96,7 +98,7 @@ vi.mock<typeof import('electrobun/view')>('electrobun/view', () => ({
 }));
 
 // Electron モジュールのモック（後方互換性のため維持）
-vi.mock<typeof import('electron')>('electron', () => {
+vi.mock('electron', () => {
   const mockApp = {
     getPath: vi.fn(),
     getName: vi.fn(),

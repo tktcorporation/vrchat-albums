@@ -63,7 +63,10 @@ const electrobunLink: TRPCLink<AppRouter> = () => {
 
           if (response.error) {
             const parsedError = superjson.parse(response.error);
-            observer.error(new Error(parsedError.message));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            observer.error(
+              new Error((parsedError as { message?: string }).message) as any,
+            );
             return;
           }
 
@@ -73,8 +76,9 @@ const electrobunLink: TRPCLink<AppRouter> = () => {
           observer.next({ result: { type: 'data', data: result } });
           observer.complete();
         } catch (error) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           observer.error(
-            error instanceof Error ? error : new Error(String(error)),
+            (error instanceof Error ? error : new Error(String(error))) as any,
           );
         }
       };

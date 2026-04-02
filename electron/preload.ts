@@ -9,12 +9,13 @@
  */
 
 // このファイルをモジュールとして扱うための空エクスポート
+export {};
 
 // Electrobun 環境ではこのファイルは不要
 // Electron フォールバック用として型定義のみ維持
 declare global {
   interface Window {
-    Main: {
+    Main?: {
       sendErrorMessage: (message: string) => void;
       Minimize: () => void;
       Maximize: () => void;
@@ -22,7 +23,7 @@ declare global {
       on: (channel: string, callback: (data: unknown) => void) => void;
       removeAllListeners: (channel: string) => void;
     };
-    MyOn: {
+    MyOn?: {
       receiveStatusToUseVRChatLogFilesDir: (
         callback: (
           data:

@@ -83,7 +83,7 @@ describe('settingsController.initializeAppData', () => {
     mockLogger.warnWithSentry = vi.fn();
     mockLogger.error = vi.fn();
 
-    mockSequelizeClient.syncRDBClient = vi.fn().mockResolvedValue();
+    mockSequelizeClient.syncRDBClient = vi.fn().mockResolvedValue(undefined);
 
     mockVrchatWorldJoinLogService.findVRChatWorldJoinLogList = vi
       .fn()
@@ -395,7 +395,7 @@ describe('settingsController.initializeAppData', () => {
     }
 
     // エラー後に再実行可能
-    mockSequelizeClient.syncRDBClient.mockResolvedValue();
+    mockSequelizeClient.syncRDBClient.mockResolvedValue(undefined);
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
     }

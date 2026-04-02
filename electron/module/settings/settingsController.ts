@@ -164,7 +164,7 @@ export const settingsRouter = () =>
     checkForUpdatesAndReturnResult: procedure.query(
       async (): Promise<{
         isUpdateAvailable: boolean;
-        updateInfo: UpdateCheckResult | null;
+        updateInfo: UpdateCheckResult;
       }> => {
         const exit = await Effect.runPromiseExit(
           settingService.getElectronUpdaterInfo(),
@@ -412,7 +412,7 @@ export const settingsRouter = () =>
           message: 'Application data initialization failed',
           stack: match(error)
             .with(P.instanceOf(Error), (err) => err)
-            .otherwise(() => {}),
+            .otherwise(() => undefined),
         });
 
         // エラーメッセージを抽出

@@ -24,13 +24,13 @@ vi.mock('../../lib/wrappedApp', () => ({
 // node:fsのモック
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),
-  mkdirSync: vi.fn().mockReturnValue(),
+  mkdirSync: vi.fn().mockReturnValue(undefined),
   readdirSync: vi.fn().mockReturnValue([]),
   promises: {
-    mkdir: vi.fn().mockResolvedValue(),
-    writeFile: vi.fn().mockResolvedValue(),
-    unlink: vi.fn().mockResolvedValue(),
-    rmdir: vi.fn().mockResolvedValue(),
+    mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined),
+    rmdir: vi.fn().mockResolvedValue(undefined),
   },
   statSync: vi.fn().mockReturnValue({ size: 100 }),
 }));

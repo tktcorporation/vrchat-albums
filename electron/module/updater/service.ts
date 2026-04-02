@@ -13,7 +13,7 @@ import { BehaviorSubject } from 'rxjs';
 import { match } from 'ts-pattern';
 
 import { logger } from '../../lib/logger';
-import type { UpdateCheckFailed } from './errors';
+import { UpdateCheckFailed } from './errors';
 
 /**
  * Electrobun Updater モジュールを遅延取得する。
@@ -73,7 +73,7 @@ export class UpdaterService {
     const updater = getUpdater();
     if (!updater) {
       logger.debug('checkForUpdates: Updater not available');
-      return Effect.succeed();
+      return Effect.void;
     }
 
     return Effect.tryPromise({
@@ -86,10 +86,11 @@ export class UpdaterService {
           updater.downloadUpdate();
         }
       },
-      catch: (e): UpdateCheckFailed => ({
-        type: 'UpdateCheckFailed',
-        message: e instanceof Error ? e.message : String(e),
-      }),
+      catch: (e) =>
+        new UpdateCheckFailed({
+          message: e instanceof Error ? e.message : String(e),
+          cause: e,
+        }),
     });
   }
 

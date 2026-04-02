@@ -12,12 +12,12 @@ import {
 // node:fs/promisesをモック（キャッシュ機能で使用）
 vi.mock('node:fs/promises', () => ({
   stat: vi.fn().mockRejectedValue(new Error('ENOENT: no such file')),
-  mkdir: vi.fn().mockResolvedValue(),
+  mkdir: vi.fn().mockResolvedValue(undefined),
   readFile: vi.fn().mockRejectedValue(new Error('ENOENT: no such file')),
-  writeFile: vi.fn().mockResolvedValue(),
+  writeFile: vi.fn().mockResolvedValue(undefined),
   readdir: vi.fn().mockResolvedValue([]),
-  unlink: vi.fn().mockResolvedValue(),
-  rename: vi.fn().mockResolvedValue(),
+  unlink: vi.fn().mockResolvedValue(undefined),
+  rename: vi.fn().mockResolvedValue(undefined),
 }));
 
 // electronをモック
@@ -55,7 +55,7 @@ describe('vrchatPhoto.service', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     // mkdir モックを再設定（ensureCacheDir で使用）
-    vi.mocked(fsPromises.mkdir).mockResolvedValue();
+    vi.mocked(fsPromises.mkdir).mockResolvedValue(undefined);
     // stat モックのデフォルト設定（ENOENT = キャッシュミス）
     const enoentError = new Error('ENOENT') as Error & { code: string };
     enoentError.code = 'ENOENT';
@@ -64,7 +64,7 @@ describe('vrchatPhoto.service', () => {
     // biome-ignore lint/suspicious/noExplicitAny: Mock return type
     vi.mocked(fsPromises.readdir).mockResolvedValue([] as any);
     // unlink モックのデフォルト設定
-    vi.mocked(fsPromises.unlink).mockResolvedValue();
+    vi.mocked(fsPromises.unlink).mockResolvedValue(undefined);
 
     // readFile モックのデフォルト設定（画像データを返す）
     vi.mocked(fsPromises.readFile).mockResolvedValue(
@@ -340,7 +340,7 @@ describe('vrchatPhoto.service', () => {
       // 最初のファイル削除は失敗するように設定
       mockUnlink
         .mockRejectedValueOnce(new Error('Permission denied'))
-        .mockResolvedValue();
+        .mockResolvedValue(undefined);
 
       // エラーにならずに完了することを確認
       await expect(cleanupThumbnailCache()).resolves.toBeUndefined();
@@ -553,7 +553,7 @@ describe('vrchatPhoto.service', () => {
       });
 
       // mkdir モックを設定（ensureCacheDir で使用）
-      mockMkdir.mockResolvedValue();
+      mockMkdir.mockResolvedValue(undefined);
 
       // キャッシュミスを強制（ENOENT）
       const enoentError = new Error('ENOENT') as Error & { code: string };
@@ -642,7 +642,7 @@ describe('vrchatPhoto.service', () => {
       });
 
       // mkdir モックを設定（ensureCacheDir で使用）
-      mockMkdir.mockResolvedValue();
+      mockMkdir.mockResolvedValue(undefined);
 
       // キャッシュミスを強制（ENOENT）
       const enoentError = new Error('ENOENT') as Error & { code: string };
@@ -678,7 +678,9 @@ describe('vrchatPhoto.service', () => {
       const cacheFailureWarning = loggerWarnSpy.mock.calls.find(
         (call) =>
           typeof call[0] === 'object' &&
-          call[0].message?.includes('Thumbnail cache has failed'),
+          (call[0] as { message?: string }).message?.includes(
+            'Thumbnail cache has failed',
+          ),
       );
       expect(cacheFailureWarning).toBeDefined();
 
@@ -722,7 +724,9 @@ describe('vrchatPhoto.service', () => {
       const cacheFailureWarning = loggerWarnSpy.mock.calls.find(
         (call) =>
           typeof call[0] === 'object' &&
-          call[0].message?.includes('Thumbnail cache has failed'),
+          (call[0] as { message?: string }).message?.includes(
+            'Thumbnail cache has failed',
+          ),
       );
       expect(cacheFailureWarning).toBeUndefined();
 
