@@ -8,6 +8,7 @@
  * 参照: .claude/rules/electron-import.md
  * 不要になれば: electrobunCompat を直接利用するよう各呼び出し元を修正して削除可能
  */
+import * as autoLaunch from '../module/autoLaunch/service';
 import * as compat from './electrobunCompat';
 
 /**
@@ -19,19 +20,8 @@ export const getApp = () => ({
   isPackaged: compat.isPackaged(),
   quit: compat.quit,
   name: 'VRChatAlbums',
-  /**
-   * ログイン時起動設定の取得（Electrobun 未対応スタブ）。
-   * TODO: Electrobun の自動起動 API が提供された場合に実装
-   */
-  getLoginItemSettings: () => ({ openAtLogin: false }),
-  setLoginItemSettings: (_settings: {
-    openAtLogin: boolean;
-    openAsHidden?: boolean;
-  }) => {
-    console.warn(
-      '[electrobunCompat] setLoginItemSettings is not supported in Electrobun',
-    );
-  },
+  getLoginItemSettings: autoLaunch.getLoginItemSettings,
+  setLoginItemSettings: autoLaunch.setLoginItemSettings,
 });
 
 /**

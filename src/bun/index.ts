@@ -9,9 +9,9 @@
  */
 import { BrowserView, BrowserWindow } from 'electrobun/bun';
 
-import type { AppRPCSchema } from '../../shared/rpc/types';
 import { setTimeEventEmitter } from '../../electron/electronUtil';
 import { getSettingStore } from '../../electron/module/settingStore';
+import type { AppRPCSchema } from '../../shared/rpc/types';
 import { initializeApp } from './appInit';
 import { setupApplicationMenu } from './menu';
 import { setupTray } from './tray';
