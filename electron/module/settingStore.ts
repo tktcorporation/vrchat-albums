@@ -1,8 +1,25 @@
 import { Data, Effect } from 'effect';
-import type { Rectangle } from 'electron';
-import Store from 'electron-store';
 import { match, P } from 'ts-pattern';
 import { z } from 'zod';
+
+import { JsonStore } from '../lib/jsonStore';
+
+/**
+ * Electron の Rectangle 型の代替。
+ * ウィンドウの位置とサイズを表す。
+ */
+interface Rectangle {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * electron-store の API 互換ラッパー型。
+ * JsonStore を electron-store と同じインターフェースで使用するために定義。
+ */
+type Store = JsonStore;
 
 import { FolderDigestSchema } from '../lib/brandedTypes';
 
@@ -257,7 +274,7 @@ import {
 
 let settingStore: ReturnType<typeof setSettingStore> | null = null;
 const setSettingStore = (name: StoreName) => {
-  const store = new Store({ name });
+  const store = new JsonStore({ name });
   const { get, set } = {
     get: getValue(store),
     set: setValue(store),
@@ -315,7 +332,7 @@ const setSettingStore = (name: StoreName) => {
             'height' in b,
           (b) => b,
         )
-        .otherwise(() => undefined);
+        .otherwise(() => {});
     },
     getTermsAccepted: getTermsAccepted(getB),
     setTermsAccepted: setTermsAccepted(set),
@@ -396,7 +413,7 @@ const getSettingStore = () => {
 };
 
 export interface SettingStore {
-  __store: Store;
+  __store: JsonStore;
   getLogFilesDir: () => string | null;
   setLogFilesDir: (dirPath: string) => void;
   getVRChatPhotoDir: () => string | null;

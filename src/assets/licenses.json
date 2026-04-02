@@ -69,13 +69,6 @@
     "path": "node_modules/@sentry/cli",
     "licenseFile": "node_modules/@sentry/cli/LICENSE"
   },
-  "@sentry/electron@7.5.0": {
-    "licenses": "MIT",
-    "repository": "https://github.com/getsentry/sentry-electron",
-    "publisher": "Sentry",
-    "path": "node_modules/@sentry/electron",
-    "licenseFile": "node_modules/@sentry/electron/LICENSE"
-  },
   "@sentry/vite-plugin@4.7.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
@@ -184,37 +177,12 @@
     "path": "node_modules/effect",
     "licenseFile": "node_modules/effect/LICENSE"
   },
-  "electron-log@5.4.3": {
+  "electrobun@1.16.0": {
     "licenses": "MIT",
-    "repository": "https://github.com/megahertz/electron-log",
-    "publisher": "Alexey Prokhorov",
-    "path": "node_modules/electron-log",
-    "licenseFile": "node_modules/electron-log/LICENSE"
-  },
-  "electron-store@8.2.0": {
-    "licenses": "MIT",
-    "repository": "https://github.com/sindresorhus/electron-store",
-    "publisher": "Sindre Sorhus",
-    "email": "sindresorhus@gmail.com",
-    "url": "https://sindresorhus.com",
-    "path": "node_modules/electron-store",
-    "licenseFile": "node_modules/electron-store/license"
-  },
-  "electron-unhandled@4.0.1": {
-    "licenses": "MIT",
-    "repository": "https://github.com/sindresorhus/electron-unhandled",
-    "publisher": "Sindre Sorhus",
-    "email": "sindresorhus@gmail.com",
-    "url": "https://sindresorhus.com",
-    "path": "node_modules/electron-unhandled",
-    "licenseFile": "node_modules/electron-unhandled/license"
-  },
-  "electron-updater@6.6.2": {
-    "licenses": "MIT",
-    "repository": "https://github.com/electron-userland/electron-builder",
-    "publisher": "Vladimir Krivosheev",
-    "path": "node_modules/electron-updater",
-    "licenseFile": "node_modules/electron-updater/LICENSE"
+    "repository": "https://github.com/blackboardsh/electrobun",
+    "publisher": "Blackboard Technologies Inc.",
+    "path": "node_modules/electrobun",
+    "licenseFile": "node_modules/electrobun/README.md"
   },
   "exiftool-vendored@34.3.0": {
     "licenses": "MIT",
@@ -350,12 +318,6 @@
     "path": "node_modules/tailwindcss",
     "licenseFile": "node_modules/tailwindcss/LICENSE"
   },
-  "trpc-electron@0.1.2": {
-    "licenses": "MIT",
-    "publisher": "Mat Sz",
-    "email": "contact@matsz.dev",
-    "path": "node_modules/trpc-electron"
-  },
   "ts-pattern@5.9.0": {
     "licenses": "MIT",
     "repository": "https://github.com/gvergnaud/ts-pattern",
@@ -392,7 +354,7 @@
     "path": "node_modules/vite",
     "licenseFile": "node_modules/vite/LICENSE.md"
   },
-  "vrchat-albums@0.27.0": {
+  "vrchat-albums@0.28.0": {
     "licenses": "Custom: https://github.com/tktcorporation/vrchat-albums/releases",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",

@@ -13,8 +13,8 @@ import {
 // fs.writeFile をモック
 vi.mock('fs', () => ({
   promises: {
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    mkdir: vi.fn().mockResolvedValue(undefined),
+    writeFile: vi.fn().mockResolvedValue(),
+    mkdir: vi.fn().mockResolvedValue(),
   },
 }));
 
@@ -22,8 +22,8 @@ describe('exportService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // モック関数のデフォルト戻り値を再設定
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.writeFile).mockResolvedValue();
+    vi.mocked(fs.mkdir).mockResolvedValue();
   });
 
   describe('getLogStoreExportPath', () => {

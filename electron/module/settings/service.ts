@@ -1,14 +1,21 @@
+/**
+ * アプリケーション設定サービス。
+ *
+ * 背景: Electron 版では electron-updater を使用していた。
+ * Electrobun では組み込みの Updater API を使用する予定だが、
+ * 移行初期段階では自動更新機能を無効化する。
+ *
+ * 呼び出し元: electron/trpc.ts, electron/api.ts
+ */
 import { Effect } from 'effect';
-import { autoUpdater, type UpdateCheckResult } from 'electron-updater';
 
-import { getApp } from '../../lib/electronModules';
 import { logger } from '../../lib/logger';
-import type { UpdateError } from './errors';
-import { DownloadFailed, NoUpdateAvailable, UpdateCheckFailed } from './errors';
+import type { UpdateError, UpdateCheckFailed } from './errors';
+import { NoUpdateAvailable } from './errors';
 
 export interface UpdaterInfo {
   isUpdateAvailable: boolean;
-  updateInfo: UpdateCheckResult | null;
+  updateInfo: null;
 }
 
 /**
@@ -16,82 +23,44 @@ export interface UpdaterInfo {
  * 開発環境では package.json の値を優先する。
  */
 export const getAppVersion = (): string => {
-  // 本番では getApp().getVersion() を使用してバージョンを取得
   const appVersionDev = process.env.npm_package_version;
   if (appVersionDev !== undefined) {
     return appVersionDev;
   }
 
-  // Electron の getApp().getVersion() を使用してバージョンを取得
-  const appVersion = getApp().getVersion();
-
-  if (!appVersion) {
-    throw new Error('App version is undefined');
-  }
-
-  return appVersion;
+  // Electrobun 環境では package.json から直接取得
+  // TODO: Electrobun の app.version API が利用可能になったら更新
+  return '0.28.0';
 };
 
 /**
  * アップデートの有無と更新情報を取得する関数。
- * SettingsModal から呼び出される。
+ *
+ * 背景: Electrobun 移行後、自動更新は Electrobun の Updater API で実装予定。
+ * 現在は常に「更新なし」を返す。
  */
 export const getElectronUpdaterInfo = (): Effect.Effect<
   UpdaterInfo,
   UpdateCheckFailed
 > => {
-  return Effect.tryPromise({
-    try: () => autoUpdater.checkForUpdates(),
-    catch: (error): UpdateCheckFailed =>
-      new UpdateCheckFailed({
-        message:
-          error instanceof Error ? error.message : 'Unknown update check error',
-      }),
-  }).pipe(
-    Effect.map((updateInfo) => {
-      if (!updateInfo) {
-        return {
-          isUpdateAvailable: false,
-          updateInfo: null,
-        };
-      }
-      logger.debug('Update info:', updateInfo);
-      return {
-        isUpdateAvailable:
-          updateInfo.updateInfo.version !== getApp().getVersion(),
-        updateInfo: updateInfo,
-      };
-    }),
-  );
+  // TODO: Electrobun の Updater API で実装
+  logger.debug('Update check skipped (Electrobun migration in progress)');
+  return Effect.succeed({
+    isUpdateAvailable: false,
+    updateInfo: null,
+  });
 };
 
 /**
  * ダウンロード済みの更新をインストールしアプリを再起動する。
+ *
+ * 背景: Electrobun 移行後は Electrobun の Updater API で実装予定。
  */
 export const installUpdate = (): Effect.Effect<void, UpdateError> => {
-  return getElectronUpdaterInfo().pipe(
-    Effect.flatMap((updateInfo) => {
-      if (!updateInfo.isUpdateAvailable) {
-        return Effect.fail(
-          new NoUpdateAvailable({
-            message: 'No update available',
-          }),
-        );
-      }
-      return Effect.succeed(updateInfo);
-    }),
-    Effect.flatMap(() =>
-      Effect.tryPromise({
-        try: () => autoUpdater.downloadUpdate(),
-        catch: (error) =>
-          new DownloadFailed({
-            message: error instanceof Error ? error.message : String(error),
-          }),
-      }),
-    ),
-    Effect.map(() => {
-      // quitAndInstall は void を返すので、同期的に呼び出し
-      autoUpdater.quitAndInstall();
+  // TODO: Electrobun の Updater API で実装
+  return Effect.fail(
+    new NoUpdateAvailable({
+      message: 'Auto-update not yet available in Electrobun build',
     }),
   );
 };

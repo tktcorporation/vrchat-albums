@@ -3,7 +3,6 @@ import * as fs from 'node:fs';
 import { Transformer } from '@napi-rs/image';
 import { Resvg } from '@resvg/resvg-js';
 import { Effect } from 'effect';
-import type Electron from 'electron';
 import * as path from 'pathe';
 
 import type { ImageGenerationError } from './errors';
@@ -33,17 +32,19 @@ const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
   }
 
   const fontsDir = (() => {
-    // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
+    // effect-lint-allow-try-catch: Electrobun 互換パターン
     try {
-      const { app } = require('electron') as typeof Electron;
+      const compat = require('../../lib/electrobunCompat');
+      const isProduction = compat.isPackaged();
       return path.join(
-        app.isPackaged
-          ? process.resourcesPath
+        isProduction
+          ? ((process as unknown as Record<string, string>).resourcesPath ??
+              path.join(__dirname, '../../resources'))
           : path.join(__dirname, '../../resources'),
         'fonts',
       );
     } catch {
-      // テスト環境または非 Electron コンテキスト
+      // テスト環境または非 Electrobun コンテキスト
       return path.join(__dirname, '../../resources/fonts');
     }
   })();

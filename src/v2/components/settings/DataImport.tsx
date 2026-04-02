@@ -36,6 +36,7 @@ const getFilenameFromPath = (filePath: string): string => {
   const parts = filePath.split(/[/\\]/);
   const filename = parts.at(-1);
   // If filename is empty (path ends with separator), try the second to last part
+  // oxlint-disable-next-line prefer-nullish-coalescing -- 空文字をfalsyとして扱う必要があるため || を使用
   return filename || parts.at(-2) || filePath;
 };
 

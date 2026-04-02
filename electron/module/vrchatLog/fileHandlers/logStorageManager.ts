@@ -165,7 +165,7 @@ export const appendLoglinesToFile = (props: {
   dedupCache?: DedupCache;
 }): Effect.Effect<void> => {
   if (props.logLines.length === 0) {
-    return Effect.succeed(undefined);
+    return Effect.succeed();
   }
 
   return Effect.gen(function* () {

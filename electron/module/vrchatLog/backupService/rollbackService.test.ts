@@ -49,7 +49,7 @@ vi.mock('../../../lib/dbQueue', () => ({
   getDBQueue: vi.fn(() => ({
     transaction: vi.fn((callback: (t: unknown) => Promise<unknown>) => {
       return Effect.tryPromise({
-        try: () => callback(undefined),
+        try: () => callback(),
         catch: (e) => {
           throw e;
         },
@@ -136,7 +136,7 @@ describe('rollbackService', () => {
       // バックアップ状態更新
       vi.mocked(
         backupServiceModule.backupService['updateBackupMetadata'],
-      ).mockReturnValue(Effect.succeed(undefined));
+      ).mockReturnValue(Effect.succeed());
 
       await Effect.runPromise(rollbackService.rollbackToBackup(mockBackup));
 
@@ -404,7 +404,7 @@ describe('rollbackService', () => {
       );
       vi.mocked(
         backupServiceModule.backupService['updateBackupMetadata'],
-      ).mockReturnValue(Effect.succeed(undefined));
+      ).mockReturnValue(Effect.succeed());
 
       await Effect.runPromise(rollbackService.rollbackToBackup(mockBackup));
       // fs.rmがforce: trueで呼ばれることを確認

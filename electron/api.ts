@@ -137,7 +137,7 @@ export const router = trpcRouter({
       await runEffect(
         clearEffect.pipe(
           // SettingStoreError は silent（設定削除失敗は致命的ではない）
-          Effect.catchAll(() => Effect.succeed(undefined)),
+          Effect.catchAll(() => Effect.succeed()),
         ),
       );
       ee.emit('toast', '設定を削除しました');
@@ -197,7 +197,7 @@ export const router = trpcRouter({
         Effect.catchAll((e) => {
           if (e === 'canceled') {
             // キャンセルは silent（ユーザーの意図的な操作）
-            return Effect.succeed(undefined);
+            return Effect.succeed();
           }
           return Effect.fail(
             UserFacingError.withStructuredInfo({

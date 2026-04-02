@@ -80,8 +80,8 @@ describe('backupService', () => {
       vi.mocked(exportServiceModule.exportLogStoreFromDB).mockReturnValue(
         Effect.succeed(mockExportResult),
       );
-      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockResolvedValue();
+      vi.mocked(fs.mkdir).mockResolvedValue();
 
       const backup = await Effect.runPromise(
         backupService.createPreImportBackup(mockGetDBLogs),
@@ -149,8 +149,8 @@ describe('backupService', () => {
         exportedFiles: ['logStore-2023-11.txt'],
       };
 
-      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+      vi.mocked(fs.mkdir).mockResolvedValue();
+      vi.mocked(fs.writeFile).mockResolvedValue();
 
       await Effect.runPromise(backupService.updateBackupMetadata(metadata));
       expect(fs.writeFile).toHaveBeenCalledWith(
@@ -173,7 +173,7 @@ describe('backupService', () => {
     });
 
     it('バックアップ履歴を取得できる', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.access).mockResolvedValue();
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: 'vrchat-albums-export_2023-12-01_14-30-45',
@@ -248,7 +248,7 @@ describe('backupService', () => {
     });
 
     it('メタデータ読み込みに失敗したバックアップはスキップする', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.access).mockResolvedValue();
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: 'vrchat-albums-export_2023-12-01_14-30-45',
@@ -286,7 +286,7 @@ describe('backupService', () => {
       };
 
       // getBackupHistoryのモック設定
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.access).mockResolvedValue();
       vi.mocked(fs.readdir).mockResolvedValue([
         {
           name: 'vrchat-albums-export_2023-12-01_14-30-45',
@@ -308,7 +308,7 @@ describe('backupService', () => {
     });
 
     it('バックアップが見つからない場合はエラーを返す', async () => {
-      vi.mocked(fs.access).mockResolvedValue(undefined);
+      vi.mocked(fs.access).mockResolvedValue();
       vi.mocked(fs.readdir).mockResolvedValue([]);
 
       const exit = await Effect.runPromiseExit(

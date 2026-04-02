@@ -14,10 +14,10 @@ vi.mock('../../lib/wrappedApp', () => ({
 vi.mock('../../lib/wrappedFs', () => {
   return {
     existsSyncSafe: vi.fn().mockReturnValue(false),
-    mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
-    appendFileAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
-    writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed(undefined)),
-    unlinkAsync: vi.fn().mockReturnValue(Effect.succeed(undefined)),
+    mkdirSyncSafe: vi.fn().mockReturnValue(Effect.succeed()),
+    appendFileAsync: vi.fn().mockReturnValue(Effect.succeed()),
+    writeFileSyncSafe: vi.fn().mockReturnValue(Effect.succeed()),
+    unlinkAsync: vi.fn().mockReturnValue(Effect.succeed()),
     readFileSyncSafe: vi
       .fn()
       .mockReturnValue(Effect.succeed(Buffer.from('test content'))),

@@ -1,46 +1,38 @@
+/**
+ * 自動アップデート機能を管理するサービス（Electrobun 互換版）。
+ *
+ * 背景: Electron 版では electron-updater を使用していた。
+ * Electrobun では組み込みの Updater API を使用する予定だが、
+ * 移行初期段階では自動更新機能を無効化する。
+ *
+ * TODO: Electrobun の Updater API で実装
+ *
+ * @see electron/module/updater/router.ts - tRPC ルーター
+ */
 import { Effect } from 'effect';
-import { autoUpdater } from 'electron-updater';
 import { BehaviorSubject } from 'rxjs';
 
 import { logger } from '../../lib/logger';
-import { UpdateCheckFailed } from './errors';
-
-/**
- * Electron自動アップデート機能を管理するサービス。
- *
- * @see docs/error-handling.md - エラーハンドリング設計
- * @see electron/module/updater/router.ts - tRPCルーター
- */
+import type { UpdateCheckFailed } from './errors';
 
 export class UpdaterService {
   private updateDownloaded = new BehaviorSubject<boolean>(false);
 
   constructor() {
-    this.initializeAutoUpdater();
-  }
-
-  private initializeAutoUpdater() {
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-
-    autoUpdater.on('update-downloaded', () => {
-      this.updateDownloaded.next(true);
-    });
+    logger.debug(
+      'UpdaterService initialized (Electrobun stub - auto-update disabled)',
+    );
   }
 
   public checkForUpdates(): Effect.Effect<void, UpdateCheckFailed> {
-    return Effect.tryPromise({
-      try: () => autoUpdater.checkForUpdates(),
-      catch: (error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(`アップデートの確認中にエラーが発生しました: ${message}`);
-        return new UpdateCheckFailed({ message, cause: error });
-      },
-    }).pipe(Effect.map(() => {}));
+    // TODO: Electrobun の Updater API で実装
+    logger.debug('checkForUpdates called (Electrobun stub)');
+    return Effect.succeed();
   }
 
   public async quitAndInstall() {
-    autoUpdater.quitAndInstall();
+    // TODO: Electrobun の Updater API で実装
+    logger.debug('quitAndInstall called (Electrobun stub)');
   }
 
   public getUpdateDownloaded() {

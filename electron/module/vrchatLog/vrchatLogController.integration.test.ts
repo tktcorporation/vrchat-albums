@@ -198,7 +198,7 @@ vi.mock('./backupService/backupService', async (importOriginal) => {
         if (index !== -1) {
           backupHistory[index] = backup;
         }
-        return Effect.succeed(undefined);
+        return Effect.succeed();
       }),
     },
   };
@@ -216,7 +216,7 @@ vi.mock('./backupService/rollbackService', async () => {
         if (index !== -1) {
           backupHistory[index].status = 'rolled_back';
         }
-        return Effect.succeed(undefined);
+        return Effect.succeed();
       }),
     },
   };
@@ -263,7 +263,7 @@ vi.mock('../fileHandlers/logStorageManager', () => {
       const logStoreDir = path.join(testUserDataDir, 'logStore');
 
       if (logLines.length === 0) {
-        return Effect.succeed(undefined);
+        return Effect.succeed();
       }
 
       // Parse log lines to extract world and player join data
@@ -333,7 +333,7 @@ vi.mock('../fileHandlers/logStorageManager', () => {
         .join('\n')}\n`;
       fs.appendFileSync(filePath, content);
 
-      return Effect.succeed(undefined);
+      return Effect.succeed();
     }),
   };
 });

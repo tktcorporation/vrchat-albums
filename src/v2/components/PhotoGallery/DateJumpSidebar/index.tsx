@@ -63,7 +63,7 @@ export const DateJumpSidebar: FC<DateJumpSidebarProps> = ({
   const [isScrolling, setIsScrolling] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [hoverY, setHoverY] = useState<number | null>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | undefined>();
 
   // スクロール状態の検知
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { Cause, Effect, Exit, Option } from 'effect';
-import type { UpdateCheckResult } from 'electron-updater';
+// Electrobun 移行: electron-updater は不要。型はインラインで定義。
+type UpdateCheckResult = unknown;
 import { match, P } from 'ts-pattern';
 
 import { reloadMainWindow } from '../../electronUtil';
@@ -310,18 +311,19 @@ export const settingsRouter = () =>
           logger.info(
             'Step 3.5: Setting default auto-start enabled for first launch...',
           );
-          await import('electron')
-            .then(({ app }) => {
-              app.setLoginItemSettings({
-                openAtLogin: true,
-                openAsHidden: true,
-              });
-              logger.info('Auto-start enabled by default for first launch');
-            })
-            .catch((error) => {
-              logger.warn('Failed to set default auto-start:', error);
-              // 自動起動の設定に失敗してもアプリの初期化は続行
+          // Electrobun 互換: getApp() 経由で自動起動設定
+          // effect-lint-allow-try-catch: ランタイム環境検出パターン
+          try {
+            const { getApp } = require('../../lib/electronModules');
+            getApp().setLoginItemSettings({
+              openAtLogin: true,
+              openAsHidden: true,
             });
+            logger.info('Auto-start enabled by default for first launch');
+          } catch (error) {
+            logger.warn('Failed to set default auto-start:', error);
+            // 自動起動の設定に失敗してもアプリの初期化は続行
+          }
         } else if (isFirstLaunch && process.env.PLAYWRIGHT_TEST) {
           logger.info('Step 3.5: Skipping auto-start setup in Playwright test');
         }
@@ -410,7 +412,7 @@ export const settingsRouter = () =>
           message: 'Application data initialization failed',
           stack: match(error)
             .with(P.instanceOf(Error), (err) => err)
-            .otherwise(() => undefined),
+            .otherwise(() => {}),
         });
 
         // エラーメッセージを抽出

@@ -129,7 +129,7 @@ export const ShareDialog = ({
     }
     await downloadOrCopyImageAsPng({
       pngBase64: previewBase64,
-      filenameWithoutExt: worldName || 'image',
+      filenameWithoutExt: worldName ?? 'image',
       downloadOrCopyMutation: {
         mutateAsync: async (params) => {
           await copyImageMutation.mutateAsync(params);
@@ -196,7 +196,7 @@ export const ShareDialog = ({
                         {previewBase64 && (
                           <img
                             src={`data:image/png;base64,${previewBase64}`}
-                            alt={worldName || 'Preview'}
+                            alt={worldName ?? 'Preview'}
                             className="h-96	 max-h-full w-auto"
                           />
                         )}

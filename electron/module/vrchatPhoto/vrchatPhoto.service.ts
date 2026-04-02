@@ -7,7 +7,16 @@ import { performance } from 'node:perf_hooks';
 import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
-import type Electron from 'electron';
+/**
+ * Electron の app モジュールに相当する互換インターフェース。
+ * Electrobun 移行後、electron パッケージの型を直接参照できないため定義。
+ */
+interface ElectronAppCompat {
+  getPath: (name: string) => string;
+  isPackaged: boolean;
+  quit: () => void;
+  name: string;
+}
 import { xxhash128 } from 'hash-wasm';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
@@ -74,29 +83,33 @@ let consecutiveCacheFailures = 0;
  *
  * @returns Electron appモジュール、または利用不可時はnull
  */
-const getElectronApp = (): typeof Electron.app | null => {
+const getElectronApp = (): ElectronAppCompat | null => {
   // テスト環境ではElectronを試行しない（想定された動作）
   if (isTestEnvironment()) {
     logger.debug('Test environment detected, skipping Electron module');
     return null;
   }
 
-  // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
+  // Electrobun 互換: electrobunCompat 経由で app 互換オブジェクトを取得
+  // effect-lint-allow-try-catch: ランタイム環境検出パターン
   try {
-    const { app } = require('electron') as typeof Electron;
-    return app;
+    const compat = require('../../lib/electrobunCompat');
+    return {
+      getPath: compat.getPath,
+      isPackaged: compat.isPackaged(),
+      quit: compat.quit,
+      name: 'VRChatAlbums',
+    } as unknown as ElectronAppCompat;
   } catch (error) {
-    // 開発/プロダクション環境でのElectronロード失敗は予期しない
-    // Sentryに送信して問題を検知できるようにする
     if (process.env.NODE_ENV === 'production') {
       logger.error({
-        message: 'Failed to load Electron app module in production environment',
+        message:
+          'Failed to load Electrobun compat module in production environment',
         stack: error instanceof Error ? error : new Error(String(error)),
       });
     } else {
-      // 開発環境では警告レベル（Electronなしでの動作確認時など）
       logger.warn({
-        message: 'Electron app module not available, using fallback paths',
+        message: 'Electrobun compat module not available, using fallback paths',
         stack: error instanceof Error ? error : new Error(String(error)),
       });
     }

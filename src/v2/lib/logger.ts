@@ -15,7 +15,6 @@
  * ```
  */
 
-import * as Sentry from '@sentry/electron/renderer';
 import { match, P } from 'ts-pattern';
 
 interface LogParams {
@@ -120,22 +119,8 @@ const warn = (params: LogParams | string): void => {
 const error = (params: LogParams | string): void => {
   log('error', params, console.error);
 
-  // Sentry にエラーを送信
-  match(params)
-    .with(P.string, (msg) => {
-      Sentry.captureMessage(msg, 'error');
-    })
-    .otherwise((p) => {
-      const errorToSend = p.error
-        ? normalizeError(p.error)
-        : new Error(p.message);
-      Sentry.captureException(errorToSend, {
-        extra: {
-          ...p.details,
-          originalMessage: p.message,
-        },
-      });
-    });
+  // TODO: @sentry/browser への移行後に Sentry 送信を復活
+  // Electrobun 移行中のため、Sentry 送信は無効化
 };
 
 export const logger = {

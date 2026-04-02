@@ -1,51 +1,60 @@
-import { captureException, captureMessage } from '@sentry/electron/main';
-import { Effect, Either } from 'effect';
-import type Electron from 'electron';
-import * as log from 'electron-log';
-import path from 'pathe';
+import fs from 'node:fs';
+import path from 'node:path';
+
+/**
+ * アプリケーションロガー。
+ *
+ * 背景: Electron 版では electron-log + @sentry/electron を使用していた。
+ * Electrobun 移行後は consola（既存依存）+ ファイル出力に置き換え。
+ * Sentry 連携は @sentry/node への移行が必要（将来対応）。
+ *
+ * 不要になれば: Sentry 移行完了後にこのファイルを更新
+ */
+import { createConsola } from 'consola';
 import { stackWithCauses } from 'pony-cause';
 import { match, P } from 'ts-pattern';
 
-import { getSettingStore } from '../module/settingStore';
-import { UserFacingError } from './errors';
-
-// ログファイルパスを遅延評価する
+/**
+ * ログファイルのパスを取得する。
+ * Electrobun の Utils.paths.userLogs が利用可能であれば使用、
+ * そうでなければフォールバック。
+ */
 const getLogFilePath = (): string => {
-  // effect-lint-allow-try-catch: Electron 環境検出パターン
   try {
-    const { app } = require('electron') as typeof Electron;
-    return path.join(app.getPath('logs'), 'app.log');
+    // Electrobun 環境
+    const { Utils } = require('electrobun/bun');
+    return path.join(Utils.paths.userLogs, 'app.log');
   } catch {
-    // テストまたは非Electron環境
+    // テストまたは非 Electrobun 環境
     return path.join(__dirname, 'test-app.log');
   }
 };
 
 const logFilePath = getLogFilePath();
 
-log.transports.file.resolvePathFn = () => logFilePath;
+// ログディレクトリの作成
+try {
+  fs.mkdirSync(path.dirname(logFilePath), { recursive: true });
+} catch {
+  // ディレクトリが既に存在する場合は無視
+}
 
-// ファイルサイズの上限設定（例: 5MB）
-log.transports.file.maxSize = 5 * 1024 * 1024;
+const consola = createConsola({
+  level: process.env.NODE_ENV === 'production' ? 3 : 4, // info : debug
+});
 
-// ログレベルの設定
-const getIsProduction = (): boolean => {
-  // effect-lint-allow-try-catch: Electron 環境検出パターン
+/**
+ * ファイルにログを追記する内部関数。
+ */
+const writeToFile = (level: string, message: string): void => {
+  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const line = `${timestamp} [${level}] ${message}\n`;
   try {
-    const { app } = require('electron') as typeof Electron;
-    return app.isPackaged;
+    fs.appendFileSync(logFilePath, line, 'utf8');
   } catch {
-    return false;
+    // ファイル書き込みに失敗してもクラッシュしない
   }
 };
-
-const isProduction = getIsProduction();
-log.transports.file.level = isProduction ? 'info' : 'debug';
-log.transports.console.level = isProduction ? 'warn' : 'debug';
-
-// ログフォーマットの設定
-log.transports.file.format = '{y}-{m}-{d} {h}:{i}:{s} [{level}] {text}';
-log.transports.console.format = '{y}-{m}-{d} {h}:{i}:{s} [{level}] {text}';
 
 interface ErrorLogParams {
   message: unknown;
@@ -55,7 +64,6 @@ interface ErrorLogParams {
 
 /**
  * 受け取ったメッセージを Error オブジェクトに変換するユーティリティ。
- * buildErrorInfo や error 関数から利用される。
  */
 const normalizeError = (message: unknown): Error => {
   return match(message)
@@ -63,106 +71,44 @@ const normalizeError = (message: unknown): Error => {
     .otherwise((m) => new Error(String(m)));
 };
 
-/**
- * stack 情報を含めたエラーオブジェクトを生成するヘルパー。
- * Sentry 送信前の整形処理で使用される。
- */
-const buildErrorInfo = ({ message, stack }: ErrorLogParams): Error => {
-  const baseError = match(message)
-    .with(P.instanceOf(Error), (e) => e)
-    .otherwise((m) => normalizeError(m));
-
-  return match(stack)
-    .with(undefined, () => baseError)
-    .otherwise((s) => {
-      // Original errorのプロパティを保持しつつstackを更新
-      const errorInfo = Object.create(
-        Object.getPrototypeOf(baseError) as object | null,
-      ) as Error;
-      Object.assign(errorInfo, baseError, {
-        name: baseError.name,
-        message: baseError.message,
-        stack: s.stack,
-        cause: baseError.cause ?? s,
-      });
-
-      return errorInfo;
-    });
+const info = (...args: unknown[]): void => {
+  const msg = args.map(String).join(' ');
+  consola.info(msg);
+  writeToFile('info', msg);
 };
 
-const info: typeof log.info = log.info.bind(log);
-const debug: typeof log.debug = log.debug.bind(log);
-const warn: typeof log.warn = log.warn.bind(log);
+const debug = (...args: unknown[]): void => {
+  const msg = args.map(String).join(' ');
+  consola.debug(msg);
+  writeToFile('debug', msg);
+};
 
-/**
- * 同期的に try-catch を Either で返すヘルパー。
- * logger 内で Result.fromThrowable の代替として使用。
- */
-const trySyncEither = <A>(fn: () => A): Either.Either<A, unknown> => {
-  return Effect.runSync(
-    Effect.either(Effect.try({ try: fn, catch: (e) => e })),
-  );
+const warn = (...args: unknown[]): void => {
+  const msg = args.map(String).join(' ');
+  consola.warn(msg);
+  writeToFile('warn', msg);
 };
 
 /**
- * ローカルログ出力に加え、Sentry に warning レベルで送信するラッパー関数。
+ * Sentry への送信も行う warning レベルのログ出力ラッパー。
  *
- * 背景: logger.warn はローカルログのみだが、一部の警告はプロダクション環境で
- * Sentry 追跡が必要。logger.error ほど深刻ではないが監視したいイベント向け。
- * 不要になれば個別の呼び出し元を logger.warn に戻して削除可能。
- *
- * 呼び出し元: VRChat API失敗、ログ処理の部分的失敗、ディレクトリ読み取り失敗など
+ * 背景: Electrobun 移行後、Sentry 連携は未実装。
+ * sentry/node への移行後に Sentry 送信を復活させる。
  */
 const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
   const messageString = match(message)
     .with(P.instanceOf(Error), (e) => e.message)
     .otherwise(String);
 
-  // ローカルログ出力
-  log.warn(
+  consola.warn(
     messageString,
     ...(stack ? [stackWithCauses(stack)] : []),
     ...(details ? [details] : []),
   );
+  writeToFile('warn', messageString);
 
-  // 規約同意済みかどうかを確認
-  const termsResult = trySyncEither(() => {
-    const settingStore = getSettingStore();
-    return settingStore.getTermsAccepted();
-  });
-  const termsAccepted = Either.match(termsResult, {
-    onRight: (accepted) => accepted,
-    onLeft: (termsError) => {
-      log.warn('Failed to get terms accepted:', termsError);
-      return false;
-    },
-  });
-
-  match(termsAccepted)
-    .with(true, () => {
-      log.debug('Attempting to send warning to Sentry...');
-      const sendResult = trySyncEither(() => {
-        captureMessage(messageString, {
-          level: 'warning',
-          extra: {
-            ...(stack ? { stack: stackWithCauses(stack) } : {}),
-            ...(details ? { details } : {}),
-          },
-          tags: {
-            source: 'electron-main',
-          },
-        });
-      });
-      Either.match(sendResult, {
-        onRight: () => log.debug('Warning sent to Sentry successfully'),
-        onLeft: (sentryError) =>
-          log.debug('Failed to send warning to Sentry:', sentryError),
-      });
-    })
-    .with(false, () => {
-      log.debug('Terms not accepted, skipping Sentry warning');
-    })
-    .exhaustive();
+  // TODO: @sentry/node を使った Sentry 送信を実装
+  // 現在は Electrobun 移行中のため、ローカルログのみ
 };
 
 /**
@@ -170,90 +116,16 @@ const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
  */
 const error = ({ message, stack, details }: ErrorLogParams): void => {
   const normalizedError = normalizeError(message);
-  const errorInfo = buildErrorInfo({ message, stack });
 
-  // ログ出力
-  log.error(
+  consola.error(
     stackWithCauses(normalizedError),
     ...(stack ? [stackWithCauses(stack)] : []),
     ...(details ? [details] : []),
   );
+  writeToFile('error', stackWithCauses(normalizedError));
 
-  // 規約同意済みかどうかを確認
-  const termsResult = trySyncEither(() => {
-    const settingStore = getSettingStore();
-    return settingStore.getTermsAccepted();
-  });
-  const termsAccepted = Either.match(termsResult, {
-    onRight: (accepted) => accepted,
-    onLeft: (termsError) => {
-      log.warn('Failed to get terms accepted:', termsError);
-      return false;
-    },
-  });
-
-  // UserFacingErrorの場合でもcauseがあればSentryに送信（予期しないエラーの詳細を取得するため）
-  // causeがない純粋なUserFacingErrorは意図的に処理されたエラーなので送信しない
-  const userFacingError = match(normalizedError)
-    .with(P.instanceOf(UserFacingError), (e) => e)
-    .otherwise(() => null);
-
-  const causeError = match(userFacingError?.errorInfo?.cause)
-    .with(P.instanceOf(Error), (e) => e)
-    .otherwise(() => null);
-
-  const shouldSendToSentry = match({ userFacingError, causeError })
-    .with({ userFacingError: P.nullish }, () => true) // 通常のエラー → 送信
-    .with({ causeError: P.not(P.nullish) }, () => true) // UserFacingError with cause → 送信
-    .otherwise(() => false); // UserFacingError without cause → スキップ
-
-  // 規約同意済みかつハンドルされていないエラーの場合のみSentryへ送信
-  match({ termsAccepted, shouldSendToSentry })
-    .with({ termsAccepted: true, shouldSendToSentry: true }, () => {
-      log.debug('Attempting to send error to Sentry...');
-      // UserFacingErrorの場合はcauseを送信、それ以外は元のエラーを送信
-      const errorToSend = causeError ?? errorInfo;
-      const sendResult = trySyncEither(() => {
-        captureException(errorToSend, {
-          extra: {
-            ...(stack ? { stack: stackWithCauses(stack) } : {}),
-            ...(details ? { details } : {}),
-            // UserFacingErrorの場合は追加情報を付与
-            ...(userFacingError
-              ? {
-                  userFacingMessage: userFacingError.message,
-                  errorCode: userFacingError.errorInfo?.code,
-                  errorCategory: userFacingError.errorInfo?.category,
-                }
-              : {}),
-          },
-          tags: {
-            source: 'electron-main',
-            ...(userFacingError ? { hasUserFacingWrapper: 'true' } : {}),
-          },
-        });
-      });
-      Either.match(sendResult, {
-        onRight: () =>
-          log.debug(
-            `Error sent to Sentry successfully${causeError ? ' (cause from UserFacingError)' : ''}`,
-          ),
-        onLeft: (sentryError) =>
-          log.debug('Failed to send error to Sentry:', sentryError),
-      });
-    })
-    .with({ termsAccepted: true, shouldSendToSentry: false }, () => {
-      log.debug(
-        'UserFacingError without cause detected, skipping Sentry (handled error)',
-      );
-    })
-    .with({ termsAccepted: false }, () => {
-      log.debug('Terms not accepted, skipping Sentry error');
-    })
-    .exhaustive();
+  // TODO: @sentry/node を使った Sentry 送信を実装
 };
-
-const electronLogFilePath = log.transports.file.getFile().path;
 
 const logger = {
   info,
@@ -262,14 +134,16 @@ const logger = {
   warn,
   warnWithSentry,
   transports: {
-    file: log.transports.file,
-    console: log.transports.console,
+    file: {
+      getFile: () => ({ path: logFilePath }),
+      level: 'info' as string | false,
+    },
+    console: { level: 'info' as string | false },
   },
-  setTransportsLevel: (level: log.LevelOption) => {
-    log.transports.file.level = level;
-    log.transports.console.level = level;
+  setTransportsLevel: (_level: string) => {
+    // consola のレベル変更は将来対応
   },
-  electronLogFilePath,
+  electronLogFilePath: logFilePath,
 };
 
 export { logger };

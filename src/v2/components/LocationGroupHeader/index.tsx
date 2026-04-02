@@ -72,7 +72,7 @@ export const LocationGroupHeader = ({
 
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
-  const visibilityTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const visibilityTimeoutRef = useRef<NodeJS.Timeout | undefined>();
 
   // Query queueing to prevent too many simultaneous requests
   // Priority based on scroll position - elements higher up get higher priority

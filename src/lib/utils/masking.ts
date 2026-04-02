@@ -1,7 +1,11 @@
-import type { Event } from '@sentry/electron/main';
-
-interface ErrorEvent extends Event {
+/**
+ * Sentry イベント型のスタブ。
+ * Electrobun 移行後、@sentry/electron は利用不可。
+ * @sentry/browser への移行時に正式な型に置き換え。
+ */
+interface ErrorEvent {
   type: undefined;
+  [key: string]: unknown;
 }
 
 /**

@@ -21,7 +21,7 @@ import { loadLogInfoIndexFromVRChatLog } from './service';
 
 // 必要最小限のモックを設定
 vi.mock('../vrchatLog/service', () => ({
-  importLogLinesFromLogPhotoDirPath: vi.fn().mockResolvedValue(undefined),
+  importLogLinesFromLogPhotoDirPath: vi.fn().mockResolvedValue(),
   getLogStoreFilePathsInRange: vi
     .fn()
     .mockImplementation(async (startDate, _currentDate) => {
@@ -102,10 +102,10 @@ vi.mock('../../lib/wrappedApp', () => ({
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),
   promises: {
-    mkdir: vi.fn().mockResolvedValue(undefined),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    unlink: vi.fn().mockResolvedValue(undefined),
-    rmdir: vi.fn().mockResolvedValue(undefined),
+    mkdir: vi.fn().mockResolvedValue(),
+    writeFile: vi.fn().mockResolvedValue(),
+    unlink: vi.fn().mockResolvedValue(),
+    rmdir: vi.fn().mockResolvedValue(),
   },
   statSync: vi.fn().mockReturnValue({ size: 100 }),
 }));
@@ -460,7 +460,7 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     );
     vi.mocked(
       vrchatLogService.importLogLinesFromLogPhotoDirPath,
-    ).mockResolvedValue(undefined);
+    ).mockResolvedValue();
     vi.mocked(vrchatPhotoService.getLatestPhotoDate).mockResolvedValue(null);
     vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockResolvedValue(
       [],

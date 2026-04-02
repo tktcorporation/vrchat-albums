@@ -74,11 +74,7 @@ export default ({ command }: ConfigEnv): UserConfig => {
       outDir: join(srcRoot, '/out'),
       emptyOutDir: true,
       rollupOptions: {
-        external: [
-          '@sentry/electron',
-          '@sentry/electron/main',
-          'clip-filepaths',
-        ],
+        external: ['clip-filepaths', 'electrobun/bun', 'electrobun/view'],
       },
       sourcemap: true,
     },

@@ -50,6 +50,6 @@ describe('viewer_api', () => {
     );
     expect(worldInfo).toBeDefined();
     expect(worldInfo.id).toBe(worldId);
-    expect(typeof worldInfo.name).toBe('string');
+    expectTypeOf(worldInfo.name).toBeString();
   }, 2000);
 });
