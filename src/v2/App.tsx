@@ -1,7 +1,9 @@
+import * as Sentry from '@sentry/browser';
 import { memo, useEffect, useState } from 'react';
 import { match } from 'ts-pattern';
 
 import { Toaster } from '@/components/ui/toaster';
+import { scrubEventData } from '@/lib/utils/masking';
 import { trpcReact } from '@/trpc';
 import { TrpcWrapper } from '@/trpcWrapper';
 
@@ -42,11 +44,13 @@ function AppContent() {
   const { mutateAsync: initializeSentryMain } =
     trpcReact.initializeSentry.useMutation({
       onSuccess: () => {
-        // TODO: @sentry/browser への移行後に Sentry 初期化を復活
-        // Electrobun 移行中のため、レンダラ Sentry は無効化
-        console.log(
-          'Sentry initialization skipped (Electrobun migration in progress)',
-        );
+        if (process.env.SENTRY_DSN) {
+          Sentry.init({
+            dsn: process.env.SENTRY_DSN,
+            environment: process.env.NODE_ENV ?? 'production',
+            beforeSend: (event) => scrubEventData(event),
+          });
+        }
       },
       onError: (error) => {
         toast({

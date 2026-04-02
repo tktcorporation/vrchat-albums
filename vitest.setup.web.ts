@@ -1,15 +1,12 @@
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
-// Sentry のモック設定
-vi.mock<typeof import('@sentry/electron/main')>(
-  '@sentry/electron/main',
-  () => ({
-    captureException: vi.fn(),
-    captureMessage: vi.fn(),
-    init: vi.fn(),
-  }),
-);
+// @sentry/browser のモック設定
+vi.mock<typeof import('@sentry/browser')>('@sentry/browser', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  init: vi.fn(),
+}));
 
 // React Testing Library のクリーンアップ
 afterEach(() => {

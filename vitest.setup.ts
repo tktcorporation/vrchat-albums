@@ -7,15 +7,12 @@ process.env.npm_package_version ??= '0.0.0-test';
 
 import * as client from './electron/lib/sequelize';
 
-// Sentry のモック設定（Electrobun 移行後は @sentry/node に移行予定）
-vi.mock<typeof import('@sentry/electron/main')>(
-  '@sentry/electron/main',
-  () => ({
-    captureException: vi.fn(),
-    captureMessage: vi.fn(),
-    init: vi.fn(),
-  }),
-);
+// @sentry/node のモック設定
+vi.mock<typeof import('@sentry/node')>('@sentry/node', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  init: vi.fn(),
+}));
 
 // React Testing Library のクリーンアップ
 afterEach(() => {

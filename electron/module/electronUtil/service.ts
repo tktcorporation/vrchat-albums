@@ -6,13 +6,7 @@ import { writeClipboardFilePaths } from 'clip-filepaths';
 import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 
-import {
-  getApp,
-  getClipboard,
-  getDialog,
-  getNativeImage,
-  getShell,
-} from '../../lib/electronModules';
+import { getApp, getDialog, getShell } from '../../lib/electronModules';
 import type { DownloadImageError, FileIOError } from './errors';
 import {
   FileCopyFailed,
@@ -135,13 +129,13 @@ const openPathWithAssociatedApp = openPathWithShell;
  * ShareDialog からのコピー処理で利用される。
  */
 const copyImageDataByPath = (filePath: string): Effect.Effect<void> => {
-  // All errors from readFile and clipboard operations are unexpected
-  // and should propagate to Sentry
-  return Effect.promise(async () => {
-    const photoBuf = await fs.readFile(filePath);
-    const image = getNativeImage().createFromBuffer(photoBuf);
-    getClipboard().writeImage(image);
-    // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
+  // clip-filepaths でファイルパスをクリップボードにコピー。
+  // OS がファイルコピーとして認識し、エクスプローラー等にペースト可能。
+  return Effect.try({
+    try: () => writeClipboardFilePaths([filePath]),
+    catch: (e) => {
+      throw e instanceof Error ? e : new Error(String(e));
+    },
   });
 };
 
@@ -158,9 +152,7 @@ const copyImageByBase64 = (options: {
       pngBase64: options.pngBase64,
     },
     async (tempPngPath) => {
-      const image = getNativeImage().createFromPath(tempPngPath);
-      getClipboard().writeImage(image);
-      // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
+      writeClipboardFilePaths([tempPngPath]);
     },
   );
 };

@@ -10,6 +10,8 @@
 import { BrowserView, BrowserWindow } from 'electrobun/bun';
 
 import type { AppRPCSchema } from '../../shared/rpc/types';
+import { setTimeEventEmitter } from '../../electron/electronUtil';
+import { getSettingStore } from '../../electron/module/settingStore';
 import { initializeApp } from './appInit';
 import { setupApplicationMenu } from './menu';
 import { setupTray } from './tray';
@@ -98,6 +100,9 @@ const main = async () => {
 
   // トレイアイコンの設定
   setupTray(win);
+
+  // バックグラウンドログ同期タイマーの設定（6時間ごと）
+  setTimeEventEmitter(getSettingStore());
 
   console.log('[VRChatAlbums] Application started successfully');
 };

@@ -8,6 +8,8 @@
  *
  * Electrobun のメイン起動処理: src/bun/index.ts
  */
+import * as Sentry from '@sentry/node';
+
 import { logger } from './lib/logger';
 import { initSettingStore } from './module/settingStore';
 
@@ -18,12 +20,13 @@ let isSentryInitializedMain = false;
 export const getIsSentryInitializedMain = () => isSentryInitializedMain;
 
 /**
- * Sentry 初期化スタブ。
+ * メインプロセスの Sentry を初期化する。
  *
- * 背景: @sentry/electron は Electrobun では利用不可。
- * @sentry/node への移行が必要。現在はスタブとして残す。
+ * 背景: @sentry/electron から @sentry/node に移行。
+ * Electrobun ではメインプロセスが Bun ランタイムで動作するため、
+ * Node.js 用の @sentry/node を使用する。
  *
- * TODO: @sentry/node を使った初期化に置き換え
+ * 呼び出し元: このファイル末尾（モジュール読み込み時に実行）
  */
 export const initializeMainSentry = () => {
   if (isSentryInitializedMain) {
@@ -35,10 +38,30 @@ export const initializeMainSentry = () => {
     return;
   }
 
-  // TODO: @sentry/node で初期化
-  logger.info(
-    'Sentry initialization skipped (Electrobun migration in progress)',
-  );
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV ?? 'production',
+    /**
+     * beforeSend でユーザー規約への同意状態をチェックする。
+     * 同意していない場合はイベントを送信しない（プライバシー保護）。
+     */
+    beforeSend: (event) => {
+      // effect-lint-allow-try-catch: Sentry コールバック内では settingStore の取得失敗を許容
+      try {
+        const { getSettingStore } = require('./module/settingStore');
+        const store = getSettingStore();
+        if (!store.getTermsAccepted()) {
+          return null;
+        }
+      } catch {
+        // settingStore 未初期化時はイベントを送信しない
+        return null;
+      }
+      return event;
+    },
+  });
+
+  logger.info('Sentry initialized in main process via @sentry/node');
   isSentryInitializedMain = true;
 };
 

@@ -6,10 +6,9 @@ import path from 'node:path';
  *
  * 背景: Electron 版では electron-log + @sentry/electron を使用していた。
  * Electrobun 移行後は consola（既存依存）+ ファイル出力に置き換え。
- * Sentry 連携は @sentry/node への移行が必要（将来対応）。
- *
- * 不要になれば: Sentry 移行完了後にこのファイルを更新
+ * Sentry 連携は @sentry/node を使用。
  */
+import * as Sentry from '@sentry/node';
 import { createConsola } from 'consola';
 import { stackWithCauses } from 'pony-cause';
 import { match, P } from 'ts-pattern';
@@ -92,8 +91,9 @@ const warn = (...args: unknown[]): void => {
 /**
  * Sentry への送信も行う warning レベルのログ出力ラッパー。
  *
- * 背景: Electrobun 移行後、Sentry 連携は未実装。
- * sentry/node への移行後に Sentry 送信を復活させる。
+ * 背景: @sentry/electron から @sentry/node に移行。
+ * captureMessage で warning を Sentry に送信する。
+ * ユーザー同意チェックは Sentry.init の beforeSend で行う。
  */
 const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
   const messageString = match(message)
@@ -107,12 +107,17 @@ const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
   );
   writeToFile('warn', messageString);
 
-  // TODO: @sentry/node を使った Sentry 送信を実装
-  // 現在は Electrobun 移行中のため、ローカルログのみ
+  Sentry.captureMessage(messageString, {
+    level: 'warning',
+    extra: details,
+  });
 };
 
 /**
  * Sentry への送信も行うエラー出力用ラッパー関数。
+ *
+ * 背景: @sentry/electron から @sentry/node に移行。
+ * captureException でエラーを Sentry に送信する。
  */
 const error = ({ message, stack, details }: ErrorLogParams): void => {
   const normalizedError = normalizeError(message);
@@ -124,7 +129,9 @@ const error = ({ message, stack, details }: ErrorLogParams): void => {
   );
   writeToFile('error', stackWithCauses(normalizedError));
 
-  // TODO: @sentry/node を使った Sentry 送信を実装
+  Sentry.captureException(stack ?? normalizedError, {
+    extra: details,
+  });
 };
 
 const logger = {

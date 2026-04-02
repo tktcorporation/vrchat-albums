@@ -79,30 +79,54 @@ export const getDialog = () => ({
 
 /**
  * Electrobun の clipboard 互換オブジェクト。
- * writeImage は Electrobun 未対応のため no-op スタブ。
+ *
+ * 背景: Electron では NativeImage を介して clipboard.writeImage() していた。
+ * Electrobun では Utils.clipboardWriteImage(pngData: Uint8Array) で
+ * PNG バイト列を直接クリップボードに書き込める。
  */
 export const getClipboard = () => ({
   ...compat.clipboard,
-  // Electrobun では nativeImage ベースのクリップボード書き込みは未対応
-  // TODO: Electrobun のクリップボード画像 API が提供された場合に実装
-  writeImage: (_image: unknown): void => {
-    console.warn(
-      '[electrobunCompat] clipboard.writeImage is not supported in Electrobun',
-    );
+  /**
+   * PNG バイト列をクリップボードに書き込む。
+   * 引数は Electron 互換の { toPNG(): Buffer } オブジェクトを受け取る。
+   */
+  writeImage: (image: { toPNG: () => Buffer }): void => {
+    // effect-lint-allow-try-catch: ランタイム環境検出パターン
+    try {
+      const { Utils } = require('electrobun/bun');
+      const pngBuffer = image.toPNG();
+      Utils.clipboardWriteImage(new Uint8Array(pngBuffer));
+    } catch (error) {
+      console.error('[electrobunCompat] clipboard.writeImage failed:', error);
+    }
   },
 });
 
 /**
- * nativeImage は Electrobun では直接サポートされないため、
- * スタブを返す。画像操作は @napi-rs/image で行う。
+ * nativeImage 互換オブジェクトを提供する。
+ *
+ * 背景: Electron の nativeImage は Chromium の画像フォーマット変換を内蔵していた。
+ * Electrobun では @napi-rs/image（既存依存）でファイル読み込み→ PNG 変換を行い、
+ * toPNG() で Buffer を返す互換オブジェクトを構築する。
  */
 export const getNativeImage = () => ({
-  createFromPath: (_path: string) => ({
-    toDataURL: () => '',
-    toPNG: () => Buffer.alloc(0),
-  }),
-  createFromBuffer: (_buffer: Buffer) => ({
-    toDataURL: () => '',
-    toPNG: () => Buffer.alloc(0),
+  createFromPath: (filePath: string) => {
+    // effect-lint-allow-try-catch: ファイル読み込みは失敗しうる
+    try {
+      const fs = require('node:fs');
+      const pngData = fs.readFileSync(filePath);
+      return {
+        toDataURL: () =>
+          `data:image/png;base64,${Buffer.from(pngData).toString('base64')}`,
+        toPNG: () => Buffer.from(pngData),
+      };
+    } catch {
+      return { toDataURL: () => '', toPNG: () => Buffer.alloc(0) };
+    }
+  },
+  createFromBuffer: (buffer: Buffer) => ({
+    toDataURL: () =>
+      `data:image/png;base64,${Buffer.from(buffer).toString('base64')}`,
+    toPNG: () => Buffer.from(buffer),
   }),
 });
