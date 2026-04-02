@@ -62,11 +62,6 @@ export const getAppUserDataPath = (): string => getPath('userData');
 export const isPackaged = (): boolean => process.env.NODE_ENV === 'production';
 
 /**
- * Electron の app.getPath('logs') に相当。
- */
-export const getLogPath = (): string => getPath('logs');
-
-/**
  * Electron の shell.openExternal() に相当。
  */
 export const openExternal = async (url: string): Promise<void> => {

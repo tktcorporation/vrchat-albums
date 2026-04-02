@@ -17,39 +17,7 @@ import { match } from 'ts-pattern';
 import { showNotification } from './lib/electrobunCompat';
 import { logger } from './lib/logger';
 import { syncLogsInBackground } from './module/logSync/service';
-import { getSettingStore, type SettingStore } from './module/settingStore';
-
-let settingStore: SettingStore | null = null;
-
-/**
- * 他モジュールから設定ストアを利用できるよう初期化する。
- * main プロセス起動時に一度だけ呼び出されることを想定。
- */
-export const initializeSettingStoreForUtil = (): void => {
-  if (settingStore === null) {
-    settingStore = getSettingStore();
-    logger.info('SettingStore initialized for electronUtil.ts');
-  }
-};
-
-/**
- * ウィンドウ生成スタブ。
- * Electrobun では src/bun/index.ts で BrowserWindow を作成する。
- * tRPC ルーターからの参照互換性のために残す。
- */
-export const createOrGetWindow = (): unknown => {
-  logger.debug('createOrGetWindow called (Electrobun stub)');
-  return {};
-};
-
-/**
- * トレイ設定スタブ。
- * Electrobun では src/bun/tray.ts で Tray を設定する。
- */
-export const setTray = (): Promise<void> => {
-  logger.debug('setTray called (Electrobun stub)');
-  return Promise.resolve();
-};
+import type { getSettingStore } from './module/settingStore';
 
 /**
  * 6時間ごとにバックグラウンドログ同期を実行するタイマーを設定する。

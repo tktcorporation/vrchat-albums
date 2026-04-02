@@ -26,6 +26,8 @@ const config: KnipConfig = {
     'only-allow',
     // grit binary comes from @getgrit/cli package
     'grit',
+    // electron-builder is used in CI workflows only
+    'electron-builder',
   ],
   ignoreDependencies: [
     '@antfu/ni',

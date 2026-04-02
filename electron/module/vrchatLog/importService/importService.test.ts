@@ -74,7 +74,7 @@ describe('importService', () => {
       };
 
       // モックの設定
-      vi.mocked(fs.access).mockResolvedValue();
+      vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.stat).mockResolvedValue({
         isFile: () => true,
         isDirectory: () => false,
@@ -137,7 +137,7 @@ describe('importService', () => {
       };
 
       // ディレクトリ構造のモック
-      vi.mocked(fs.access).mockResolvedValue();
+      vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.stat).mockImplementation(async (p) => {
         if (p === dirPath) {
           return { isFile: () => false, isDirectory: () => true } as Stats;
@@ -231,7 +231,7 @@ describe('importService', () => {
     it('バックアップ作成に失敗した場合はエラーを返す', async () => {
       const filePaths = ['/path/to/logStore-2023-11.txt'];
 
-      vi.mocked(fs.access).mockResolvedValue();
+      vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.stat).mockResolvedValue({
         isFile: () => true,
         isDirectory: () => false,
@@ -277,7 +277,7 @@ describe('importService', () => {
       };
 
       // モックの設定
-      vi.mocked(fs.access).mockResolvedValue();
+      vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.stat).mockImplementation(async (p) => {
         if (p === '/path/to/dir' || p.toString().includes('subdir')) {
           return { isFile: () => false, isDirectory: () => true } as Stats;
@@ -360,7 +360,7 @@ describe('importService', () => {
         exportedFiles: [],
       };
 
-      vi.mocked(fs.access).mockResolvedValue();
+      vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.stat).mockResolvedValue({
         isFile: () => true,
         isDirectory: () => false,
@@ -416,7 +416,7 @@ describe('importService', () => {
         exportedFiles: [],
       };
 
-      vi.mocked(fs.access).mockResolvedValue();
+      vi.mocked(fs.access).mockResolvedValue(undefined);
       vi.mocked(fs.stat).mockResolvedValue({
         isFile: () => false,
         isDirectory: () => true,

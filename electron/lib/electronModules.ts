@@ -92,32 +92,3 @@ export const getClipboard = () => ({
     }
   },
 });
-
-/**
- * nativeImage 互換オブジェクトを提供する。
- *
- * 背景: Electron の nativeImage は Chromium の画像フォーマット変換を内蔵していた。
- * Electrobun では @napi-rs/image（既存依存）でファイル読み込み→ PNG 変換を行い、
- * toPNG() で Buffer を返す互換オブジェクトを構築する。
- */
-export const getNativeImage = () => ({
-  createFromPath: (filePath: string) => {
-    // effect-lint-allow-try-catch: ファイル読み込みは失敗しうる
-    try {
-      const fs = require('node:fs');
-      const pngData = fs.readFileSync(filePath);
-      return {
-        toDataURL: () =>
-          `data:image/png;base64,${Buffer.from(pngData).toString('base64')}`,
-        toPNG: () => Buffer.from(pngData),
-      };
-    } catch {
-      return { toDataURL: () => '', toPNG: () => Buffer.alloc(0) };
-    }
-  },
-  createFromBuffer: (buffer: Buffer) => ({
-    toDataURL: () =>
-      `data:image/png;base64,${Buffer.from(buffer).toString('base64')}`,
-    toPNG: () => Buffer.from(buffer),
-  }),
-});

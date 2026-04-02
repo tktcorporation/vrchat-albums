@@ -20,10 +20,6 @@ const mockElectron = vi.hoisted(() => ({
     writeText: vi.fn(),
     writeImage: vi.fn(),
   },
-  nativeImage: {
-    createFromPath: vi.fn(),
-    createFromBuffer: vi.fn(),
-  },
   dialog: {
     showSaveDialog: vi.fn(),
   },
@@ -35,7 +31,6 @@ vi.mock('../../../../lib/electronModules', () => ({
   getShell: () => ({}),
   getDialog: () => mockElectron.dialog,
   getClipboard: () => mockElectron.clipboard,
-  getNativeImage: () => mockElectron.nativeImage,
 }));
 
 describe('electronUtilController', () => {
