@@ -20,7 +20,7 @@ const screenshot = async (page: Page, title: string, suffix: string) => {
   const filePath = screenshotPath(title, suffix);
   try {
     await page.screenshot({ path: filePath });
-    const now = new Date().toISOString().split('T')[1].split('.')[0];
+    const now = new Date().toISOString().split('T')[1]?.split('.')[0];
     consola.log(`[${now}]: screenshot: ${filePath}`);
     screenshotsTaken.add(suffix);
   } catch (error) {
@@ -37,13 +37,13 @@ test.setTimeout(TIMEOUT);
  * アプリケーションの各画面でスクリーンショットを撮影する。
  *
  * 背景: Electrobun 移行後は Chromium ブラウザ + Vite dev サーバー + tRPC HTTP サーバーで実行。
- * HTTP フォールバックモードでは subscription は無効化され、
- * セットアップ画面の表示有無は VRChat ディレクトリの自動検出結果に依存する。
+ * HTTP フォールバックモードでは subscription は無効化される。
  *
  * テストフロー:
  *   1. 初期画面（規約モーダル or メイン画面）のスクリーンショット
  *   2. 規約未同意の場合は同意処理
- *   3. メイン画面到達後のスクリーンショット（セットアップ or 写真表示 or 空画面）
+ *   3. セットアップ画面が表示されたらパスを入力して完了
+ *   4. メイン画面（ギャラリー）到達後のスクリーンショット
  */
 test('各画面でスクショ', async ({ page }) => {
   // スクリーンショット追跡をリセット
@@ -87,27 +87,78 @@ test('各画面でスクショ', async ({ page }) => {
       .count()) > 0;
 
   if (hasSetupScreen) {
-    // セットアップ画面が表示されている場合
-    // HTTP フォールバック環境では VRChat ディレクトリが存在しないため、
-    // セットアップ画面が正しく表示されることを確認してスクリーンショットを撮る。
-    console.log('Setup screen detected - capturing setup state');
+    // セットアップ画面が表示されている場合、パスを入力して遷移する
+    console.log('Setup screen detected - filling in paths');
     await screenshot(page, title, 'setup');
-    await screenshot(page, title, 'finalized');
+
+    // VRChatログファイルディレクトリの入力
+    try {
+      const logFileInput = await page.waitForSelector(
+        '[aria-label="input-VRChatログファイルディレクトリ"]',
+        { timeout: 5000 },
+      );
+      await logFileInput.click();
+      await page.keyboard.press('Control+A');
+      await page.keyboard.press('Delete');
+      await page.keyboard.type(path.join(__dirname, '../debug/logs'));
+      const logSubmitButton = await page.waitForSelector(
+        '[aria-label="送信-VRChatログファイルディレクトリ"]',
+      );
+      await logSubmitButton.click();
+      console.log('Log directory path submitted');
+
+      // 写真ディレクトリの入力
+      const photoFileInput = await page.waitForSelector(
+        '[aria-label="input-写真ディレクトリ"]',
+      );
+      await photoFileInput.click();
+      await page.keyboard.press('Control+A');
+      await page.keyboard.press('Delete');
+      await page.keyboard.type(path.join(__dirname, '../debug/photos/VRChat'));
+      const photoSubmitButton = await page.waitForSelector(
+        '[aria-label="送信-写真ディレクトリ"]',
+      );
+      await photoSubmitButton.click();
+      console.log('Photo directory path submitted');
+
+      // 「設定を確認して続ける」ボタンをクリック
+      const continueButton = await page.waitForSelector(
+        'text=設定を確認して続ける',
+      );
+      await continueButton.click();
+      console.log('Continue button clicked, waiting for main screen...');
+
+      // メイン画面が表示されるまで待機
+      await page.waitForTimeout(3000);
+    } catch (error) {
+      console.log('Setup path filling failed:', error);
+      // パス入力に失敗してもテストは継続する
+    }
   } else if (hasMainContent) {
-    // 既に写真が表示されている場合
     console.log('Main content already loaded');
-    await screenshot(page, title, 'logs-loaded');
-    await page.waitForTimeout(500);
-    await screenshot(page, title, 'finalized');
   } else {
-    // セットアップ画面でもメイン画面でもない場合（空の PhotoGallery 等）
-    // HTTP フォールバック環境では VRChat ディレクトリ自動検出が動かないため、
-    // 空の画面になることがある。
-    console.log(
-      'Neither setup nor main content detected, capturing current state',
-    );
-    await screenshot(page, title, 'finalized');
+    console.log('Neither setup nor main content detected');
   }
+
+  // メイン画面（ギャラリーまたは空画面）のスクリーンショット
+  // LocationGroupHeader または写真カードが表示されるのを待つ
+  try {
+    console.log('Waiting for main content to load...');
+    await page.waitForSelector(
+      '[data-testid="location-group-header"], .photo-card',
+      { timeout: 15000 },
+    );
+    await screenshot(page, title, 'logs-loaded');
+  } catch {
+    // メインコンテンツが見つからなくても現在の状態をキャプチャ
+    console.log(
+      'Main content not found within timeout, capturing current state',
+    );
+  }
+
+  // 最終状態のスクリーンショット
+  await page.waitForTimeout(500);
+  await screenshot(page, title, 'finalized');
 
   // テスト終了時に必須スクリーンショットの確認
   console.log('\n=== Verifying screenshots ===');
