@@ -2,123 +2,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { _electron, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import consola from 'consola';
 
 // ESモジュール環境で__dirnameの代わりに使用
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Constants
-const XVFB_STARTUP_DELAY_MS = 1000; // Xvfb起動待機時間
-const SERVER_CHECK_INTERVAL_MS = 1000; // サーバーチェック間隔
-const SERVER_MAX_ATTEMPTS = 10; // サーバーチェック最大試行回数
-const MEMORY_LIMIT_MB = process.env.PLAYWRIGHT_MAX_MEMORY ?? '4096'; // メモリ上限設定
-
-const launchElectronApp = async () => {
-  // Start Xvfb if not running
-  const { execSync } = await import('node:child_process');
-  try {
-    execSync('pidof Xvfb', { stdio: 'ignore' });
-    console.log('Xvfb is already running');
-  } catch {
-    console.log('Starting Xvfb...');
-    execSync('Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &', {
-      shell: '/bin/bash',
-    });
-    await new Promise((resolve) => setTimeout(resolve, XVFB_STARTUP_DELAY_MS)); // Wait for Xvfb to start
-  }
-
-  // 開発サーバーが起動するまで待つ（Playwrightのwebserver設定が処理する）
-  // ただし、念のため確認する
-  const waitForServer = async (
-    url: string,
-    maxAttempts = SERVER_MAX_ATTEMPTS,
-  ) => {
-    console.log('Checking if development server is ready...');
-    for (let i = 0; i < maxAttempts; i++) {
-      try {
-        const response = await fetch(url);
-        if (response.ok || response.status === 304) {
-          console.log('Development server is ready');
-          return true;
-        }
-      } catch {
-        // サーバーがまだ起動していない
-        console.log(`Waiting for server... (attempt ${i + 1}/${maxAttempts})`);
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, SERVER_CHECK_INTERVAL_MS),
-      );
-    }
-    // webServerの設定があるので、サーバーは起動しているはず
-    console.warn('Could not verify development server, but proceeding anyway');
-    return true;
-  };
-
-  // 開発サーバーの起動を確認（オプショナル）
-  await waitForServer('http://localhost:3000');
-
-  // Launch Electron app with increased memory
-  const electronApp = await _electron.launch({
-    args: [
-      '--no-sandbox',
-      `--max-old-space-size=${MEMORY_LIMIT_MB}`,
-      `--js-flags=--max-old-space-size=${MEMORY_LIMIT_MB}`,
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--enable-logging',
-      '--log-level=0',
-      // Disable crash reporter to prevent GLib-GObject errors from killing the process
-      '--disable-breakpad',
-      path.join(__dirname, '../main/index.cjs'),
-    ],
-    env: {
-      ...process.env,
-      PLAYWRIGHT_TEST: 'true',
-      PLAYWRIGHT_STORE_HASH: Date.now().toString(),
-      NODE_ENV: 'development', // 開発モードを強制
-      PORT: '3000', // 開発サーバーのポート
-      NODE_OPTIONS: `--max-old-space-size=${MEMORY_LIMIT_MB}`, // Node.js環境変数でもメモリ制限を設定
-      ELECTRON_ENABLE_LOGGING: '1', // Enable Electron logging
-      G_SLICE: 'always-malloc', // Fix GLib memory issues
-      G_DEBUG: '', // Suppress GLib debug output
-      GDK_BACKEND: 'x11', // Force X11 backend
-      GTK_THEME: 'Adwaita', // Set a default GTK theme
-      LIBGL_ALWAYS_SOFTWARE: '1', // Force software rendering
-      DISPLAY: ':99', // Virtual display
-      // Prevent Electron from creating native dialogs that may cause GTK issues
-      ELECTRON_NO_ATTACH_CONSOLE: '1',
-      // Disable hardware acceleration to avoid GPU-related crashes
-      ELECTRON_DISABLE_GPU: '1',
-      // Force libvips to use single thread to avoid GObject conflicts with GTK
-      VIPS_CONCURRENCY: '1',
-      // Disable GTK accessibility to prevent D-Bus issues
-      GTK_A11Y: 'none',
-      NO_AT_BRIDGE: '1',
-      // Prevent Glib extra module loading
-      GIO_EXTRA_MODULES: '',
-      // Suppress GTK warning messages
-      GTK_DEBUG: 'no-css-validation',
-      // libvips settings to avoid GLib-GObject conflicts
-      VIPS_MAX_THREADS: '1',
-      VIPS_NOVECTOR: '1',
-      // Force Sharp to use bundled libvips (avoids system libvips/GTK conflicts)
-      SHARP_IGNORE_GLOBAL_LIBVIPS: '1',
-    },
-  });
-
-  // Capture process output
-  electronApp.process().stdout?.on('data', (data) => {
-    console.log(`[Electron stdout] ${data}`);
-  });
-
-  electronApp.process().stderr?.on('data', (data) => {
-    console.error(`[Electron stderr] ${data}`);
-  });
-
-  return electronApp;
-};
 
 const screenshotPath = (title: string, suffix: string) => {
   return path.join(__dirname, './previews', `${title}-${suffix}.png`);
@@ -140,61 +29,24 @@ const screenshot = async (page: Page, title: string, suffix: string) => {
   }
 };
 
-const TIMEOUT = 60000; // Increased timeout to 60 seconds
+const TIMEOUT = 60000;
 
 test.setTimeout(TIMEOUT);
 
-test('各画面でスクショ', async () => {
+test('各画面でスクショ', async ({ page }) => {
   // スクリーンショット追跡をリセット
   screenshotsTaken = new Set();
 
-  // Launch Electron app.
-  console.log('Launching Electron app...');
-  const electronApp = await launchElectronApp();
-  console.log('Electron app launched, waiting for first window...');
+  // Vite dev サーバーに直接アクセス（playwright.config.ts の webServer が起動）
+  console.log('Navigating to Vite dev server...');
+  await page.goto('http://localhost:3000');
 
-  // Get the first window that the app opens, wait if necessary.
-  const page = await electronApp.firstWindow({ timeout: 30000 });
-
-  // 開発サーバーが完全に起動するまで待つ
-  await page.waitForTimeout(5000);
+  const title = (await page.title()) || 'VRChatAlbums';
 
   // Listen for critical errors only
   page.on('pageerror', (error) => {
     console.error('[Page Error]', error.message);
   });
-
-  page.on('close', () => {
-    console.error('[Page Closed] The page was closed unexpectedly');
-  });
-
-  page.on('crash', () => {
-    console.error('[Page Crashed] The page crashed');
-  });
-
-  const title = await page.title();
-
-  // Print the title.
-  console.log(title);
-
-  // await page.evaluate((routerPath) => {
-  //   window.history.pushState({}, '', routerPath);
-  //   window.location.href = `#${routerPath}`;
-  // }, routerPath);
-
-  // タイムアウト処理の調整
-  const timeoutDecreaseTwo = TIMEOUT - 5000;
-  void Promise.race([
-    new Promise((resolve) => setTimeout(resolve, timeoutDecreaseTwo)),
-    new Promise((_resolve, reject) => {
-      setTimeout(() => {
-        void (async () => {
-          await screenshot(page, title, 'timeout');
-          reject(new Error('Timeout'));
-        })();
-      }, timeoutDecreaseTwo);
-    }),
-  ]);
 
   await screenshot(page, title, 'initial');
 
@@ -231,8 +83,6 @@ test('各画面でスクショ', async () => {
     if (hasMainContent) {
       console.log('Main screen already loaded, skipping setup');
       await screenshot(page, title, 'main-already-loaded');
-      // Exit app.
-      await electronApp.close();
       return;
     }
   }
@@ -273,35 +123,11 @@ test('各画面でスクショ', async () => {
       'text=設定を確認して続ける',
     );
 
-    // クリック前にページのクローズイベントをリッスン
-    let pageClosedDuringSetup = false;
-    page.once('close', () => {
-      console.error(
-        '[CRITICAL] Page closed immediately after clicking setup button',
-      );
-      pageClosedDuringSetup = true;
-    });
-
     await 設定を確認して続けるButton.click();
 
     // 設定送信後の処理を待つ
     console.log('Waiting for setup to complete...');
-
-    // ページがすぐに閉じた場合のチェック
-    if (pageClosedDuringSetup) {
-      throw new Error(
-        'Page closed immediately after setup button click - likely a crash during initialization',
-      );
-    }
-
-    // 短い待機でページの状態を確認
-    await page.waitForTimeout(500);
-
-    if (page.isClosed()) {
-      throw new Error('Page closed during setup initialization');
-    }
-
-    await page.waitForTimeout(2500); // 残りの待機時間
+    await page.waitForTimeout(3000);
   } catch (error) {
     console.log('Setup fields not found, app might be already configured');
     console.log('Error:', error);
@@ -313,7 +139,7 @@ test('各画面でスクショ', async () => {
     console.log('Waiting for main content to load...');
     await page.waitForSelector(
       '[data-testid="location-group-header"], .photo-card',
-      { timeout: 30000 }, // タイムアウトを延長
+      { timeout: 30000 },
     );
     await screenshot(page, title, 'logs-loaded');
 
@@ -322,28 +148,10 @@ test('各画面でスクショ', async () => {
     await screenshot(page, title, 'finalized');
   } catch (error) {
     console.log('Failed to wait for main content, checking page status...');
-
-    // ページがまだ開いているか確認
-    const isPageClosed = page.isClosed();
-    if (isPageClosed) {
-      // ページがクローズされるのは異常
-      throw new Error(
-        'Page was unexpectedly closed during test execution (possibly due to memory issues)',
-        { cause: error },
-      );
-    }
-    // ページが開いているのにセレクタが見つからない場合もエラー
     throw new Error(
       `Failed to find main content selector after setup: ${error}`,
       { cause: error },
     );
-  }
-
-  // Exit app.
-  try {
-    await electronApp.close();
-  } catch {
-    console.log('App already closed');
   }
 
   // テスト終了時に必要なスクリーンショットがすべて撮影されたことを確認
