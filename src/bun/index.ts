@@ -9,7 +9,10 @@
  */
 import { BrowserView, BrowserWindow } from 'electrobun/bun';
 
-import { setTimeEventEmitter } from '../../electron/electronUtil';
+import {
+  registerReloadMainWindow,
+  setTimeEventEmitter,
+} from '../../electron/electronUtil';
 import { getSettingStore } from '../../electron/module/settingStore';
 import type { AppRPCSchema } from '../../shared/rpc/types';
 import { initializeApp } from './appInit';
@@ -100,6 +103,16 @@ const main = async () => {
 
   // メインウィンドウの作成
   const win = createMainWindow();
+
+  // リロードハンドラーの登録
+  // Electrobun には直接の reload API がないため、URL 再設定で代替する
+  registerReloadMainWindow(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentWin = (BrowserWindow as any).getAllWindows()[0];
+    if (currentWin) {
+      currentWin.loadURL('views://main-ui/index.html');
+    }
+  });
 
   // トレイアイコンの設定
   setupTray(win);

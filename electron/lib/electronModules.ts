@@ -8,6 +8,8 @@
  * 参照: .claude/rules/electron-import.md
  * 不要になれば: electrobunCompat を直接利用するよう各呼び出し元を修正して削除可能
  */
+import * as path from 'node:path';
+
 import * as autoLaunch from '../module/autoLaunch/service';
 import * as compat from './electrobunCompat';
 
@@ -57,10 +59,13 @@ export const getDialog = () => ({
         return { canceled: true };
       }
       // ディレクトリ選択 + デフォルトファイル名で保存先を構築
-      const defaultName = options.defaultPath
-        ? (options.defaultPath.split('/').pop() ?? 'file')
-        : 'file';
-      const filePath = `${result.filePaths[0]}/${defaultName}`;
+      const baseName = options.defaultPath
+        ? path.basename(options.defaultPath)
+        : '';
+      const defaultExt = options.filters?.[0]?.extensions?.[0];
+      const defaultName =
+        baseName || (defaultExt ? `file.${defaultExt}` : 'file');
+      const filePath = path.join(result.filePaths[0], defaultName);
       return { canceled: false, filePath };
     } catch {
       return { canceled: true };

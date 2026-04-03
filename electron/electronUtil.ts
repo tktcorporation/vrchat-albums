@@ -54,62 +54,75 @@ export const setTimeEventEmitter = (
         Effect.either(syncLogsInBackground()),
       );
 
-      if (either._tag === 'Left') {
-        const error = either.left;
-        const errorMessage = match(error)
-          .with(
-            { code: 'LOG_FILE_NOT_FOUND' },
-            () => 'VRChatのログファイルが見つかりませんでした',
-          )
-          .with(
-            { code: 'LOG_FILE_DIR_NOT_FOUND' },
-            () => 'VRChatのログディレクトリが見つかりませんでした',
-          )
-          .with(
-            { code: 'LOG_FILES_NOT_FOUND' },
-            () => 'VRChatのログファイルが存在しません',
-          )
-          .with({ code: 'UNKNOWN' }, () => '不明なエラーが発生しました')
-          .otherwise(() => '予期せぬエラーが発生しました');
+      match(either)
+        .with({ _tag: 'Left' }, ({ left: error }) => {
+          const errorMessage = match(error)
+            .with(
+              { code: 'LOG_FILE_NOT_FOUND' },
+              () => 'VRChatのログファイルが見つかりませんでした',
+            )
+            .with(
+              { code: 'LOG_FILE_DIR_NOT_FOUND' },
+              () => 'VRChatのログディレクトリが見つかりませんでした',
+            )
+            .with(
+              { code: 'LOG_FILES_NOT_FOUND' },
+              () => 'VRChatのログファイルが存在しません',
+            )
+            .with({ code: 'UNKNOWN' }, () => '不明なエラーが発生しました')
+            .otherwise(() => '予期せぬエラーが発生しました');
 
-        logger.error({ message: error });
+          logger.error({ message: error });
 
-        showNotification({
-          title: `joinの記録に失敗しました: ${now.toString()}`,
-          body: errorMessage,
-        });
+          showNotification({
+            title: `joinの記録に失敗しました: ${now.toString()}`,
+            body: errorMessage,
+          });
+        })
+        .with({ _tag: 'Right' }, ({ right: result }) => {
+          const {
+            createdVRChatPhotoPathModelList,
+            createdWorldJoinLogModelList,
+            createdPlayerJoinLogModelList,
+          } = result;
+          if (
+            createdVRChatPhotoPathModelList.length === 0 &&
+            createdWorldJoinLogModelList.length === 0 &&
+            createdPlayerJoinLogModelList.length === 0
+          ) {
+            return;
+          }
 
-        return;
-      }
+          const photoCount = createdVRChatPhotoPathModelList.length;
+          const worldJoinCount = createdWorldJoinLogModelList.length;
+          const playerJoinCount = createdPlayerJoinLogModelList.length;
 
-      const {
-        createdVRChatPhotoPathModelList,
-        createdWorldJoinLogModelList,
-        createdPlayerJoinLogModelList,
-      } = either.right;
-      if (
-        createdVRChatPhotoPathModelList.length === 0 &&
-        createdWorldJoinLogModelList.length === 0 &&
-        createdPlayerJoinLogModelList.length === 0
-      ) {
-        return;
-      }
-
-      const photoCount = createdVRChatPhotoPathModelList.length;
-      const worldJoinCount = createdWorldJoinLogModelList.length;
-      const playerJoinCount = createdPlayerJoinLogModelList.length;
-
-      showNotification({
-        title: `joinの記録に成功しました: ${now.toString()}`,
-        body: `${photoCount}枚の新しい写真を記録しました\n${worldJoinCount}件のワールド参加を記録しました\n${playerJoinCount}件のプレイヤー参加を記録しました`,
-      });
+          showNotification({
+            title: `joinの記録に成功しました: ${now.toString()}`,
+            body: `${photoCount}枚の新しい写真を記録しました\n${worldJoinCount}件のワールド参加を記録しました\n${playerJoinCount}件のプレイヤー参加を記録しました`,
+          });
+        })
+        .exhaustive();
     })();
   });
 };
 
 /**
- * メインウィンドウリロードスタブ。
+ * メインウィンドウリロードハンドラー。
+ * src/bun/index.ts から registerReloadMainWindow() で実際のリロード処理を登録する。
+ * 未登録の場合は fail-fast でエラーを投げる。
  */
+let reloadMainWindowHandler: (() => void) | undefined;
+
+export const registerReloadMainWindow = (handler: () => void): void => {
+  reloadMainWindowHandler = handler;
+};
+
 export const reloadMainWindow = (): void => {
-  logger.debug('reloadMainWindow called (Electrobun stub)');
+  if (!reloadMainWindowHandler) {
+    throw new Error(
+      'reloadMainWindow handler is not registered. Call registerReloadMainWindow() from src/bun/index.ts first.',
+    );
+  }
+  reloadMainWindowHandler();
 };
