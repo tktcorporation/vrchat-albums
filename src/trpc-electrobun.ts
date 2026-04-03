@@ -140,7 +140,7 @@ const httpFallbackLink = httpBatchLink({
  */
 const noopSubscriptionLink: TRPCLink<AppRouter> = () => {
   return ({ op }) => {
-    return observable((observer) => {
+    return observable((_observer) => {
       console.info(
         `[tRPC] Subscription "${op.path}" skipped (HTTP fallback mode)`,
       );
