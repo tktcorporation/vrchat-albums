@@ -81,7 +81,6 @@ test('各画面でスクショ', async ({ page }) => {
 
   // セットアップ画面かメイン画面かを判定
   const hasSetupScreen = await page.isVisible('text=初期セットアップ');
-  const hasInput = (await page.locator('input[type="text"]').count()) > 0;
   const hasMainContent =
     (await page
       .locator('[data-testid="location-group-header"], .photo-card')
