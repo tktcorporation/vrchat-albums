@@ -87,64 +87,13 @@ test('各画面でスクショ', async ({ page }) => {
       .locator('[data-testid="location-group-header"], .photo-card')
       .count()) > 0;
 
-  if (hasSetupScreen && hasInput) {
+  if (hasSetupScreen) {
     // セットアップ画面が表示されている場合
-    console.log('Setup screen detected, configuring paths...');
+    // HTTP フォールバック環境では VRChat ディレクトリが存在しないため、
+    // セットアップ画面が正しく表示されることを確認してスクリーンショットを撮る。
+    console.log('Setup screen detected - capturing setup state');
     await screenshot(page, title, 'setup');
-
-    // VRChatログファイルディレクトリの入力フィールドを選択
-    try {
-      const logFileInput = await page.waitForSelector(
-        '[aria-label="input-VRChatログファイルディレクトリ"]',
-        { timeout: 5000 },
-      );
-      await logFileInput.click();
-      await page.keyboard.press('Control+A');
-      await page.keyboard.press('Delete');
-      await page.keyboard.type(path.join(__dirname, '../debug/logs'));
-      const submitButton = await page.waitForSelector(
-        '[aria-label="送信-VRChatログファイルディレクトリ"]',
-      );
-      await submitButton.click();
-
-      // 写真ディレクトリも設定
-      const photoFileInput = await page.waitForSelector(
-        '[aria-label="input-写真ディレクトリ"]',
-      );
-      await photoFileInput.click();
-      await page.keyboard.press('Control+A');
-      await page.keyboard.press('Delete');
-      await page.keyboard.type(path.join(__dirname, '../debug/photos/VRChat'));
-      const photoSubmitButton = await page.waitForSelector(
-        '[aria-label="送信-写真ディレクトリ"]',
-      );
-      await photoSubmitButton.click();
-
-      const confirmButton = await page.waitForSelector(
-        'text=設定を確認して続ける',
-      );
-      await confirmButton.click();
-
-      console.log('Waiting for setup to complete...');
-      await page.waitForTimeout(3000);
-    } catch (error) {
-      console.log('Setup fields interaction failed:', error);
-    }
-
-    // データ処理完了まで待機
-    try {
-      console.log('Waiting for main content to load...');
-      await page.waitForSelector(
-        '[data-testid="location-group-header"], .photo-card',
-        { timeout: 30000 },
-      );
-      await screenshot(page, title, 'logs-loaded');
-      await page.waitForTimeout(500);
-      await screenshot(page, title, 'finalized');
-    } catch (error) {
-      console.log('Main content not loaded after setup:', error);
-      await screenshot(page, title, 'finalized');
-    }
+    await screenshot(page, title, 'finalized');
   } else if (hasMainContent) {
     // 既に写真が表示されている場合
     console.log('Main content already loaded');

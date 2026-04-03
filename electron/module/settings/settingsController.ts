@@ -220,12 +220,15 @@ export const settingsRouter = () =>
      */
     initializeAppData: procedure.mutation(async () => {
       // 重複実行をチェック
+      // throw することで onSuccess が発火しないようにする。
+      // React 18 StrictMode は useEffect を2回実行するため、
+      // 成功レスポンスを返すと2回目の mutation が成功扱いになり、
+      // 1回目の SETUP_REQUIRED エラーが握りつぶされる。
       if (isInitializing) {
         logger.debug(
           'Initialization already in progress, skipping duplicate request',
         );
-        // Sentryに送信しないよう、debugレベルでログ記録
-        return { success: false, message: '初期化処理が既に実行中です' };
+        throw new Error('初期化処理が既に実行中です');
       }
 
       isInitializing = true;
