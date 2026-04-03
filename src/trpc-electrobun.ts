@@ -116,8 +116,16 @@ const electrobunLink: TRPCLink<AppRouter> = () => {
  * Electrobun RPC が利用できない場合（ブラウザ直接アクセス、Playwright テスト時）に使用。
  * dev-trpc-server (port 3001) に HTTP 経由で接続する。
  */
+const httpFallbackUrl =
+  import.meta.env.VITE_TRPC_BASE_URL ??
+  (typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:${
+        import.meta.env.VITE_TRPC_PORT ?? '3001'
+      }/`
+    : `http://localhost:${import.meta.env.VITE_TRPC_PORT ?? '3001'}/`);
+
 const httpFallbackLink = httpBatchLink({
-  url: `http://localhost:${import.meta.env.VITE_TRPC_PORT ?? '3001'}/`,
+  url: httpFallbackUrl,
   transformer: superjson,
 });
 

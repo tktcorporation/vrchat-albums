@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 /**
@@ -26,7 +27,7 @@ const getLogFilePath = (): string => {
     return path.join(Utils.paths.userLogs, 'app.log');
   } catch {
     // テストまたは非 Electrobun 環境
-    return path.join(__dirname, 'test-app.log');
+    return path.join(os.tmpdir(), 'vrchat-albums-test-app.log');
   }
 };
 

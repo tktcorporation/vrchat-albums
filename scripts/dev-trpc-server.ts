@@ -1,5 +1,3 @@
-import { EventEmitter } from 'node:events';
-
 /**
  * 開発/テスト用の tRPC HTTP サーバー。
  *
@@ -11,9 +9,13 @@ import { EventEmitter } from 'node:events';
  *   - Playwright スクリーンショットテスト
  *   - 開発時のブラウザ直接アクセス（electrobun dev の代替）
  *
- * 呼び出し元: package.json の dev:trpc-server / test:playwright
+ * 前提: --require ./scripts/mock-electrobun.cjs で electrobun モジュールをモック化済み
+ *
+ * 呼び出し元: package.json の dev:trpc-server
  * 不要になれば: Electrobun の Playwright テスト対応後に削除可能
  */
+import { EventEmitter } from 'node:events';
+
 import { createHTTPServer } from '@trpc/server/adapters/standalone';
 
 import { router } from '../electron/api';

@@ -30,6 +30,14 @@ export default defineConfig({
         browserName: 'chromium',
         trace: process.env.CI ? 'on-first-retry' : 'on',
       },
+      /**
+       * Electron API を使用するスペック（init-progress, memory-profiling,
+       * photo-loading-debug）を除外し、ブラウザベースの screenshot テストのみ実行。
+       *
+       * 背景: Electrobun 移行後は Electron ランタイムが不要。
+       * Electron 専用テストは将来 Electrobun 対応または別プロジェクトに移行予定。
+       */
+      testMatch: 'screenshot.spec.ts',
       metadata: {
         platform: process.platform,
         headful: true,
