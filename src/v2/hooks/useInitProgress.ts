@@ -6,6 +6,7 @@ import {
   STAGE_LABELS,
 } from '../../../electron/module/initProgress/schema';
 import { trpcReact } from '../../trpc';
+import { isElectrobunAvailable } from '../../trpc-electrobun';
 
 // electronモジュールから型とラベルを再エクスポート
 export type { InitProgressPayload, InitStage };
@@ -63,7 +64,18 @@ const calculateOverallProgress = (
 export const useInitProgress = () => {
   const [progress, setProgress] = useState<InitProgressPayload | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [isSubscriptionReady, setIsSubscriptionReady] = useState(false);
+  /**
+   * HTTP フォールバック時は subscription が利用できないため、
+   * subscription 接続完了を待たずに即座に ready とする。
+   *
+   * 背景: Electrobun RPC 環境では subscription で initProgress を受信し、
+   * ready イベントで isSubscriptionReady が true になる。
+   * ブラウザ直接アクセス / Playwright テスト時は subscription が noop なため、
+   * isSubscriptionReady を最初から true にして初期化をブロックしない。
+   */
+  const [isSubscriptionReady, setIsSubscriptionReady] = useState(
+    !isElectrobunAvailable(),
+  );
 
   // tRPC subscriptionで進捗を購読
   trpcReact.subscribeInitProgress.useSubscription(undefined, {

@@ -13,6 +13,7 @@
 import {
   createTRPCProxyClient,
   httpBatchLink,
+  splitLink,
   type TRPCLink,
 } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
@@ -25,7 +26,7 @@ import type { AppRouter } from '../electron/api';
  * Electrobun RPC が利用可能かどうかを判定する。
  * Electrobun ランタイム上では window.__electrobun が設定される。
  */
-const isElectrobunAvailable = (): boolean => {
+export const isElectrobunAvailable = (): boolean => {
   // effect-lint-allow-try-catch: ランタイム環境検出パターン
   try {
     const electrobun = (window as unknown as Record<string, unknown>)
@@ -130,8 +131,36 @@ const httpFallbackLink = httpBatchLink({
 });
 
 /**
+ * HTTP フォールバック時に subscription をサイレントに無視する noop link。
+ *
+ * 背景: httpBatchLink は subscription をサポートしない。
+ * ブラウザ直接アクセス / Playwright テスト時に subscribeToast や
+ * subscribeInitProgress が呼ばれるとエラーになるため、
+ * subscription タイプの操作は何もせず即座に complete する。
+ */
+const noopSubscriptionLink: TRPCLink<AppRouter> = () => {
+  return ({ op }) => {
+    return observable((observer) => {
+      console.info(
+        `[tRPC] Subscription "${op.path}" skipped (HTTP fallback mode)`,
+      );
+      // subscription を即座に complete せず、開いたまま保持する。
+      // complete() すると React Query が再接続を試みてループする。
+      // unsubscribe 時に自然にクリーンアップされる。
+      return () => {
+        // cleanup on unsubscribe
+      };
+    });
+  };
+};
+
+/**
  * ランタイム環境に応じた tRPC link を選択する。
  * Electrobun RPC が利用可能な場合は RPC 経由、そうでなければ HTTP フォールバック。
+ *
+ * HTTP フォールバック時は splitLink で subscription と query/mutation を分離:
+ * - subscription → noopSubscriptionLink（サイレントに無視）
+ * - query/mutation → httpBatchLink（HTTP 経由で dev-trpc-server に接続）
  *
  * trpcWrapper.tsx からも参照される。
  */
@@ -143,7 +172,13 @@ export const getLinks = (): TRPCLink<AppRouter>[] => {
     '[tRPC] Electrobun RPC not available, using HTTP fallback (port %s)',
     import.meta.env.VITE_TRPC_PORT ?? '3001',
   );
-  return [httpFallbackLink];
+  return [
+    splitLink({
+      condition: (op) => op.type === 'subscription',
+      true: noopSubscriptionLink,
+      false: httpFallbackLink,
+    }),
+  ];
 };
 
 /**
