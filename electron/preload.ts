@@ -9,7 +9,7 @@
  */
 
 // このファイルをモジュールとして扱うための空エクスポート
-export {};
+export type PreloadModule = Record<string, never>;
 
 // Electrobun 環境ではこのファイルは不要
 // Electron フォールバック用として型定義のみ維持

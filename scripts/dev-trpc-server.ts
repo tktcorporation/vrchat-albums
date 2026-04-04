@@ -15,6 +15,7 @@
  * 不要になれば: Electrobun の Playwright テスト対応後に削除可能
  */
 import { EventEmitter } from 'node:events';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -42,10 +43,21 @@ const startServer = async () => {
   store.clearAllStoredSettings();
 
   // データベース初期化（テスト用の一時パス）
+  // E2E テストでは初期ユーザーのフローを再現するため、
+  // 前回実行時の DB を削除してクリーンな状態で起動する。
+  // DB が残っていると isFirstLaunch=false になり INCREMENTAL モードが選択され、
+  // 意図した初回フロー（FULL モード）が検証できない。
+  const dbDir = path.join(os.tmpdir(), 'dev-trpc-user-data');
   const dbPath = path
-    .join(os.tmpdir(), 'dev-trpc-user-data', 'db.sqlite')
+    .join(dbDir, 'db.sqlite')
     .split(path.sep)
     .join(path.posix.sep);
+  for (const suffix of ['', '-shm', '-wal']) {
+    const filePath = path.join(dbDir, `db.sqlite${suffix}`);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
   await sequelizeClient.initRDBClient({ db_url: dbPath });
   console.log(`[dev-trpc-server] Database initialized at: ${dbPath}`);
 

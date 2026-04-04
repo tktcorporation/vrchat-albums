@@ -98,7 +98,10 @@ export const useInitProgress = () => {
   const reset = useCallback(() => {
     setProgress(null);
     setError(null);
-    setIsSubscriptionReady(false);
+    // HTTP フォールバック時は subscription がないため、
+    // リセット後も即座に ready とする（初期状態と同じロジック）。
+    // Electrobun 環境では subscription の 'ready' イベントで true になる。
+    setIsSubscriptionReady(!isElectrobunAvailable());
   }, []);
 
   /**

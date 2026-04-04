@@ -59,7 +59,7 @@ describe('estimateGroupHeight', () => {
     it('キャッシュがundefinedの場合は計算を実行する', () => {
       const photos = createMockPhotos(5);
 
-      const result = estimateGroupHeight(photos, 1000, undefined);
+      const result = estimateGroupHeight(photos, 1000);
 
       expect(result.source).toBe('calculated');
     });
@@ -69,7 +69,7 @@ describe('estimateGroupHeight', () => {
     it('フォールバック高さを返す', () => {
       const photos: Photo[] = [];
 
-      const result = estimateGroupHeight(photos, 1000, undefined);
+      const result = estimateGroupHeight(photos, 1000);
 
       expect(result.height).toBe(
         GROUP_HEIGHT_CONSTANTS.FALLBACK_EMPTY_HEIGHT +
@@ -121,7 +121,7 @@ describe('estimateGroupHeight', () => {
       const photos = createMockPhotos(3);
       const containerWidth = 800;
 
-      const result = estimateGroupHeight(photos, containerWidth, undefined);
+      const result = estimateGroupHeight(photos, containerWidth);
 
       expect(result.source).toBe('calculated');
       expect(result.height).toBeGreaterThan(
@@ -139,13 +139,13 @@ describe('estimateGroupHeight', () => {
       );
 
       // 写真なし
-      const result2 = estimateGroupHeight([], 1000, undefined);
+      const result2 = estimateGroupHeight([], 1000);
       expect(result2.height).toBeGreaterThanOrEqual(
         GROUP_HEIGHT_CONSTANTS.GROUP_SPACING,
       );
 
       // 写真あり
-      const result3 = estimateGroupHeight(createMockPhotos(5), 1000, undefined);
+      const result3 = estimateGroupHeight(createMockPhotos(5), 1000);
       expect(result3.height).toBeGreaterThanOrEqual(
         GROUP_HEIGHT_CONSTANTS.GROUP_SPACING,
       );
@@ -156,17 +156,14 @@ describe('estimateGroupHeight', () => {
       const height1 = estimateGroupHeight(
         createMockPhotos(1),
         containerWidth,
-        undefined,
       ).height;
       const height5 = estimateGroupHeight(
         createMockPhotos(5),
         containerWidth,
-        undefined,
       ).height;
       const height20 = estimateGroupHeight(
         createMockPhotos(20),
         containerWidth,
-        undefined,
       ).height;
 
       expect(height5).toBeGreaterThan(height1);
@@ -296,8 +293,8 @@ describe('effectiveWidth によるレイアウト変化の保証', () => {
   it('異なる effectiveWidth で異なる高さが返される', () => {
     const photos = createMockPhotos(10);
 
-    const narrow = estimateGroupHeight(photos, 600, undefined);
-    const wide = estimateGroupHeight(photos, 1200, undefined);
+    const narrow = estimateGroupHeight(photos, 600);
+    const wide = estimateGroupHeight(photos, 1200);
 
     // 狭い幅 → 多くの行 → 高さが高い
     // 広い幅 → 少ない行 → 高さが低い
@@ -311,10 +308,10 @@ describe('effectiveWidth によるレイアウト変化の保証', () => {
     const photos = createMockPhotos(8);
 
     // 初期幅
-    const initial = estimateGroupHeight(photos, 1000, undefined);
+    const initial = estimateGroupHeight(photos, 1000);
 
     // リサイズ後
-    const afterResize = estimateGroupHeight(photos, 800, undefined);
+    const afterResize = estimateGroupHeight(photos, 800);
 
     // 幅が変わると高さも変わる（どちらが大きいかはレイアウト次第）
     // 重要なのは「幅の変化に応じて高さが再計算される」こと

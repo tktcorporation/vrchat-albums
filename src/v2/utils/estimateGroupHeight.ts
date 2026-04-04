@@ -43,7 +43,7 @@ export interface GroupHeightEstimate {
 export function estimateGroupHeight(
   photos: Photo[],
   containerWidth: number,
-  cachedHeight: number | undefined,
+  cachedHeight?: number,
   calculator?: JustifiedLayoutCalculator,
 ): GroupHeightEstimate {
   // 1. キャッシュがあればそれを使用
