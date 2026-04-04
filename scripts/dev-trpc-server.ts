@@ -17,15 +17,11 @@
 import { EventEmitter } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { createHTTPServer } from '@trpc/server/adapters/standalone';
 
 import * as sequelizeClient from '../electron/lib/sequelize';
 import { initSettingStore } from '../electron/module/settingStore';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * データベースと設定ストアを初期化してから tRPC ルーターをインポートする。
@@ -34,27 +30,13 @@ const __dirname = path.dirname(__filename);
  * dev-trpc-server では Electrobun ランタイムがないため手動で初期化が必要。
  * router のインポートは DB 初期化後に行う必要がある（import 時に
  * Sequelize モデルへの参照が解決されるため）。
+ *
+ * 注意: パスの事前設定はしない。E2E テストでは初期ユーザーと同じ
+ * セットアップフローを検証するため、未設定状態で起動する必要がある。
  */
 const startServer = async () => {
   // 設定ストアの初期化
-  const settingStore = initSettingStore();
-
-  // デバッグデータのパスを事前設定。
-  // セットアップ画面をスキップしてギャラリー画面を直接表示するため。
-  // debug/ ディレクトリは pnpm generate:debug-data で生成される。
-  const debugLogsDir = path.resolve(__dirname, '..', 'debug', 'logs');
-  const debugPhotosDir = path.resolve(
-    __dirname,
-    '..',
-    'debug',
-    'photos',
-    'VRChat',
-  );
-  settingStore.setLogFilesDir(debugLogsDir);
-  settingStore.setVRChatPhotoDir(debugPhotosDir);
-  console.log(
-    `[dev-trpc-server] Pre-configured paths: logs=${debugLogsDir}, photos=${debugPhotosDir}`,
-  );
+  initSettingStore();
 
   // データベース初期化（テスト用の一時パス）
   const dbPath = path

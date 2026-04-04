@@ -34,16 +34,23 @@ const TIMEOUT = 60000;
 test.setTimeout(TIMEOUT);
 
 /**
- * アプリケーションの各画面でスクリーンショットを撮影する。
+ * 初期ユーザーの一連の操作フローを E2E で検証し、各画面のスクリーンショットを撮影する。
  *
- * 背景: Electrobun 移行後は Chromium ブラウザ + Vite dev サーバー + tRPC HTTP サーバーで実行。
- * dev-trpc-server がデバッグデータのパスを事前設定するため、
- * セットアップ画面をスキップしてギャラリー画面に到達する。
+ * このテストの目的:
+ *   初めてアプリを起動したユーザーが、規約同意 → 初期セットアップ（パス設定） →
+ *   ギャラリー画面到達 までの一連のフローが壊れていないことをシナリオベースで検証する。
+ *   各ステップでスクリーンショットを撮影し、PR 上で視覚的にレビューできるようにする。
  *
  * テストフロー:
- *   1. 初期画面（規約モーダル）のスクリーンショット
- *   2. 規約同意
- *   3. メイン画面（ギャラリー）到達後のスクリーンショット
+ *   1. initial    - アプリ起動直後（規約モーダル表示）
+ *   2. terms      - 規約同意画面
+ *   3. setup      - 初期セットアップ画面（VRChat ディレクトリ未設定状態）
+ *   4. logs-loaded - セットアップ完了後、ギャラリー画面（写真・ワールド情報表示）
+ *   5. finalized  - 最終状態
+ *
+ * 前提:
+ *   - playwright.config.ts の webServer で Vite dev サーバー + tRPC HTTP サーバーが起動
+ *   - pnpm generate:debug-data で debug/logs/ と debug/photos/VRChat/ にテストデータ生成済み
  */
 test('各画面でスクショ', async ({ page }) => {
   // スクリーンショット追跡をリセット
@@ -55,14 +62,13 @@ test('各画面でスクショ', async ({ page }) => {
 
   const title = (await page.title()) || 'VRChatAlbums';
 
-  // Listen for critical errors only
   page.on('pageerror', (error) => {
     console.error('[Page Error]', error.message);
   });
 
   await screenshot(page, title, 'initial');
 
-  // 「同意する」が表示されればクリック、表示されなければ次へ進む
+  // ── Step 1: 規約同意 ──
   await page.waitForTimeout(2000);
   const isTermsButtonVisible = await page.isVisible('text=同意する');
   if (isTermsButtonVisible) {
@@ -74,49 +80,89 @@ test('各画面でスクショ', async ({ page }) => {
     consola.log('「同意する」ボタンが表示されていません');
   }
 
-  // 規約同意後の状態を確認
-  console.log('Waiting for app to settle after terms...');
+  // ── Step 2: 初期セットアップ ──
+  // VRChat ディレクトリが未設定のため、セットアップ画面が表示されるはず
+  console.log('Waiting for setup screen...');
   await page.waitForTimeout(3000);
   await screenshot(page, title, 'debug-current-state');
 
-  // メイン画面（ギャラリー）のコンテンツが表示されるのを待つ
-  // dev-trpc-server がデバッグデータのパスを事前設定しているため、
-  // セットアップ画面をスキップしてギャラリーに到達するはず
+  const hasSetupScreen = await page.isVisible('text=初期セットアップ');
+  if (hasSetupScreen) {
+    console.log('Setup screen detected - filling in paths');
+    await screenshot(page, title, 'setup');
+
+    // VRChatログファイルディレクトリのパスを設定
+    // page.fill() は React の制御コンポーネントと互換性が高い
+    // （keyboard.type() と異なり、input イベントを正しく発火する）
+    const logPath = path.resolve(__dirname, '../debug/logs');
+    const photoPath = path.resolve(__dirname, '../debug/photos/VRChat');
+
+    await page.fill(
+      '[aria-label="input-VRChatログファイルディレクトリ"]',
+      logPath,
+    );
+    console.log(`Log directory path filled: ${logPath}`);
+
+    // fill() で値が変わると isManuallyChanged=true になり、送信ボタンが表示される
+    await page.waitForSelector(
+      '[aria-label="送信-VRChatログファイルディレクトリ"]',
+      { timeout: 3000 },
+    );
+    await page.click('[aria-label="送信-VRChatログファイルディレクトリ"]');
+    console.log('Log directory path submitted');
+    await page.waitForTimeout(1000);
+
+    // 写真ディレクトリのパスを設定
+    await page.fill('[aria-label="input-写真ディレクトリ"]', photoPath);
+    console.log(`Photo directory path filled: ${photoPath}`);
+
+    await page.waitForSelector('[aria-label="送信-写真ディレクトリ"]', {
+      timeout: 3000,
+    });
+    await page.click('[aria-label="送信-写真ディレクトリ"]');
+    console.log('Photo directory path submitted');
+    await page.waitForTimeout(1000);
+
+    // 「設定を確認して続ける」ボタンをクリックしてメイン画面へ遷移
+    const continueButton = await page.waitForSelector(
+      'text=設定を確認して続ける',
+      { timeout: 5000 },
+    );
+    await continueButton.click();
+    console.log('Continue button clicked, transitioning to gallery...');
+  } else {
+    console.log('Setup screen not detected, app may already be configured');
+  }
+
+  // ── Step 3: ギャラリー画面到達の確認 ──
+  // LocationGroupHeader または写真カードが表示されるまで待機
   try {
-    console.log('Waiting for main content (gallery) to load...');
+    console.log('Waiting for gallery content to load...');
     await page.waitForSelector(
       '[data-testid="location-group-header"], .photo-card',
       { timeout: 30000 },
     );
-    console.log('Gallery content loaded');
+    console.log('Gallery content loaded successfully');
     await screenshot(page, title, 'logs-loaded');
   } catch {
-    // ギャラリーが見つからない場合、セットアップ画面かもしれない
-    const hasSetupScreen = await page.isVisible('text=初期セットアップ');
-    if (hasSetupScreen) {
-      console.log(
-        'Setup screen still visible - dev-trpc-server may not have pre-configured paths',
-      );
-      await screenshot(page, title, 'setup');
-    } else {
-      console.log(
-        'Neither gallery nor setup screen found, capturing current state',
-      );
-    }
+    console.log('Gallery content not found within timeout');
+    await screenshot(page, title, 'gallery-timeout');
   }
 
   // 最終状態のスクリーンショット
   await page.waitForTimeout(500);
   await screenshot(page, title, 'finalized');
 
-  // テスト終了時に必須スクリーンショットの確認
+  // ── スクリーンショット検証 ──
   console.log('\n=== Verifying screenshots ===');
 
-  // 必須: initial と finalized は常に撮影される
   const requiredScreenshots = ['initial', 'debug-current-state', 'finalized'];
-
-  // オプショナル: terms, setup, logs-loaded はフローによって撮影されない場合がある
-  const optionalScreenshots = ['terms', 'setup', 'logs-loaded'];
+  const optionalScreenshots = [
+    'terms',
+    'setup',
+    'logs-loaded',
+    'gallery-timeout',
+  ];
 
   for (const name of requiredScreenshots) {
     if (!screenshotsTaken.has(name)) {
