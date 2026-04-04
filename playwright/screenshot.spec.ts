@@ -37,13 +37,13 @@ test.setTimeout(TIMEOUT);
  * アプリケーションの各画面でスクリーンショットを撮影する。
  *
  * 背景: Electrobun 移行後は Chromium ブラウザ + Vite dev サーバー + tRPC HTTP サーバーで実行。
- * HTTP フォールバックモードでは subscription は無効化される。
+ * dev-trpc-server がデバッグデータのパスを事前設定するため、
+ * セットアップ画面をスキップしてギャラリー画面に到達する。
  *
  * テストフロー:
- *   1. 初期画面（規約モーダル or メイン画面）のスクリーンショット
- *   2. 規約未同意の場合は同意処理
- *   3. セットアップ画面が表示されたらパスを入力して完了
- *   4. メイン画面（ギャラリー）到達後のスクリーンショット
+ *   1. 初期画面（規約モーダル）のスクリーンショット
+ *   2. 規約同意
+ *   3. メイン画面（ギャラリー）到達後のスクリーンショット
  */
 test('各画面でスクショ', async ({ page }) => {
   // スクリーンショット追跡をリセット
@@ -74,86 +74,35 @@ test('各画面でスクショ', async ({ page }) => {
     consola.log('「同意する」ボタンが表示されていません');
   }
 
-  // 規約同意後またはメイン画面到達後の状態を確認
-  console.log('Waiting for app to settle...');
+  // 規約同意後の状態を確認
+  console.log('Waiting for app to settle after terms...');
   await page.waitForTimeout(3000);
   await screenshot(page, title, 'debug-current-state');
 
-  // セットアップ画面かメイン画面かを判定
-  const hasSetupScreen = await page.isVisible('text=初期セットアップ');
-  const hasMainContent =
-    (await page
-      .locator('[data-testid="location-group-header"], .photo-card')
-      .count()) > 0;
-
-  if (hasSetupScreen) {
-    // セットアップ画面が表示されている場合、パスを入力して遷移する
-    console.log('Setup screen detected - filling in paths');
-    await screenshot(page, title, 'setup');
-
-    // VRChatログファイルディレクトリの入力
-    try {
-      const logFileInput = await page.waitForSelector(
-        '[aria-label="input-VRChatログファイルディレクトリ"]',
-        { timeout: 5000 },
-      );
-      await logFileInput.click();
-      await page.keyboard.press('Control+A');
-      await page.keyboard.press('Delete');
-      await page.keyboard.type(path.join(__dirname, '../debug/logs'));
-      const logSubmitButton = await page.waitForSelector(
-        '[aria-label="送信-VRChatログファイルディレクトリ"]',
-      );
-      await logSubmitButton.click();
-      console.log('Log directory path submitted');
-
-      // 写真ディレクトリの入力
-      const photoFileInput = await page.waitForSelector(
-        '[aria-label="input-写真ディレクトリ"]',
-      );
-      await photoFileInput.click();
-      await page.keyboard.press('Control+A');
-      await page.keyboard.press('Delete');
-      await page.keyboard.type(path.join(__dirname, '../debug/photos/VRChat'));
-      const photoSubmitButton = await page.waitForSelector(
-        '[aria-label="送信-写真ディレクトリ"]',
-      );
-      await photoSubmitButton.click();
-      console.log('Photo directory path submitted');
-
-      // 「設定を確認して続ける」ボタンをクリック
-      const continueButton = await page.waitForSelector(
-        'text=設定を確認して続ける',
-      );
-      await continueButton.click();
-      console.log('Continue button clicked, waiting for main screen...');
-
-      // メイン画面が表示されるまで待機
-      await page.waitForTimeout(3000);
-    } catch (error) {
-      console.log('Setup path filling failed:', error);
-      // パス入力に失敗してもテストは継続する
-    }
-  } else if (hasMainContent) {
-    console.log('Main content already loaded');
-  } else {
-    console.log('Neither setup nor main content detected');
-  }
-
-  // メイン画面（ギャラリーまたは空画面）のスクリーンショット
-  // LocationGroupHeader または写真カードが表示されるのを待つ
+  // メイン画面（ギャラリー）のコンテンツが表示されるのを待つ
+  // dev-trpc-server がデバッグデータのパスを事前設定しているため、
+  // セットアップ画面をスキップしてギャラリーに到達するはず
   try {
-    console.log('Waiting for main content to load...');
+    console.log('Waiting for main content (gallery) to load...');
     await page.waitForSelector(
       '[data-testid="location-group-header"], .photo-card',
-      { timeout: 15000 },
+      { timeout: 30000 },
     );
+    console.log('Gallery content loaded');
     await screenshot(page, title, 'logs-loaded');
   } catch {
-    // メインコンテンツが見つからなくても現在の状態をキャプチャ
-    console.log(
-      'Main content not found within timeout, capturing current state',
-    );
+    // ギャラリーが見つからない場合、セットアップ画面かもしれない
+    const hasSetupScreen = await page.isVisible('text=初期セットアップ');
+    if (hasSetupScreen) {
+      console.log(
+        'Setup screen still visible - dev-trpc-server may not have pre-configured paths',
+      );
+      await screenshot(page, title, 'setup');
+    } else {
+      console.log(
+        'Neither gallery nor setup screen found, capturing current state',
+      );
+    }
   }
 
   // 最終状態のスクリーンショット

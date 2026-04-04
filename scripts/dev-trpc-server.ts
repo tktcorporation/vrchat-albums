@@ -17,11 +17,15 @@
 import { EventEmitter } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { createHTTPServer } from '@trpc/server/adapters/standalone';
 
 import * as sequelizeClient from '../electron/lib/sequelize';
 import { initSettingStore } from '../electron/module/settingStore';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * データベースと設定ストアを初期化してから tRPC ルーターをインポートする。
@@ -33,7 +37,24 @@ import { initSettingStore } from '../electron/module/settingStore';
  */
 const startServer = async () => {
   // 設定ストアの初期化
-  initSettingStore();
+  const settingStore = initSettingStore();
+
+  // デバッグデータのパスを事前設定。
+  // セットアップ画面をスキップしてギャラリー画面を直接表示するため。
+  // debug/ ディレクトリは pnpm generate:debug-data で生成される。
+  const debugLogsDir = path.resolve(__dirname, '..', 'debug', 'logs');
+  const debugPhotosDir = path.resolve(
+    __dirname,
+    '..',
+    'debug',
+    'photos',
+    'VRChat',
+  );
+  settingStore.setLogFilesDir(debugLogsDir);
+  settingStore.setVRChatPhotoDir(debugPhotosDir);
+  console.log(
+    `[dev-trpc-server] Pre-configured paths: logs=${debugLogsDir}, photos=${debugPhotosDir}`,
+  );
 
   // データベース初期化（テスト用の一時パス）
   const dbPath = path
