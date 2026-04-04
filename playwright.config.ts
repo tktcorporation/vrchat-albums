@@ -1,12 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
 /**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// require('dotenv').config();
-
-/**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
@@ -18,15 +12,12 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  /* Electronテストは同一SQLiteファイルへのアクセスで競合するため、ローカルでも1 worker */
+  /* テストは同一SQLiteファイルへのアクセスで競合するため、ローカルでも1 worker */
   workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [['html', { open: 'never' }]],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://127.0.0.1:3000',
-
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
@@ -39,10 +30,18 @@ export default defineConfig({
         browserName: 'chromium',
         trace: process.env.CI ? 'on-first-retry' : 'on',
       },
+      /**
+       * Electron API を使用するスペック（init-progress, memory-profiling,
+       * photo-loading-debug）を除外し、ブラウザベースの screenshot テストのみ実行。
+       *
+       * 背景: Electrobun 移行後は Electron ランタイムが不要。
+       * Electron 専用テストは将来 Electrobun 対応または別プロジェクトに移行予定。
+       */
+      testMatch: 'screenshot.spec.ts',
       metadata: {
         platform: process.platform,
         headful: true,
-        browserName: 'electron',
+        browserName: 'chromium',
         channel: undefined,
         mode: 'default',
         video: false,
@@ -50,18 +49,30 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    // Use dev:vite directly to avoid race condition with build:electron
-    // The electron main process files are already built by test:playwright
-    command: 'pnpm dev:vite',
-    url: 'http://localhost:3000',
-    reuseExistingServer: false,
-    timeout: 60000,
-    env: {
-      NODE_OPTIONS: `--max-old-space-size=${
-        process.env.PLAYWRIGHT_MAX_MEMORY ?? '4096'
-      }`,
+  /**
+   * Vite dev サーバーと tRPC HTTP サーバーの両方を起動する。
+   *
+   * 背景: Electrobun 移行後、Playwright テストは Electron アプリではなく
+   * Chromium ブラウザで Vite dev サーバーに直接アクセスする。
+   * tRPC 通信は dev-trpc-server (HTTP) 経由で行う。
+   */
+  webServer: [
+    {
+      command: 'pnpm dev:trpc-server',
+      port: 3001,
+      reuseExistingServer: false,
+      timeout: 30000,
     },
-  },
+    {
+      command: 'pnpm dev:vite',
+      url: 'http://localhost:3000',
+      reuseExistingServer: false,
+      timeout: 60000,
+      env: {
+        NODE_OPTIONS: `--max-old-space-size=${
+          process.env.PLAYWRIGHT_MAX_MEMORY ?? '4096'
+        }`,
+      },
+    },
+  ],
 });

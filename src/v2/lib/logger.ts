@@ -15,7 +15,6 @@
  * ```
  */
 
-import * as Sentry from '@sentry/electron/renderer';
 import { match, P } from 'ts-pattern';
 
 interface LogParams {
@@ -120,21 +119,25 @@ const warn = (params: LogParams | string): void => {
 const error = (params: LogParams | string): void => {
   log('error', params, console.error);
 
-  // Sentry にエラーを送信
-  match(params)
-    .with(P.string, (msg) => {
-      Sentry.captureMessage(msg, 'error');
+  // @sentry/browser でエラーを送信
+  // Sentry 未初期化時は captureException が no-op になるため安全
+  import('@sentry/browser')
+    .then((Sentry) => {
+      match(params)
+        .with(P.string, (msg) => {
+          Sentry.captureException(new Error(msg));
+        })
+        .otherwise((p) => {
+          const errorObj = p.error
+            ? normalizeError(p.error)
+            : new Error(p.message);
+          Sentry.captureException(errorObj, {
+            extra: p.details,
+          });
+        });
     })
-    .otherwise((p) => {
-      const errorToSend = p.error
-        ? normalizeError(p.error)
-        : new Error(p.message);
-      Sentry.captureException(errorToSend, {
-        extra: {
-          ...p.details,
-          originalMessage: p.message,
-        },
-      });
+    .catch(() => {
+      // @sentry/browser が利用不可の場合はログのみ
     });
 };
 

@@ -7,13 +7,14 @@ process.env.npm_package_version ??= '0.0.0-test';
 
 import * as client from './electron/lib/sequelize';
 
-// Sentryのモック設定
-vi.mock('@sentry/electron/main', () => ({
+// @sentry/node のモック設定
+vi.mock('@sentry/node', () => ({
   captureException: vi.fn(),
+  captureMessage: vi.fn(),
   init: vi.fn(),
 }));
 
-// React Testing Libraryのクリーンアップ
+// React Testing Library のクリーンアップ
 afterEach(() => {
   cleanup();
 });
@@ -22,7 +23,81 @@ afterAll(async () => {
   await client.__cleanupTestRDBClient();
 });
 
-// electronモジュールのモック
+// Electrobun モジュールのモック
+vi.mock('electrobun/bun', () => {
+  const mockUtils = {
+    paths: {
+      userData: '/tmp/test-user-data',
+      userLogs: '/tmp/test-logs',
+      home: '/tmp/test-home',
+      appData: '/tmp/test-appdata',
+      temp: '/tmp',
+      downloads: '/tmp/test-downloads',
+      documents: '/tmp/test-documents',
+      pictures: '/tmp/test-pictures',
+      desktop: '/tmp/test-desktop',
+      config: '/tmp/test-config',
+      cache: '/tmp/test-cache',
+      logs: '/tmp/test-logs',
+      userCache: '/tmp/test-cache',
+    },
+    openExternal: vi.fn(),
+    openPath: vi.fn(),
+    showItemInFolder: vi.fn(),
+    openFileDialog: vi.fn().mockResolvedValue([]),
+    showNotification: vi.fn(),
+    clipboardReadText: vi.fn().mockResolvedValue(''),
+    clipboardWriteText: vi.fn(),
+    quit: vi.fn(),
+  };
+
+  const mockBrowserWindow = vi.fn().mockReturnValue({
+    close: vi.fn(),
+    focus: vi.fn(),
+    minimize: vi.fn(),
+    maximize: vi.fn(),
+    isMinimized: vi.fn().mockReturnValue(false),
+    isMaximized: vi.fn().mockReturnValue(false),
+    unminimize: vi.fn(),
+    unmaximize: vi.fn(),
+  });
+  (mockBrowserWindow as unknown as Record<string, unknown>).getAllWindows = vi
+    .fn()
+    .mockReturnValue([]);
+
+  const mockBrowserView = {
+    defineRPC: vi.fn().mockReturnValue({}),
+  };
+
+  return {
+    Utils: mockUtils,
+    BrowserWindow: mockBrowserWindow,
+    BrowserView: mockBrowserView,
+    ApplicationMenu: { setApplicationMenu: vi.fn() },
+    Tray: vi.fn().mockReturnValue({
+      setMenu: vi.fn(),
+      on: vi.fn(),
+      remove: vi.fn(),
+    }),
+    Screen: {
+      getPrimaryDisplay: vi.fn().mockReturnValue({
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        workArea: { x: 0, y: 0, width: 1920, height: 1040 },
+      }),
+    },
+  };
+});
+
+vi.mock('electrobun/view', () => ({
+  Electroview: vi.fn().mockReturnValue({
+    rpc: {
+      request: {},
+      send: {},
+    },
+  }),
+}));
+
+// Electron モジュールのモック（後方互換性のため維持）
 vi.mock('electron', () => {
   const mockApp = {
     getPath: vi.fn(),
@@ -48,7 +123,6 @@ vi.mock('electron', () => {
 
   const mockBrowserWindow = vi.fn();
 
-  // CommonJSモジュールとしてエクスポート
   const mock = {
     default: {
       app: mockApp,
@@ -65,18 +139,4 @@ vi.mock('electron', () => {
   };
 
   return mock;
-});
-
-// vi.mock section after existing mocks
-vi.mock('electron-trpc/renderer', () => {
-  /** No-op TRPC link mock to prevent tests from requiring Electron context */
-  // oxlint-disable-next-line eslint-plugin-unicorn(consistent-function-scoping) -- vi.mockはホイスティングされるため、外部スコープの変数を参照できない
-  const mockIpcLink = () => {
-    return (_runtime: unknown) =>
-      ({ next, op }: { next: (operation: unknown) => unknown; op: unknown }) =>
-        next(op);
-  };
-  return {
-    ipcLink: mockIpcLink,
-  };
 });

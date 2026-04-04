@@ -3,7 +3,6 @@ import * as path from 'node:path';
 
 import * as datefns from 'date-fns';
 import { Effect } from 'effect';
-import type Electron from 'electron';
 import { match } from 'ts-pattern';
 
 import {
@@ -67,9 +66,13 @@ const getElectronDownloadsPath = (): string | null => {
   // Playwright テスト互換性のため遅延評価
   // @see CLAUDE.md Electron Module Import パターン
   const electronApp = (() => {
-    // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
+    // effect-lint-allow-try-catch: Electrobun 互換パターン
     try {
-      return (require('electron') as typeof Electron).app;
+      const compat = require('../../../lib/electrobunCompat');
+      return {
+        getPath: compat.getPath,
+        isPackaged: compat.isPackaged(),
+      } as { getPath: (name: string) => string; isPackaged: boolean };
     } catch {
       return null;
     }

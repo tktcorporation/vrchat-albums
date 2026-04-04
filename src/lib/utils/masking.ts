@@ -1,8 +1,4 @@
-import type { Event } from '@sentry/electron/main';
-
-interface ErrorEvent extends Event {
-  type: undefined;
-}
+import type { ErrorEvent } from '@sentry/browser';
 
 /**
  * 文字列中のファイルパスに含まれる可能性のあるユーザー名をマスクします。

@@ -227,7 +227,9 @@ export const appendLoglinesToFile = (props: {
           // Unexpected errors should propagate as defects
           yield* fs.writeFileSyncSafe(newFilePath, newLog).pipe(
             Effect.catchAll((e) => {
-              throw e;
+              throw new Error(`Failed to write log file: ${e.message}`, {
+                cause: e,
+              });
             }),
           );
           continue;
@@ -282,13 +284,17 @@ export const appendLoglinesToFile = (props: {
       if (isExists) {
         yield* fs.appendFileAsync(logStoreFilePath.value, newLog).pipe(
           Effect.catchAll((e) => {
-            throw e;
+            throw new Error(`Failed to append log file: ${e.error.message}`, {
+              cause: e,
+            });
           }),
         );
       } else {
         yield* fs.writeFileSyncSafe(logStoreFilePath.value, newLog).pipe(
           Effect.catchAll((e) => {
-            throw e;
+            throw new Error(`Failed to write log file: ${e.message}`, {
+              cause: e,
+            });
           }),
         );
       }

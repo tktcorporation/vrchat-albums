@@ -1,18 +1,36 @@
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
-// Sentryのモック設定
-vi.mock('@sentry/electron/main', () => ({
+// @sentry/browser のモック設定
+vi.mock('@sentry/browser', () => ({
   captureException: vi.fn(),
+  captureMessage: vi.fn(),
   init: vi.fn(),
 }));
 
-// React Testing Libraryのクリーンアップ
+// React Testing Library のクリーンアップ
 afterEach(() => {
   cleanup();
 });
 
-// electronモジュールのモック
+// Electrobun モジュールのモック
+vi.mock('electrobun/bun', () => ({
+  Utils: {
+    paths: {
+      userData: '/tmp/test-user-data',
+      userLogs: '/tmp/test-logs',
+      home: '/tmp/test-home',
+    },
+  },
+  BrowserWindow: vi.fn(),
+  BrowserView: { defineRPC: vi.fn() },
+}));
+
+vi.mock('electrobun/view', () => ({
+  Electroview: vi.fn().mockReturnValue({ rpc: { request: {}, send: {} } }),
+}));
+
+// Electron モジュールのモック（後方互換性）
 vi.mock('electron', () => {
   const mockApp = {
     getPath: vi.fn(),
@@ -21,24 +39,11 @@ vi.mock('electron', () => {
     quit: vi.fn(),
   };
 
-  const mockIpcMain = {
-    handle: vi.fn(),
-    on: vi.fn(),
-  };
-
-  const mockIpcRenderer = {
-    invoke: vi.fn(),
-    on: vi.fn(),
-    send: vi.fn(),
-  };
-
-  const mockDialog = {
-    showOpenDialog: vi.fn(),
-  };
-
+  const mockIpcMain = { handle: vi.fn(), on: vi.fn() };
+  const mockIpcRenderer = { invoke: vi.fn(), on: vi.fn(), send: vi.fn() };
+  const mockDialog = { showOpenDialog: vi.fn() };
   const mockBrowserWindow = vi.fn();
 
-  // CommonJSモジュールとしてエクスポート
   const mock = {
     default: {
       app: mockApp,
@@ -55,18 +60,4 @@ vi.mock('electron', () => {
   };
 
   return mock;
-});
-
-// vi.mock section after existing mocks
-vi.mock('electron-trpc/renderer', () => {
-  /** No-op TRPC link mock to prevent tests from requiring Electron context */
-  // oxlint-disable-next-line eslint-plugin-unicorn(consistent-function-scoping) -- vi.mockはホイスティングされるため、外部スコープの変数を参照できない
-  const mockIpcLink = () => {
-    return (_runtime: unknown) =>
-      ({ next, op }: { next: (operation: unknown) => unknown; op: unknown }) =>
-        next(op);
-  };
-  return {
-    ipcLink: mockIpcLink,
-  };
 });

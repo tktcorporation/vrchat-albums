@@ -57,6 +57,16 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
   // 初期化開始時刻を記録（最小表示時間保証用）
   const initStartTimeRef = useRef<number | null>(null);
 
+  /**
+   * React 18 StrictMode による useEffect 二重実行で
+   * mutation.mutate() が2回呼ばれるのを防ぐガード。
+   *
+   * 背景: mutate() 呼び出し後、mutation.isIdle の状態更新は
+   * 非同期にスケジュールされるため、StrictMode の2回目の
+   * effect 実行時にまだ isIdle = true の場合がある。
+   */
+  const hasMutationStartedRef = useRef(false);
+
   // tRPC utils for query invalidation
   const utils = trpcReact.useUtils();
 
@@ -158,8 +168,10 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
     match({
       stage: stages.initialization,
       isIdle: mutation.isIdle,
+      hasStarted: hasMutationStartedRef.current,
     })
-      .with({ stage: 'pending', isIdle: true }, () => {
+      .with({ stage: 'pending', isIdle: true, hasStarted: false }, () => {
+        hasMutationStartedRef.current = true;
         mutation.mutate();
       })
       .otherwise(() => {});
@@ -176,6 +188,7 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
   const retryProcess = useCallback(() => {
     setStages(initialStages);
     setError(null);
+    hasMutationStartedRef.current = false;
     mutationRef.current.reset();
     // startInitialization は useEffect で自動的に呼ばれる
   }, []);

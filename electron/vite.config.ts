@@ -1,9 +1,16 @@
+/**
+ * Electron/Electrobun メインプロセスのビルド設定。
+ *
+ * 背景: tRPC ルーターとビジネスロジックのバンドルに使用。
+ * Electrobun 移行後もビジネスロジック（electron/module/）のビルドに利用。
+ * Electrobun のメインプロセスは Bun が直接実行するため、
+ * このビルドは主にテスト・lint 用。
+ */
 import { builtinModules } from 'node:module';
 import { join } from 'node:path';
 
 import { defineConfig } from 'vite';
 
-// Node.js の組み込みモジュールのリストを作成（'node:' プレフィックス付きと無しの両方）
 const nodeBuiltins = [
   ...builtinModules,
   ...builtinModules.map((m) => `node:${m}`),
@@ -30,21 +37,19 @@ export default defineConfig({
     },
     rollupOptions: {
       external: [
-        // Sentry 関連のモジュール
-        '@sentry/electron',
-        '@sentry/electron/main',
+        // Electrobun モジュール
+        'electrobun/bun',
+        'electrobun/view',
+        'electrobun',
+        // Sentry（将来 @sentry/node に移行予定）
+        '@sentry/cli',
         '@sentry/vite-plugin',
-        // Electron 関連のモジュール
-        'electron',
-        'electron-log',
-        'electron-store',
-        'electron-unhandled',
-        'electron-updater',
+        // ネイティブモジュール
         'exiftool-vendored',
         '@napi-rs/image',
         '@resvg/resvg-js',
         'clip-filepaths',
-        // Sequelize 関連のモジュール
+        // Sequelize 関連
         '@sequelize/core',
         '@sequelize/core/decorators-legacy',
         '@sequelize/sqlite3',
@@ -55,9 +60,8 @@ export default defineConfig({
         '@sequelize/db2',
         '@sequelize/db2-ibmi',
         '@sequelize/snowflake',
-        // Node.js の組み込みモジュールを外部化
+        // Node.js 組み込みモジュール
         ...nodeBuiltins,
-        // 必要に応じて他の外部依存関係を追加
       ],
       output: {
         entryFileNames: '[name].cjs',
@@ -66,7 +70,6 @@ export default defineConfig({
     },
     sourcemap: true,
     minify: process.env.NODE_ENV === 'production',
-    // TypeScript のデコレータをサポートするための設定
     commonjsOptions: {
       transformMixedEsModules: true,
       include: [/node_modules/, /@sequelize\/core/],
@@ -78,15 +81,12 @@ export default defineConfig({
       '@shared': join(__dirname, '../shared'),
     },
   },
-  // esbuild の設定を追加
   esbuild: {
-    // デコレータのサポートを有効化
     target: 'node20',
     supported: {
       decorators: true,
     },
   },
-  // TypeScript の設定
   optimizeDeps: {
     esbuildOptions: {
       target: 'node20',

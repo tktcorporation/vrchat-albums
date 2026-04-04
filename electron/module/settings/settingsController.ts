@@ -1,5 +1,6 @@
 import { Cause, Effect, Exit, Option } from 'effect';
-import type { UpdateCheckResult } from 'electron-updater';
+// Electrobun 移行: electron-updater は不要。型はインラインで定義。
+type UpdateCheckResult = unknown;
 import { match, P } from 'ts-pattern';
 
 import { reloadMainWindow } from '../../electronUtil';
@@ -163,7 +164,7 @@ export const settingsRouter = () =>
     checkForUpdatesAndReturnResult: procedure.query(
       async (): Promise<{
         isUpdateAvailable: boolean;
-        updateInfo: UpdateCheckResult | null;
+        updateInfo: UpdateCheckResult;
       }> => {
         const exit = await Effect.runPromiseExit(
           settingService.getElectronUpdaterInfo(),
@@ -219,12 +220,15 @@ export const settingsRouter = () =>
      */
     initializeAppData: procedure.mutation(async () => {
       // 重複実行をチェック
+      // throw することで onSuccess が発火しないようにする。
+      // React 18 StrictMode は useEffect を2回実行するため、
+      // 成功レスポンスを返すと2回目の mutation が成功扱いになり、
+      // 1回目の SETUP_REQUIRED エラーが握りつぶされる。
       if (isInitializing) {
         logger.debug(
           'Initialization already in progress, skipping duplicate request',
         );
-        // Sentryに送信しないよう、debugレベルでログ記録
-        return { success: false, message: '初期化処理が既に実行中です' };
+        throw new Error('初期化処理が既に実行中です');
       }
 
       isInitializing = true;
@@ -310,18 +314,19 @@ export const settingsRouter = () =>
           logger.info(
             'Step 3.5: Setting default auto-start enabled for first launch...',
           );
-          await import('electron')
-            .then(({ app }) => {
-              app.setLoginItemSettings({
-                openAtLogin: true,
-                openAsHidden: true,
-              });
-              logger.info('Auto-start enabled by default for first launch');
-            })
-            .catch((error) => {
-              logger.warn('Failed to set default auto-start:', error);
-              // 自動起動の設定に失敗してもアプリの初期化は続行
+          // Electrobun 互換: getApp() 経由で自動起動設定
+          // effect-lint-allow-try-catch: ランタイム環境検出パターン
+          try {
+            const { getApp } = require('../../lib/electronModules');
+            getApp().setLoginItemSettings({
+              openAtLogin: true,
+              openAsHidden: true,
             });
+            logger.info('Auto-start enabled by default for first launch');
+          } catch (error) {
+            logger.warn('Failed to set default auto-start:', error);
+            // 自動起動の設定に失敗してもアプリの初期化は続行
+          }
         } else if (isFirstLaunch && process.env.PLAYWRIGHT_TEST) {
           logger.info('Step 3.5: Skipping auto-start setup in Playwright test');
         }
@@ -410,7 +415,7 @@ export const settingsRouter = () =>
           message: 'Application data initialization failed',
           stack: match(error)
             .with(P.instanceOf(Error), (err) => err)
-            .otherwise(() => undefined),
+            .otherwise((): undefined => undefined),
         });
 
         // エラーメッセージを抽出

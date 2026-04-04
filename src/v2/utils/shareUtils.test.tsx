@@ -5,7 +5,14 @@ import { downloadOrCopyImageAsPng } from './shareUtils';
 describe('shareUtils', () => {
   describe('downloadOrCopyImageAsPng', () => {
     it('should call mutation with correct params', async () => {
-      const copyImageMutation = vi.fn().mockResolvedValue(undefined);
+      const copyImageMutation = vi
+        .fn<
+          (params: {
+            pngBase64: string;
+            filenameWithoutExt: string;
+          }) => Promise<void>
+        >()
+        .mockResolvedValue();
 
       await downloadOrCopyImageAsPng({
         pngBase64: 'test-base64',
@@ -22,7 +29,14 @@ describe('shareUtils', () => {
     });
 
     it('should handle null PNG base64 data', async () => {
-      const copyImageMutation = vi.fn().mockResolvedValue(undefined);
+      const copyImageMutation = vi
+        .fn<
+          (params: {
+            pngBase64: string;
+            filenameWithoutExt: string;
+          }) => Promise<void>
+        >()
+        .mockResolvedValue();
 
       await expect(
         downloadOrCopyImageAsPng({

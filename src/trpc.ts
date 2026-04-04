@@ -1,27 +1,10 @@
-import { createTRPCProxyClient } from '@trpc/client';
-import { createTRPCReact } from '@trpc/react-query';
-import superjson from 'superjson';
-import { ipcLink } from 'trpc-electron/renderer';
-
-import type { AppRouter } from '../electron/api';
-
 /**
- * Reactコンポーネント内でtRPCプロシージャを呼び出すためのクライアント。
- * `useQuery`, `useMutation`, `useSubscription` などのReactフックを提供し、
- * データの取得、更新、キャッシュ管理、ローディング状態の管理などをReactの流儀で簡単に行えます。
- * UIのリアクティブな更新に適しています。
- */
-export const trpcReact = createTRPCReact<AppRouter>();
-
-/**
- * Reactのライフサイクル外 (例: イベントハンドラ、コールバック関数、Sentryの`beforeSend`のような純粋なJS関数内)で
- * tRPCプロシージャを命令的に呼び出すためのプレーンなクライアント。
- * Reactフックを使用せず、直接 `.query()` や `.mutate()` メソッドを呼び出してデータを操作します。
- * バックグラウンド処理や特定のタイミングでのデータ操作が主目的の場合に適しています。
+ * tRPC クライアント（Electrobun 版）。
  *
- * `trpcReact` と `trpcClient` は同じ `AppRouter` と `transformer` (`superjson`) を共有し、
- * `ipcLink` を通じてメインプロセスと通信します。
+ * 背景: Electron では trpc-electron/renderer の ipcLink を使用していた。
+ * Electrobun では RPC 経由で tRPC ルーターを呼び出す。
+ *
+ * Electrobun RPC の trpcCall を使い、既存の tRPC ルーターを呼び出す。
+ * trpcReact と trpcClient のインターフェースは Electron 版と同じ。
  */
-export const trpcClient = createTRPCProxyClient<AppRouter>({
-  links: [ipcLink({ transformer: superjson })],
-});
+export { trpcReact, trpcClient } from './trpc-electrobun';

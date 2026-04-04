@@ -1,151 +1,100 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock dependencies
-const mockCaptureException = vi.fn();
-const mockCaptureMessage = vi.fn();
-const mockGetSettingStore = vi.fn();
+/**
+ * @sentry/node を使ったロガーの Sentry 連携テスト。
+ *
+ * 背景: @sentry/electron/main から @sentry/node に移行。
+ * logger.error / logger.warnWithSentry が @sentry/node の
+ * captureException / captureMessage を呼ぶことを検証する。
+ *
+ * 注意: vitest.setup.ts で @sentry/node はグローバルにモック済み。
+ * logger.ts は静的 import で @sentry/node を使用するため、
+ * vi.mock のホイスティングでモックが正しく適用される。
+ */
+import { logger } from './logger';
 
-describe('logger Sentry consent integration', () => {
+describe('logger Sentry integration (@sentry/node)', () => {
+  let mockCaptureException: ReturnType<typeof vi.fn>;
+  let mockCaptureMessage: ReturnType<typeof vi.fn>;
+
   beforeEach(async () => {
-    vi.resetAllMocks();
-    vi.resetModules();
-
-    // Set up mocks before importing
-    vi.doMock('electron', () => ({
-      app: {
-        getPath: () => '/test/logs',
-        isPackaged: false,
-      },
-    }));
-
-    vi.doMock('@sentry/electron/main', () => ({
-      captureException: mockCaptureException,
-      captureMessage: mockCaptureMessage,
-    }));
-
-    vi.doMock('../module/settingStore', () => ({
-      getSettingStore: mockGetSettingStore,
-    }));
-
-    vi.doMock('electron-log', () => ({
-      error: vi.fn(),
-      warn: vi.fn(),
-      info: vi.fn(),
-      debug: vi.fn(),
-      transports: {
-        file: {
-          resolvePathFn: vi.fn(),
-          maxSize: 0,
-          level: 'debug',
-          format: '',
-          getFile: () => ({ path: '/test/path' }),
-        },
-        console: {
-          level: 'debug',
-          format: '',
-        },
-      },
-    }));
+    vi.clearAllMocks();
+    const Sentry = await import('@sentry/node');
+    mockCaptureException = vi.mocked(Sentry.captureException);
+    mockCaptureMessage = vi.mocked(Sentry.captureMessage);
   });
 
-  it('should not send to Sentry when terms are not accepted', async () => {
-    mockGetSettingStore.mockReturnValue({
-      getTermsAccepted: () => false,
-    });
+  it('should send error to Sentry via captureException', () => {
+    const testError = new Error('Test error');
+    logger.error({ message: testError });
 
-    // Dynamically import logger after mocks are set
-    const { logger } = await import('./logger');
-
-    logger.error({ message: 'Test error without consent' });
-
-    // Sentryが呼ばれていないことを確認
-    expect(mockCaptureException).not.toHaveBeenCalled();
-  });
-
-  it('should send to Sentry when terms are accepted', async () => {
-    mockGetSettingStore.mockReturnValue({
-      getTermsAccepted: () => true,
-    });
-
-    // Dynamically import logger after mocks are set
-    const { logger } = await import('./logger');
-
-    logger.error({ message: 'Test error with consent' });
-
-    // Sentryが呼ばれていることを確認
     expect(mockCaptureException).toHaveBeenCalledWith(
-      expect.any(Error),
+      testError,
       expect.objectContaining({
-        tags: {
-          source: 'electron-main',
-        },
+        extra: undefined,
       }),
     );
   });
 
+  it('should send string message error to Sentry', () => {
+    logger.error({ message: 'String error message' });
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.anything(),
+    );
+  });
+
+  it('should send error with details as extra', () => {
+    logger.error({
+      message: 'Error with details',
+      details: { worldId: 'wrld_123' },
+    });
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: { worldId: 'wrld_123' },
+      }),
+    );
+  });
+
+  it('should prefer stack over normalized error for captureException', () => {
+    const stackError = new Error('Original stack');
+    logger.error({ message: 'Wrapper message', stack: stackError });
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      stackError,
+      expect.anything(),
+    );
+  });
+
   describe('warnWithSentry', () => {
-    it('should not send to Sentry when terms are not accepted', async () => {
-      mockGetSettingStore.mockReturnValue({
-        getTermsAccepted: () => false,
+    it('should send warning to Sentry via captureMessage', () => {
+      logger.warnWithSentry({ message: 'Test warning' });
+
+      expect(mockCaptureMessage).toHaveBeenCalledWith('Test warning', {
+        level: 'warning',
+        extra: undefined,
       });
-
-      const { logger } = await import('./logger');
-
-      logger.warnWithSentry({ message: 'Test warning without consent' });
-
-      expect(mockCaptureMessage).not.toHaveBeenCalled();
     });
 
-    it('should send warning to Sentry via captureMessage when terms are accepted', async () => {
-      mockGetSettingStore.mockReturnValue({
-        getTermsAccepted: () => true,
-      });
-
-      const { logger } = await import('./logger');
-
-      logger.warnWithSentry({ message: 'Test warning with consent' });
-
-      expect(mockCaptureMessage).toHaveBeenCalledWith(
-        'Test warning with consent',
-        expect.objectContaining({
-          level: 'warning',
-          tags: {
-            source: 'electron-main',
-          },
-        }),
-      );
-    });
-
-    it('should include details in Sentry extra when provided', async () => {
-      mockGetSettingStore.mockReturnValue({
-        getTermsAccepted: () => true,
-      });
-
-      const { logger } = await import('./logger');
-
+    it('should include details in Sentry extra when provided', () => {
       logger.warnWithSentry({
-        message: 'Test warning with details',
+        message: 'Warning with details',
         details: { worldId: 'wrld_123', retryCount: 3 },
       });
 
       expect(mockCaptureMessage).toHaveBeenCalledWith(
-        'Test warning with details',
+        'Warning with details',
         expect.objectContaining({
           level: 'warning',
-          extra: expect.objectContaining({
-            details: { worldId: 'wrld_123', retryCount: 3 },
-          }),
+          extra: { worldId: 'wrld_123', retryCount: 3 },
         }),
       );
     });
 
-    it('should extract message from Error objects', async () => {
-      mockGetSettingStore.mockReturnValue({
-        getTermsAccepted: () => true,
-      });
-
-      const { logger } = await import('./logger');
-
+    it('should extract message from Error objects', () => {
       logger.warnWithSentry({
         message: new Error('Error object warning'),
       });

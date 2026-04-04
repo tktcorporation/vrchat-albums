@@ -49,7 +49,7 @@ vi.mock('../../../lib/dbQueue', () => ({
   getDBQueue: vi.fn(() => ({
     transaction: vi.fn((callback: (t: unknown) => Promise<unknown>) => {
       return Effect.tryPromise({
-        try: () => callback(null),
+        try: () => callback(undefined),
         catch: (e) => {
           throw e;
         },

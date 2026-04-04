@@ -678,7 +678,9 @@ describe('vrchatPhoto.service', () => {
       const cacheFailureWarning = loggerWarnSpy.mock.calls.find(
         (call) =>
           typeof call[0] === 'object' &&
-          call[0].message?.includes('Thumbnail cache has failed'),
+          (call[0] as { message?: string }).message?.includes(
+            'Thumbnail cache has failed',
+          ),
       );
       expect(cacheFailureWarning).toBeDefined();
 
@@ -722,7 +724,9 @@ describe('vrchatPhoto.service', () => {
       const cacheFailureWarning = loggerWarnSpy.mock.calls.find(
         (call) =>
           typeof call[0] === 'object' &&
-          call[0].message?.includes('Thumbnail cache has failed'),
+          (call[0] as { message?: string }).message?.includes(
+            'Thumbnail cache has failed',
+          ),
       );
       expect(cacheFailureWarning).toBeUndefined();
 

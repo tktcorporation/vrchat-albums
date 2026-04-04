@@ -344,17 +344,15 @@ describe('settingsController.initializeAppData', () => {
     }
     const firstPromise = initializeAppData();
 
-    // 2回目の実行（重複）
+    // 2回目の実行（重複）- エラーがスローされることを確認
+    // React 18 StrictMode 対策として throw に変更したため、
+    // onSuccess が発火せず最初の実行のエラーが正しく伝播される
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
     }
-    const secondResult = await initializeAppData();
-
-    // 2回目は重複として処理される
-    expect(secondResult).toEqual({
-      success: false,
-      message: '初期化処理が既に実行中です',
-    });
+    await expect(initializeAppData()).rejects.toThrow(
+      '初期化処理が既に実行中です',
+    );
     expect(mockLogger.debug).toHaveBeenCalledWith(
       'Initialization already in progress, skipping duplicate request',
     );

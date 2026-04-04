@@ -1,23 +1,26 @@
-import type Electron from 'electron';
 /**
- * Get the path to the user data directory.
- * ex. C:\Users\username\AppData\Roaming\app-name
+ * アプリケーションパス取得ユーティリティ。
+ *
+ * 背景: Electron の app.getPath('userData') の代替。
+ * Electrobun の Utils.paths.userData にマッピング。
+ * テスト環境ではフォールバックパスを返す。
+ *
+ * 呼び出し元: electron/lib/sequelize.ts, electron/index.ts
  */
-export const getAppUserDataPath = () => {
-  // effect-lint-allow-try-catch: Electron 環境検出パターン
+import * as compat from './electrobunCompat';
+
+/**
+ * ユーザーデータディレクトリのパスを取得する。
+ * ex. ~/.config/com.tktcorporation.vrchat-albums/ (Linux)
+ * ex. ~/Library/Application Support/com.tktcorporation.vrchat-albums/ (macOS)
+ * ex. %APPDATA%/com.tktcorporation.vrchat-albums/ (Windows)
+ */
+export const getAppUserDataPath = (): string => {
+  // effect-lint-allow-try-catch: Electrobun 環境検出パターン
   try {
-    const { app } = require('electron') as typeof Electron;
-    return app.getPath('userData');
+    return compat.getAppUserDataPath();
   } catch {
-    // テストまたは非Electron環境
+    // テストまたは非 Electrobun 環境
     return '/tmp/test-user-data';
   }
 };
-
-// /**
-//  * Get the path to the app directory.
-//  * ex. C:\Program Files\app-name
-//  */
-// export const getAppPath = () => {
-//   return app.getAppPath();
-// };

@@ -10,19 +10,24 @@ const config: KnipConfig = {
   entry: [
     // Renderer process
     'src/main.tsx',
-    // Main process
+    // Main process (Electron legacy)
     'electron/index.ts',
     'electron/preload.ts',
     'electron/api.ts',
     'electron/vite.config.ts',
+    // Electrobun entry points
+    'src/bun/index.ts',
+    'src/main-ui/index.ts',
     // tRPC controllers are used dynamically
     'electron/module/**/*Controller.ts',
   ],
-  project: ['src/**/*.{ts,tsx}', 'electron/**/*.ts'],
+  project: ['src/**/*.{ts,tsx}', 'electron/**/*.ts', 'shared/**/*.ts'],
   ignoreBinaries: [
     'only-allow',
     // grit binary comes from @getgrit/cli package
     'grit',
+    // electron-builder is used in CI workflows only
+    'electron-builder',
   ],
   ignoreDependencies: [
     '@antfu/ni',
@@ -30,6 +35,8 @@ const config: KnipConfig = {
     'tw-animate-css',
     // Used in scripts/ which is ignored by knip
     'minimatch',
+    // Electrobun runtime - resolved at build time
+    'electrobun',
   ],
   ignore: [
     // shadcn/ui components

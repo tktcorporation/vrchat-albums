@@ -1,19 +1,13 @@
-import type { Event, EventHint } from '@sentry/electron/main';
-import { init as initSentry } from '@sentry/electron/renderer';
+import * as Sentry from '@sentry/browser';
 import { memo, useEffect, useState } from 'react';
 import { match } from 'ts-pattern';
 
 import { Toaster } from '@/components/ui/toaster';
 import { scrubEventData } from '@/lib/utils/masking';
-import { trpcClient, trpcReact } from '@/trpc';
+import { trpcReact } from '@/trpc';
 import { TrpcWrapper } from '@/trpcWrapper';
 
 import './App.css';
-import { ERROR_CATEGORIES, parseErrorFromTRPC } from './types/errors';
-
-// Electron レンダラープロセスでの開発環境検出
-const isDev = process.env.NODE_ENV === 'development';
-
 import { AppHeader } from './components/AppHeader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import PhotoGallery from './components/PhotoGallery';
@@ -24,10 +18,7 @@ import { StartupProvider, useStartup } from './contexts/StartupContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useToast } from './hooks/use-toast';
 import { useLoadingState } from './hooks/useLoadingState';
-
-interface ErrorEvent extends Event {
-  type: undefined;
-}
+import { ERROR_CATEGORIES, parseErrorFromTRPC } from './types/errors';
 
 /**
  * 規約の確認や Sentry の初期化など、起動時の処理を行うコンポーネント。
@@ -53,52 +44,13 @@ function AppContent() {
   const { mutateAsync: initializeSentryMain } =
     trpcReact.initializeSentry.useMutation({
       onSuccess: () => {
-        initSentry({
-          dsn: process.env.SENTRY_DSN, // 環境変数からDSNを取得
-          environment: isDev ? 'development' : 'production',
-          debug: isDev,
-          // Sentryプラグインが注入するリリース識別子
-          release: __SENTRY_RELEASE__,
-          tags: {
-            source: 'electron-renderer',
-          },
-          beforeSend: async (event: ErrorEvent, _hint: EventHint) => {
-            // effect-lint-allow-try-catch: React フロントエンド境界
-            try {
-              // 開発環境でも規約同意をチェックする
-              const currentTermsStatus =
-                await trpcClient.getTermsAccepted.query();
-              if (!currentTermsStatus?.accepted) {
-                if (isDev) {
-                  console.log(
-                    'Sentry event dropped in renderer development mode due to terms not accepted.',
-                  );
-                } else {
-                  console.log(
-                    'Sentry event dropped in renderer due to terms not accepted (queried from main).',
-                  );
-                }
-                return null;
-              }
-
-              // 個人情報マスク処理を追加
-              const processedEvent = scrubEventData(event);
-
-              if (isDev) {
-                console.log('Sentry event sent in renderer development mode.');
-              }
-
-              return processedEvent;
-            } catch (error) {
-              console.error(
-                'Failed to query terms status from main process for Sentry or scrub event:',
-                error,
-              );
-              return null;
-            }
-          },
-        });
-        console.log('Sentry initialized in renderer process');
+        if (process.env.SENTRY_DSN) {
+          Sentry.init({
+            dsn: process.env.SENTRY_DSN,
+            environment: process.env.NODE_ENV ?? 'production',
+            beforeSend: (event) => scrubEventData(event),
+          });
+        }
       },
       onError: (error) => {
         toast({
@@ -120,9 +72,17 @@ function AppContent() {
       } // termsStatusが取得できるまで待つ
 
       // Sentryの初期化（レンダラープロセス側）を試みる
-      // 実際の初期化やイベント送信は、DSNの有無やbeforeSendフックで制御される
+      // 失敗しても規約表示をブロックしない（Sentry は必須機能ではない）
       // initializeSentryMain の onSuccess フック内でレンダラープロセスのSentryが初期化される
-      await initializeSentryMain();
+      // effect-lint-allow-try-catch: Sentry 初期化失敗はアプリ動作に影響させないため
+      try {
+        await initializeSentryMain();
+      } catch (sentryError) {
+        console.warn(
+          'Sentry initialization failed (non-blocking):',
+          sentryError,
+        );
+      }
 
       const { accepted, version } = termsStatus;
       const currentVersion = terms.version;

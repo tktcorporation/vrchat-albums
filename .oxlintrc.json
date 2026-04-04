@@ -160,7 +160,8 @@
         "unicorn/consistent-function-scoping": "off",
         "no-shadow": "off",
         "require-yield": "off",
-        "vitest/hoisted-apis-on-top": "off"
+        "vitest/hoisted-apis-on-top": "off",
+        "no-useless-undefined": "off"
       }
     }
   ],

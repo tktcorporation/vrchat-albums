@@ -1,10 +1,16 @@
+/**
+ * tRPC プロバイダラッパー（Electrobun 版）。
+ *
+ * 背景: Electron では trpc-electron/renderer の ipcLink を使用していた。
+ * Electrobun では electrobunLink（Electrobun RPC 経由の tRPC ブリッジ）を使用。
+ * Electrobun RPC が利用できない場合は HTTP フォールバックに自動切替する。
+ */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { FC, ReactNode } from 'react';
 import { useMemo, useState } from 'react';
-import superjson from 'superjson';
-import { ipcLink } from 'trpc-electron/renderer';
 
 import { trpcReact } from './trpc';
+import { getLinks } from './trpc-electrobun';
 
 const MOCK_API = import.meta.env.VITE_MOCK_API === 'true';
 
@@ -13,8 +19,6 @@ interface Props {
 }
 export const TrpcWrapper: FC<Props> = ({ children }) => {
   if (MOCK_API) {
-    // console.log('USING MOCK MODE');
-
     return children;
   }
 
@@ -41,7 +45,7 @@ export const TrpcWrapper: FC<Props> = ({ children }) => {
   // oxlint-disable-next-line react/rules-of-hooks -- 同上
   const [trpcClient] = useState(() =>
     trpcReact.createClient({
-      links: [ipcLink({ transformer: superjson })],
+      links: getLinks(),
     }),
   );
   return (

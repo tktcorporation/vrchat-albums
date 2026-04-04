@@ -12,6 +12,14 @@ declare global {
   const __SENTRY_RELEASE__: string;
 
   interface Window {
+    Main?: {
+      sendErrorMessage: (message: string) => void;
+      Minimize: () => void;
+      Maximize: () => void;
+      Close: () => void;
+      on: (channel: string, callback: (data: unknown) => void) => void;
+      removeAllListeners: (channel: string) => void;
+    };
     MyOn?: {
       receiveStatusToUseVRChatLogFilesDir: (
         callback: (
