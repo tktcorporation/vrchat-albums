@@ -72,9 +72,17 @@ function AppContent() {
       } // termsStatusが取得できるまで待つ
 
       // Sentryの初期化（レンダラープロセス側）を試みる
-      // 実際の初期化やイベント送信は、DSNの有無やbeforeSendフックで制御される
+      // 失敗しても規約表示をブロックしない（Sentry は必須機能ではない）
       // initializeSentryMain の onSuccess フック内でレンダラープロセスのSentryが初期化される
-      await initializeSentryMain();
+      // effect-lint-allow-try-catch: Sentry 初期化失敗はアプリ動作に影響させないため
+      try {
+        await initializeSentryMain();
+      } catch (sentryError) {
+        console.warn(
+          'Sentry initialization failed (non-blocking):',
+          sentryError,
+        );
+      }
 
       const { accepted, version } = termsStatus;
       const currentVersion = terms.version;

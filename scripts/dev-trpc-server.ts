@@ -36,7 +36,10 @@ import { initSettingStore } from '../electron/module/settingStore';
  */
 const startServer = async () => {
   // 設定ストアの初期化
-  initSettingStore();
+  // E2E テストでは初期ユーザーのフローを再現するため、
+  // 前回実行時の設定（termsAccepted 等）を全クリアして未設定状態で起動する。
+  const store = initSettingStore();
+  store.clearAllStoredSettings();
 
   // データベース初期化（テスト用の一時パス）
   const dbPath = path
