@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.28.1
+
+### Patch Changes
+
+- [#758](https://github.com/tktcorporation/vrchat-albums/pull/758) [`b0fcb81`](https://github.com/tktcorporation/vrchat-albums/commit/b0fcb8193c35ce672aa57c43981f782ae9098c18) Thanks [@tktcorporation](https://github.com/tktcorporation)! - セキュリティ強化: 脆弱な依存パッケージのオーバーライド追加、ts-prune 削除、.npmrc 設定追加
+
 ## 0.28.0
 
 ### Minor Changes
