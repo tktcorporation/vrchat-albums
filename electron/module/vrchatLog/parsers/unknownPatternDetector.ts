@@ -2,19 +2,22 @@ import { logger } from '../../../lib/logger';
 import {
   DETECTION_BROAD_PATTERNS,
   FILTER_PATTERNS,
+  KNOWN_NOISE_PATTERNS,
   LOG_PATTERNS,
 } from '../constants/logPatterns';
 import type { VRChatLogLine } from '../model';
 
 /**
- * パーサーが処理対象として認識するすべてのパターン。
- * FILTER_PATTERNS に加え、補助的に使われるパターン（ワールド名抽出用等）も含む。
+ * パーサーが処理対象として認識するすべてのパターン + 処理不要な既知ノイズ。
+ * FILTER_PATTERNS に加え、補助的に使われるパターン（ワールド名抽出用等）と、
+ * VRChat が正常に出力するが処理不要なパターンを含む。
  *
  * この一覧に含まれる文字列を持つ行は「既知」として扱い、未知パターン検知の対象外とする。
  */
 const KNOWN_PATTERNS: readonly string[] = [
   ...FILTER_PATTERNS,
   LOG_PATTERNS.WORLD_NAME,
+  ...KNOWN_NOISE_PATTERNS,
 ];
 
 /**
@@ -117,9 +120,24 @@ export const extractPatternSkeleton = (line: string): string => {
 const reportedSkeletons = new Set<string>();
 
 /**
+ * プロセスあたりの Sentry error 送信上限。
+ *
+ * 未知パターンは VRChat のアップデートで一度に複数追加されることがあるが、
+ * 同一プロセス内でそれ以上送信しても新しい情報は得られない。
+ * 上限到達後は warn（ローカルログのみ）に降格して Sentry クオータを保護する。
+ *
+ * 背景: v0.27.0 で 9,619 件/14日の Sentry イベントが発生した（VRCHAT-PHOTO-ELECTRON-5C）。
+ */
+const MAX_SENTRY_REPORTS_PER_PROCESS = 3;
+let sentryReportCount = 0;
+
+/**
  * 未知パターンを検出し、結果をロガーに記録する。
- * 未知パターンが見つかった場合のみ Sentry に送信する。
- * 同一プロセス内で既に報告済みのパターンは再送信しない。
+ *
+ * 送信ポリシー:
+ * 1. 同一骨格パターンはプロセス内で1回のみ報告（reportedSkeletons で重複排除）
+ * 2. Sentry への error 送信はプロセスあたり最大 MAX_SENTRY_REPORTS_PER_PROCESS 回
+ * 3. 上限到達後は warn に降格（ローカルログには残るが Sentry には送らない）
  *
  * @param logLines 検査対象のログ行
  */
@@ -146,25 +164,34 @@ export const detectAndReportUnknownPatterns = (
     reportedSkeletons.add(p);
   }
 
-  logger.warn(
+  const message =
     `Detected ${summary.totalCount} unknown log pattern(s) matching broad filter. ` +
-      `${newPatterns.length} new unique pattern(s) found. ` +
-      'VRChat may have added new log events.',
-  );
+    `${newPatterns.length} new unique pattern(s) found. ` +
+    'VRChat may have added new log events.';
 
-  // Sentry に送信して追跡可能にする
-  logger.error({
-    message: new Error(
-      `Unknown VRChat log patterns detected: ${newPatterns.length} unique pattern(s)`,
-    ),
-    details: {
-      uniquePatterns: newPatterns,
-      totalCount: summary.totalCount,
-    },
-  });
+  // Sentry 送信上限チェック: 上限内なら error（Sentry送信）、超過なら warn（ローカルのみ）
+  if (sentryReportCount < MAX_SENTRY_REPORTS_PER_PROCESS) {
+    sentryReportCount++;
+    logger.warn(message);
+    logger.error({
+      message: new Error(
+        `Unknown VRChat log patterns detected: ${newPatterns.length} unique pattern(s)`,
+      ),
+      details: {
+        uniquePatterns: newPatterns,
+        totalCount: summary.totalCount,
+        sentryReportCount,
+      },
+    });
+  } else {
+    logger.warn(
+      `${message} (Sentry report suppressed: ${sentryReportCount}/${MAX_SENTRY_REPORTS_PER_PROCESS} reports sent this session)`,
+    );
+  }
 };
 
-/** テスト用: reportedSkeletons をリセットする */
+/** テスト用: reportedSkeletons と sentryReportCount をリセットする */
 export const _resetReportedSkeletons = (): void => {
   reportedSkeletons.clear();
+  sentryReportCount = 0;
 };

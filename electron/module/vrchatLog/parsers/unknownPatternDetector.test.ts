@@ -184,4 +184,68 @@ describe('detectAndReportUnknownPatterns', () => {
       }),
     );
   });
+
+  it('Sentry 送信上限（3回）を超えたら error ではなく warn に降格する', async () => {
+    const { logger } = await import('../../../lib/logger');
+
+    // 異なるパターンで3回送信 → 全て error
+    for (let i = 0; i < 3; i++) {
+      vi.clearAllMocks();
+      detectAndReportUnknownPatterns(
+        [
+          `2024.01.15 12:34:5${i} Log - [Behaviour] Pattern${i} data`,
+        ].map(asLogLine),
+      );
+      expect(logger.error).toHaveBeenCalledTimes(1);
+    }
+
+    vi.clearAllMocks();
+
+    // 4回目 → error は呼ばれず warn のみ
+    detectAndReportUnknownPatterns(
+      [
+        '2024.01.15 12:35:00 Log - [Behaviour] Pattern3 data',
+      ].map(asLogLine),
+    );
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Sentry report suppressed'),
+    );
+  });
+});
+
+describe('detectUnknownPatterns - ノイズパターン除外', () => {
+  it('Sanity check パターンは既知として除外される', () => {
+    const lines = [
+      '2025.06.22 10:49:18 Debug - [Behaviour] Sanity check passed for ID: 1, Path: 386',
+      '2025.06.22 10:49:19 Debug - [Behaviour] Sanity check passed for ID: 2, Path: 500',
+    ].map(asLogLine);
+
+    const result = detectUnknownPatterns(lines);
+    expect(result.totalCount).toBe(0);
+    expect(result.uniquePatterns).toHaveLength(0);
+  });
+
+  it('Avatar Expression Parameter パターンは既知として除外される', () => {
+    const lines = [
+      "2026.01.01 00:39:01 Error - [Behaviour] Avatar Expression Parameter 'GestureLeft' duplicate definition",
+      "2026.01.01 00:39:02 Error - [Behaviour] Avatar Expression Parameter 'GestureRight' duplicate definition",
+    ].map(asLogLine);
+
+    const result = detectUnknownPatterns(lines);
+    expect(result.totalCount).toBe(0);
+    expect(result.uniquePatterns).toHaveLength(0);
+  });
+
+  it('変数部分が異なっても同じパターンとして除外される', () => {
+    const lines = [
+      '2025.06.22 10:49:18 Debug - [Behaviour] Sanity check passed for ID: 99, Path: 1234',
+      "2026.03.15 12:00:00 Error - [Behaviour] Avatar Expression Parameter 'VRCEmote' duplicate definition",
+    ].map(asLogLine);
+
+    const result = detectUnknownPatterns(lines);
+    expect(result.totalCount).toBe(0);
+    expect(result.uniquePatterns).toHaveLength(0);
+  });
 });

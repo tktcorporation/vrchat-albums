@@ -45,3 +45,19 @@ export const FILTER_PATTERNS = [
  * パース処理には使わないこと（パフォーマンス劣化を避けるため）。
  */
 export const DETECTION_BROAD_PATTERNS = ['[Behaviour]'] as const;
+
+/**
+ * 未知パターン検知で除外する VRChat 内部ログパターン。
+ *
+ * パーサーが処理対象としない [Behaviour] 行のうち、VRChat が正常に出力する
+ * ことが確認されたパターン。これらは「未知」ではなく「処理不要な既知」として扱う。
+ *
+ * 背景: v0.27.0 で未知パターン検知を導入した際、VRChat が出力する多数の
+ * [Behaviour] 行が Sentry に大量送信される問題が発生した（VRCHAT-PHOTO-ELECTRON-5C/5D）。
+ *
+ * 新しい VRChat ログパターンを Sentry で確認したら、ここに追加すること。
+ */
+export const KNOWN_NOISE_PATTERNS = [
+  '[Behaviour] Sanity check',
+  '[Behaviour] Avatar Expression Parameter',
+] as const;
