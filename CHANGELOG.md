@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.28.2
+
+### Patch Changes
+
+- [#761](https://github.com/tktcorporation/vrchat-albums/pull/761) [`39a88b3`](https://github.com/tktcorporation/vrchat-albums/commit/39a88b3a499126d55c5b681aa746dd3b3e2cb854) Thanks [@tktcorporation](https://github.com/tktcorporation)! - セキュリティ修正: electron, electron-builder, tar 等の依存パッケージを更新し、23 件の脆弱性を 1 件(low)に削減。サプライチェーン攻撃対策として .npmrc に min-released-date=3d を追加。
+
 ## 0.28.1
 
 ### Patch Changes
