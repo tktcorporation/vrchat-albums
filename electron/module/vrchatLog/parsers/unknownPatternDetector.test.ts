@@ -192,9 +192,9 @@ describe('detectAndReportUnknownPatterns', () => {
     for (let i = 0; i < 3; i++) {
       vi.clearAllMocks();
       detectAndReportUnknownPatterns(
-        [
-          `2024.01.15 12:34:5${i} Log - [Behaviour] Pattern${i} data`,
-        ].map(asLogLine),
+        [`2024.01.15 12:34:5${i} Log - [Behaviour] Pattern${i} data`].map(
+          asLogLine,
+        ),
       );
       expect(logger.error).toHaveBeenCalledTimes(1);
     }
@@ -203,9 +203,7 @@ describe('detectAndReportUnknownPatterns', () => {
 
     // 4回目 → error は呼ばれず warn のみ
     detectAndReportUnknownPatterns(
-      [
-        '2024.01.15 12:35:00 Log - [Behaviour] Pattern3 data',
-      ].map(asLogLine),
+      ['2024.01.15 12:35:00 Log - [Behaviour] Pattern3 data'].map(asLogLine),
     );
     expect(logger.error).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalledTimes(1);
