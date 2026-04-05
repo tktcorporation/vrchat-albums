@@ -103,6 +103,15 @@ const ja: Translations = {
       name: 'アプリ名',
       dependencies: '主要な依存関係',
       openLog: 'アプリログを開く',
+      update: {
+        checkForUpdates: 'アップデートを確認',
+        checking: '確認中...',
+        available: '新しいバージョン {version} が利用可能です',
+        upToDate: '最新バージョンです',
+        downloaded: '新しいバージョンがダウンロード済みです',
+        installAndRestart: 'インストールして再起動',
+        checkFailed: 'アップデートの確認に失敗しました',
+      },
       licenses: {
         title: 'ライセンス情報',
         viewLicense: 'ライセンスを表示',

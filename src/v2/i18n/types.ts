@@ -128,6 +128,15 @@ export interface Translations {
       name: string;
       dependencies: string;
       openLog: string;
+      update: {
+        checkForUpdates: string;
+        checking: string;
+        available: string;
+        upToDate: string;
+        downloaded: string;
+        installAndRestart: string;
+        checkFailed: string;
+      };
       licenses: {
         title: string;
         viewLicense: string;
