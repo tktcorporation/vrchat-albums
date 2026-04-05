@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.1
+
+### Patch Changes
+
+- [#767](https://github.com/tktcorporation/vrchat-albums/pull/767) [`0fe6df6`](https://github.com/tktcorporation/vrchat-albums/commit/0fe6df6a8331a628716e8b7753350c21b0f0a15b) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 未知ログパターン検知の Sentry 大量送信を抑制
+
 ## 0.29.0
 
 ### Minor Changes
