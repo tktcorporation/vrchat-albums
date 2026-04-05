@@ -93,5 +93,6 @@ export const installUpdate = (): Effect.Effect<void, UpdateError> => {
       // quitAndInstall は void を返すので、同期的に呼び出し
       autoUpdater.quitAndInstall();
     }),
+    Effect.as(void 0),
   );
 };

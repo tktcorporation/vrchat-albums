@@ -73,6 +73,7 @@ export const setVRChatLogFilesDirByDialog = (): Effect.Effect<
       const settingStore = getSettingStore();
       settingStore.setLogFilesDir(dirPath);
     }),
+    Effect.as(void 0),
   );
 };
 

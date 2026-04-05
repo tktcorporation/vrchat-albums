@@ -45,8 +45,5 @@ app.log
 worktrees/
 .worktrees/
 
-# Jujutsu
-.jj/
-
 # Node compile cache
 node-compile-cache/

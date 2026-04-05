@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'lsof.*-ti.*\\|.*xargs.*kill|lsof.*-ti.*\\|.*kill|kill.*\\$\\(lsof|kill.*lsof|fuser.*-k'; then echo 'BLOCKED: lsof+kill / fuser+kill はポートフォワーディングプロセスを巻き込んで devcontainer を殺す。代わりに pkill -f で特定プロセス名を指定して kill すること。' >&2; exit 2; fi"
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'lsof.*-ti.*\\|.*xargs.*kill|lsof.*-ti.*\\|.*kill|kill.*\\$\\(lsof|kill.*lsof|fuser.*-k'; then echo 'BLOCKED: lsof+kill / fuser+kill はポートフォワーディングプロセスを巻き込んで devcontainer を殺す。代わりに lsof -i :PORT でプロセスを確認し、対象の PID を特定してから kill <PID> すること。' >&2; exit 2; fi"
           },
           {
             "type": "command",

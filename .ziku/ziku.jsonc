@@ -19,7 +19,6 @@
     ".claude/settings.json",
     ".claude/hooks/*.sh",
     ".claude/rules/*.md",
-    ".claude/rules/jujutsu.md",
     ".claude/skills/upstream-fix/SKILL.md",
     ".claude/skills/ui-craft",
     ".claude/skills/ui-design-research",
