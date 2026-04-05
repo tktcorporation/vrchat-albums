@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.29.0
+
+### Minor Changes
+
+- [#765](https://github.com/tktcorporation/vrchat-albums/pull/765) [`3ad0ec6`](https://github.com/tktcorporation/vrchat-albums/commit/3ad0ec60360956605bf37a12cd02f5b6675e8e6e) Thanks [@tktcorporation](https://github.com/tktcorporation)! - アプリ情報画面にアップデート確認・インストール機能を追加
+
+- [#763](https://github.com/tktcorporation/vrchat-albums/pull/763) [`307cfcf`](https://github.com/tktcorporation/vrchat-albums/commit/307cfcfea8185761bcb63e84cbbc209f88b2f2c0) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Vite 8 + Rolldown へのアップグレード。バンドラーが Rolldown（Rust 製）に統一され、ビルド速度が向上。
+
 ## 0.28.2
 
 ### Patch Changes
