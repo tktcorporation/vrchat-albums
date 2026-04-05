@@ -408,9 +408,7 @@ export const settingsRouter = () =>
       } catch (error) {
         logger.error({
           message: 'Application data initialization failed',
-          stack: match(error)
-            .with(P.instanceOf(Error), (err) => err)
-            .otherwise(() => undefined),
+          stack: error instanceof Error ? error : undefined,
         });
 
         // エラーメッセージを抽出

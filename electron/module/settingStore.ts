@@ -304,18 +304,16 @@ const setSettingStore = (name: StoreName) => {
     },
     getWindowBounds: (): Rectangle | undefined => {
       const bounds = store.get('windowBounds');
-      return match(bounds)
-        .when(
-          (b): b is Rectangle =>
-            b !== null &&
-            typeof b === 'object' &&
-            'x' in b &&
-            'y' in b &&
-            'width' in b &&
-            'height' in b,
-          (b) => b,
-        )
-        .otherwise(() => undefined);
+      if (
+        bounds !== null &&
+        typeof bounds === 'object' &&
+        'x' in bounds &&
+        'y' in bounds &&
+        'width' in bounds &&
+        'height' in bounds
+      ) {
+        return bounds as Rectangle;
+      }
     },
     getTermsAccepted: getTermsAccepted(getB),
     setTermsAccepted: setTermsAccepted(set),
