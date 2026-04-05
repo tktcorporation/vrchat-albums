@@ -35,8 +35,15 @@ const getFilenameFromPath = (filePath: string): string => {
   // Split by both forward slashes and backslashes
   const parts = filePath.split(/[/\\]/);
   const filename = parts.at(-1);
-  // If filename is empty (path ends with separator), try the second to last part
-  return filename || parts.at(-2) || filePath;
+  // 空文字の場合（パスがセパレータで終わる場合）、手前のパーツを返す
+  if (filename) {
+    return filename;
+  }
+  const parent = parts.at(-2);
+  if (parent) {
+    return parent;
+  }
+  return filePath;
 };
 
 /**

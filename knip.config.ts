@@ -15,6 +15,7 @@ const config: KnipConfig = {
     'electron/preload.ts',
     'electron/api.ts',
     'electron/vite.config.ts',
+    'electron/vite.config.preload.ts',
     // tRPC controllers are used dynamically
     'electron/module/**/*Controller.ts',
   ],

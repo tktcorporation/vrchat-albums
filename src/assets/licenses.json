@@ -95,12 +95,6 @@
     "path": "node_modules/@sequelize/sqlite3",
     "licenseFile": "node_modules/@sequelize/sqlite3/LICENSE"
   },
-  "@tailwindcss/vite@4.1.18": {
-    "licenses": "MIT",
-    "repository": "https://github.com/tailwindlabs/tailwindcss",
-    "path": "node_modules/@tailwindcss/vite",
-    "licenseFile": "node_modules/@tailwindcss/vite/LICENSE"
-  },
   "@tanstack/react-query@5.90.20": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
@@ -135,13 +129,6 @@
     "publisher": "KATT",
     "path": "node_modules/@trpc/server",
     "licenseFile": "node_modules/@trpc/server/LICENSE"
-  },
-  "@vitejs/plugin-react@5.1.2": {
-    "licenses": "MIT",
-    "repository": "https://github.com/vitejs/vite-plugin-react",
-    "publisher": "Evan You",
-    "path": "node_modules/@vitejs/plugin-react",
-    "licenseFile": "node_modules/@vitejs/plugin-react/LICENSE"
   },
   "class-variance-authority@0.7.1": {
     "licenses": "Apache-2.0",
@@ -344,7 +331,7 @@
     "path": "node_modules/tailwind-merge",
     "licenseFile": "node_modules/tailwind-merge/LICENSE.md"
   },
-  "tailwindcss@4.1.18": {
+  "tailwindcss@4.2.2": {
     "licenses": "MIT",
     "repository": "https://github.com/tailwindlabs/tailwindcss",
     "path": "node_modules/tailwindcss",
@@ -385,14 +372,7 @@
     "path": "node_modules/uuidv7",
     "licenseFile": "node_modules/uuidv7/LICENSE"
   },
-  "vite@7.3.1": {
-    "licenses": "MIT",
-    "repository": "https://github.com/vitejs/vite",
-    "publisher": "Evan You",
-    "path": "node_modules/vite",
-    "licenseFile": "node_modules/vite/LICENSE.md"
-  },
-  "vrchat-albums@0.28.1": {
+  "vrchat-albums@0.28.2": {
     "licenses": "Custom: https://github.com/tktcorporation/vrchat-albums/releases",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",
