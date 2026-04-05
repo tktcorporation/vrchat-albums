@@ -28,6 +28,7 @@ const tasks: LintTask[] = [
   { name: 'jsdoc-see', script: 'scripts/lint-jsdoc-see.ts' },
   { name: 'ts-pattern', script: 'scripts/lint-ts-pattern.ts' },
   { name: 'logger-level', script: 'scripts/lint-logger-level.ts' },
+  { name: 'native-hoist', script: 'scripts/lint-native-hoist.ts' },
 ];
 
 let allPassed = true;
