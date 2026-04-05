@@ -57,6 +57,7 @@
     "lint:jsdoc-see": "tsx scripts/lint-jsdoc-see.ts",
     "lint:ts-pattern": "tsx scripts/lint-ts-pattern.ts",
     "lint:logger-level": "tsx scripts/lint-logger-level.ts",
+    "lint:native-hoist": "tsx scripts/lint-native-hoist.ts",
     "lint:ast-grep": "ast-grep scan --warning",
     "lint:oxlint": "oxlint",
     "lint:fmt-check": "oxfmt --check .",
