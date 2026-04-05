@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import {
   ArrowUpRight,
   CheckCircle,
@@ -24,6 +25,11 @@ import {
 import { useI18n } from '../../i18n/store';
 import { SettingsSection } from './common';
 import SqliteConsole from './SqliteConsole';
+
+/** アップデートチェック時のエラー型 */
+interface UpdateCheckError {
+  type: 'UPDATE_CHECK_FAILED';
+}
 
 /**
  * アップデートチェックの UI 状態。
@@ -52,35 +58,56 @@ const AppInfo = memo(() => {
     status: 'idle',
   });
 
-  /** アップデートを確認し、結果に応じて状態を更新する */
+  /**
+   * アップデートを確認し、結果に応じて状態を更新する。
+   * tRPC クライアント呼び出しを Effect.tryPromise でラップし、
+   * エラーを UpdateCheckError として型安全に伝播する。
+   */
   const handleCheckForUpdates = useCallback(() => {
     setUpdateState({ status: 'checking' });
 
-    void (async () => {
-      try {
-        const result =
-          await trpcClient.settings.checkForUpdatesAndReturnResult.query();
+    type CheckResult =
+      | { status: 'up-to-date' }
+      | { status: 'available'; version: string }
+      | { status: 'downloaded' };
 
-        if (result.isUpdateAvailable && result.updateInfo) {
-          // autoDownload=true なので、チェック後すぐにダウンロードが始まる。
-          // ダウンロード済みかどうかを確認して表示を分ける。
-          const downloadStatus =
-            await trpcClient.updater.getUpdateStatus.query();
-          if (downloadStatus.updateDownloaded) {
-            setUpdateState({ status: 'downloaded' });
-          } else {
-            setUpdateState({
-              status: 'available',
-              version: result.updateInfo.updateInfo.version,
-            });
-          }
-        } else {
-          setUpdateState({ status: 'up-to-date' });
-        }
-      } catch {
-        setUpdateState({ status: 'error' });
-      }
-    })();
+    const checkEffect: Effect.Effect<CheckResult, UpdateCheckError> =
+      Effect.tryPromise({
+        try: () => trpcClient.settings.checkForUpdatesAndReturnResult.query(),
+        catch: (): UpdateCheckError => ({ type: 'UPDATE_CHECK_FAILED' }),
+      }).pipe(
+        Effect.flatMap(
+          (result): Effect.Effect<CheckResult, UpdateCheckError> => {
+            if (!result.isUpdateAvailable || !result.updateInfo) {
+              return Effect.succeed({ status: 'up-to-date' });
+            }
+            const version = result.updateInfo.updateInfo.version;
+            // autoDownload=true なので、チェック後すぐにダウンロードが始まる。
+            // ダウンロード済みかどうかを確認して表示を分ける。
+            return Effect.tryPromise({
+              try: () => trpcClient.updater.getUpdateStatus.query(),
+              catch: (): UpdateCheckError => ({
+                type: 'UPDATE_CHECK_FAILED',
+              }),
+            }).pipe(
+              Effect.map((downloadStatus) =>
+                downloadStatus.updateDownloaded
+                  ? { status: 'downloaded' as const }
+                  : { status: 'available' as const, version },
+              ),
+            );
+          },
+        ),
+      );
+
+    const program = checkEffect.pipe(
+      Effect.match({
+        onSuccess: (state) => setUpdateState(state),
+        onFailure: () => setUpdateState({ status: 'error' }),
+      }),
+    );
+
+    void Effect.runPromise(program);
   }, []);
 
   const { mutate: quitAndInstall, isPending: isInstalling } =
