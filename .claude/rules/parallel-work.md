@@ -19,7 +19,7 @@
 作業を開始するとき、以下を確認する:
 
 ```
-1. jj status / git status で未コミットの変更を確認
+1. git status で未コミットの変更を確認
 2. 自分のタスクと無関係な変更が存在するか？
    → Yes: ワークスペースを切って作業開始
    → No: そのまま作業開始
@@ -33,15 +33,6 @@
 プロジェクトルート直下の `.worktrees/` ディレクトリ内にワークスペースを作成する。
 `.worktrees/` は `.gitignore` で除外済みのため `jj status` / `git status` に表示されない。
 また devcontainer.json で VS Code のファイル監視・検索からも除外済み。
-
-### jj の場合（推奨）
-
-```bash
-jj workspace add .worktrees/<タスク概要> --name ws-<タスク概要>
-cd .worktrees/<タスク概要>
-```
-
-### git の場合（フォールバック）
 
 ```bash
 git worktree add .worktrees/<タスク概要> -b wt/<タスク概要>
@@ -59,13 +50,13 @@ cd .worktrees/<タスク概要>
 
 以下を検知したらワークスペースに切り替える:
 
-- `jj status` / `git status` で自分が触っていないファイルに変更が入っている
+- `git status` で自分が触っていないファイルに変更が入っている
 - ファイルの内容が自分の編集と異なっている
 - lint や test の結果が、自分の変更では説明できない形で変わった
 
 ### 対処手順
 
-1. 自分の変更を退避（`jj shelve` / `git stash push <自分のファイル>`）
+1. 自分の変更を退避（`git stash push <自分のファイル>`）
 2. ワークスペースを作成（上記の手順）
 3. ワークスペース側で退避した変更を適用して作業再開
 4. ユーザーに「競合を検知したためワークスペースに切り替えました」と報告
@@ -77,11 +68,6 @@ cd .worktrees/<タスク概要>
 作業完了・マージ後にワークスペースを削除する:
 
 ```bash
-# jj の場合
-jj workspace forget ws-<タスク概要>
-rm -rf .worktrees/<タスク概要>
-
-# git の場合
 git worktree remove .worktrees/<タスク概要>
 ```
 
@@ -95,7 +81,6 @@ git worktree remove .worktrees/<タスク概要>
 | 他プロセスの変更を「修正」「整理」する                   | 意図を誤解して壊す可能性   |
 | 競合を無視して上書き                                     | 変更が消える               |
 | `git checkout -- .` / `git restore .` で全変更を巻き戻す | 他プロセスの成果物が消える |
-| `jj restore` で変更を巻き戻す                            | 同上                       |
 
 ## 許可される行為
 
