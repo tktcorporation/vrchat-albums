@@ -12,6 +12,7 @@ import {
   TEXT_COLOR,
   TYPOGRAPHY,
 } from '../../constants/ui';
+import { useInitProgress } from '../../hooks/useInitProgress';
 import { LOG_SYNC_MODE, useLogSync } from '../../hooks/useLogSync';
 import { useVRChatPhotoExtraDirList } from '../../hooks/useVRChatPhotoExtraDirList';
 import { useI18n } from '../../i18n/store';
@@ -27,6 +28,9 @@ interface PathSettingsProps {
  */
 const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
   const { t } = useI18n();
+
+  // 進捗情報を購読
+  const { progress, message: progressMessage } = useInitProgress();
 
   // ログ同期フックを使用
   const { sync: syncLogs, isLoading: isRefreshing } = useLogSync({
@@ -277,6 +281,26 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
                   設定したVRChatのログファイルから、過去のワールド訪問履歴を含む全てのインデックスを再構築します。
                   初回設定時や、インデックスの不整合が発生した場合に使用してください。
                 </p>
+                {isRefreshing && (
+                  <div className={SPACING.stack.tight}>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                        style={{
+                          width: `${Math.max(progress?.progress ?? 0, 5)}%`,
+                        }}
+                      />
+                    </div>
+                    <p
+                      className={`${TYPOGRAPHY.caption.default} ${TEXT_COLOR.secondary}`}
+                    >
+                      {progressMessage || t('pullToRefresh.refreshing')}
+                      {progress?.details?.current != null &&
+                        progress?.details?.total != null &&
+                        ` (${progress.details.current}/${progress.details.total})`}
+                    </p>
+                  </div>
+                )}
                 <div className="flex justify-end">
                   <Button
                     variant="secondary"
