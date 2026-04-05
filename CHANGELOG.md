@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.2
+
+### Patch Changes
+
+- [#770](https://github.com/tktcorporation/vrchat-albums/pull/770) [`11a7072`](https://github.com/tktcorporation/vrchat-albums/commit/11a707236abee8569a7ad300fe64447418844706) Thanks [@tktcorporation](https://github.com/tktcorporation)! - oxlint でカバー済みの lint-floating-promises と不要な lint-neverthrow を削除
+
 ## 0.29.1
 
 ### Patch Changes
