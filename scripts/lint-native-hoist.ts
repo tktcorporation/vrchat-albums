@@ -30,13 +30,15 @@ const require = createRequire(import.meta.url);
  */
 function parseElectronExternal(): string[] {
   const configPath = path.join(ROOT, 'electron', 'vite.config.ts');
-  const content = fs.readFileSync(configPath, 'utf-8');
+  const content = fs.readFileSync(configPath, 'utf8');
 
   const modules: string[] = [];
   const externalMatch = content.match(
     /electronExternal\s*=\s*\[([\s\S]*?)\.\.\./,
   );
-  if (!externalMatch) return modules;
+  if (!externalMatch) {
+    return modules;
+  }
 
   const entries = externalMatch[1].matchAll(/'([^']+)'|"([^"]+)"/g);
   for (const entry of entries) {
@@ -54,7 +56,9 @@ function hasPlatformSpecificDeps(pkgName: string): boolean {
     const pkgJson = require(`${pkgName}/package.json`) as {
       optionalDependencies?: Record<string, string>;
     };
-    if (!pkgJson.optionalDependencies) return false;
+    if (!pkgJson.optionalDependencies) {
+      return false;
+    }
     return Object.keys(pkgJson.optionalDependencies).some(
       (dep) =>
         dep.includes('win32') ||
@@ -74,11 +78,13 @@ function hasPlatformSpecificDeps(pkgName: string): boolean {
  */
 function parseAsarUnpackPatterns(): string[] {
   const configPath = path.join(ROOT, 'electron-builder.cjs');
-  const content = fs.readFileSync(configPath, 'utf-8');
+  const content = fs.readFileSync(configPath, 'utf8');
 
   const patterns: string[] = [];
   const asarUnpackMatch = content.match(/asarUnpack\s*:\s*\[([\s\S]*?)\]/);
-  if (!asarUnpackMatch) return patterns;
+  if (!asarUnpackMatch) {
+    return patterns;
+  }
 
   const entries = asarUnpackMatch[1].matchAll(/'([^']+)'|"([^"]+)"/g);
   for (const entry of entries) {
@@ -96,7 +102,7 @@ function parseAsarUnpackPatterns(): string[] {
  */
 function parseHoistPatterns(): string[] {
   const npmrcPath = path.join(ROOT, '.npmrc');
-  const content = fs.readFileSync(npmrcPath, 'utf-8');
+  const content = fs.readFileSync(npmrcPath, 'utf8');
 
   const patterns: string[] = [];
   for (const line of content.split('\n')) {
@@ -117,7 +123,9 @@ function asarPatternMatchesModule(
   asarPattern: string,
   moduleName: string,
 ): boolean {
-  if (asarPattern === moduleName) return true;
+  if (asarPattern === moduleName) {
+    return true;
+  }
   // ワイルドカード末尾パターン: "clip-filepaths*" matches "clip-filepaths"
   if (asarPattern.endsWith('*')) {
     const base = asarPattern.slice(0, -1);
@@ -164,7 +172,9 @@ function checkHoistPatterns(
 
   for (const asarPattern of asarPatterns) {
     // ワイルドカード末尾のパターンのみチェック（例: clip-filepaths*）
-    if (!asarPattern.endsWith('*')) continue;
+    if (!asarPattern.endsWith('*')) {
+      continue;
+    }
 
     const baseName = asarPattern.slice(0, -1);
 

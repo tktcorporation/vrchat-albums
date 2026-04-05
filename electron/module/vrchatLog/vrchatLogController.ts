@@ -8,6 +8,7 @@ import {
   ERROR_CODES,
   UserFacingError,
 } from '../../lib/errors';
+import { emitProgress } from '../initProgress/emitter';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
 import * as vrchatLogFileDirService from './../vrchatLogFileDir/service';
@@ -129,6 +130,7 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   // バッチごとのlogStoreファイル再読み込みを回避する）
   const dedupCache = vrchatLogService.createDedupCache();
 
+  let processedBatchCount = 0;
   // ストリーミング処理で各バッチを処理
   for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
     {
@@ -138,6 +140,23 @@ export const appendLoglinesToFileFromLogFilePathList = async (
       maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
     },
   )) {
+    processedBatchCount += 1;
+    // ログファイル数ベースで進捗を算出（完了の100%は syncLogs 側で発行するため99%を上限とする）
+    const batchProgress = Math.min(
+      Math.round(
+        (processedBatchCount / Math.max(logFilePathList.length, 1)) * 99,
+      ),
+      99,
+    );
+    emitProgress({
+      stage: 'log_append',
+      progress: batchProgress,
+      message: 'VRChatログファイルを読み込んでいます...',
+      details: {
+        current: processedBatchCount,
+        total: logFilePathList.length,
+      },
+    });
     // ログ行をフィルタリング（processAll=trueの場合はスキップ）
     const filteredLogLines = processAll
       ? logLineBatch

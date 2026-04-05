@@ -227,6 +227,12 @@ export function loadLogInfoIndexFromVRChatLog({
       logger.info(
         `Using ${preLoadedLogLines.length} pre-loaded log lines (skipping file read)`,
       );
+      emitProgress({
+        stage: 'log_load',
+        progress: 10,
+        message: 'ログデータを解析しています...',
+        details: { current: 0, total: preLoadedLogLines.length },
+      });
       const parseResult =
         vrchatLogService.convertLogLinesToWorldAndPlayerJoinLogInfos(
           preLoadedLogLines,
@@ -251,6 +257,12 @@ export function loadLogInfoIndexFromVRChatLog({
       );
 
       // 3. ログファイルからログ情報を取得（部分的な成功を許容）
+      emitProgress({
+        stage: 'log_load',
+        progress: 10,
+        message: 'ログストアファイルを読み込んでいます...',
+        details: { current: 0, total: logStoreFilePaths.length },
+      });
       const getLogInfoStartTime = performance.now();
       // この関数は never エラーなので常に成功
       const logInfoListFromLogFile =
