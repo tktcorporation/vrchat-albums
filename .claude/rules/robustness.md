@@ -181,7 +181,6 @@ const obj = new MyValueObject(value); // ❌ 直接newは禁止
 
 | コマンド                 | 目的                            |
 | ------------------------ | ------------------------------- |
-| `pnpm lint:neverthrow`   | Result型の正しい使用を検証      |
 | `pnpm lint:valueobjects` | ValueObjectパターンの遵守を検証 |
 | `pnpm lint:ts-pattern`   | ts-patternの適切な使用を検証    |
 
@@ -311,4 +310,3 @@ return ok(user.profile.settings.displayName);
 ## 関連ドキュメント
 
 - `.claude/rules/error-handling.md` - エラーハンドリングの詳細
-- `docs/lint-neverthrow.md` - neverthrowリンターの使用方法
