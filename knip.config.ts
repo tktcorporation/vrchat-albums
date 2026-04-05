@@ -30,6 +30,8 @@ const config: KnipConfig = {
     'tw-animate-css',
     // Used in scripts/ which is ignored by knip
     'minimatch',
+    // electron-builder の optional peer dependency（直接 import されないが macOS/Windows ビルドに必要）
+    'electron-builder-squirrel-windows',
   ],
   ignore: [
     // shadcn/ui components
