@@ -17,25 +17,23 @@ gh pr checks <PR番号> --watch
 
 ## Changeset
 
-機能追加・バグ修正の PR には必ず changeset ファイルを含める。
+`packages/ziku-cli/` を変更する PR には changeset ファイルを含める。
 コミット・プッシュ前に changeset ファイルが存在するか確認し、なければ作成すること。
 
 ```bash
-pnpm changeset
-# 対話的にバージョンの種類（patch/minor）と変更内容を入力
-# .changeset/ にmarkdownファイルが自動作成される
+# .changeset/<変更を端的に表す名前>.md を作成
+# minor: 機能追加、patch: バグ修正
 ```
 
 形式:
 
 ```markdown
 ---
-'vrchat-albums': minor
+"@tktco/ziku": patch
 ---
 
 変更の説明
 ```
 
 - CI に `Changeset Check` ジョブがあり、changeset がないと fail する
-- 1 PR に 1 changeset ファイルで十分（複数変更がある場合はまとめてよい）
 - ドキュメントのみの変更やリファクタなど、バージョンに影響しない変更は不要

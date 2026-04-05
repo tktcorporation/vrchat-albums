@@ -1,0 +1,1 @@
+- [他プロセスの変更を絶対に消さない](feedback_no_delete_other_changes.md) — 並列作業時に競合したらworktreeに切り替え、他の変更を削除しない
