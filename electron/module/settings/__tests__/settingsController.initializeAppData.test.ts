@@ -95,6 +95,8 @@ describe('settingsController.initializeAppData', () => {
     // getSettingStoreのモック
     mockSettingStore.getSettingStore = vi.fn().mockReturnValue({
       getVRChatPhotoDir: vi.fn().mockReturnValue('/path/to/photos'),
+      getAutoStartEnabled: vi.fn().mockReturnValue(null),
+      setAutoStartEnabled: vi.fn(),
     });
 
     // テスト対象の関数を取得

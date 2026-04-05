@@ -20,6 +20,7 @@ const settingStoreKey = [
   'migrationNoticeShown',
   'photoFolderScanStates',
   'worldJoinImageGenerationEnabled',
+  'autoStartEnabled',
 ] as const;
 type SettingStoreKey = (typeof settingStoreKey)[number];
 
@@ -219,6 +220,27 @@ const setWorldJoinImageGenerationEnabled =
   };
 
 /**
+ * ユーザーが意図した自動起動設定を永続化するためのフラグ。
+ *
+ * 背景: Electron の app.setLoginItemSettings() は OS のログインアイテムに
+ * exe パスで登録されるが、electron-updater でアップデートすると exe パスが
+ * 変わり、OS 側の登録が無効になる。この settingStore に意図を保存しておくことで、
+ * アプリ起動時に OS 状態との不一致を検出し、再登録できるようにする。
+ *
+ * 対になる処理: settingsController.ts の initializeAppData 内で復元
+ * 不要になる条件: Electron が exe パス変更後も登録を維持する仕組みを提供した場合
+ */
+const getAutoStartEnabled =
+  (getB: (key: SettingStoreKey) => boolean | null) => (): boolean | null => {
+    return getB('autoStartEnabled');
+  };
+
+const setAutoStartEnabled =
+  (set: (key: SettingStoreKey, value: unknown) => void) => (flag: boolean) => {
+    set('autoStartEnabled', flag);
+  };
+
+/**
  * Clear all settings
  */
 const clearAllStoredSettings = (settingsStore: Store) => () => {
@@ -324,6 +346,8 @@ const setSettingStore = (name: StoreName) => {
     getWorldJoinImageGenerationEnabled:
       getWorldJoinImageGenerationEnabled(getB),
     setWorldJoinImageGenerationEnabled: setWorldJoinImageGenerationEnabled(set),
+    getAutoStartEnabled: getAutoStartEnabled(getB),
+    setAutoStartEnabled: setAutoStartEnabled(set),
     getPhotoFolderScanStates: (): PhotoFolderScanStates => {
       const value = get('photoFolderScanStates');
       const result = PhotoFolderScanStatesSchema.safeParse(value);
@@ -419,6 +443,8 @@ export interface SettingStore {
   setMigrationNoticeShown: (shown: boolean) => void;
   getWorldJoinImageGenerationEnabled: () => boolean;
   setWorldJoinImageGenerationEnabled: (flag: boolean) => void;
+  getAutoStartEnabled: () => boolean | null;
+  setAutoStartEnabled: (flag: boolean) => void;
   getPhotoFolderScanStates: () => PhotoFolderScanStates;
   setPhotoFolderScanStates: (states: PhotoFolderScanStates) => void;
   clearPhotoFolderScanStates: () => void;
