@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.29.3
+
+### Patch Changes
+
+- [#777](https://github.com/tktcorporation/vrchat-albums/pull/777) [`0134441`](https://github.com/tktcorporation/vrchat-albums/commit/01344419277d752e759e8287daa4aa6adcccd9a4) Thanks [@tktcorporation](https://github.com/tktcorporation)! - feat: ネイティブモジュールの asarUnpack/hoist 整合性チェック lint を追加
+
+  napi-rs 系ネイティブモジュールの asarUnpack 入れ忘れや public-hoist-pattern の
+  設定漏れを CI で自動検知するスクリプトを追加。
+
+- [#774](https://github.com/tktcorporation/vrchat-albums/pull/774) [`0f7c99f`](https://github.com/tktcorporation/vrchat-albums/commit/0f7c99f830963fd9b2bf72d8cef4b80b66efe950) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix: clip-filepaths のプラットフォーム固有バイナリを asarUnpack に含める
+
+  electron-builder の asarUnpack パターンで clip-filepaths のプラットフォーム固有パッケージ
+  （clip-filepaths-win32-x64-msvc 等）が含まれていなかったため、Windows でアプリ起動時に
+  「Cannot find module 'clip-filepaths-win32-x64-msvc'」エラーが発生していた問題を修正。
+
+- [#776](https://github.com/tktcorporation/vrchat-albums/pull/776) [`2eafec4`](https://github.com/tktcorporation/vrchat-albums/commit/2eafec4ad366ab7f7899212e835c1149d7c5f3c1) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix: clip-filepaths のプラットフォーム固有パッケージを pnpm でホイストする
+
+  .npmrc の public-hoist-pattern に clip-filepaths のみが指定されており、
+  プラットフォーム固有パッケージ（clip-filepaths-win32-x64-msvc 等）がホイストされて
+  いなかった。pnpm の isolated モードではこれらが node_modules/.pnpm/ 内に配置される
+  ため、electron-builder の asarUnpack パターンに一致せず、asar 内に閉じ込められて
+  ランタイムで "Cannot find module" エラーが発生していた。
+
+- [#772](https://github.com/tktcorporation/vrchat-albums/pull/772) [`a5e1162`](https://github.com/tktcorporation/vrchat-albums/commit/a5e11628e6338819919eb2c1e38537138250a5a9) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix: ネイティブバインディングが見つからないエラーを修正
+
+  pnpm の isolated node_modules 構造で、@napi-rs/image 等のプラットフォーム固有の
+  オプショナル依存パッケージが electron-builder のパッケージングに含まれない問題を修正。
+  .npmrc に public-hoist-pattern を追加し、ネイティブモジュールをホイストするようにした。
+
 ## 0.29.2
 
 ### Patch Changes
