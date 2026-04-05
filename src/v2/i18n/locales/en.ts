@@ -97,6 +97,15 @@ const en: Translations = {
       name: 'Name',
       dependencies: 'Major Dependencies',
       openLog: 'Open App Log',
+      update: {
+        checkForUpdates: 'Check for updates',
+        checking: 'Checking...',
+        available: 'Version {version} is available',
+        upToDate: 'Up to date',
+        downloaded: 'New version has been downloaded',
+        installAndRestart: 'Install and restart',
+        checkFailed: 'Failed to check for updates',
+      },
       licenses: {
         title: 'License Information',
         viewLicense: 'View License',
