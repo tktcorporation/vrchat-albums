@@ -3,7 +3,7 @@ name: block-revert-others
 enabled: true
 event: bash
 pattern: (git\s+checkout\s+--\s+\.|git\s+restore\s+\.|git\s+reset\s+--hard|git\s+clean\s+-[a-z]*f|jj\s+restore\s+(--from|--to|--changes-in))
-action: block
+action: warn
 ---
 
 🚫 **他プロセスの変更を巻き込む可能性のあるコマンドがブロックされました**
