@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.29.4
+
+### Patch Changes
+
+- [#778](https://github.com/tktcorporation/vrchat-albums/pull/778) [`34f98d3`](https://github.com/tktcorporation/vrchat-albums/commit/34f98d3cd946ffd446805f5371fe023f9af7dd54) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix: アップデート後に自動起動フラグがオフになる問題を修正
+
+  ユーザーの自動起動設定の意図を settingStore に永続化し、アプリ起動時に
+  OS のログインアイテム登録と照合して不一致があれば再登録するようにした。
+
 ## 0.29.3
 
 ### Patch Changes
