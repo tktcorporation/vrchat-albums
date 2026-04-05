@@ -57,10 +57,9 @@
           "**/.pytest_cache/**": true,
           "**/venv/**": true,
           "**/.venv/**": true,
-          // jj workspace（*-ws-* パターン）の監視を除外
-          // Claude Code の並列作業で一時的に作成されるワークスペースが
+          // Claude Code の並列作業で .worktrees/ 内に作成されるワークスペースが
           // VS Code の Git 拡張に検知されてメモリを大量消費するのを防ぐ
-          "**/*-ws-*/**": true
+          "**/.worktrees/**": true
         },
         "search.exclude": {
           "**/node_modules": true,
@@ -71,7 +70,7 @@
           "**/dist": true,
           "**/.next": true,
           "**/coverage": true,
-          "**/*-ws-*": true
+          "**/.worktrees": true
         },
         "git.detectSubmodulesLimit": 0,
         // jj workspace が VS Code の Git 拡張に自動検出されるのを防ぐ
@@ -101,14 +100,6 @@
       "bash",
       "-c",
       "set -e; sudo mkdir -p ~/.local/state/mise ~/.cache/mise && sudo chown -R $(whoami) .pnpm-store ~/.local/share/mise ~/.local/state/mise ~/.cache/mise ~/.claude"
-    ],
-    // /workspaces/ を vscode ユーザーに書き込み可能にする
-    // Claude Code の並列作業で jj workspace / git worktree を兄弟ディレクトリに作成するため
-    // 命名規則 *-ws-* は devcontainer.json の watcherExclude/search.exclude で除外済み
-    "fix-workspaces-permissions": [
-      "bash",
-      "-c",
-      "sudo chmod 1777 /workspaces"
     ]
   },
   "updateContentCommand": {

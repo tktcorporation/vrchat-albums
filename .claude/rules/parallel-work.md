@@ -1,7 +1,6 @@
 # 並列作業ルール（競合防止）
 
 複数の Claude Code プロセスが同一リポジトリで同時に作業する場合の必須ルール。
-Dev Container 環境を前提に設計。
 
 ---
 
@@ -31,51 +30,28 @@ Dev Container 環境を前提に設計。
 
 ## ワークスペースの作成方法
 
-### Dev Container での制約
-
-- `/workspaces/` は root 所有。ディレクトリ作成には `sudo mkdir` が必要
-- ワークスペースのディレクトリは `/workspaces/` 直下に作成する（リポジトリの兄弟）
-- 命名規則: `<リポジトリ名>-ws-<タスク概要>`（devcontainer.json の `*-ws-*` 除外パターンに合致させる）
+プロジェクトルート直下の `.worktrees/` ディレクトリ内にワークスペースを作成する。
+`.worktrees/` は `.gitignore` で除外済みのため `jj status` / `git status` に表示されない。
+また devcontainer.json で VS Code のファイル監視・検索からも除外済み。
 
 ### jj の場合（推奨）
 
 ```bash
-REPO_NAME=$(basename "$PWD")
-WS_DIR="/workspaces/${REPO_NAME}-ws-<タスク概要>"
-
-sudo mkdir -p "$WS_DIR"
-sudo chown "$(whoami)" "$WS_DIR"
-jj workspace add "$WS_DIR" --name "${REPO_NAME}-ws-<タスク概要>"
-cd "$WS_DIR"
+jj workspace add .worktrees/<タスク概要> --name ws-<タスク概要>
+cd .worktrees/<タスク概要>
 ```
 
 ### git の場合（フォールバック）
 
 ```bash
-REPO_NAME=$(basename "$PWD")
-WS_DIR="/workspaces/${REPO_NAME}-ws-<タスク概要>"
-
-sudo mkdir -p "$(dirname "$WS_DIR")"
-git worktree add "$WS_DIR" -b "wt/<タスク概要>"
-cd "$WS_DIR"
+git worktree add .worktrees/<タスク概要> -b wt/<タスク概要>
+cd .worktrees/<タスク概要>
 ```
 
 ### 依存関係のインストール
 
 ワークスペース作成後、`node_modules` が存在しない場合は `pnpm install` を実行すること。
-jj workspace はファイルツリーをコピーするが `node_modules` は通常 `.gitignore` されているため含まれない。
-
----
-
-## VS Code との共存
-
-devcontainer.json に以下の設定があることを前提とする（ziku で共有済み）:
-
-- `files.watcherExclude`: `"**/*-ws-*/**": true` — ワークスペースの監視を除外
-- `search.exclude`: `"**/*-ws-*": true` — 検索から除外
-- `git.autoRepositoryDetection`: `"openEditors"` — Git 拡張の自動検出を制限
-
-これにより、ワークスペースが VS Code のメモリを圧迫しない。
+ワークスペースはファイルツリーをコピーするが `node_modules` は `.gitignore` されているため含まれない。
 
 ---
 
@@ -102,11 +78,11 @@ devcontainer.json に以下の設定があることを前提とする（ziku で
 
 ```bash
 # jj の場合
-jj workspace forget <ワークスペース名>
-sudo rm -rf /workspaces/<リポジトリ名>-ws-<タスク概要>
+jj workspace forget ws-<タスク概要>
+rm -rf .worktrees/<タスク概要>
 
 # git の場合
-git worktree remove /workspaces/<リポジトリ名>-ws-<タスク概要>
+git worktree remove .worktrees/<タスク概要>
 ```
 
 ---
@@ -119,7 +95,7 @@ git worktree remove /workspaces/<リポジトリ名>-ws-<タスク概要>
 | 他プロセスの変更を「修正」「整理」する | 意図を誤解して壊す可能性 |
 | 競合を無視して上書き | 変更が消える |
 | `git checkout -- .` / `git restore .` で全変更を巻き戻す | 他プロセスの成果物が消える |
-| `git reset --hard` / `jj restore` で変更を巻き戻す | 同上 |
+| `jj restore` で変更を巻き戻す | 同上 |
 
 ## 許可される行為
 
