@@ -305,24 +305,60 @@ export const settingsRouter = () =>
           }, using ${syncMode} sync mode`,
         );
 
-        // Step 3.5: 初回起動時に自動起動を有効化（テスト時はスキップ）
-        if (isFirstLaunch && !process.env.PLAYWRIGHT_TEST) {
-          logger.info(
-            'Step 3.5: Setting default auto-start enabled for first launch...',
-          );
-          await import('electron')
-            .then(({ app }) => {
-              app.setLoginItemSettings({
-                openAtLogin: true,
-                openAsHidden: true,
+        // Step 3.5: 自動起動設定の初期化・復元（テスト時はスキップ）
+        // 初回起動時: 自動起動を有効化し、意図を settingStore に保存
+        // アップデート後: settingStore の意図と OS 状態が不一致なら再登録
+        //   （electron-updater で exe パスが変わると OS のログインアイテム登録が無効になるため）
+        if (!process.env.PLAYWRIGHT_TEST) {
+          const settingStore = getSettingStore();
+          const savedAutoStartIntent = settingStore.getAutoStartEnabled();
+
+          if (isFirstLaunch) {
+            logger.info(
+              'Step 3.5: Setting default auto-start enabled for first launch...',
+            );
+            await import('electron')
+              .then(({ app }) => {
+                app.setLoginItemSettings({
+                  openAtLogin: true,
+                  openAsHidden: true,
+                });
+                settingStore.setAutoStartEnabled(true);
+                logger.info(
+                  'Auto-start enabled by default for first launch and saved to settingStore',
+                );
+              })
+              .catch((error) => {
+                logger.warn('Failed to set default auto-start:', error);
+                // 自動起動の設定に失敗してもアプリの初期化は続行
               });
-              logger.info('Auto-start enabled by default for first launch');
-            })
-            .catch((error) => {
-              logger.warn('Failed to set default auto-start:', error);
-              // 自動起動の設定に失敗してもアプリの初期化は続行
-            });
-        } else if (isFirstLaunch && process.env.PLAYWRIGHT_TEST) {
+          } else if (savedAutoStartIntent !== null) {
+            // 通常起動: settingStore に保存された意図と OS 状態を比較
+            await import('electron')
+              .then(({ app }) => {
+                const currentOsSetting = app.getLoginItemSettings().openAtLogin;
+                if (savedAutoStartIntent && !currentOsSetting) {
+                  // ユーザーは有効にしていたが OS 側が無効 → アップデートでリセットされた可能性
+                  logger.info(
+                    'Step 3.5: Auto-start was enabled by user but OS reports disabled. Re-registering login item (likely due to app update changing exe path).',
+                  );
+                  app.setLoginItemSettings({
+                    openAtLogin: true,
+                    openAsHidden: true,
+                  });
+                  logger.info(
+                    'Auto-start re-registered successfully after update',
+                  );
+                }
+              })
+              .catch((error) => {
+                logger.warn(
+                  'Failed to restore auto-start setting after update:',
+                  error,
+                );
+              });
+          }
+        } else if (isFirstLaunch) {
           logger.info('Step 3.5: Skipping auto-start setup in Playwright test');
         }
 

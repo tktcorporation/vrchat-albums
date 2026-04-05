@@ -1,6 +1,7 @@
 import z from 'zod';
 
 import { getApp } from '../../../lib/electronModules';
+import { logger } from '../../../lib/logger';
 import { UserFacingError } from './../../../lib/errors';
 import { procedure, router as trpcRouter } from './../../../trpc';
 import type { getSettingStore } from './../../settingStore';
@@ -40,12 +41,27 @@ const getIsAppAutoStartEnabled = async (): Promise<boolean> => {
  * アプリの自動起動設定を変更するユーティリティ。
  * SystemSettings からの更新操作に用いられる。
  */
-const setIsAppAutoStartEnabled = async (isEnabled: boolean) => {
+/**
+ * アプリの自動起動設定を変更するユーティリティ。
+ * SystemSettings からの更新操作に用いられる。
+ *
+ * OS のログインアイテムと settingStore の両方に保存する。
+ * settingStore への保存は、アップデートで exe パスが変わった際に
+ * ユーザーの意図を復元するため。
+ */
+const setIsAppAutoStartEnabled = async (
+  isEnabled: boolean,
+  settingStore: ReturnType<typeof getSettingStore>,
+) => {
   // macOSの場合、openAsHiddenをtrueに設定することで、バックグラウンドで起動するように
   getApp().setLoginItemSettings({
     openAtLogin: isEnabled,
     openAsHidden: true,
   });
+
+  // ユーザーの意図を永続化（アップデート後の復元用）
+  settingStore.setAutoStartEnabled(isEnabled);
+  logger.info(`Auto-start intent saved to settingStore: ${isEnabled}`);
 
   // 設定が反映されるまで少し待つ
   await new Promise<void>((resolve) => {
@@ -82,7 +98,7 @@ export const backgroundSettingsRouter = (
     setIsAppAutoStartEnabled: procedure
       .input(z.boolean())
       .mutation(async (ctx) => {
-        const result = await setIsAppAutoStartEnabled(ctx.input);
+        const result = await setIsAppAutoStartEnabled(ctx.input, settingStore);
         return result;
       }),
     getWorldJoinImageGenerationEnabled: procedure.query(() => {
