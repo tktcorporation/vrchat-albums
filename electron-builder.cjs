@@ -22,7 +22,7 @@ const config = {
     'node_modules/@resvg/resvg-js*/**',
     'node_modules/@napi-rs/image*/**',
     'node_modules/sqlite3/**',
-    'node_modules/clip-filepaths/**',
+    'node_modules/clip-filepaths*/**',
   ],
   publish: [
     {
