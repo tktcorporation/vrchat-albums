@@ -216,7 +216,7 @@ const globalPlayerBatchManager = new PlayerInfoBatchManager();
 export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
   const [players, setPlayers] = useState<PlayerInfo[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [batchError, setBatchError] = useState<Error | null>(null);
 
   const requestIdRef = useRef<string | null>(null);
 
@@ -296,7 +296,7 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
     if (!enabled) {
       setPlayers(null);
       setIsLoading(false);
-      setError(null);
+      setBatchError(null);
       return;
     }
 
@@ -304,7 +304,7 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
     requestIdRef.current = requestId;
 
     setIsLoading(true);
-    setError(null);
+    setBatchError(null);
 
     globalPlayerBatchManager
       .addRequest(joinDateTime)
@@ -317,7 +317,9 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
       })
       .catch((error: unknown) => {
         if (requestIdRef.current === requestId) {
-          setError(error instanceof Error ? error : new Error(String(error)));
+          setBatchError(
+            error instanceof Error ? error : new Error(String(error)),
+          );
           setIsLoading(false);
         }
       });
@@ -330,5 +332,5 @@ export const useSessionInfoBatch = (joinDateTime: Date, enabled = true) => {
     };
   }, [joinDateTime, enabled]);
 
-  return { players, isLoading, error };
+  return { players, isLoading, error: batchError };
 };

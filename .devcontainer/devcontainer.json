@@ -7,9 +7,20 @@
   // Volume name must start with [a-zA-Z0-9] to comply with Docker naming rules
   // Using 'devcontainer-' prefix so ${localWorkspaceFolderBasename} ('.github') doesn't start the name
   "mounts": [
-    "source=devcontainer-${localWorkspaceFolderBasename}-pnpm-store,target=${containerWorkspaceFolder}/.pnpm-store,type=volume"
-  ],
+    "source=devcontainer-${localWorkspaceFolderBasename}-pnpm-store,target=${containerWorkspaceFolder}/.pnpm-store,type=volume",
 
+    // Claude Code データ永続化 (会話履歴・設定)
+    // ~/.claude 全体を named volume にすることで、rebuild しても会話履歴が残る
+    // 会話履歴: ~/.claude/projects/<path>/*.jsonl
+    // 認証はコンテナ内で `claude login` して取得する（ホストの macOS Keychain は使えないため）
+    // ログイン後の ~/.claude.json は volume 外だが、postStartCommand で volume 内にバックアップされる
+    "source=devcontainer-${localWorkspaceFolderBasename}-claude-data,target=/home/vscode/.claude,type=volume",
+
+    // mise インストール済みツールを DevContainer 間で共有
+    // 全コンテナが Linux なのでバイナリ互換性あり。ワークスペース名を含めず共有 volume にする
+    // ホスト (macOS) とは OS が異なるためバインドマウントではなく named volume を使う
+    "source=devcontainer-shared-mise-data,target=/home/vscode/.local/share/mise,type=volume"
+  ],
   "features": {
     // "ghcr.io/devcontainers/features/docker-in-docker:2": {
     //   "version": "latest",
@@ -18,12 +29,9 @@
     // },
     "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers-extra/features/mise:1": {},
-    "ghcr.io/devcontainers/features/desktop-lite:1": {
-      "webPort": "6080",
-      "vncPort": "5901"
-    }
+    "ghcr.io/devcontainers-extra/features/mise:1": {}
   },
+  "runArgs": ["--env-file", ".devcontainer/.env.devcontainer"],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -42,39 +50,56 @@
           "**/node_modules/**": true,
           "**/.pnpm/**": true,
           "**/.pnpm-store/**": true,
-          "**/.turbo/**": true
+          "**/.turbo/**": true,
+          "**/dist/**": true,
+          "**/.next/**": true,
+          "**/__pycache__/**": true,
+          "**/.pytest_cache/**": true,
+          "**/venv/**": true,
+          "**/.venv/**": true,
+          // Claude Code の並列作業で .worktrees/ 内に作成されるワークスペースが
+          // VS Code の Git 拡張に検知されてメモリを大量消費するのを防ぐ
+          "**/.worktrees/**": true
         },
         "search.exclude": {
           "**/node_modules": true,
           "**/.pnpm": true,
           "**/.pnpm-store": true,
           "**/.git": true,
-          "**/.turbo": true
-        }
+          "**/.turbo": true,
+          "**/dist": true,
+          "**/.next": true,
+          "**/coverage": true,
+          "**/.worktrees": true
+        },
+        "git.detectSubmodulesLimit": 0,
+        // jj workspace が VS Code の Git 拡張に自動検出されるのを防ぐ
+        // "openEditors" に設定すると、開いたファイルのリポジトリのみ追跡する
+        "git.autoRepositoryDetection": "openEditors",
+        // バックグラウンドの定期 fetch を無効化（メモリ・CPU 削減）
+        "git.autoFetch": false,
+        // ファイルツリーの Git 差分色付け計算を省略（大きいリポジトリで効果大）
+        "git.decorations.enabled": false
       }
     }
-  },
-  "forwardPorts": [6080],
-  "portsAttributes": {
-    "6080": {
-      "label": "desktop"
-    }
-  },
-  "runArgs": [
-    "--shm-size=2g",
-    "--memory=8g",
-    "--memory-swap=16g",
-    "--env-file",
-    ".devcontainer/devcontainer.env"
-  ],
-  "containerEnv": {
-    "VNC_RESOLUTION": "1920x1080x24"
   },
   "onCreateCommand": {
     "install-packages": [
       "bash",
       "-c",
       "set -e; sudo apt-get update && sudo apt-get install -y build-essential fzf ripgrep bc gpg ca-certificates curl tmux"
+    ],
+    // named volume は root 所有で作成されるため、vscode ユーザーに権限を付与する
+    // 対象:
+    //   .pnpm-store: pnpm のパッケージキャッシュ (named volume)
+    //   ~/.local/share/mise: mise のインストール済みツール (named volume)
+    //   ~/.local/state/mise: mise trust の trusted-configs 保存先
+    //   ~/.cache/mise: mise のダウンロードキャッシュ
+    //   ~/.claude: Claude Code データ全体 (named volume)
+    "fix-volume-permissions": [
+      "bash",
+      "-c",
+      "set -e; sudo mkdir -p ~/.local/state/mise ~/.cache/mise && sudo chown -R $(whoami) .pnpm-store ~/.local/share/mise ~/.local/state/mise ~/.cache/mise ~/.claude"
     ]
   },
   "updateContentCommand": {
@@ -88,22 +113,56 @@
       "-c",
       "echo 'eval \"$(mise activate bash)\"' >> ~/.bashrc"
     ],
-    "trust-mise": ["mise", "trust"]
+    "trust-mise": ["bash", "-lc", "mise trust"],
+    "setup-git-user": ["bash", "-l", ".devcontainer/setup-git-user.sh"],
+    // vite-plus (vp) CLI: Vite, Vitest, Oxlint, Oxfmt, Rolldown, tsdown を統合した開発ツールチェーン
+    // CI=true で Node.js 管理の対話プロンプトをスキップ
+    "install-vite-plus": [
+      "bash",
+      "-c",
+      "CI=true curl -fsSL https://vite.plus | bash"
+    ]
   },
   "postCreateCommand": {
-    "mise-install": "mise install",
     "fix-pnpm-store-permissions": [
       "bash",
       "-lc",
       "sudo chown -R $(whoami) .pnpm-store"
+    ],
+    "git-performance": "git config status.submoduleSummary false && git config diff.ignoreSubmodules all && git config fetch.recurseSubmodules false && git config submodule.recurse false",
+    "install-gh-extensions": "gh extension install agbiotech/gh-sub-issue 2>/dev/null || true",
+    "mise-install": ["bash", "-lc", "mise install"],
+    // ~/.claude.json は volume 外（ホームディレクトリ直下）のため、rebuild で消える
+    // volume 内のバックアップからリストアする（postStartCommand で毎回バックアップされる）
+    // 初回（バックアップなし）は onboarding 済みの最小ファイルを作成
+    "restore-claude-json": [
+      "bash",
+      "-c",
+      "test -f ~/.claude/.claude.json.bak && cp ~/.claude/.claude.json.bak ~/.claude.json || test -f ~/.claude.json || echo '{\"hasCompletedOnboarding\":true}' > ~/.claude.json"
     ]
   },
   "postStartCommand": {
+    // ~/.claude.json を volume 内にバックアップ（認証情報の永続化）
+    // コンテナ内で claude login した後の OAuth セッションを rebuild 後も保持するため
+    // 有効な認証（oauthAccount）が含まれている場合のみバックアップする
+    "backup-claude-json": [
+      "bash",
+      "-c",
+      "grep -q 'oauthAccount' ~/.claude.json 2>/dev/null && cp ~/.claude.json ~/.claude/.claude.json.bak || true"
+    ],
     "setup-chrome-devtools-mcp": [
       "bash",
       "-lc",
       ".devcontainer/setup-chrome-devtools-mcp.sh"
     ],
-    "mise-upgrade": ["mise", "upgrade"]
-  }
+    "mise-upgrade": ["mise", "upgrade"],
+    "check-env-file": [
+      "bash",
+      "-c",
+      "[ -s .devcontainer/.env.devcontainer ] || echo 'WARNING: .devcontainer/.env.devcontainer is empty or missing. Secrets are not loaded.'"
+    ]
+  },
+  // initializeCommand はホスト側で実行される
+  // .env.devcontainer が無ければ空ファイルを作成（runArgs --env-file の失敗防止）
+  "initializeCommand": "touch .devcontainer/.env.devcontainer"
 }

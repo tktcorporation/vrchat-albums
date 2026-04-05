@@ -48,7 +48,9 @@ const setIsAppAutoStartEnabled = async (isEnabled: boolean) => {
   });
 
   // 設定が反映されるまで少し待つ
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 100);
+  });
 
   // 設定が反映されたか確認
   const newSettings = getApp().getLoginItemSettings();

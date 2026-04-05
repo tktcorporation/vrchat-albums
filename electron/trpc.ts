@@ -9,6 +9,7 @@ import { UserFacingError } from './lib/errors';
 import { logger } from './lib/logger';
 import * as settingService from './module/settings/service';
 
+// oxlint-disable-next-line unicorn/prefer-event-target -- EventTarget は emit() をサポートしないため、tRPC/Node.js 境界では EventEmitter を使用
 const eventEmitter = new EventEmitter();
 
 const t = initTRPC.context<{ eventEmitter: EventEmitter }>().create({

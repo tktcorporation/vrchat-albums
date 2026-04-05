@@ -278,7 +278,9 @@ describe('useThumbnail', () => {
     renderHook(() => useThumbnail('/test/disabled.png', false));
 
     // Wait a bit for any async operations
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -288,7 +290,9 @@ describe('useThumbnail', () => {
 
     renderHook(() => useThumbnail('', true));
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -497,7 +501,9 @@ describe('バッチフェッチ失敗時のエラーハンドリング', () => {
     });
 
     // Wait for the first request to complete
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
 
     // Second prefetch (will succeed)
     const successPath = '/test/success.png';

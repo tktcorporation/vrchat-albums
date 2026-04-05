@@ -177,8 +177,7 @@
     "vitest": "^4.1.2"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint:oxlint && pnpm lint:fmt-check && pnpm lint:type-check",
-    "prepare-commit-msg": "bash scripts/hooks/prepare-commit-msg.sh"
+    "pre-commit": "pnpm lint:oxlint && pnpm lint:fmt-check && pnpm lint:type-check"
   },
   "engines": {
     "node": "22",

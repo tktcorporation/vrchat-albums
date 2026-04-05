@@ -428,7 +428,9 @@ export function useThumbnailCache(options: UseThumbnailCacheOptions = {}) {
         await fetchBatch(batch);
 
         // 次のバッチの前に少し待機（UIをブロックしない）
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 50);
+        });
       }
     } finally {
       isPrefetchingRef.current = false;

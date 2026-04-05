@@ -185,7 +185,9 @@ describe('画像処理 メモリプロファイリング', () => {
     // GC後のメモリを計測
     if (global.gc) {
       global.gc();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 100);
+      });
       snapshots.push(takeMemorySnapshot('after_gc'));
     }
 
@@ -230,7 +232,9 @@ describe('画像処理 メモリプロファイリング', () => {
 
     if (global.gc) {
       global.gc();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 100);
+      });
       snapshots.push(takeMemorySnapshot('after_gc'));
     }
 
@@ -283,7 +287,9 @@ describe('画像処理 メモリプロファイリング', () => {
 
     if (global.gc) {
       global.gc();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 100);
+      });
       snapshots.push(takeMemorySnapshot('after_gc'));
     }
 

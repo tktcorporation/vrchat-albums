@@ -69,10 +69,9 @@ export const setVRChatLogFilesDirByDialog = (): Effect.Effect<
   Error | 'canceled'
 > => {
   return utilsService.openGetDirDialog().pipe(
-    Effect.map((dirPath) => {
+    Effect.tap((dirPath) => {
       const settingStore = getSettingStore();
       settingStore.setLogFilesDir(dirPath);
-      return;
     }),
   );
 };

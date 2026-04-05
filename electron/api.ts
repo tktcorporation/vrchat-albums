@@ -128,7 +128,6 @@ export const router = trpcRouter({
   clearAllStoredSettings: procedure.mutation(async () => {
     service.clearAllStoredSettings();
     ee.emit('toast', '設定をすべて削除しました');
-    return;
   }),
   clearStoredSetting: procedure
     .input(z.union([z.literal('logFilesDir'), z.literal('vrchatPhotoDir')]))
@@ -141,7 +140,6 @@ export const router = trpcRouter({
         ),
       );
       ee.emit('toast', '設定を削除しました');
-      return;
     }),
   openPathOnExplorer: procedure.input(z.string()).mutation(async (ctx) => {
     await runEffect(

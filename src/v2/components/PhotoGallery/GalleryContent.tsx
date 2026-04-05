@@ -238,7 +238,7 @@ const VirtualizedGallery = memo(
                 : current;
             });
             const index = (topEntry.target as HTMLElement).dataset.index;
-            if (index != null) {
+            if (index !== undefined) {
               setCurrentGroupIndex(Number.parseInt(index, 10));
             }
           }
@@ -269,9 +269,9 @@ const VirtualizedGallery = memo(
 
     return (
       <>
-        {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events -- scroll container, not interactive */}
         <div
           ref={scrollElementRef}
+          role="presentation"
           className="flex-1 min-h-0 overflow-y-auto p-4 pr-4 scrollbar-none"
           onClick={handleBackgroundClick}
         >

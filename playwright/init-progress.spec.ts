@@ -26,7 +26,9 @@ const launchElectronApp = async () => {
     execSync('Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &', {
       shell: '/bin/bash',
     });
-    await new Promise((resolve) => setTimeout(resolve, XVFB_STARTUP_DELAY_MS));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, XVFB_STARTUP_DELAY_MS);
+    });
   }
 
   const waitForServer = async (
@@ -44,9 +46,9 @@ const launchElectronApp = async () => {
       } catch {
         console.log(`Waiting for server... (attempt ${i + 1}/${maxAttempts})`);
       }
-      await new Promise((resolve) =>
-        setTimeout(resolve, SERVER_CHECK_INTERVAL_MS),
-      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, SERVER_CHECK_INTERVAL_MS);
+      });
     }
     console.warn('Could not verify development server, but proceeding anyway');
     return true;

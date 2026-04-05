@@ -154,9 +154,9 @@ export class MemoryMonitor {
       this.warningCount++;
 
       // GCを促すための遅延
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.config.throttleDelayMs),
-      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, this.config.throttleDelayMs);
+      });
     }
     // 警告閾値超過時はログのみ
     else if (snapshot.rssMB > this.config.rssWarningThresholdMB) {

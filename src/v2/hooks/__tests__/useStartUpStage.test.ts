@@ -94,7 +94,9 @@ describe('useStartupStage - simplified implementation', () => {
     );
 
     // 少し待ってからmutateが呼ばれていないことを確認
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
 
     expect(mockMutate).not.toHaveBeenCalled();
   });
@@ -310,7 +312,9 @@ describe('useStartupStage - simplified implementation', () => {
     );
 
     // 少し待ってからmutateが呼ばれていないことを確認
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
 
     expect(mockMutate).not.toHaveBeenCalled();
   });
@@ -332,7 +336,9 @@ describe('useStartupStage - simplified implementation', () => {
     );
 
     // 少し待ってからmutateが呼ばれていないことを確認
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 100);
+    });
 
     expect(mockMutate).not.toHaveBeenCalled();
   });

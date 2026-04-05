@@ -258,7 +258,10 @@ const generateMissingWorldJoinImagesInternal = (params: {
       // API レート制限回避: 1 秒間隔でリクエスト
       if (index > 0) {
         yield* Effect.promise(
-          () => new Promise((resolve) => setTimeout(resolve, 1000)),
+          () =>
+            new Promise<void>((resolve) => {
+              setTimeout(resolve, 1000);
+            }),
         );
       }
 

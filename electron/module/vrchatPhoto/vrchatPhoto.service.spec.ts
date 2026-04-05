@@ -570,7 +570,9 @@ describe('vrchatPhoto.service', () => {
       let _writeCallCount = 0;
       mockWriteFile.mockImplementation(async () => {
         _writeCallCount++;
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 10);
+        });
       });
 
       // 同じパスに対して並行でリクエスト
@@ -671,7 +673,9 @@ describe('vrchatPhoto.service', () => {
           getVRChatPhotoItemData({ photoPath, width: 256 }),
         );
         // キャッシュ書き込みは非同期で行われるので少し待つ
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 10);
+        });
       }
 
       // 10回連続失敗時に警告ログが呼ばれることを確認
@@ -715,7 +719,9 @@ describe('vrchatPhoto.service', () => {
         await Effect.runPromise(
           getVRChatPhotoItemData({ photoPath, width: 256 }),
         );
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 10);
+        });
       }
 
       // 連続失敗が10回に達しないので警告は出ないはず

@@ -197,7 +197,9 @@ const launchElectronApp = async () => {
     execSync('Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &', {
       shell: '/bin/bash',
     });
-    await new Promise((resolve) => setTimeout(resolve, XVFB_STARTUP_DELAY_MS));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, XVFB_STARTUP_DELAY_MS);
+    });
   }
 
   const waitForServer = async (

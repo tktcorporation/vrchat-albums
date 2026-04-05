@@ -94,6 +94,7 @@
     "typescript/no-namespace": "off",
     "no-namespace": "off",
     "unicorn/filename-case": "off",
+    "unicorn/number-literal-case": "off",
     "arrow-body-style": "off",
     "exports-last": "off",
     "jsdoc/require-param-type": "off",
