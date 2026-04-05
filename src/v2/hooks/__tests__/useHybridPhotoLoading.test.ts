@@ -254,11 +254,9 @@ describe('useHybridPhotoLoading', () => {
           height: 1080,
         },
       ];
-      const pathCache = new Map<string, string>();
-      pathCache.set(
-        'photo-1',
-        '/photos/VRChat_2024-01-01_12-00-00.000_1920x1080.png',
-      );
+      const pathCache = new Map<string, string>([
+        ['photo-1', '/photos/VRChat_2024-01-01_12-00-00.000_1920x1080.png'],
+      ]);
 
       const result = createPhotoArray(metadataList, pathCache);
 
@@ -304,15 +302,10 @@ describe('useHybridPhotoLoading', () => {
           height: 1080,
         },
       ];
-      const pathCache = new Map<string, string>();
-      pathCache.set(
-        'photo-a',
-        '/photos/VRChat_2024-01-01_12-00-00.000_1920x1080.png',
-      );
-      pathCache.set(
-        'photo-c',
-        '/photos/VRChat_2024-01-01_12-00-01.000_1920x1080.png',
-      );
+      const pathCache = new Map<string, string>([
+        ['photo-a', '/photos/VRChat_2024-01-01_12-00-00.000_1920x1080.png'],
+        ['photo-c', '/photos/VRChat_2024-01-01_12-00-01.000_1920x1080.png'],
+      ]);
 
       const result = createPhotoArray(metadataList, pathCache);
 
@@ -351,12 +344,10 @@ describe('useHybridPhotoLoading', () => {
           height: 1080,
         },
       ];
-      const pathCache = new Map<string, string>();
-      pathCache.set(
-        'photo-valid',
-        '/photos/VRChat_2024-01-01_12-00-00.000_1920x1080.png',
-      );
-      pathCache.set('photo-invalid', '/photos/invalid-filename.png');
+      const pathCache = new Map<string, string>([
+        ['photo-valid', '/photos/VRChat_2024-01-01_12-00-00.000_1920x1080.png'],
+        ['photo-invalid', '/photos/invalid-filename.png'],
+      ]);
 
       const result = createPhotoArray(metadataList, pathCache);
 

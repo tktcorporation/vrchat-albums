@@ -108,15 +108,27 @@
       "-c",
       "set -e; curl -fsSL https://raw.githubusercontent.com/nodejs/release-keys/b362bd15f2ac7ce350d7563fc03e0c625e455e5f/cli.sh | bash -s import"
     ],
-    "setup-mise-bash": ["bash", "-c", "echo 'eval \"$(mise activate bash)\"' >> ~/.bashrc"],
+    "setup-mise-bash": [
+      "bash",
+      "-c",
+      "echo 'eval \"$(mise activate bash)\"' >> ~/.bashrc"
+    ],
     "trust-mise": ["bash", "-lc", "mise trust"],
     "setup-git-user": ["bash", "-l", ".devcontainer/setup-git-user.sh"],
     // vite-plus (vp) CLI: Vite, Vitest, Oxlint, Oxfmt, Rolldown, tsdown を統合した開発ツールチェーン
     // CI=true で Node.js 管理の対話プロンプトをスキップ
-    "install-vite-plus": ["bash", "-c", "CI=true curl -fsSL https://vite.plus | bash"]
+    "install-vite-plus": [
+      "bash",
+      "-c",
+      "CI=true curl -fsSL https://vite.plus | bash"
+    ]
   },
   "postCreateCommand": {
-    "fix-pnpm-store-permissions": ["bash", "-lc", "sudo chown -R $(whoami) .pnpm-store"],
+    "fix-pnpm-store-permissions": [
+      "bash",
+      "-lc",
+      "sudo chown -R $(whoami) .pnpm-store"
+    ],
     "git-performance": "git config status.submoduleSummary false && git config diff.ignoreSubmodules all && git config fetch.recurseSubmodules false && git config submodule.recurse false",
     "install-gh-extensions": "gh extension install agbiotech/gh-sub-issue 2>/dev/null || true",
     "mise-install": ["bash", "-lc", "mise install"],
@@ -138,7 +150,11 @@
       "-c",
       "grep -q 'oauthAccount' ~/.claude.json 2>/dev/null && cp ~/.claude.json ~/.claude/.claude.json.bak || true"
     ],
-    "setup-chrome-devtools-mcp": ["bash", "-lc", ".devcontainer/setup-chrome-devtools-mcp.sh"],
+    "setup-chrome-devtools-mcp": [
+      "bash",
+      "-lc",
+      ".devcontainer/setup-chrome-devtools-mcp.sh"
+    ],
     "mise-upgrade": ["mise", "upgrade"],
     "check-env-file": [
       "bash",

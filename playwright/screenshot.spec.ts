@@ -26,7 +26,9 @@ const launchElectronApp = async () => {
     execSync('Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &', {
       shell: '/bin/bash',
     });
-    await new Promise((resolve) => setTimeout(resolve, XVFB_STARTUP_DELAY_MS)); // Wait for Xvfb to start
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, XVFB_STARTUP_DELAY_MS);
+    }); // Wait for Xvfb to start
   }
 
   // 開発サーバーが起動するまで待つ（Playwrightのwebserver設定が処理する）
@@ -47,9 +49,9 @@ const launchElectronApp = async () => {
         // サーバーがまだ起動していない
         console.log(`Waiting for server... (attempt ${i + 1}/${maxAttempts})`);
       }
-      await new Promise((resolve) =>
-        setTimeout(resolve, SERVER_CHECK_INTERVAL_MS),
-      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, SERVER_CHECK_INTERVAL_MS);
+      });
     }
     // webServerの設定があるので、サーバーは起動しているはず
     console.warn('Could not verify development server, but proceeding anyway');
@@ -185,7 +187,9 @@ test('各画面でスクショ', async () => {
   // タイムアウト処理の調整
   const timeoutDecreaseTwo = TIMEOUT - 5000;
   void Promise.race([
-    new Promise((resolve) => setTimeout(resolve, timeoutDecreaseTwo)),
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, timeoutDecreaseTwo);
+    }),
     new Promise((_resolve, reject) => {
       setTimeout(() => {
         void (async () => {

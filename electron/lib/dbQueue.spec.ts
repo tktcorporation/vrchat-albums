@@ -99,7 +99,9 @@ describe('DBQueue', () => {
     );
 
     // 少し待機してキューの状態を安定させる
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // キューの状態を確認
     console.log('Queue pending:', queue.pending);
@@ -140,7 +142,9 @@ describe('DBQueue', () => {
     );
 
     // 少し待機してキューの状態を安定させる
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 10);
+    });
 
     // 3つ目のタスクを追加しようとすると、キューが一杯でエラー
     const exit = await Effect.runPromiseExit(
@@ -254,19 +258,25 @@ describe('DBQueue', () => {
 
     // 3つのタスクを追加
     const task1 = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 50);
+      });
       results.push(1);
       return 1;
     };
 
     const task2 = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 30);
+      });
       results.push(2);
       return 2;
     };
 
     const task3 = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
       results.push(3);
       return 3;
     };
@@ -294,7 +304,10 @@ describe('DBQueue', () => {
 
     // タスクを追加して実行中の状態
     const task1Promise = queue.add(
-      () => new Promise((resolve) => setTimeout(() => resolve('task1'), 50)),
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve('task1'), 50);
+        }),
     );
 
     // タスクが実行中
@@ -304,7 +317,10 @@ describe('DBQueue', () => {
 
     // 別のタスクを追加（キューに入る）
     const task2Promise = queue.add(
-      () => new Promise((resolve) => setTimeout(() => resolve('task2'), 50)),
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve('task2'), 50);
+        }),
     );
 
     // キューにタスクがある状態
@@ -325,7 +341,10 @@ describe('DBQueue', () => {
 
     // タスクを追加
     void queue.add(
-      () => new Promise((resolve) => setTimeout(() => resolve('task'), 50)),
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve('task'), 50);
+        }),
     );
 
     // キューが空になるまで待機

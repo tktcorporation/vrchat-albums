@@ -133,7 +133,6 @@ export const ShareDialog = ({
       downloadOrCopyMutation: {
         mutateAsync: async (params) => {
           await copyImageMutation.mutateAsync(params);
-          return;
         },
       },
     });

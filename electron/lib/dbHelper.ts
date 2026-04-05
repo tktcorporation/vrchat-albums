@@ -138,7 +138,7 @@ export function executeQuery(
 //     logger.debug(
 //       `データベース操作を再試行します (${attempt + 1}/${maxRetries})`,
 //     );
-//     await new Promise((resolve) => setTimeout(resolve, retryDelay));
+//     await new Promise<void>((resolve) => { setTimeout(resolve, retryDelay); });
 //   }
 
 //   return err({

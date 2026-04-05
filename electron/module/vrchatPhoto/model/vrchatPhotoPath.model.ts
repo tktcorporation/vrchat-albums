@@ -213,7 +213,6 @@ export const getLatestVRChatPhoto = async () => {
 /**
  * 軽量メタデータ型（ハイブリッドローディング用）
  *
- * @remarks
  * フロントエンド側に同等の型 PhotoMetadata が存在する。
  * tRPC 経由で転送時に Date→string 変換されるため、
  * 各レイヤーで専用の型定義を維持している。

@@ -171,7 +171,9 @@ const processQueue = async () => {
     if (request) {
       console.log('processQueue', requestQueue.length);
       await request();
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay of 1 second
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 1000);
+      }); // Delay of 1 second
     }
   }
   isProcessingQueue = false;

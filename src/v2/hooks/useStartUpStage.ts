@@ -106,7 +106,9 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
         const elapsed = Date.now() - (initStartTimeRef.current ?? Date.now());
         const remaining = MIN_LOADING_DISPLAY_MS - elapsed;
         if (remaining > 0) {
-          await new Promise((resolve) => setTimeout(resolve, remaining));
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, remaining);
+          });
         }
 
         // ログ同期完了後、ログ関連のクエリキャッシュを無効化

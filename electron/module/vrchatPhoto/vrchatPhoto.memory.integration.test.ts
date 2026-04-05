@@ -252,7 +252,9 @@ describe('写真インデックス作成のメモリプロファイリング', (
     // GC後のメモリを計測
     if (global.gc) {
       global.gc();
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 500);
+      });
       snapshots.push(takeMemorySnapshot('after_gc'));
     }
 

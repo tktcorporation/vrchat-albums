@@ -183,7 +183,6 @@ export type FolderDigest = z.infer<typeof FolderDigestSchema>;
  * スキャンによって発見された、VRChat_*.png を含むフォルダを表す。
  * この型は `getPhotoFolders` 関数の出力としてのみ生成されるべき。
  *
- * @remarks
  * - VRChat写真が存在することの検証は型レベルではなく `getPhotoFolders` で実行
  * - 任意のパス文字列からの生成は避け、スキャン結果としてのみ使用すること
  * - VRChatPhotoDirPath（ユーザー設定のベースディレクトリ）とは区別される

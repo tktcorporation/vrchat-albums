@@ -29,7 +29,7 @@ gh pr checks <PR番号> --watch
 
 ```markdown
 ---
-"@tktco/ziku": patch
+'@tktco/ziku': patch
 ---
 
 変更の説明
