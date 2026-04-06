@@ -137,13 +137,13 @@ const withTimeout = <T>(
 ): Promise<T> => {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) =>
+    new Promise<never>((_, reject) => {
       setTimeout(
         () =>
           reject(new Error(`EXIF read timeout after ${timeoutMs}ms: ${label}`)),
         timeoutMs,
-      ),
-    ),
+      );
+    }),
   ]);
 };
 
