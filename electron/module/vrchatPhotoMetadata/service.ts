@@ -98,9 +98,19 @@ export const extractAndSaveMetadataBatch = (
       return 0;
     }
 
-    // バッチでメタデータ抽出
+    // バッチでメタデータ抽出（進捗ログ付き）
     const metadataMap = yield* Effect.promise(() =>
-      parsePhotoMetadataBatch(targetPaths, exifTagReader, concurrency),
+      parsePhotoMetadataBatch(
+        targetPaths,
+        exifTagReader,
+        concurrency,
+        (processed, total, errors) => {
+          const errorSuffix = errors > 0 ? ` (${errors} errors)` : '';
+          logger.info(
+            `Metadata extraction progress: ${processed}/${total}${errorSuffix}`,
+          );
+        },
+      ),
     );
 
     if (metadataMap.size === 0) {
