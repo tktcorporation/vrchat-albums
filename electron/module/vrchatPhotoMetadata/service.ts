@@ -10,7 +10,7 @@
 import { Effect } from 'effect';
 
 import { logger } from '../../lib/logger';
-import { readExif } from '../../lib/wrappedExifTool';
+import { readXmpTags } from '../../lib/wrappedExifTool';
 import {
   MetadataDbError,
   type MetadataParseError,
@@ -32,11 +32,13 @@ import {
 // ============================================================================
 
 /**
- * wrappedExifTool.readExif を parser の ExifTagReader 型に適合させるキャスト。
- * readExif は exiftool-vendored の Tags を返すが、parser は Record<string, any> を期待する。
+ * wrappedExifTool.readXmpTags を parser の ExifTagReader 型に適合させるキャスト。
+ *
+ * readXmpTags は XMP タグのみを高速に読み取る（-XMP:all -fast2）。
+ * VRChat メタデータは XMP に格納されるため、全タグ読み取りの readExif より効率的。
  * プロセスのライフサイクル管理は wrappedExifTool 側で行われる。
  */
-const exifTagReader = readExif as (
+const exifTagReader = readXmpTags as (
   filePath: string,
   // biome-ignore lint/suspicious/noExplicitAny: parser が Record<string, any> を期待するため
 ) => Promise<Record<string, any>>;
@@ -64,7 +66,7 @@ export const extractMetadataFromPhoto = (
  */
 export const extractAndSaveMetadataBatch = (
   photoPaths: string[],
-  concurrency = 5,
+  concurrency = 20,
 ): Effect.Effect<number, MetadataDbError> =>
   Effect.gen(function* () {
     if (photoPaths.length === 0) {
