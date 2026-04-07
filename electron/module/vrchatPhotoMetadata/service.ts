@@ -152,8 +152,13 @@ export const extractAndSaveMetadataBatch = (
         }),
     });
 
+    // 読み取り結果のサマリー（XMP の各フィールドが正しく取れているか確認用）
+    const withWorldId = attributes.filter((a) => a.worldId !== null).length;
+    const withWorldName = attributes.filter(
+      (a) => a.worldDisplayName !== null,
+    ).length;
     logger.info(
-      `Photo metadata complete: ${attributes.length} found with XMP out of ${targetPaths.length} scanned`,
+      `Photo metadata complete: ${attributes.length} found with XMP out of ${targetPaths.length} scanned (worldId: ${withWorldId}, worldName: ${withWorldName})`,
     );
     return attributes.length;
   });
