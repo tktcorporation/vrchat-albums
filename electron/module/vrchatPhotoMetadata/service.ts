@@ -10,7 +10,7 @@
 import { Effect } from 'effect';
 
 import { logger } from '../../lib/logger';
-import { readExif } from '../../lib/wrappedExifTool';
+import { readXmpTags } from '../../lib/wrappedExifTool';
 import {
   MetadataDbError,
   type MetadataParseError,
@@ -32,11 +32,13 @@ import {
 // ============================================================================
 
 /**
- * wrappedExifTool.readExif を parser の ExifTagReader 型に適合させるキャスト。
- * readExif は exiftool-vendored の Tags を返すが、parser は Record<string, any> を期待する。
+ * wrappedExifTool.readXmpTags を parser の ExifTagReader 型に適合させるキャスト。
+ *
+ * readXmpTags は XMP タグのみを高速に読み取る（-XMP:all -fast2）。
+ * VRChat メタデータは XMP に格納されるため、全タグ読み取りの readExif より効率的。
  * プロセスのライフサイクル管理は wrappedExifTool 側で行われる。
  */
-const exifTagReader = readExif as (
+const exifTagReader = readXmpTags as (
   filePath: string,
   // biome-ignore lint/suspicious/noExplicitAny: parser が Record<string, any> を期待するため
 ) => Promise<Record<string, any>>;
@@ -64,7 +66,7 @@ export const extractMetadataFromPhoto = (
  */
 export const extractAndSaveMetadataBatch = (
   photoPaths: string[],
-  concurrency = 5,
+  concurrency = 20,
 ): Effect.Effect<number, MetadataDbError> =>
   Effect.gen(function* () {
     if (photoPaths.length === 0) {
@@ -84,23 +86,45 @@ export const extractAndSaveMetadataBatch = (
       return 0;
     }
 
-    logger.info(
-      `Extracting metadata from ${newPaths.length} photos (${photoPaths.length - newPaths.length} already processed)`,
-    );
+    // VRChat 2025.3.1 で XMP メタデータが導入されたため、それ以前の写真をスキップ。
+    // カットオフを 2025-01-01 に設定（余裕を持たせる）。
+    const METADATA_CUTOFF_DATE = '2025-01-01';
+    const dateFilteredPaths = newPaths.filter((p) => {
+      const match = p.match(/VRChat_(\d{4}-\d{2}-\d{2})/);
+      // パターンにマッチしないファイルは安全側に倒して除外しない
+      return !match || match[1] >= METADATA_CUTOFF_DATE;
+    });
 
     // PNG/JPEGファイルのみフィルタ（XMPメタデータはPNG/JPEGどちらにも存在し得る）
-    const targetPaths = newPaths.filter(
+    const targetPaths = dateFilteredPaths.filter(
       (p) =>
         p.toLowerCase().endsWith('.png') || p.toLowerCase().endsWith('.jpg'),
+    );
+
+    const skippedByDb = photoPaths.length - newPaths.length;
+    const skippedByDate = newPaths.length - dateFilteredPaths.length;
+    const skippedByExt = dateFilteredPaths.length - targetPaths.length;
+    logger.info(
+      `Photo metadata: ${targetPaths.length} to extract (${skippedByDb} already in DB, ${skippedByDate} before ${METADATA_CUTOFF_DATE}, ${skippedByExt} unsupported format)`,
     );
 
     if (targetPaths.length === 0) {
       return 0;
     }
 
-    // バッチでメタデータ抽出
+    // バッチでメタデータ抽出（進捗ログ付き）
     const metadataMap = yield* Effect.promise(() =>
-      parsePhotoMetadataBatch(targetPaths, exifTagReader, concurrency),
+      parsePhotoMetadataBatch(
+        targetPaths,
+        exifTagReader,
+        concurrency,
+        (processed, total, errors) => {
+          const errorSuffix = errors > 0 ? ` (${errors} errors)` : '';
+          logger.info(
+            `Metadata extraction progress: ${processed}/${total}${errorSuffix}`,
+          );
+        },
+      ),
     );
 
     if (metadataMap.size === 0) {
@@ -128,7 +152,14 @@ export const extractAndSaveMetadataBatch = (
         }),
     });
 
-    logger.info(`Saved metadata for ${attributes.length} photos`);
+    // 読み取り結果のサマリー（XMP の各フィールドが正しく取れているか確認用）
+    const withWorldId = attributes.filter((a) => a.worldId !== null).length;
+    const withWorldName = attributes.filter(
+      (a) => a.worldDisplayName !== null,
+    ).length;
+    logger.info(
+      `Photo metadata complete: ${attributes.length} found with XMP out of ${targetPaths.length} scanned (worldId: ${withWorldId}, worldName: ${withWorldName})`,
+    );
     return attributes.length;
   });
 

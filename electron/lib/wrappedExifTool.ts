@@ -238,6 +238,20 @@ export const readExif = async (filePath: string) => {
   return exif;
 };
 
+/**
+ * VRChat XMP メタデータに必要なタグだけを高速に読み取る
+ *
+ * 背景: readExif() は全タグを読み取るが、VRChat メタデータには
+ * XMP の 4 タグ (AuthorID, Author, WorldID, WorldDisplayName) しか不要。
+ * `-XMP:all` 指定でファイル全体をスキャンせず XMP チャンクだけ読むため、
+ * 特に PNG ファイルで高速化が期待できる。
+ */
+export const readXmpTags = async (filePath: string) => {
+  const instance = await getExiftoolInstance();
+  const tags = await instance.read(filePath, ['-XMP:all', '-fast2']);
+  return tags;
+};
+
 export const readExifByBuffer = (
   buffer: Buffer,
 ): Effect.Effect<exiftool.Tags, ExifOperationError> => {
