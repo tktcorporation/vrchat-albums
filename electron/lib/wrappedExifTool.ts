@@ -115,7 +115,9 @@ const createTempFile = (
 let exiftoolInstance: exiftool.ExifTool | null = null;
 
 const getExiftoolInstance = async () => {
-  exiftoolInstance ??= new exiftool.ExifTool();
+  // taskTimeoutMillis: ハングしたタスクを30秒でタイムアウトし、exiftoolプロセスを再起動する。
+  // デフォルトはタイムアウトなしのため、1ファイルのハングが後続すべてのキューをブロックする。
+  exiftoolInstance ??= new exiftool.ExifTool({ taskTimeoutMillis: 30_000 });
   return exiftoolInstance;
 };
 
@@ -248,7 +250,9 @@ export const readExif = async (filePath: string) => {
  */
 export const readXmpTags = async (filePath: string) => {
   const instance = await getExiftoolInstance();
-  const tags = await instance.read(filePath, ['-XMP:all', '-fast2']);
+  // -fast2 は JPEG の IFD 末尾以降をスキップする最適化だが、PNG ファイルで
+  // exiftool がハングする原因になることがあるため使用しない。
+  const tags = await instance.read(filePath, ['-XMP:all']);
   return tags;
 };
 

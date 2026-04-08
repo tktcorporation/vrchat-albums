@@ -126,9 +126,11 @@ export const parsePhotoMetadata = (
 /**
  * 個別ファイルの EXIF 読み取りにタイムアウトを付与するラッパー。
  *
- * 背景: exiftool-vendored は taskTimeoutMillis (デフォルト30秒) を持つが、
- * プロセスレベルの問題（exiftool 子プロセスのハング等）ではタイムアウトが
- * 発火しないケースがある。Promise.race で二重のタイムアウトを設ける。
+ * 背景: ExifTool インスタンスは taskTimeoutMillis: 30_000 で設定されており、
+ * ハングしたタスクを30秒でタイムアウトしプロセスを再起動する。
+ * ただしプロセスレベルの問題では発火しないケースがあるため、
+ * Promise.race で35秒の二重タイムアウトを設ける（taskTimeoutMillis より5秒長く、
+ * プロセス再起動が完了するのを待ってから強制終了する）。
  */
 const withTimeout = <T>(
   promise: Promise<T>,
@@ -169,9 +171,9 @@ export const parsePhotoMetadataBatch = async (
   let processed = 0;
   let parseErrors = 0;
 
-  /** readExifTags に 60秒のタイムアウトを付与したラッパー */
+  /** readExifTags に 35秒のタイムアウトを付与したラッパー（taskTimeoutMillis:30s の5秒後） */
   const readExifTagsWithTimeout = (filePath: string) =>
-    withTimeout(readExifTags(filePath), 60_000, filePath);
+    withTimeout(readExifTags(filePath), 35_000, filePath);
 
   // 並列数制限付きで処理
   for (let i = 0; i < filePaths.length; i += concurrency) {
