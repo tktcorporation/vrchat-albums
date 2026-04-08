@@ -60,4 +60,6 @@ export const DETECTION_BROAD_PATTERNS = ['[Behaviour]'] as const;
 export const KNOWN_NOISE_PATTERNS = [
   '[Behaviour] Sanity check',
   '[Behaviour] Avatar Expression Parameter',
+  '[Behaviour] OnPlayerJoinComplete',
+  '[Behaviour] RPC',
 ] as const;
