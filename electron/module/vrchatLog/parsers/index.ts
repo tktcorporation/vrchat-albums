@@ -151,18 +151,26 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
           type: 'world_join',
         });
 
-        // Sentry に送信して、どのパターンで例外が起きているか追跡可能にする。
-        // LOG_FORMAT_MISMATCH は VRChat のログ形式変更の可能性があるため、
-        // 早期検出のために送信する。
-        // new Error() で stack trace を保持（Player Join/Leave と同じパターン）。
-        logger.error({
-          message: new Error(`World join parse error: ${errorMessage}`),
-          details: {
-            logLine: l,
-            errorType: worldError.type,
-            ...worldError,
-          },
-        });
+        // INVALID_INSTANCE_ID はローカルワールド（wrld_xxx:wrld_xxx 形式）で起きる
+        // 既知の VRChat 動作のため warn レベル（Sentry 不送信）。
+        // その他のエラーは VRChat ログ形式変更の可能性があるため Sentry 送信対象。
+        match(worldError)
+          .with({ type: 'INVALID_INSTANCE_ID' }, () => {
+            logger.warn(`World join skipped (local world): ${errorMessage}`, {
+              logLine: l,
+              errorType: worldError.type,
+            });
+          })
+          .otherwise(() => {
+            logger.error({
+              message: new Error(`World join parse error: ${errorMessage}`),
+              details: {
+                logLine: l,
+                errorType: worldError.type,
+                ...worldError,
+              },
+            });
+          });
       }
     }
 
