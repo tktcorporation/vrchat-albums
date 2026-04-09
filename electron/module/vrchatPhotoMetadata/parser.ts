@@ -123,32 +123,6 @@ export const parsePhotoMetadata = (
     return metadata;
   });
 
-/**
- * 個別ファイルの EXIF 読み取りにタイムアウトを付与するラッパー。
- *
- * 背景: ExifTool インスタンスは taskTimeoutMillis: 30_000 で設定されており、
- * ハングしたタスクを30秒でタイムアウトしプロセスを再起動する。
- * ただしプロセスレベルの問題では発火しないケースがあるため、
- * Promise.race で35秒の二重タイムアウトを設ける（taskTimeoutMillis より5秒長く、
- * プロセス再起動が完了するのを待ってから強制終了する）。
- */
-const withTimeout = <T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  label: string,
-): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      setTimeout(
-        () =>
-          reject(new Error(`EXIF read timeout after ${timeoutMs}ms: ${label}`)),
-        timeoutMs,
-      );
-    }),
-  ]);
-};
-
 /** バッチ処理の進捗をログ出力する間隔（ファイル数） */
 const PROGRESS_LOG_INTERVAL = 100;
 
@@ -171,16 +145,14 @@ export const parsePhotoMetadataBatch = async (
   let processed = 0;
   let parseErrors = 0;
 
-  /** readExifTags に 35秒のタイムアウトを付与したラッパー（taskTimeoutMillis:30s の5秒後） */
-  const readExifTagsWithTimeout = (filePath: string) =>
-    withTimeout(readExifTags(filePath), 35_000, filePath);
-
   // 並列数制限付きで処理
+  // タイムアウトとプロセスリカバリは readExifTags 実装側（readXmpTags）に委譲する。
+  // parser はファイル読み取りの詳細に依存せず、純粋にパース処理のみを担う。
   for (let i = 0; i < filePaths.length; i += concurrency) {
     const batch = filePaths.slice(i, i + concurrency);
     const promises = batch.map(async (filePath) => {
       const result = await Effect.runPromiseExit(
-        parsePhotoMetadata(filePath, readExifTagsWithTimeout),
+        parsePhotoMetadata(filePath, readExifTags),
       );
       if (result._tag === 'Success') {
         results.set(filePath, result.value);

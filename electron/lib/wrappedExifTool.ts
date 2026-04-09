@@ -240,20 +240,51 @@ export const readExif = async (filePath: string) => {
   return exif;
 };
 
+/** Promise.race 用のタイムアウト Promise を生成するヘルパー */
+const makeTimeoutPromise = (ms: number, label: string): Promise<never> =>
+  new Promise((_, reject) => {
+    setTimeout(
+      () => reject(new Error(`EXIF read timeout after ${ms}ms: ${label}`)),
+      ms,
+    );
+  });
+
 /**
  * VRChat XMP メタデータに必要なタグだけを高速に読み取る
  *
  * 背景: readExif() は全タグを読み取るが、VRChat メタデータには
  * XMP の 4 タグ (AuthorID, Author, WorldID, WorldDisplayName) しか不要。
- * `-XMP:all` 指定でファイル全体をスキャンせず XMP チャンクだけ読むため、
- * 特に PNG ファイルで高速化が期待できる。
+ * `-XMP:all` 指定で XMP チャンクだけ読むため PNG ファイルで高速化が期待できる。
+ *
+ * タイムアウト設計:
+ * - taskTimeoutMillis: 30_000 が1次タイムアウト（exiftool プロセス自動再起動）
+ * - Promise.race 35_000 が2次タイムアウト（taskTimeoutMillis が発火しない場合のフォールバック）
+ * - 2次タイムアウト発火時は closeExiftoolInstance() を呼び出してキューをリセットする。
+ *   Promise.race は負けた側（instance.read）をキャンセルしないため、
+ *   プロセス強制リセットなしではキューが積み上がり後続すべてがハングする。
  */
 export const readXmpTags = async (filePath: string) => {
   const instance = await getExiftoolInstance();
   // -fast2 は JPEG の IFD 末尾以降をスキップする最適化だが、PNG ファイルで
   // exiftool がハングする原因になることがあるため使用しない。
-  const tags = await instance.read(filePath, ['-XMP:all']);
-  return tags;
+  const TIMEOUT_MS = 35_000;
+  try {
+    return await Promise.race([
+      instance.read(filePath, ['-XMP:all']),
+      makeTimeoutPromise(TIMEOUT_MS, filePath),
+    ]);
+  } catch (error) {
+    // taskTimeoutMillis が発火しなかった場合（2次タイムアウト）:
+    // インスタンスを強制リセットしてキューのブロックを解消する。
+    // void で非同期実行（エラーを即返却し、クリーンアップはバックグラウンドで行う）
+    if (
+      error instanceof Error &&
+      error.message.startsWith('EXIF read timeout')
+    ) {
+      void closeExiftoolInstance();
+    }
+    throw error;
+  }
 };
 
 export const readExifByBuffer = (
@@ -314,9 +345,12 @@ export const readExifByBuffer = (
 
 // アプリケーション終了時にExiftoolのインスタンスを終了
 export const closeExiftoolInstance = async () => {
-  if (exiftoolInstance) {
-    await exiftoolInstance.end();
-    exiftoolInstance = null;
+  // 先に null にセットすることで、並列呼び出し時の二重 close を防ぐ。
+  // end() 自体がハングする可能性があるため .catch() で無視して回復を優先する。
+  const instance = exiftoolInstance;
+  exiftoolInstance = null;
+  if (instance) {
+    await instance.end().catch(() => {});
   }
 };
 
