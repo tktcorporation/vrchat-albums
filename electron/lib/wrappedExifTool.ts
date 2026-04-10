@@ -240,14 +240,27 @@ export const readExif = async (filePath: string) => {
   return exif;
 };
 
-/** Promise.race 用のタイムアウト Promise を生成するヘルパー */
-const makeTimeoutPromise = (ms: number, label: string): Promise<never> =>
-  new Promise((_, reject) => {
-    setTimeout(
+/**
+ * Promise.race 用のタイムアウト Promise とそのキャンセル関数を返すヘルパー。
+ *
+ * Promise.race が read 側で決着した後も setTimeout が残り続けるタイマーリークを防ぐため、
+ * cancelTimeout を finally ブロックで呼び出すこと。
+ */
+const makeTimeoutPromise = (ms: number, label: string) => {
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+  const promise = new Promise<never>((_, reject) => {
+    timerId = setTimeout(
       () => reject(new Error(`EXIF read timeout after ${ms}ms: ${label}`)),
       ms,
     );
   });
+  const cancelTimeout = () => {
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+    }
+  };
+  return { promise, cancelTimeout };
+};
 
 /**
  * VRChat XMP メタデータに必要なタグだけを高速に読み取る
@@ -262,30 +275,47 @@ const makeTimeoutPromise = (ms: number, label: string): Promise<never> =>
  * - 2次タイムアウト発火時は closeExiftoolInstance() を呼び出してキューをリセットする。
  *   Promise.race は負けた側（instance.read）をキャンセルしないため、
  *   プロセス強制リセットなしではキューが積み上がり後続すべてがハングする。
+ * - makeTimeoutPromise の cancelTimeout を finally で呼び出し、
+ *   read が先に完了した場合のタイマーリークを防ぐ。
  */
-export const readXmpTags = async (filePath: string) => {
-  const instance = await getExiftoolInstance();
-  // -fast2 は JPEG の IFD 末尾以降をスキップする最適化だが、PNG ファイルで
-  // exiftool がハングする原因になることがあるため使用しない。
-  const TIMEOUT_MS = 35_000;
-  try {
-    return await Promise.race([
-      instance.read(filePath, ['-XMP:all']),
-      makeTimeoutPromise(TIMEOUT_MS, filePath),
-    ]);
-  } catch (error) {
-    // taskTimeoutMillis が発火しなかった場合（2次タイムアウト）:
-    // インスタンスを強制リセットしてキューのブロックを解消する。
-    // void で非同期実行（エラーを即返却し、クリーンアップはバックグラウンドで行う）
-    if (
-      error instanceof Error &&
-      error.message.startsWith('EXIF read timeout')
-    ) {
-      void closeExiftoolInstance();
-    }
-    throw error;
-  }
-};
+export const readXmpTags = (
+  filePath: string,
+): Effect.Effect<exiftool.Tags, ExifOperationError> =>
+  Effect.gen(function* () {
+    const instance = yield* Effect.promise(getExiftoolInstance);
+    // -fast2 は JPEG の IFD 末尾以降をスキップする最適化だが、PNG ファイルで
+    // exiftool がハングする原因になることがあるため使用しない。
+    const TIMEOUT_MS = 35_000;
+    const { promise: timeoutPromise, cancelTimeout } = makeTimeoutPromise(
+      TIMEOUT_MS,
+      filePath,
+    );
+    return yield* Effect.tryPromise({
+      try: () =>
+        Promise.race([
+          instance.read(filePath, ['-XMP:all']),
+          timeoutPromise,
+        ]).finally(cancelTimeout),
+      catch: (readError): ExifOperationError => {
+        // taskTimeoutMillis が発火しなかった場合（2次タイムアウト）:
+        // インスタンスを強制リセットしてキューのブロックを解消する。
+        // void で非同期実行（エラーを即返却し、クリーンアップはバックグラウンドで行う）
+        if (
+          readError instanceof Error &&
+          readError.message.startsWith('EXIF read timeout')
+        ) {
+          void closeExiftoolInstance();
+        }
+        return new ExifOperationError({
+          code: 'EXIF_READ_FAILED',
+          message:
+            readError instanceof Error ? readError.message : String(readError),
+          cause: readError,
+          filePath,
+        });
+      },
+    });
+  });
 
 export const readExifByBuffer = (
   buffer: Buffer,
@@ -350,7 +380,9 @@ export const closeExiftoolInstance = async () => {
   const instance = exiftoolInstance;
   exiftoolInstance = null;
   if (instance) {
-    await instance.end().catch(() => {});
+    await instance.end().catch((endError) => {
+      logger.debug('ExifTool shutdown failed', endError);
+    });
   }
 };
 

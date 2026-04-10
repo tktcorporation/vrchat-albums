@@ -32,16 +32,20 @@ import {
 // ============================================================================
 
 /**
- * wrappedExifTool.readXmpTags を parser の ExifTagReader 型に適合させるキャスト。
+ * readXmpTags（Effect）を parser の ExifTagReader（Promise）型に変換するアダプター。
  *
- * readXmpTags は XMP タグのみを高速に読み取る（-XMP:all -fast2）。
+ * readXmpTags は XMP タグのみを高速に読み取る（-XMP:all）。
  * VRChat メタデータは XMP に格納されるため、全タグ読み取りの readExif より効率的。
- * プロセスのライフサイクル管理は wrappedExifTool 側で行われる。
+ * タイムアウトとプロセスリカバリは wrappedExifTool 側で管理される。
+ * 失敗時は Effect が ExifOperationError を throw するが、
+ * parser 層の Effect.tryPromise がそれを MetadataParseError にラップする。
  */
-const exifTagReader = readXmpTags as (
+const exifTagReader = (
   filePath: string,
   // biome-ignore lint/suspicious/noExplicitAny: parser が Record<string, any> を期待するため
-) => Promise<Record<string, any>>;
+): Promise<Record<string, any>> =>
+  // biome-ignore lint/suspicious/noExplicitAny: exiftool.Tags は Record<string, any> と互換
+  Effect.runPromise(readXmpTags(filePath)) as Promise<Record<string, any>>;
 
 // ============================================================================
 // サービス関数
