@@ -63,10 +63,12 @@ describe('wrappedExifTool', () => {
       };
 
       // EXIFデータを書き込む
-      await wrappedExiftool.writeDateTimeWithTimezone({
-        filePath: testImagePath,
-        ...testData,
-      });
+      await Effect.runPromise(
+        wrappedExiftool.writeDateTimeWithTimezone({
+          filePath: testImagePath,
+          ...testData,
+        }),
+      );
 
       // exiftool-vendored で読み戻して検証
       const exifData = await verifier.read(testImagePath);

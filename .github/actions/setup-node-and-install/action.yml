@@ -45,4 +45,4 @@ runs:
     - name: Build exif-native
       shell: bash
       run: |
-        cd packages/exif-native && npx @napi-rs/cli@3.6.1 build --platform
+        cd packages/exif-native && npx -p @napi-rs/cli@3.6.1 napi build --platform

@@ -2,7 +2,7 @@
  * EXIF/XMP メタデータ操作のラッパー。
  *
  * 背景: exiftool-vendored（Perl 子プロセス）から @vrchat-albums/exif-native（Rust napi-rs）に
- * 移行中。XMP 読み取りと EXIF 書き込みは exif-native が担当する。
+ * 移行。XMP 読み取りと EXIF 書き込みは exif-native が担当する。
  *
  * @see docs/plans/exif-native-spec.md — 移行仕様書
  */
@@ -16,12 +16,7 @@ import { Data, Effect } from 'effect';
 import { logger } from './logger';
 
 /** EXIF操作関連のエラーコード */
-type ExifOperationErrorCode =
-  | 'EXIF_TEMP_DIR_CREATE_FAILED'
-  | 'EXIF_TEMP_FILE_WRITE_FAILED'
-  | 'EXIF_WRITE_FAILED'
-  | 'EXIF_TEMP_FILE_READ_FAILED'
-  | 'EXIF_READ_FAILED';
+type ExifOperationErrorCode = 'EXIF_WRITE_FAILED' | 'EXIF_READ_FAILED';
 
 /**
  * EXIF操作関連のエラー型（Data.TaggedError）
@@ -119,31 +114,31 @@ export const readXmpTags = (
  * World Join Image 生成時に使用。Rust ネイティブモジュールで
  * TIFF IFD を直接構築して書き込むため、一時ファイル不要。
  */
-export const writeDateTimeWithTimezone = async ({
-  filePath,
-  description,
-  dateTimeOriginal,
-  timezoneOffset,
-}: {
+export const writeDateTimeWithTimezone = (params: {
   filePath: string;
   description: string;
   dateTimeOriginal: string;
   timezoneOffset: string;
-}): Promise<void> => {
-  try {
-    const native = getExifNative();
-    native.writeExif(filePath, {
-      description,
-      dateTimeOriginal,
-      timezoneOffset,
-    });
-  } catch (error) {
-    logger.error({
-      message: `Failed to write EXIF data: ${error instanceof Error ? error.message : String(error)}`,
-    });
-    throw error;
-  }
-};
+}): Effect.Effect<void, ExifOperationError> =>
+  Effect.try({
+    try: () => {
+      const native = getExifNative();
+      native.writeExif(params.filePath, {
+        description: params.description,
+        dateTimeOriginal: params.dateTimeOriginal,
+        timezoneOffset: params.timezoneOffset,
+      });
+    },
+    catch: (error): ExifOperationError => {
+      logger.debug('Failed to write EXIF data', error);
+      return new ExifOperationError({
+        code: 'EXIF_WRITE_FAILED',
+        message: error instanceof Error ? error.message : String(error),
+        cause: error,
+        filePath: params.filePath,
+      });
+    },
+  });
 
 /**
  * バッファに EXIF メタデータを書き込んで新しいバッファを返す。

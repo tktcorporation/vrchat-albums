@@ -146,15 +146,17 @@ export const electronUtilRouter = () =>
               }
 
               // Write EXIF data with timezone
-              await exiftool.writeDateTimeWithTimezone({
-                filePath: tempPngPath,
-                description: ctx.input.worldId,
-                dateTimeOriginal: datefns.format(
-                  ctx.input.joinDateTime,
-                  'yyyy-MM-dd HH:mm:ss',
-                ),
-                timezoneOffset: datefns.format(ctx.input.joinDateTime, 'xxx'),
-              });
+              await Effect.runPromise(
+                exiftool.writeDateTimeWithTimezone({
+                  filePath: tempPngPath,
+                  description: ctx.input.worldId,
+                  dateTimeOriginal: datefns.format(
+                    ctx.input.joinDateTime,
+                    'yyyy-MM-dd HH:mm:ss',
+                  ),
+                  timezoneOffset: datefns.format(ctx.input.joinDateTime, 'xxx'),
+                }),
+              );
 
               // Move the temp file to the final destination
               await Effect.runPromise(

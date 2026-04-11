@@ -248,12 +248,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const pngPath = path.join(tempDir, 'write-test.png');
       await fs.promises.writeFile(pngPath, await createTestPng());
 
-      await writeDateTimeWithTimezone({
-        filePath: pngPath,
-        description: 'Test World Name',
-        dateTimeOriginal: '2024:06:15 18:30:00',
-        timezoneOffset: '+09:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: pngPath,
+          description: 'Test World Name',
+          dateTimeOriginal: '2024:06:15 18:30:00',
+          timezoneOffset: '+09:00',
+        }),
+      );
 
       // exiftool-vendored で読み戻して EXIF フィールドを検証
       const tags = await verifier.read(pngPath);
@@ -266,12 +268,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const jpegPath = path.join(tempDir, 'write-test.jpg');
       await fs.promises.writeFile(jpegPath, await createTestJpeg());
 
-      await writeDateTimeWithTimezone({
-        filePath: jpegPath,
-        description: 'JPEG World',
-        dateTimeOriginal: '2025:01:01 00:00:00',
-        timezoneOffset: '+00:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: jpegPath,
+          description: 'JPEG World',
+          dateTimeOriginal: '2025:01:01 00:00:00',
+          timezoneOffset: '+00:00',
+        }),
+      );
 
       const tags = await verifier.read(jpegPath);
       expect(tags.ImageDescription).toBe('JPEG World');
@@ -283,12 +287,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const pngPath = path.join(tempDir, 'all-fields.png');
       await fs.promises.writeFile(pngPath, await createTestPng());
 
-      await writeDateTimeWithTimezone({
-        filePath: pngPath,
-        description: 'All Fields Test',
-        dateTimeOriginal: '2024:12:31 23:59:59',
-        timezoneOffset: '-05:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: pngPath,
+          description: 'All Fields Test',
+          dateTimeOriginal: '2024:12:31 23:59:59',
+          timezoneOffset: '-05:00',
+        }),
+      );
 
       const tags = await verifier.read(pngPath);
 
@@ -381,12 +387,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       await fs.promises.writeFile(pngPath, await createTestPng());
 
       // まず EXIF を書き込み（exif-native）
-      await writeDateTimeWithTimezone({
-        filePath: pngPath,
-        description: 'Coexist World',
-        dateTimeOriginal: '2024:08:01 12:00:00',
-        timezoneOffset: '+09:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: pngPath,
+          description: 'Coexist World',
+          dateTimeOriginal: '2024:08:01 12:00:00',
+          timezoneOffset: '+09:00',
+        }),
+      );
 
       // 次に XMP を追加書き込み（exiftool-vendored）
       await writeVrcXmpWithExiftool(exifToolInstance, pngPath, {
@@ -417,12 +425,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const pngPath = path.join(tempDir, 'unicode.png');
       await fs.promises.writeFile(pngPath, await createTestPng());
 
-      await writeDateTimeWithTimezone({
-        filePath: pngPath,
-        description: '日本語のワールド名 🌏',
-        dateTimeOriginal: '2024:01:01 00:00:00',
-        timezoneOffset: '+09:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: pngPath,
+          description: '日本語のワールド名 🌏',
+          dateTimeOriginal: '2024:01:01 00:00:00',
+          timezoneOffset: '+09:00',
+        }),
+      );
 
       const tags = await verifier.read(pngPath);
       expect(tags.ImageDescription).toBe('日本語のワールド名 🌏');
@@ -452,12 +462,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       await fs.promises.writeFile(pngPath, await createTestPng());
 
       const longDescription = 'A'.repeat(1000);
-      await writeDateTimeWithTimezone({
-        filePath: pngPath,
-        description: longDescription,
-        dateTimeOriginal: '2024:01:01 00:00:00',
-        timezoneOffset: '+09:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: pngPath,
+          description: longDescription,
+          dateTimeOriginal: '2024:01:01 00:00:00',
+          timezoneOffset: '+09:00',
+        }),
+      );
 
       const tags = await verifier.read(pngPath);
       expect(tags.ImageDescription).toBe(longDescription);
@@ -467,12 +479,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const pngPath = path.join(tempDir, 'utc.png');
       await fs.promises.writeFile(pngPath, await createTestPng());
 
-      await writeDateTimeWithTimezone({
-        filePath: pngPath,
-        description: 'UTC Test',
-        dateTimeOriginal: '2024:06:15 12:00:00',
-        timezoneOffset: '+00:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: pngPath,
+          description: 'UTC Test',
+          dateTimeOriginal: '2024:06:15 12:00:00',
+          timezoneOffset: '+00:00',
+        }),
+      );
 
       const tags = await verifier.read(pngPath);
       expect(tags.OffsetTimeOriginal).toBe('+00:00');
@@ -482,12 +496,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const pngPath = path.join(tempDir, 'negative-tz.png');
       await fs.promises.writeFile(pngPath, await createTestPng());
 
-      await writeDateTimeWithTimezone({
-        filePath: pngPath,
-        description: 'Negative TZ',
-        dateTimeOriginal: '2024:06:15 12:00:00',
-        timezoneOffset: '-08:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: pngPath,
+          description: 'Negative TZ',
+          dateTimeOriginal: '2024:06:15 12:00:00',
+          timezoneOffset: '-08:00',
+        }),
+      );
 
       const tags = await verifier.read(pngPath);
       expect(tags.OffsetTimeOriginal).toBe('-08:00');
@@ -549,12 +565,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const pngPath = path.join(tempDir, 'hyphen-date.png');
       await fs.promises.writeFile(pngPath, await createTestPng());
 
-      await writeDateTimeWithTimezone({
-        filePath: pngPath,
-        description: 'wrld_test',
-        dateTimeOriginal: '2024-06-15 18:30:00',
-        timezoneOffset: '+09:00',
-      });
+      await Effect.runPromise(
+        writeDateTimeWithTimezone({
+          filePath: pngPath,
+          description: 'wrld_test',
+          dateTimeOriginal: '2024-06-15 18:30:00',
+          timezoneOffset: '+09:00',
+        }),
+      );
 
       const tags = await verifier.read(pngPath);
       expect(tags.ImageDescription).toBe('wrld_test');
