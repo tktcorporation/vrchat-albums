@@ -9,6 +9,7 @@
 
 import type {
   JsExifWriteParams,
+  JsImageDimensions,
   JsVrcXmpMetadata,
 } from '@vrchat-albums/exif-native';
 import { Data, Effect } from 'effect';
@@ -50,6 +51,10 @@ interface ExifNativeModule {
   writeExif(filePath: string, params: JsExifWriteParams): void;
   writeExifToBuffer(buffer: Buffer, params: JsExifWriteParams): Buffer;
   detectImageFormatJs(buffer: Buffer): string;
+  readImageDimensions(filePath: string): JsImageDimensions | null;
+  readImageDimensionsBatch(
+    filePaths: string[],
+  ): (JsImageDimensions | null | undefined)[];
 }
 
 let _exifNative: ExifNativeModule | null = null;
@@ -191,6 +196,27 @@ export const setExifToBuffer = (
       });
     },
   });
+
+// ============================================================================
+// 画像サイズ取得
+// ============================================================================
+
+/**
+ * 複数ファイルから画像サイズ（width/height）をバッチ読み取り。
+ *
+ * 背景: 写真インデックスでは width/height だけが必要だが、
+ * 従来は @napi-rs/image の Transformer でファイル全体をデコードしていた。
+ * Rust ネイティブモジュールでファイルの先頭バイトだけを読み取り、
+ * Rayon でスレッドプール並列化することで 10〜50 倍の高速化を実現する。
+ *
+ * 呼び出し元: processPhotoBatch() (vrchatPhoto.service.ts)
+ */
+export const readImageDimensionsBatch = (
+  filePaths: string[],
+): (JsImageDimensions | null | undefined)[] => {
+  const native = getExifNative();
+  return native.readImageDimensionsBatch(filePaths);
+};
 
 // ============================================================================
 // ライフサイクル管理（exif-native では不要だが、既存の呼び出し元との互換性のため残す）

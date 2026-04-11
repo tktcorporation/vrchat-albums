@@ -28,11 +28,8 @@ import {
   MemoryMonitor,
   PARALLEL_LIMITS,
 } from './../../lib/memoryMonitor';
-import {
-  clearSharpCache,
-  initializeSharp,
-  isSharpInitialized,
-} from './../../lib/sharpConfig';
+import { initializeSharp, isSharpInitialized } from './../../lib/sharpConfig';
+import { readImageDimensionsBatch } from './../../lib/wrappedExifTool';
 import * as fs from './../../lib/wrappedFs';
 import * as model from './model/vrchatPhotoPath.model';
 import {
@@ -1044,156 +1041,67 @@ const filterNewFilesByMtime = async (
 
 /**
  * 写真情報のバッチを処理する
- * メモリ効率を考慮し、並列処理数を制限
  *
- * ## メモリ最適化
- * - 並列数を5に制限（libvipsのネイティブメモリ使用を抑制）
- * - RSS監視で圧迫時に遅延
- * - サブバッチ間でキャッシュをクリア
+ * 背景: Rust ネイティブモジュール (exif-native) でファイルの先頭バイトだけを
+ * 部分読み込みし、Rayon でスレッドプール並列化することで高速に width/height を取得する。
+ * 従来は @napi-rs/image の Transformer でファイル全体をデコードしていたが、
+ * 画像サイズだけなら PNG の IHDR (24B) / JPEG の SOF マーカーで十分。
  */
-async function processPhotoBatch(
+function processPhotoBatch(
   photoPaths: string[],
-  memoryMonitor?: MemoryMonitor,
-): Promise<
-  { photoPath: string; takenAt: Date; width: number; height: number }[]
-> {
+): { photoPath: string; takenAt: Date; width: number; height: number }[] {
+  // Step 1: ファイル名から takenAt をパース（I/O なし）
+  const pathsWithDates: { photoPath: string; takenAt: Date }[] = [];
+  for (const photoPath of photoPaths) {
+    const matchResult = photoPath.match(
+      /VRChat_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.\d{3})/,
+    );
+    if (!matchResult) {
+      logger.debug({
+        message: 'Photo filename did not match expected pattern, skipping',
+        details: { photoPath },
+      });
+      continue;
+    }
+    const takenAt = dateFns.parse(
+      matchResult[1],
+      'yyyy-MM-dd_HH-mm-ss.SSS',
+      new Date(),
+    );
+    pathsWithDates.push({ photoPath, takenAt });
+  }
+
+  if (pathsWithDates.length === 0) {
+    return [];
+  }
+
+  // Step 2: Rust バッチで画像サイズ取得（rayon 並列、先頭バイトのみ読み込み）
+  const dimensions = readImageDimensionsBatch(
+    pathsWithDates.map((p) => p.photoPath),
+  );
+
+  // Step 3: 結合（null はスキップ — ファイル未検出、権限エラー、破損ヘッダー等）
   const results: {
     photoPath: string;
     takenAt: Date;
     width: number;
     height: number;
   }[] = [];
-
-  // 並列処理数をメモリ使用量に基づいて動的に決定
-  const monitor = memoryMonitor ?? getGlobalMemoryMonitor();
-  const parallelLimit = monitor.getRecommendedParallelLimit(
-    PARALLEL_LIMITS.sharpMetadata,
-  );
-
-  for (let i = 0; i < photoPaths.length; i += parallelLimit) {
-    const subBatch = photoPaths.slice(i, i + parallelLimit);
-
-    // メモリ監視
-    await monitor.checkMemory(
-      `processPhotoBatch subBatch ${Math.floor(i / parallelLimit) + 1}`,
-    );
-
-    const photoInfoPromises = subBatch.map(async (photoPath) => {
-      const matchResult = photoPath.match(
-        /VRChat_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.\d{3})/,
-      );
-      if (!matchResult) {
-        // VRChat写真のファイル名パターンにマッチしない場合
-        // これは通常発生しないが、ファイル名が破損している可能性がある
-        logger.debug({
-          message: 'Photo filename did not match expected pattern, skipping',
-          details: { photoPath },
-        });
-        return null;
-      }
-
-      const takenAt = dateFns.parse(
-        matchResult[1],
-        'yyyy-MM-dd_HH-mm-ss.SSS',
-        new Date(),
-      );
-
-      // Transformerインスタンスを使い捨てにしてメモリリークを防ぐ
-      const metadataEither = await Effect.runPromise(
-        Effect.either(
-          Effect.tryPromise({
-            try: () =>
-              fsPromises.readFile(photoPath).then(async (buf) => {
-                const transformer = new Transformer(buf);
-                return transformer.metadata();
-              }),
-            catch: (error): { type: 'SHARP_ERROR'; message: string } => {
-              const nodeError = error as NodeJS.ErrnoException;
-              return match(nodeError.code)
-                .with('ENOENT', () => {
-                  // ファイル削除はレースコンディションで想定される
-                  logger.debug(
-                    `Photo file not found during metadata extraction: ${photoPath}`,
-                  );
-                  return {
-                    type: 'SHARP_ERROR' as const,
-                    message: 'File not found',
-                  };
-                })
-                .with(P.union('EACCES', 'EPERM'), () => {
-                  // 権限エラー → ユーザーに通知すべき
-                  logger.warn({
-                    message: `Permission denied reading photo: ${photoPath}`,
-                    stack:
-                      error instanceof Error ? error : new Error(String(error)),
-                  });
-                  return {
-                    type: 'SHARP_ERROR' as const,
-                    message: nodeError.message ?? 'Permission denied',
-                  };
-                })
-                .otherwise(() => {
-                  // 画像処理の内部エラー、破損ファイル等 → Sentry送信のため再スロー
-                  // デバッグのためファイルパス情報を付加
-                  const contextualError = new Error(
-                    `Image processing failed for: ${photoPath}`,
-                    { cause: error },
-                  );
-                  throw contextualError;
-                });
-            },
-          }),
-        ),
-      );
-
-      if (metadataEither._tag === 'Left') {
-        return null;
-      }
-
-      const metadata = metadataEither.right;
-      const height = metadata.height ?? 720;
-      const width = metadata.width ?? 1280;
-
-      // メタデータが不完全な場合は警告ログを出力（デバッグ用）
-      if (!metadata.height || !metadata.width) {
-        logger.warn({
-          message: `Missing dimension metadata for photo, using defaults`,
-          details: {
-            photoPath,
-            hasHeight: Boolean(metadata.height),
-            hasWidth: Boolean(metadata.width),
-            defaultsUsed: { height, width },
-          },
-        });
-      }
-
-      return {
-        photoPath,
-        takenAt,
-        width,
-        height,
-      };
-    });
-
-    const resolvedPhotoInfos = await Promise.all(photoInfoPromises);
-    const subResults = resolvedPhotoInfos.filter(
-      (
-        info,
-      ): info is {
-        photoPath: string;
-        takenAt: Date;
-        width: number;
-        height: number;
-      } => info !== null,
-    );
-
-    results.push(...subResults);
-
-    // サブバッチ処理後にキャッシュをクリア（メモリ解放）
-    // 大量処理時のメモリ蓄積を防ぐ
-    if (photoPaths.length > PHOTO_METADATA_BATCH_SIZE) {
-      clearSharpCache();
+  for (let i = 0; i < pathsWithDates.length; i++) {
+    const dim = dimensions[i];
+    if (dim == null) {
+      logger.debug({
+        message: 'Failed to read image dimensions, skipping',
+        details: { photoPath: pathsWithDates[i].photoPath },
+      });
+      continue;
     }
+    results.push({
+      photoPath: pathsWithDates[i].photoPath,
+      takenAt: pathsWithDates[i].takenAt,
+      width: dim.width,
+      height: dim.height,
+    });
   }
 
   return results;
@@ -1339,7 +1247,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
           await memoryMonitor.checkMemory(`batch ${batchNumber} start`);
 
           const batchStartTime = performance.now();
-          const processedBatch = await processPhotoBatch(batch, memoryMonitor);
+          const processedBatch = processPhotoBatch(batch);
 
           if (processedBatch.length > 0) {
             const dbStartTime = performance.now();
@@ -1389,9 +1297,6 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
               `Batch ${batchNumber}: Processed ${processedBatch.length} photos in ${(batchEndTime - batchStartTime).toFixed(2)} ms (metadata: ${(dbStartTime - batchStartTime).toFixed(2)} ms, DB: ${(dbEndTime - dbStartTime).toFixed(2)} ms)`,
             );
           }
-
-          // バッチ処理後にキャッシュをクリア（メモリ解放）
-          clearSharpCache();
         }
 
         // フォルダスキャン状態を更新

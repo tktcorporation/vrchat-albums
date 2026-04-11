@@ -29,6 +29,15 @@ vi.mock('@napi-rs/image', () => {
   }
   return { Transformer: MockTransformer };
 });
+vi.mock('./../../lib/wrappedExifTool', () => ({
+  readImageDimensionsBatch: vi
+    .fn()
+    .mockReturnValue([{ width: 1920, height: 1080 }]),
+  readXmpTags: vi.fn(),
+  writeDateTimeWithTimezone: vi.fn(),
+  setExifToBuffer: vi.fn(),
+  closeExiftoolInstance: vi.fn(),
+}));
 vi.mock('./../../lib/logger', () => ({
   logger: {
     debug: vi.fn(),
@@ -40,6 +49,8 @@ vi.mock('./../../lib/logger', () => ({
 
 // hash-wasm のインポート
 import { xxhash128 } from 'hash-wasm';
+
+import { readImageDimensionsBatch } from './../../lib/wrappedExifTool';
 
 /**
  * ファイル名リストからモックダイジェストを生成（hash-wasm モック用）
@@ -219,9 +230,14 @@ describe('createVRChatPhotoPathIndex', () => {
       >;
     });
 
-    // readFile モック - 画像処理エンジン（@napi-rs/image）用のダミーバッファを返す
+    // readFile モック - サムネイル生成（@napi-rs/image）用のダミーバッファを返す
     vi.mocked(nodefsPromises.readFile).mockResolvedValue(
       Buffer.from('fake_image_data'),
+    );
+
+    // readImageDimensionsBatch モック - 渡されたパス数に応じて結果を返す
+    vi.mocked(readImageDimensionsBatch).mockImplementation((paths) =>
+      paths.map(() => ({ width: 1920, height: 1080 })),
     );
 
     // DB model モック

@@ -7,6 +7,7 @@ extern crate napi_derive;
 
 mod container;
 mod detect;
+mod dimensions;
 mod exif;
 mod xmp;
 
@@ -15,6 +16,7 @@ use std::fs;
 
 use container::{jpeg, png};
 use detect::{detect_image_format, ImageFormat};
+use dimensions::read_image_dimensions_from_file;
 use exif::writer::{build_exif_bytes, ExifWriteParams};
 use xmp::reader::{parse_vrc_xmp, VrcXmpMetadata};
 
@@ -40,6 +42,13 @@ impl From<VrcXmpMetadata> for JsVrcXmpMetadata {
             world_display_name: m.world_display_name,
         }
     }
+}
+
+/// 画像サイズ（width/height）の読み取り結果
+#[napi(object)]
+pub struct JsImageDimensions {
+    pub width: u32,
+    pub height: u32,
 }
 
 /// EXIF 書き込み用パラメータ
@@ -154,6 +163,47 @@ pub fn detect_image_format_js(buffer: Buffer) -> String {
         ImageFormat::Png => "png".to_string(),
         ImageFormat::Unknown => "unknown".to_string(),
     }
+}
+
+// ============================================================================
+// 画像サイズ取得
+// ============================================================================
+
+/// ファイルパスから画像サイズ（width/height）を読み取る。
+///
+/// ファイルの先頭だけを部分読み込みするため、ファイル全体のデコードは不要。
+/// PNG: 先頭 24 バイト（IHDR チャンク）から取得。
+/// JPEG: 先頭 64KB をスキャンして SOF マーカーから取得。
+/// エラー時（ファイル未検出、権限エラー、不明フォーマット、破損ヘッダー）は null を返す。
+#[napi]
+pub fn read_image_dimensions(file_path: String) -> Option<JsImageDimensions> {
+    read_image_dimensions_from_file(&file_path)
+        .ok()
+        .map(|d| JsImageDimensions {
+            width: d.width,
+            height: d.height,
+        })
+}
+
+/// 複数ファイルから画像サイズをバッチ読み取り。
+///
+/// Rayon でスレッドプール並列化する。
+/// 個別のファイルでエラーが発生しても null を返し、他のファイルの処理を続行する。
+#[napi]
+pub fn read_image_dimensions_batch(file_paths: Vec<String>) -> Vec<Option<JsImageDimensions>> {
+    use rayon::prelude::*;
+
+    file_paths
+        .par_iter()
+        .map(|path| {
+            read_image_dimensions_from_file(path)
+                .ok()
+                .map(|d| JsImageDimensions {
+                    width: d.width,
+                    height: d.height,
+                })
+        })
+        .collect()
 }
 
 // ============================================================================
