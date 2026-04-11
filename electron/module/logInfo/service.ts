@@ -140,6 +140,37 @@ function _getLogStoreFilePaths(
 }
 
 /**
+ * 写真メタデータ抽出を非同期で開始する（fire-and-forget）
+ *
+ * 背景: exiftool による XMP 読み取りは写真枚数に比例して重い処理。
+ * syncLogs の完了をブロックすると、後続の triggerWorldJoinImageGeneration が
+ * メタデータ抽出完了まで開始されない問題があった。
+ * メタデータ抽出結果は loadLogInfoIndexFromVRChatLog の戻り値に含まれず、
+ * 後続ステップ（Step 7: 写真フォルダからのログインポート）にも依存されないため、
+ * fire-and-forget で安全に実行できる。
+ */
+function triggerMetadataExtraction(photoPaths: string[]): void {
+  emitStageStart('photo_metadata', '写真メタデータを抽出中...');
+  const metadataStartTime = performance.now();
+  void Effect.runPromise(
+    metadataService.extractAndSaveMetadataBatch(photoPaths),
+  )
+    .then((count) => {
+      const metadataEndTime = performance.now();
+      logger.info(
+        `Photo metadata extracted: ${count} new records (${(metadataEndTime - metadataStartTime).toFixed(0)} ms)`,
+      );
+    })
+    .catch((error) => {
+      const metadataEndTime = performance.now();
+      logger.error({
+        message: `Photo metadata extraction failed after ${(metadataEndTime - metadataStartTime).toFixed(0)} ms: ${error instanceof Error ? error.message : String(error)}`,
+        stack: error instanceof Error ? error : new Error(String(error)),
+      });
+    });
+}
+
+/**
  * VRChatのログファイルからログ情報をロードしてデータベースに保存する
  *
  * @param options.excludeOldLogLoad - trueの場合、DBに保存されている最新のログ日時以降のログのみを処理します。
@@ -540,30 +571,13 @@ export function loadLogInfoIndexFromVRChatLog({
     );
 
     // 6.5. 写真メタデータ抽出 (VRChat公式XMP)
+    // Fire-and-forget: exiftool による XMP 読み取りは重い処理のため、
+    // syncLogs の完了をブロックしない。これにより triggerWorldJoinImageGeneration が
+    // メタデータ抽出の完了を待たずに開始できる。
+    // Step 7 以降はメタデータ抽出結果に依存しないため安全。
     if (photoResults && photoResults.length > 0) {
-      emitStageStart('photo_metadata', '写真メタデータを抽出中...');
-      const metadataStartTime = performance.now();
       const photoPaths = photoResults.map((p) => p.photoPath);
-      const metadataResult = yield* Effect.either(
-        metadataService.extractAndSaveMetadataBatch(photoPaths),
-      );
-      if (metadataResult._tag === 'Right') {
-        logger.info(
-          `Photo metadata extracted: ${metadataResult.right} new records`,
-        );
-      } else {
-        // MetadataDbError は予期しないエラーなので error レベル（Sentry送信）
-        logger.error({
-          message: `Photo metadata DB error: ${metadataResult.left.message}`,
-          stack: metadataResult.left,
-        });
-      }
-      const metadataEndTime = performance.now();
-      logger.debug(
-        `Photo metadata extraction took ${
-          metadataEndTime - metadataStartTime
-        } ms`,
-      );
+      triggerMetadataExtraction(photoPaths);
     }
 
     // 7. 写真フォルダからのログインポート（通常ログ処理後に実行）
