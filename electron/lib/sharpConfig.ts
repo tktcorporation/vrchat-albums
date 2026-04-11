@@ -10,7 +10,7 @@
  * - electron/index.ts での早期初期化（GLib-GObject 競合回避）
  * - concurrency / cache の手動設定
  *
- * この薄いラッパーは、既存コードの initializeSharp() / clearSharpCache() /
+ * この薄いラッパーは、既存コードの initializeSharp() /
  * isSharpInitialized() 呼び出しとの互換性を維持するために残している。
  * 将来的に呼び出し元が不要と判断されれば削除可能。
  */
@@ -31,14 +31,4 @@ export const initializeSharp = (): void => {
  */
 export const isSharpInitialized = (): boolean => {
   return isInitialized;
-};
-
-/**
- * キャッシュクリア（互換性のためのno-op）
- *
- * napi-rs/image にはグローバルキャッシュがないため何もしない。
- * 呼び出し元がこの関数を使わなくなれば削除可能。
- */
-export const clearSharpCache = (): void => {
-  // no-op: @napi-rs/image has no global cache to clear
 };
