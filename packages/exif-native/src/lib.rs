@@ -172,7 +172,8 @@ fn write_exif_to_bytes(data: &[u8], params: &JsExifWriteParams) -> Result<Vec<u8
         description: params.description.clone(),
         date_time_original: params.date_time_original.clone(),
         timezone_offset: params.timezone_offset.clone(),
-    });
+    })
+    .map_err(|e| Error::from_reason(e))?;
 
     match detect_image_format(data) {
         ImageFormat::Png => {
