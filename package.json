@@ -18,7 +18,7 @@
   "main": "main/index.cjs",
   "scripts": {
     "postinstall": "simple-git-hooks && pnpm run license-check:generate && pnpm run rebuild-native",
-    "rebuild-native": "npx @electron/rebuild -f -w clip-filepaths",
+    "rebuild-native": "pnpm exec electron-rebuild -f -w clip-filepaths && pnpm exec electron-rebuild -f -w @vrchat-albums/exif-native",
     "setup:debug": "bash debug/genDevFiles.sh",
     "generate:debug-data": "tsx scripts/generate-debug-data.mts",
     "generate:icons": "tsx scripts/generate-platform-icons.ts",
@@ -99,6 +99,7 @@
     "@trpc/client": "^11.8.1",
     "@trpc/react-query": "^11.8.1",
     "@trpc/server": "^11.8.1",
+    "@vrchat-albums/exif-native": "workspace:*",
     "class-variance-authority": "0.7.1",
     "clip-filepaths": "^0.3.0",
     "clsx": "2.1.1",
@@ -172,7 +173,6 @@
     "simple-git-hooks": "2.13.1",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "uuid": "^13.0.0",
     "vite": "^8.0.3",
     "vitest": "^4.1.2"
   },

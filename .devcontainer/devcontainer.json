@@ -29,9 +29,22 @@
     // },
     "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers-extra/features/mise:1": {}
+    "ghcr.io/devcontainers-extra/features/mise:1": {},
+    "ghcr.io/devcontainers/features/desktop-lite:1": {
+      "webPort": "6080",
+      "vncPort": "5901"
+    }
   },
-  "runArgs": ["--env-file", ".devcontainer/.env.devcontainer"],
+  "forwardPorts": [6080],
+  "portsAttributes": {
+    "6080": {
+      "label": "desktop"
+    }
+  },
+  "runArgs": ["--shm-size=2g", "--env-file", ".devcontainer/.env.devcontainer"],
+  "containerEnv": {
+    "VNC_RESOLUTION": "1920x1080x24"
+  },
   "customizations": {
     "vscode": {
       "extensions": [

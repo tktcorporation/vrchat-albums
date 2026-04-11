@@ -29,6 +29,7 @@ export const electronExternal = [
   '@napi-rs/image',
   '@resvg/resvg-js',
   'clip-filepaths',
+  '@vrchat-albums/exif-native',
   // Sequelize 関連のモジュール
   '@sequelize/core',
   '@sequelize/core/decorators-legacy',

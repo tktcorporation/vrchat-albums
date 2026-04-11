@@ -18,8 +18,31 @@ runs:
       shell: bash
       run: corepack enable
 
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Cargo registry and build
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          packages/exif-native/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('packages/exif-native/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
     - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
         pnpm install --frozen-lockfile
+
+    - name: Run Rust tests
+      shell: bash
+      run: cd packages/exif-native && cargo test
+
+    - name: Build exif-native
+      shell: bash
+      run: |
+        cd packages/exif-native && npx -p @napi-rs/cli@3.6.1 napi build --platform

@@ -24,6 +24,8 @@ const config: KnipConfig = {
     'only-allow',
     // grit binary comes from @getgrit/cli package
     'grit',
+    // napi-rs CLI — CI で npx -p @napi-rs/cli napi build として使用
+    'napi',
   ],
   ignoreDependencies: [
     '@antfu/ni',
@@ -43,6 +45,8 @@ const config: KnipConfig = {
     'scripts/**',
     // GritQL patterns and modules
     '.grit/**',
+    // napi-rs 生成コード（index.js/index.d.ts）は knip のスコープ外
+    'packages/exif-native/**',
   ],
   // Don't report unused exports in entry files (tRPC routers)
   includeEntryExports: false,

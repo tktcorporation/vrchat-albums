@@ -1,0 +1,23 @@
+{
+  "name": "@vrchat-albums/exif-native",
+  "version": "0.1.0",
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepare": "which napi > /dev/null 2>&1 && napi build --platform || true"
+  },
+  "napi": {
+    "binaryName": "exif-native",
+    "targets": [
+      "x86_64-apple-darwin",
+      "x86_64-pc-windows-msvc",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-apple-darwin",
+      "aarch64-pc-windows-msvc",
+      "aarch64-unknown-linux-gnu"
+    ]
+  }
+}
