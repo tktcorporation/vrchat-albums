@@ -1089,7 +1089,7 @@ function processPhotoBatch(
   }[] = [];
   for (let i = 0; i < pathsWithDates.length; i++) {
     const dim = dimensions[i];
-    if (dim == null) {
+    if (dim === null || dim === undefined) {
       logger.debug({
         message: 'Failed to read image dimensions, skipping',
         details: { photoPath: pathsWithDates[i].photoPath },
