@@ -53,11 +53,27 @@ interface ExifNativeModule {
 }
 
 let _exifNative: ExifNativeModule | null = null;
+/** require() の失敗メッセージをキャッシュして、繰り返し require するのを防ぐ */
+let _exifNativeErrorMessage: string | null = null;
 
 const getExifNative = (): ExifNativeModule => {
-  // Playwright テスト互換: トップレベル import を避け、遅延 require で読み込む
-  _exifNative ??= require('@vrchat-albums/exif-native') as ExifNativeModule;
-  return _exifNative;
+  // 前回の require() 失敗をキャッシュ済みなら即座に再スロー
+  if (_exifNativeErrorMessage) {
+    throw new Error(_exifNativeErrorMessage);
+  }
+  if (_exifNative) {
+    return _exifNative;
+  }
+  // effect-lint-allow-try-catch: Electron 環境検出パターン（遅延 require のキャッシュ）
+  try {
+    // Playwright テスト互換: トップレベル import を避け、遅延 require で読み込む
+    _exifNative = require('@vrchat-albums/exif-native') as ExifNativeModule;
+    return _exifNative;
+  } catch (error) {
+    _exifNativeErrorMessage =
+      error instanceof Error ? error.message : String(error);
+    throw new Error(_exifNativeErrorMessage, { cause: error });
+  }
 };
 
 // ============================================================================

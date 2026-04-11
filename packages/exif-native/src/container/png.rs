@@ -63,8 +63,11 @@ pub fn extract_xmp_from_png(data: &[u8]) -> Result<Option<String>, String> {
             None => continue,
         }
 
-        // 残りが XMP XML テキスト
-        let xml_text = String::from_utf8_lossy(&chunk_data[offset..]).to_string();
+        // 残りが XMP XML テキスト（不正な UTF-8 の場合は XMP なしとして扱う）
+        let xml_text = match String::from_utf8(chunk_data[offset..].to_vec()) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
         return Ok(Some(xml_text));
     }
 
@@ -136,4 +139,91 @@ pub fn set_xmp_in_png(data: &[u8], xmp_xml: &str) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("Failed to encode PNG: {e}"))?;
 
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 最小限の有効な PNG バイト列を構築する（iTXt チャンクなし）。
+    ///
+    /// PNG signature + IHDR (1x1 8-bit grayscale) + IDAT (zlib-compressed) + IEND
+    fn minimal_png() -> Vec<u8> {
+        let mut buf = Vec::new();
+        // PNG signature
+        buf.extend_from_slice(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+        // IHDR chunk: 1x1 pixel, 8-bit grayscale
+        let ihdr_data: [u8; 13] = [
+            0, 0, 0, 1, // width = 1
+            0, 0, 0, 1, // height = 1
+            8,  // bit depth = 8
+            0,  // color type = grayscale
+            0,  // compression method
+            0,  // filter method
+            0,  // interlace method
+        ];
+        write_png_chunk(&mut buf, b"IHDR", &ihdr_data);
+
+        // IDAT chunk: minimal zlib-compressed data
+        write_png_chunk(&mut buf, b"IDAT", &[0x78, 0x01, 0x62, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01]);
+
+        // IEND chunk (empty)
+        write_png_chunk(&mut buf, b"IEND", &[]);
+
+        buf
+    }
+
+    /// PNG チャンクを書き込む（length + type + data + CRC）
+    fn write_png_chunk(buf: &mut Vec<u8>, chunk_type: &[u8; 4], data: &[u8]) {
+        buf.extend_from_slice(&(data.len() as u32).to_be_bytes());
+        buf.extend_from_slice(chunk_type);
+        buf.extend_from_slice(data);
+        let mut crc_input = Vec::with_capacity(4 + data.len());
+        crc_input.extend_from_slice(chunk_type);
+        crc_input.extend_from_slice(data);
+        let crc = crc32_png(&crc_input);
+        buf.extend_from_slice(&crc.to_be_bytes());
+    }
+
+    /// CRC-32 (PNG polynomial 0xEDB88320)
+    fn crc32_png(data: &[u8]) -> u32 {
+        let mut crc: u32 = 0xFFFFFFFF;
+        for &byte in data {
+            crc ^= byte as u32;
+            for _ in 0..8 {
+                if crc & 1 != 0 {
+                    crc = (crc >> 1) ^ 0xEDB88320;
+                } else {
+                    crc >>= 1;
+                }
+            }
+        }
+        crc ^ 0xFFFFFFFF
+    }
+
+    #[test]
+    fn extract_xmp_returns_none_for_png_without_itxt() {
+        let png_bytes = minimal_png();
+        let result = extract_xmp_from_png(&png_bytes);
+        // img_parts may accept or reject our minimal PNG.
+        // If it parses successfully, XMP should be None (no iTXt chunk).
+        // If it rejects due to invalid zlib data, that's also acceptable.
+        match result {
+            Ok(xmp) => assert!(xmp.is_none(), "Expected None XMP for PNG without iTXt chunk"),
+            Err(_) => {} // Parse error on minimal PNG is acceptable
+        }
+    }
+
+    #[test]
+    fn extract_xmp_returns_error_for_empty_data() {
+        let result = extract_xmp_from_png(&[]);
+        assert!(result.is_err(), "Expected error for empty data");
+    }
+
+    #[test]
+    fn extract_xmp_returns_error_for_invalid_data() {
+        let result = extract_xmp_from_png(b"not a png file at all");
+        assert!(result.is_err(), "Expected error for non-PNG data");
+    }
 }

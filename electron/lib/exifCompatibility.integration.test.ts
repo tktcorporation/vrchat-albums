@@ -17,12 +17,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { Transformer } from '@napi-rs/image';
-import { Effect } from 'effect';
+import { Cause, Effect, Exit, Option } from 'effect';
 import type { ExifDateTime, ExifTool } from 'exiftool-vendored';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { extractOfficialMetadata } from '../module/vrchatPhotoMetadata/parser';
 import {
+  ExifOperationError,
   closeExiftoolInstance,
   readXmpTags,
   setExifToBuffer,
@@ -315,8 +316,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
         expect(dtd.year).toBe(2024);
       }
 
-      // OffsetTime フィールド
-      expect(tags.OffsetTime).toBe('-05:00');
+      // OffsetTime フィールド（OffsetTime は DateTime なしのため書き込まない）
       expect(tags.OffsetTimeOriginal).toBe('-05:00');
       expect(tags.OffsetTimeDigitized).toBe('-05:00');
     });
@@ -417,7 +417,98 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
   });
 
   // ==========================================================================
-  // 5. エッジケース
+  // 5. エラーハンドリング
+  // ==========================================================================
+
+  describe('エラーハンドリング', () => {
+    it('readXmpTags に存在しないファイルパスを渡すと ExifOperationError を返す', async () => {
+      const nonExistentPath = path.join(tempDir, 'does-not-exist.png');
+
+      const exit = await Effect.runPromiseExit(readXmpTags(nonExistentPath));
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value).toBeInstanceOf(ExifOperationError);
+          expect(failOpt.value._tag).toBe('ExifOperationError');
+          expect(failOpt.value.code).toBe('EXIF_READ_FAILED');
+        }
+      }
+    });
+
+    it('setExifToBuffer に非画像バッファを渡すと ExifOperationError を返す', async () => {
+      const invalidBuffer = Buffer.from('not an image');
+
+      const exit = await Effect.runPromiseExit(
+        setExifToBuffer(invalidBuffer, {
+          description: 'Test',
+          dateTimeOriginal: '2024:01:01 00:00:00',
+          timezoneOffset: '+09:00',
+        }),
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value).toBeInstanceOf(ExifOperationError);
+          expect(failOpt.value._tag).toBe('ExifOperationError');
+          expect(failOpt.value.code).toBe('EXIF_WRITE_FAILED');
+        }
+      }
+    });
+  });
+
+  // ==========================================================================
+  // 5.5. XMP 保護（VRChat XMP が EXIF 書き込みで上書きされないこと）
+  // ==========================================================================
+
+  describe('XMP 保護', () => {
+    it('VRChat XMP を持つ PNG に EXIF を書き込んでも XMP フィールドが保護される', async () => {
+      const pngPath = path.join(tempDir, 'xmp-preserve.png');
+      await fs.promises.writeFile(pngPath, await createTestPng());
+
+      // まず VRChat XMP を書き込む
+      await writeVrcXmpWithExiftool(exifToolInstance, pngPath, {
+        authorId: 'usr_preserve_test',
+        authorDisplayName: 'PreserveUser',
+        worldId: 'wrld_preserve_test',
+        worldDisplayName: 'Preserve World',
+      });
+
+      // XMP が書き込まれたことを確認
+      const tagsBefore = await Effect.runPromise(readXmpTags(pngPath));
+      const metaBefore = extractOfficialMetadata(tagsBefore);
+      expect(metaBefore).not.toBeNull();
+      expect(metaBefore?.authorId).toBe('usr_preserve_test');
+
+      // ファイルを読み込んで setExifToBuffer で EXIF を書き込む
+      const fileBuffer = await fs.promises.readFile(pngPath);
+      const resultBuffer = await Effect.runPromise(
+        setExifToBuffer(fileBuffer, {
+          description: 'EXIF Description',
+          dateTimeOriginal: '2024:06:15 18:30:00',
+          timezoneOffset: '+09:00',
+        }),
+      );
+
+      // 結果を一時ファイルに書き出して VRChat XMP が保護されていることを確認
+      const outputPath = path.join(tempDir, 'xmp-preserve-result.png');
+      await fs.promises.writeFile(outputPath, resultBuffer);
+
+      const tagsAfter = await Effect.runPromise(readXmpTags(outputPath));
+      const metaAfter = extractOfficialMetadata(tagsAfter);
+      expect(metaAfter).not.toBeNull();
+      expect(metaAfter?.authorId).toBe('usr_preserve_test');
+      expect(metaAfter?.authorDisplayName).toBe('PreserveUser');
+      expect(metaAfter?.worldId).toBe('wrld_preserve_test');
+      expect(metaAfter?.worldDisplayName).toBe('Preserve World');
+    });
+  });
+
+  // ==========================================================================
+  // 6. エッジケース
   // ==========================================================================
 
   describe('エッジケース', () => {

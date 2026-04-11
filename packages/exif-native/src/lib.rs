@@ -114,7 +114,15 @@ pub fn write_exif(file_path: String, params: JsExifWriteParams) -> Result<()> {
     let result = write_exif_to_bytes(&data, &params)?;
 
     // アトミック書き込み: 同ディレクトリの .tmp ファイルに書き込み → rename
-    let tmp_path = format!("{file_path}.tmp");
+    // PID + タイムスタンプで一意な一時ファイル名を生成（予測可能パス攻撃の防止）
+    let tmp_path = format!(
+        "{file_path}.{}.{:x}.tmp",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.subsec_nanos())
+            .unwrap_or(0)
+    );
     fs::write(&tmp_path, &result).map_err(|e| {
         Error::from_reason(format!("Failed to write temp file {tmp_path}: {e}"))
     })?;

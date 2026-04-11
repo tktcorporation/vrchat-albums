@@ -1,9 +1,12 @@
 /// EXIF IFD バイト列の構築。
 ///
-/// World Join Image に埋め込む 7 フィールドのみをサポート:
+/// World Join Image に埋め込む 6 フィールドをサポート:
 ///   IFD0: ImageDescription (0x010E)
 ///   Exif SubIFD: DateTimeOriginal (0x9003), DateTimeDigitized (0x9004),
-///                OffsetTime (0x9010), OffsetTimeOriginal (0x9011), OffsetTimeDigitized (0x9012)
+///                OffsetTimeOriginal (0x9011), OffsetTimeDigitized (0x9012)
+///
+/// 注: OffsetTime (0x9010) は IFD0 に DateTime (0x0132) がないため書き込まない。
+///      OffsetTime は DateTime に対応するオフセットなので、対になるタグがなければ不要。
 ///
 /// TIFF 構造（リトルエンディアン）:
 ///   [Byte Order "II"] [Magic 0x002A] [IFD0 Offset]
@@ -26,6 +29,9 @@ const TAG_IMAGE_DESCRIPTION: u16 = 0x010E;
 const TAG_EXIF_IFD_POINTER: u16 = 0x8769;
 const TAG_DATE_TIME_ORIGINAL: u16 = 0x9003;
 const TAG_DATE_TIME_DIGITIZED: u16 = 0x9004;
+/// OffsetTime タグ ID。対になる DateTime (0x0132) を IFD0 に書き込んでいないため
+/// 現在は使用しないが、将来 DateTime を追加する際に必要になるため定義を残す。
+#[allow(dead_code)]
 const TAG_OFFSET_TIME: u16 = 0x9010;
 const TAG_OFFSET_TIME_ORIGINAL: u16 = 0x9011;
 const TAG_OFFSET_TIME_DIGITIZED: u16 = 0x9012;
@@ -172,8 +178,8 @@ pub fn build_exif_bytes(params: &ExifWriteParams) -> Result<Vec<u8>, String> {
     // Exif SubIFD のオフセット: IFD0 の直後
     let exif_ifd_offset = 8 + ifd0_size;
 
-    // Exif SubIFD には 5 エントリ
-    let exif_ifd_entry_count: u16 = 5;
+    // Exif SubIFD には 4 エントリ（OffsetTime は DateTime なしのため除外）
+    let exif_ifd_entry_count: u16 = 4;
     let exif_ifd_size = 2 + (exif_ifd_entry_count as usize * 12) + 4;
 
     // データ領域のオフセット: Exif SubIFD の直後
@@ -188,8 +194,7 @@ pub fn build_exif_bytes(params: &ExifWriteParams) -> Result<Vec<u8>, String> {
     let desc_offset = data_area_offset;
     let datetime_orig_offset = desc_offset + desc_bytes.len();
     let datetime_digi_offset = datetime_orig_offset + datetime_bytes.len();
-    let tz_offset = datetime_digi_offset + datetime_bytes.len();
-    let tz_orig_offset = tz_offset + tz_bytes.len();
+    let tz_orig_offset = datetime_digi_offset + datetime_bytes.len();
     let tz_digi_offset = tz_orig_offset + tz_bytes.len();
 
     // --- IFD0 エントリ書き込み ---
@@ -237,15 +242,6 @@ pub fn build_exif_bytes(params: &ExifWriteParams) -> Result<Vec<u8>, String> {
         datetime_digi_offset as u32,
     );
 
-    // OffsetTime
-    write_ifd_entry(
-        &mut buf,
-        TAG_OFFSET_TIME,
-        TYPE_ASCII,
-        tz_bytes.len() as u32,
-        tz_offset as u32,
-    );
-
     // OffsetTimeOriginal
     write_ifd_entry(
         &mut buf,
@@ -271,9 +267,13 @@ pub fn build_exif_bytes(params: &ExifWriteParams) -> Result<Vec<u8>, String> {
     buf.extend_from_slice(&desc_bytes);
     buf.extend_from_slice(&datetime_bytes); // DateTimeOriginal
     buf.extend_from_slice(&datetime_bytes); // DateTimeDigitized (同じ値)
-    buf.extend_from_slice(&tz_bytes); // OffsetTime
     buf.extend_from_slice(&tz_bytes); // OffsetTimeOriginal
     buf.extend_from_slice(&tz_bytes); // OffsetTimeDigitized
+
+    let total_size = buf.len();
+    if total_size > u32::MAX as usize {
+        return Err("EXIF data too large: exceeds u32 offset limit".to_string());
+    }
 
     Ok(buf)
 }
@@ -422,15 +422,15 @@ mod tests {
         let ptr_entry = find_entry(&bytes, ifd0_offset, TAG_EXIF_IFD_POINTER).unwrap();
         let exif_ifd_offset = ptr_entry.value_offset as usize;
 
-        // Exif SubIFD のエントリ数 = 5
+        // Exif SubIFD のエントリ数 = 4（OffsetTime は DateTime なしのため除外）
         let sub_count =
             u16::from_le_bytes([bytes[exif_ifd_offset], bytes[exif_ifd_offset + 1]]);
-        assert_eq!(sub_count, 5);
+        assert_eq!(sub_count, 4);
 
-        // 全 5 タグが存在する
+        // 全 4 タグが存在する（OffsetTime は除外）
         assert!(find_entry(&bytes, exif_ifd_offset, TAG_DATE_TIME_ORIGINAL).is_some());
         assert!(find_entry(&bytes, exif_ifd_offset, TAG_DATE_TIME_DIGITIZED).is_some());
-        assert!(find_entry(&bytes, exif_ifd_offset, TAG_OFFSET_TIME).is_some());
+        assert!(find_entry(&bytes, exif_ifd_offset, TAG_OFFSET_TIME).is_none());
         assert!(find_entry(&bytes, exif_ifd_offset, TAG_OFFSET_TIME_ORIGINAL).is_some());
         assert!(find_entry(&bytes, exif_ifd_offset, TAG_OFFSET_TIME_DIGITIZED).is_some());
     }
@@ -468,8 +468,8 @@ mod tests {
         let dtd = find_entry(&bytes, exif_offset, TAG_DATE_TIME_DIGITIZED).unwrap();
         assert_eq!(read_ascii(&bytes, dtd.value_offset, dtd.count), "2024:12:31 23:59:59");
 
-        let ot = find_entry(&bytes, exif_offset, TAG_OFFSET_TIME).unwrap();
-        assert_eq!(read_ascii(&bytes, ot.value_offset, ot.count), "-05:00");
+        // OffsetTime は DateTime なしのため書き込まれない
+        assert!(find_entry(&bytes, exif_offset, TAG_OFFSET_TIME).is_none());
 
         let oto = find_entry(&bytes, exif_offset, TAG_OFFSET_TIME_ORIGINAL).unwrap();
         assert_eq!(read_ascii(&bytes, oto.value_offset, oto.count), "-05:00");
