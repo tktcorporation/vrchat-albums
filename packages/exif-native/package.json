@@ -1,11 +1,13 @@
 {
   "name": "@vrchat-albums/exif-native",
   "version": "0.1.0",
+  "license": "MIT",
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
     "build": "napi build --platform --release",
-    "build:debug": "napi build --platform"
+    "build:debug": "napi build --platform",
+    "prepare": "which napi > /dev/null 2>&1 && napi build --platform || true"
   },
   "napi": {
     "binaryName": "exif-native",

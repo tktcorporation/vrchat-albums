@@ -32,7 +32,9 @@ pub fn parse_vrc_xmp(xmp_xml: &str) -> Option<VrcXmpMetadata> {
     let doc = Document::parse(xmp_xml).ok()?;
 
     let mut author_id: Option<String> = None;
-    let mut author: Option<String> = None;
+    // vrc:Author と xmp:Author を別々に収集し、後で vrc: を優先して解決する
+    let mut vrc_author: Option<String> = None;
+    let mut xmp_author: Option<String> = None;
     let mut world_id: Option<String> = None;
     let mut world_display_name: Option<String> = None;
 
@@ -61,17 +63,17 @@ pub fn parse_vrc_xmp(xmp_xml: &str) -> Option<VrcXmpMetadata> {
                 }
             }
             (VRC_NS, "Author") => {
-                if author.is_none() {
+                if vrc_author.is_none() {
                     if let Some(text) = get_non_empty_text(&node) {
-                        author = Some(text);
+                        vrc_author = Some(text);
                     }
                 }
             }
             // --- xmp: ネームスペースの子要素（VRChat は Author をここに書く） ---
             (XMP_NS, "Author") => {
-                if author.is_none() {
+                if xmp_author.is_none() {
                     if let Some(text) = get_non_empty_text(&node) {
-                        author = Some(text);
+                        xmp_author = Some(text);
                     }
                 }
             }
@@ -85,19 +87,19 @@ pub fn parse_vrc_xmp(xmp_xml: &str) -> Option<VrcXmpMetadata> {
                         }
                     }
                 }
-                if author.is_none() {
-                    // vrc:Author 属性
+                // vrc:Author 属性
+                if vrc_author.is_none() {
                     if let Some(val) = node.attribute((VRC_NS, "Author")) {
                         if !val.is_empty() {
-                            author = Some(val.to_string());
+                            vrc_author = Some(val.to_string());
                         }
                     }
-                    // xmp:Author 属性（フォールバック）
-                    if author.is_none() {
-                        if let Some(val) = node.attribute((XMP_NS, "Author")) {
-                            if !val.is_empty() {
-                                author = Some(val.to_string());
-                            }
+                }
+                // xmp:Author 属性
+                if xmp_author.is_none() {
+                    if let Some(val) = node.attribute((XMP_NS, "Author")) {
+                        if !val.is_empty() {
+                            xmp_author = Some(val.to_string());
                         }
                     }
                 }
@@ -119,6 +121,9 @@ pub fn parse_vrc_xmp(xmp_xml: &str) -> Option<VrcXmpMetadata> {
             _ => {}
         }
     }
+
+    // vrc:Author を優先、なければ xmp:Author にフォールバック
+    let author = vrc_author.or(xmp_author);
 
     // AuthorID がなければ VRChat メタデータなし
     let author_id = author_id?;
@@ -248,6 +253,48 @@ mod tests {
 </x:xmpmeta>"#;
 
         assert!(parse_vrc_xmp(xmp).is_none());
+    }
+
+    #[test]
+    fn prefers_vrc_author_over_xmp_author() {
+        // vrc:Author と xmp:Author の両方が存在する場合、vrc:Author を優先する
+        let xmp = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xmp="http://ns.adobe.com/xap/1.0/">
+    <rdf:Description>
+      <xmp:Author>xmp_user</xmp:Author>
+    </rdf:Description>
+    <rdf:Description xmlns:vrc="http://ns.vrchat.com/vrc/1.0/">
+      <vrc:AuthorID>usr_test</vrc:AuthorID>
+      <vrc:Author>vrc_user</vrc:Author>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>"#;
+
+        let result = parse_vrc_xmp(xmp);
+        assert!(result.is_some());
+        let meta = result.unwrap();
+        // vrc:Author が優先される
+        assert_eq!(meta.author.as_deref(), Some("vrc_user"));
+    }
+
+    #[test]
+    fn falls_back_to_xmp_author_when_no_vrc_author() {
+        // vrc:Author がなく xmp:Author のみの場合、xmp:Author を使用する
+        let xmp = r#"<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xmp="http://ns.adobe.com/xap/1.0/">
+    <rdf:Description>
+      <xmp:Author>xmp_only_user</xmp:Author>
+    </rdf:Description>
+    <rdf:Description xmlns:vrc="http://ns.vrchat.com/vrc/1.0/">
+      <vrc:AuthorID>usr_test</vrc:AuthorID>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>"#;
+
+        let result = parse_vrc_xmp(xmp);
+        assert!(result.is_some());
+        let meta = result.unwrap();
+        assert_eq!(meta.author.as_deref(), Some("xmp_only_user"));
     }
 
     #[test]

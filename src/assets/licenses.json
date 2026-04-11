@@ -131,7 +131,7 @@
     "licenseFile": "node_modules/@trpc/server/LICENSE"
   },
   "@vrchat-albums/exif-native@0.1.0": {
-    "licenses": "UNKNOWN",
+    "licenses": "MIT",
     "path": "node_modules/@vrchat-albums/exif-native"
   },
   "class-variance-authority@0.7.1": {

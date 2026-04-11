@@ -102,9 +102,10 @@ pub fn read_vrc_xmp_batch(file_paths: Vec<String>) -> Vec<Option<JsVrcXmpMetadat
 // EXIF 書き込み
 // ============================================================================
 
-/// ファイルに EXIF メタデータを書き込む（ファイルを直接変更）。
+/// ファイルに EXIF メタデータを書き込む（アトミック書き込み：一時ファイル + rename）。
 ///
 /// ImageDescription, DateTimeOriginal, DateTimeDigitized, OffsetTime* を埋め込む。
+/// クラッシュ時のファイル破損を防ぐため、同ディレクトリの .tmp ファイルに書き込んでから rename する。
 #[napi]
 pub fn write_exif(file_path: String, params: JsExifWriteParams) -> Result<()> {
     let data = fs::read(&file_path)
@@ -112,8 +113,16 @@ pub fn write_exif(file_path: String, params: JsExifWriteParams) -> Result<()> {
 
     let result = write_exif_to_bytes(&data, &params)?;
 
-    fs::write(&file_path, &result)
-        .map_err(|e| Error::from_reason(format!("Failed to write file {file_path}: {e}")))?;
+    // アトミック書き込み: 同ディレクトリの .tmp ファイルに書き込み → rename
+    let tmp_path = format!("{file_path}.tmp");
+    fs::write(&tmp_path, &result).map_err(|e| {
+        Error::from_reason(format!("Failed to write temp file {tmp_path}: {e}"))
+    })?;
+    fs::rename(&tmp_path, &file_path).map_err(|e| {
+        // rename に失敗した場合、一時ファイルを削除して元のファイルを保護
+        let _ = fs::remove_file(&tmp_path);
+        Error::from_reason(format!("Failed to rename temp file to {file_path}: {e}"))
+    })?;
 
     Ok(())
 }
@@ -167,23 +176,39 @@ fn write_exif_to_bytes(data: &[u8], params: &JsExifWriteParams) -> Result<Vec<u8
 
     match detect_image_format(data) {
         ImageFormat::Png => {
-            // PNG: eXIf チャンクに EXIF、さらに XMP の Description も書く
+            // PNG: eXIf チャンクに EXIF を書き込む
             let with_exif = png::set_exif_in_png(data, &exif_bytes)
                 .map_err(|e| Error::from_reason(e))?;
 
-            // Description を XMP としても埋め込む（写真管理ソフトとの互換性のため）
-            let xmp_xml = build_description_xmp(&params.description);
-            png::set_xmp_in_png(&with_exif, &xmp_xml)
-                .map_err(|e| Error::from_reason(e))
+            // 既存 XMP がある場合（VRChat の vrc:* フィールド等）は保護し、XMP 書き込みをスキップ。
+            // EXIF の ImageDescription だけで Description は十分。
+            // 既存 XMP がなければ、互換性のため dc:description を XMP にも書く。
+            let existing_xmp = png::extract_xmp_from_png(data)
+                .map_err(|e| Error::from_reason(e))?;
+            if existing_xmp.is_some() {
+                Ok(with_exif)
+            } else {
+                let xmp_xml = build_description_xmp(&params.description);
+                png::set_xmp_in_png(&with_exif, &xmp_xml)
+                    .map_err(|e| Error::from_reason(e))
+            }
         }
         ImageFormat::Jpeg => {
-            // JPEG: APP1 セグメントに EXIF、さらに XMP の Description も書く
+            // JPEG: APP1 セグメントに EXIF を書き込む
             let with_exif = jpeg::set_exif_in_jpeg(data, &exif_bytes)
                 .map_err(|e| Error::from_reason(e))?;
 
-            let xmp_xml = build_description_xmp(&params.description);
-            jpeg::set_xmp_in_jpeg(&with_exif, &xmp_xml)
-                .map_err(|e| Error::from_reason(e))
+            // 既存 XMP がある場合は保護（VRChat の vrc:* フィールドを上書きしない）。
+            // 既存 XMP がなければ、互換性のため dc:description を XMP にも書く。
+            let existing_xmp = jpeg::extract_xmp_from_jpeg(data)
+                .map_err(|e| Error::from_reason(e))?;
+            if existing_xmp.is_some() {
+                Ok(with_exif)
+            } else {
+                let xmp_xml = build_description_xmp(&params.description);
+                jpeg::set_xmp_in_jpeg(&with_exif, &xmp_xml)
+                    .map_err(|e| Error::from_reason(e))
+            }
         }
         ImageFormat::Unknown => Err(Error::from_reason(
             "Unknown image format: cannot write EXIF",
