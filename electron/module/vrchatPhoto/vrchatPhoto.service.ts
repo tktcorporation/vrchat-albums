@@ -51,6 +51,37 @@ export const isVRChatPhotoFile = (filename: string): boolean =>
   filename.startsWith('VRChat_') &&
   (filename.endsWith('.png') || filename.endsWith('.jpeg'));
 
+/**
+ * VRChat 写真のファイルパスから画像の寸法（width × height）を抽出する
+ *
+ * 背景: VRChat の PNG 写真ファイル名には解像度が含まれている
+ * （例: VRChat_2024-01-15_10-00-00.000_1920x1080.png）。
+ * ファイル名から直接寸法を取得できればファイルI/Oが不要になり、
+ * インデックス構築が大幅に高速化される。
+ *
+ * World Join 画像（.jpeg）にはワールドIDが入り寸法は含まれないため null を返す。
+ * 寸法が取得できない場合は従来通り Sharp でファイルを読む必要がある。
+ *
+ * @returns { width, height } または null（ファイル名に寸法がない場合）
+ */
+export const parseDimensionsFromFileName = (
+  filePath: string,
+): { width: number; height: number } | null => {
+  const fileName = path.basename(filePath);
+  // VRChat_YYYY-MM-DD_HH-mm-ss.SSS_WIDTHxHEIGHT.png のパターンにマッチ
+  const dimensionMatch = fileName.match(/_(\d+)x(\d+)\.\w+$/);
+  if (!dimensionMatch) {
+    return null;
+  }
+  const width = Number(dimensionMatch[1]);
+  const height = Number(dimensionMatch[2]);
+  // 妥当性チェック（0以下や極端に大きい値を弾く）
+  if (width <= 0 || height <= 0 || width > 16384 || height > 16384) {
+    return null;
+  }
+  return { width, height };
+};
+
 // サムネイルキャッシュの設定
 const THUMBNAIL_CACHE_DIR_NAME = 'vrchat-albums-thumbnails';
 const MAX_CACHE_SIZE_MB = 500; // キャッシュの最大サイズ
@@ -635,7 +666,9 @@ export const getVRChatPhotoDirPath = (): VRChatPhotoDirPath => {
 };
 
 // バッチサイズ定数
-const PHOTO_METADATA_BATCH_SIZE = 100; // メタデータ取得用（画像処理は重いため小さく）
+// ファイル名から寸法を取得できる写真が大半のため、バッチサイズを大きくしても
+// ファイルI/Oは発生しない。Sharpフォールバックが必要な少数の写真のみI/Oが走る。
+const PHOTO_METADATA_BATCH_SIZE = 500;
 
 /**
  * フォルダハッシュ計算エラー
@@ -766,12 +799,11 @@ const getPhotoFolders = async (
       photoFolders.push(dirPath);
     }
 
-    // サブディレクトリを再帰探索（async/await制御のためif文を使用）
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        await scanDir(path.join(dirPath, entry.name));
-      }
-    }
+    // サブディレクトリを並列で再帰探索（ディスクI/O並列化で高速化）
+    const subdirs = entries.filter((entry) => entry.isDirectory());
+    await Promise.all(
+      subdirs.map((entry) => scanDir(path.join(dirPath, entry.name))),
+    );
   };
 
   await scanDir(basePath.value);
@@ -1098,6 +1130,19 @@ async function processPhotoBatch(
         new Date(),
       );
 
+      // ファイル名から寸法を抽出（高速パス: ファイルI/O不要）
+      // VRChat PNG写真は VRChat_..._WIDTHxHEIGHT.png 形式のため大半はここで取得できる
+      const fileNameDimensions = parseDimensionsFromFileName(photoPath);
+      if (fileNameDimensions) {
+        return {
+          photoPath,
+          takenAt,
+          width: fileNameDimensions.width,
+          height: fileNameDimensions.height,
+        };
+      }
+
+      // フォールバック: ファイル名に寸法がない場合（World Join .jpeg 等）のみSharpで取得
       // Transformerインスタンスを使い捨てにしてメモリリークを防ぐ
       const metadataEither = await Effect.runPromise(
         Effect.either(
