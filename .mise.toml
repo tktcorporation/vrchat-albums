@@ -13,6 +13,8 @@ jj = "latest"
 
 # Browser automation
 "npm:playwright" = "latest"
+rust = "latest"
+"npm:@napi-rs/cli" = "latest"
 
 
 [settings]
