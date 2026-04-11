@@ -3,12 +3,7 @@
     "CLAUDE_CODE_NO_FLICKER": "1"
   },
   "permissions": {
-    "allow": [
-      "Bash(find:*)",
-      "Bash(rg:*)",
-      "Bash(grep:*)",
-      "Bash(ls:*)"
-    ],
+    "allow": ["Bash(find:*)", "Bash(rg:*)", "Bash(grep:*)", "Bash(ls:*)"],
     "deny": [
       "Read(./secrets/**)",
       "Write(./secrets/**)",
@@ -19,9 +14,7 @@
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "chrome-devtools"
-  ],
+  "enabledMcpjsonServers": ["chrome-devtools"],
   "hooks": {
     "PreToolUse": [
       {

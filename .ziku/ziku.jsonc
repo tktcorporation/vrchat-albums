@@ -21,6 +21,6 @@
     ".github/workflows/label.yml",
     ".github/labeler.yml",
     ".mcp.json",
-    ".mise.toml"
-  ]
+    ".mise.toml",
+  ],
 }

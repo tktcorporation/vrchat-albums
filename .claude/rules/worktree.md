@@ -44,6 +44,7 @@ git fetch origin master
 HEAD やトピックブランチから切ると、他の作業の未マージコミットが混入し、CI が無関係なエラーで失敗する。
 
 `EnterWorktree` は HEAD ベースで切るため、実行前に必ず以下を確認すること:
+
 1. `git fetch origin master` でリモートを最新にする
 2. 現在の HEAD が origin/master と同じであること（サブモジュールの場合は `cd` してから）
 
