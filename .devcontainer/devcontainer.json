@@ -35,9 +35,7 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "GitHub.copilot",
         "mhutchie.git-graph",
-        "steoates.autoimport",
         "editorconfig.editorconfig",
         "WakaTime.vscode-wakatime",
         "nemesv.copy-file-name"
@@ -117,8 +115,6 @@
     "setup-git-user": ["bash", "-l", ".devcontainer/setup-git-user.sh"],
     // vite-plus (vp) CLI: Vite, Vitest, Oxlint, Oxfmt, Rolldown, tsdown を統合した開発ツールチェーン
     // CI=true で Node.js 管理の対話プロンプトをスキップ
-    // NOTE: curl|bash パターンはサプライチェーンリスクあり。DevContainer 初期化時のみ実行される。
-    // pinned package に置き換え可能になったら移行を検討する。
     "install-vite-plus": [
       "bash",
       "-c",
@@ -140,7 +136,7 @@
     "restore-claude-json": [
       "bash",
       "-c",
-      "if [ -f ~/.claude/.claude.json.bak ]; then cp ~/.claude/.claude.json.bak ~/.claude.json || echo 'WARNING: failed to restore ~/.claude.json from backup' >&2; elif [ ! -f ~/.claude.json ]; then echo '{\"hasCompletedOnboarding\":true}' > ~/.claude.json; fi"
+      "test -f ~/.claude/.claude.json.bak && cp ~/.claude/.claude.json.bak ~/.claude.json || test -f ~/.claude.json || echo '{\"hasCompletedOnboarding\":true}' > ~/.claude.json"
     ]
   },
   "postStartCommand": {
