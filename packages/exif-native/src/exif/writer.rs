@@ -121,30 +121,30 @@ pub fn build_exif_bytes(params: &ExifWriteParams) -> Vec<u8> {
         datetime_digi_offset as u32,
     );
 
-    // OffsetTime
-    write_ifd_entry_inline_or_offset(
+    // OffsetTime — 常にオフセット参照（インライン最適化はオフセット計算の不整合リスクがあるため不使用）
+    write_ifd_entry(
         &mut buf,
         TAG_OFFSET_TIME,
         TYPE_ASCII,
-        &tz_bytes,
+        tz_bytes.len() as u32,
         tz_offset as u32,
     );
 
     // OffsetTimeOriginal
-    write_ifd_entry_inline_or_offset(
+    write_ifd_entry(
         &mut buf,
         TAG_OFFSET_TIME_ORIGINAL,
         TYPE_ASCII,
-        &tz_bytes,
+        tz_bytes.len() as u32,
         tz_orig_offset as u32,
     );
 
     // OffsetTimeDigitized
-    write_ifd_entry_inline_or_offset(
+    write_ifd_entry(
         &mut buf,
         TAG_OFFSET_TIME_DIGITIZED,
         TYPE_ASCII,
-        &tz_bytes,
+        tz_bytes.len() as u32,
         tz_digi_offset as u32,
     );
 
@@ -168,31 +168,6 @@ fn write_ifd_entry(buf: &mut Vec<u8>, tag: u16, data_type: u16, count: u32, valu
     write_u16(buf, data_type);
     write_u32(buf, count);
     write_u32(buf, value_offset);
-}
-
-/// IFD エントリを書き込む。4バイト以下ならインライン、超えたらオフセット参照。
-///
-/// TIFF 仕様: データが 4 バイト以下なら IFD エントリの value/offset フィールドに
-/// 直接格納する（インライン）。超える場合はデータ領域へのオフセットを書く。
-fn write_ifd_entry_inline_or_offset(
-    buf: &mut Vec<u8>,
-    tag: u16,
-    data_type: u16,
-    data: &[u8],
-    offset: u32,
-) {
-    write_u16(buf, tag);
-    write_u16(buf, data_type);
-    write_u32(buf, data.len() as u32);
-
-    if data.len() <= 4 {
-        // インライン: 4 バイトにパディング
-        let mut inline = [0u8; 4];
-        inline[..data.len()].copy_from_slice(data);
-        buf.extend_from_slice(&inline);
-    } else {
-        write_u32(buf, offset);
-    }
 }
 
 fn write_u16(buf: &mut Vec<u8>, val: u16) {

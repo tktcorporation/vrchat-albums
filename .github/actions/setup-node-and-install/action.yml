@@ -38,8 +38,11 @@ runs:
       run: |
         pnpm install --frozen-lockfile
 
+    - name: Run Rust tests
+      shell: bash
+      run: cd packages/exif-native && cargo test
+
     - name: Build exif-native
       shell: bash
       run: |
-        npm install -g @napi-rs/cli
-        cd packages/exif-native && napi build --platform
+        cd packages/exif-native && npx @napi-rs/cli@3.6.1 build --platform

@@ -130,12 +130,19 @@ export const writeDateTimeWithTimezone = async ({
   dateTimeOriginal: string;
   timezoneOffset: string;
 }): Promise<void> => {
-  const native = getExifNative();
-  native.writeExif(filePath, {
-    description,
-    dateTimeOriginal,
-    timezoneOffset,
-  });
+  try {
+    const native = getExifNative();
+    native.writeExif(filePath, {
+      description,
+      dateTimeOriginal,
+      timezoneOffset,
+    });
+  } catch (error) {
+    logger.error({
+      message: `Failed to write EXIF data: ${error instanceof Error ? error.message : String(error)}`,
+    });
+    throw error;
+  }
 };
 
 /**
