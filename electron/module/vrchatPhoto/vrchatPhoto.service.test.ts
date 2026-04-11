@@ -776,5 +776,37 @@ describe('createVRChatPhotoPathIndex', () => {
         );
       });
     });
+
+    describe('readImageDimensionsBatch エラー', () => {
+      it('null が返った写真はスキップしてDB保存しない', async () => {
+        // file1Path の dimensions だけ null を返す
+        vi.mocked(readImageDimensionsBatch).mockImplementation((paths) =>
+          paths.map((p) =>
+            p.includes(file1Name) ? null : { width: 1920, height: 1080 },
+          ),
+        );
+
+        await service.createVRChatPhotoPathIndex(false);
+
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+        const savedPaths = allSavedData.map((d) => d.photoPath);
+
+        // file1Path は null なのでスキップ
+        expect(savedPaths).not.toContain(file1Path);
+        // 他のファイルは正常に処理
+        expect(savedPaths).toContain(file2Path);
+        expect(savedPaths).toContain(extraFilePath);
+      });
+
+      it('全て null が返った場合はDB保存が呼ばれない', async () => {
+        vi.mocked(readImageDimensionsBatch).mockReturnValue([null, null, null]);
+
+        await service.createVRChatPhotoPathIndex(false);
+
+        expect(model.createOrUpdateListVRChatPhotoPath).not.toHaveBeenCalled();
+      });
+    });
   });
 });

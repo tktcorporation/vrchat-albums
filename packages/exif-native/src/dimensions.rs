@@ -21,7 +21,9 @@ pub struct ImageDimensions {
 const PNG_MIN_BYTES: usize = 24;
 
 /// JPEG の SOF マーカーを探すために読み込む最大バイト数。
-/// APP1(EXIF) が最大 64KB 程度になることがあるため、余裕を持って 64KB。
+/// APP1(EXIF) が最大 65533B になることがあるため、64KB + 余裕分を確保。
+/// 制約: SOF が 65536B 以降にある JPEG（複数の大きなメタデータセグメント）は
+/// 未対応だが、VRChat 写真の実用範囲では十分。
 const JPEG_SCAN_BYTES: usize = 65536;
 
 /// PNG バイト列の先頭から width/height を読み取る。
@@ -94,8 +96,11 @@ pub fn read_jpeg_dimensions(data: &[u8]) -> Result<ImageDimensions, String> {
         let marker = data[offset];
         offset += 1;
 
-        // SOF0-SOF3: フレームヘッダー（画像サイズを含む）
-        if (0xC0..=0xC3).contains(&marker) {
+        // SOF マーカー: フレームヘッダー（画像サイズを含む）
+        // SOF0-3 (baseline/extended/progressive/lossless),
+        // SOF5-7 (differential), SOF9-11 (arithmetic), SOF13-15 (differential arithmetic)
+        // 0xC4 (DHT), 0xC8 (JPG), 0xCC (DAC) は寸法を持たないため除外
+        if matches!(marker, 0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF) {
             // SOF payload: length(2B) + precision(1B) + height(2B) + width(2B)
             if offset + 7 > data.len() {
                 return Err("JPEG data truncated: SOF marker too short".to_string());
@@ -162,7 +167,9 @@ pub fn read_image_dimensions_from_file(file_path: &str) -> Result<ImageDimension
             let mut buf = vec![0u8; JPEG_SCAN_BYTES];
             buf[..8].copy_from_slice(&header);
             // ファイルが 64KB 未満でも OK（読めた分だけで判定）
-            let n = file.read(&mut buf[8..]).unwrap_or(0);
+            let n = file
+                .read(&mut buf[8..])
+                .map_err(|e| format!("Failed to read JPEG data from {file_path}: {e}"))?;
             buf.truncate(8 + n);
             read_jpeg_dimensions(&buf)
         }
@@ -328,6 +335,34 @@ mod tests {
             ImageDimensions {
                 width: 1280,
                 height: 720
+            }
+        );
+    }
+
+    #[test]
+    fn reads_jpeg_sof9_arithmetic() {
+        // SOF9 (arithmetic coding) もフレームヘッダーとして認識される
+        let data = build_jpeg_with_sof(640, 480, 0xC9, &[]);
+        let dim = read_jpeg_dimensions(&data).unwrap();
+        assert_eq!(
+            dim,
+            ImageDimensions {
+                width: 640,
+                height: 480
+            }
+        );
+    }
+
+    #[test]
+    fn reads_jpeg_sof13_differential_arithmetic() {
+        // SOF13 (differential arithmetic) もフレームヘッダーとして認識される
+        let data = build_jpeg_with_sof(800, 600, 0xCD, &[]);
+        let dim = read_jpeg_dimensions(&data).unwrap();
+        assert_eq!(
+            dim,
+            ImageDimensions {
+                width: 800,
+                height: 600
             }
         );
     }
