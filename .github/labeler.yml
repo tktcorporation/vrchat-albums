@@ -1,7 +1,7 @@
 document:
   - changed-files:
-      - any-glob-to-any-file: 'README.md'
+      - any-glob-to-any-file: "README.md"
 
 ci:
   - changed-files:
-      - any-glob-to-any-file: '.github/workflows/**/*'
+      - any-glob-to-any-file: ".github/workflows/**/*"

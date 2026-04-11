@@ -3,7 +3,12 @@
     "CLAUDE_CODE_NO_FLICKER": "1"
   },
   "permissions": {
-    "allow": ["Bash(find:*)", "Bash(rg:*)", "Bash(grep:*)", "Bash(ls:*)"],
+    "allow": [
+      "Bash(find:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)"
+    ],
     "deny": [
       "Read(./secrets/**)",
       "Write(./secrets/**)",
@@ -14,7 +19,9 @@
     ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["chrome-devtools"],
+  "enabledMcpjsonServers": [
+    "chrome-devtools"
+  ],
   "hooks": {
     "PreToolUse": [
       {
@@ -22,11 +29,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'lsof.*-ti.*\\|.*xargs.*kill|lsof.*-ti.*\\|.*kill|kill.*\\$\\(lsof|kill.*lsof|fuser.*-k'; then echo 'BLOCKED: lsof+kill / fuser+kill はポートフォワーディングプロセスを巻き込んで devcontainer を殺す。代わりに lsof -i :PORT でプロセスを確認し、対象の PID を特定してから kill <PID> すること。' >&2; exit 2; fi"
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'lsof.*-ti.*\\|.*xargs.*kill|lsof.*-ti.*\\|.*kill|kill.*\\$\\(lsof|kill.*lsof|fuser.*-k'; then echo 'BLOCKED: lsof+kill / fuser+kill はポートフォワーディングプロセスを巻き込んで devcontainer を殺す。代わりに pkill -f で特定プロセス名を指定して kill すること。' >&2; exit 2; fi"
           },
           {
             "type": "command",
             "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+checkout\\s+--\\s+\\.|git\\s+restore\\s+\\.|git\\s+reset\\s+--hard|git\\s+clean\\s+-[a-z]*f|jj\\s+restore\\s+--(from|to|changes-in)'; then echo 'BLOCKED: 全ファイル対象の revert/reset は他プロセスの変更を巻き込む。特定ファイルを指定するか、ワークスペース (jj workspace add / git worktree add) を作成して作業すること。' >&2; exit 2; fi"
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+worktree\\s+add'; then if ! echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+worktree\\s+add\\s+\\.claude/worktrees/'; then echo 'BLOCKED: worktree は .claude/worktrees/ 配下に作成すること。例: git worktree add .claude/worktrees/<タスク名> -b <ブランチ名> origin/master。または EnterWorktree ツールを使うこと。' >&2; exit 2; fi; fi"
           }
         ]
       }
@@ -94,13 +105,26 @@
     "wealth-management@financial-services-plugins": true,
     "lseg@financial-services-plugins": true,
     "sp-global@financial-services-plugins": true,
-    "sentry@claude-plugins-official": true
+    "sentry@claude-plugins-official": true,
+    "intercom@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "anthropic-agent-skills": {
       "source": {
         "source": "github",
         "repo": "anthropics/skills"
+      }
+    },
+    "financial-services-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/financial-services-plugins"
+      }
+    },
+    "knowledge-work-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/knowledge-work-plugins"
       }
     }
   },

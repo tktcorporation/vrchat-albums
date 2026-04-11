@@ -1,39 +1,29 @@
 # PR ワークフロールール
 
-## PR 作成後の CI ウォッチ
+## PR 作成後の CI 監視
 
-PR を作成した後は、必ず CI が完了するまでウォッチする。
+PR を作成またはプッシュした後は、CI が **全て pass するまで** 監視すること。
+CI が全部通るまでユーザーに「完了」と報告しない。
 
-```bash
-gh pr checks <PR番号> --watch
-```
+### 手順
 
-- CI が全て pass したらユーザーに報告する
-- fail したチェックがあれば、ログを確認して修正を試みる
-  ```bash
-  gh run view <run-id> --log-failed
-  ```
-- 修正後は再度 push して CI を再ウォッチする
+1. `gh pr checks <PR番号> --watch` で CI の状態を監視する
+2. fail したチェックがあれば、ログを確認して修正を試みる
+   ```bash
+   gh run view <run-id> --log-failed
+   ```
+3. 修正後は再度 push して CI を再ウォッチする
+4. 全チェックが pass するまでこのサイクルを繰り返す
 
-## Changeset
+### ポイント
 
-`packages/ziku-cli/` を変更する PR には changeset ファイルを含める。
-コミット・プッシュ前に changeset ファイルが存在するか確認し、なければ作成すること。
+- CI で実行される lint・test・build 等は手元でも事前に実行できる（`pre-push-verification.md` 参照）
+- テスト失敗時はログから原因を特定し、コード修正 → テスト再実行 → プッシュのサイクルを回す
 
-```bash
-# .changeset/<変更を端的に表す名前>.md を作成
-# minor: 機能追加、patch: バグ修正
-```
+## Changeset（該当プロジェクトのみ）
 
-形式:
+changeset を使用しているプロジェクトでは:
 
-```markdown
----
-'@tktco/ziku': patch
----
-
-変更の説明
-```
-
-- CI に `Changeset Check` ジョブがあり、changeset がないと fail する
-- ドキュメントのみの変更やリファクタなど、バージョンに影響しない変更は不要
+- バージョンに影響する変更を含む PR では、コミット前に changeset ファイルの有無を確認し、なければ作成する
+- パッケージ名は `package.json` の `name` フィールドを参照すること
+- ドキュメントのみの変更やリファクタなど、バージョンに影響しない変更では不要
