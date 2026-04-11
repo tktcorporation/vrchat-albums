@@ -1080,7 +1080,13 @@ function processPhotoBatch(
     pathsWithDates.map((p) => p.photoPath),
   );
 
-  // Step 3: 結合（null はスキップ — ファイル未検出、権限エラー、破損ヘッダー等）
+  // Step 3: 結合（null はデフォルトサイズでフォールバック）
+  // 背景: ファイル未検出・権限エラー・破損ヘッダー等で null が返る場合でも、
+  // 写真の存在自体はインデックスに残す。サイズが不明な場合は VRChat のデフォルト解像度を使用。
+  // DB に写真が登録されないとギャラリーに表示されなくなるため、スキップより保存を優先。
+  const DEFAULT_WIDTH = 1920;
+  const DEFAULT_HEIGHT = 1080;
+
   const results: {
     photoPath: string;
     takenAt: Date;
@@ -1091,16 +1097,20 @@ function processPhotoBatch(
     const dim = dimensions[i];
     if (dim === null || dim === undefined) {
       logger.debug({
-        message: 'Failed to read image dimensions, skipping',
-        details: { photoPath: pathsWithDates[i].photoPath },
+        message:
+          'Failed to read image dimensions, using default size for indexing',
+        details: {
+          photoPath: pathsWithDates[i].photoPath,
+          defaultWidth: DEFAULT_WIDTH,
+          defaultHeight: DEFAULT_HEIGHT,
+        },
       });
-      continue;
     }
     results.push({
       photoPath: pathsWithDates[i].photoPath,
       takenAt: pathsWithDates[i].takenAt,
-      width: dim.width,
-      height: dim.height,
+      width: dim?.width ?? DEFAULT_WIDTH,
+      height: dim?.height ?? DEFAULT_HEIGHT,
     });
   }
 

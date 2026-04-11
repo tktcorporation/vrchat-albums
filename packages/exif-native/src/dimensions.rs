@@ -5,7 +5,7 @@
 /// PNG なら先頭 24 バイト、JPEG なら SOF マーカーまでの数 KB で十分なため、
 /// 部分読み込みで 10〜50 倍の高速化を実現する。
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 
 use crate::detect::{detect_image_format, ImageFormat};
 
@@ -20,11 +20,10 @@ pub struct ImageDimensions {
 /// signature(8) + chunk_length(4) + "IHDR"(4) + width(4) + height(4) = 24
 const PNG_MIN_BYTES: usize = 24;
 
-/// JPEG の SOF マーカーを探すために読み込む最大バイト数。
-/// APP1(EXIF) が最大 65533B になることがあるため、64KB + 余裕分を確保。
-/// 制約: SOF が 65536B 以降にある JPEG（複数の大きなメタデータセグメント）は
-/// 未対応だが、VRChat 写真の実用範囲では十分。
-const JPEG_SCAN_BYTES: usize = 65536;
+/// JPEG の SOF マーカーを探すためにファイルから一括読み込みする最大バイト数。
+/// SOF がこの範囲内に見つからない場合、マーカーの length を使って
+/// ファイルを seek してスキャンを続行する（上限なし）。
+const JPEG_INITIAL_READ_BYTES: usize = 65536;
 
 /// PNG バイト列の先頭から width/height を読み取る。
 ///
@@ -163,19 +162,98 @@ pub fn read_image_dimensions_from_file(file_path: &str) -> Result<ImageDimension
             read_png_dimensions(&buf)
         }
         ImageFormat::Jpeg => {
-            // JPEG: 先頭 64KB を読む（SOF は通常この範囲内にある）
-            let mut buf = vec![0u8; JPEG_SCAN_BYTES];
+            // JPEG: まず先頭 64KB を一括読み込みして SOF を探す（大半はここで見つかる）
+            let mut buf = vec![0u8; JPEG_INITIAL_READ_BYTES];
             buf[..8].copy_from_slice(&header);
-            // ファイルが 64KB 未満でも OK（読めた分だけで判定）
             let n = file
                 .read(&mut buf[8..])
                 .map_err(|e| format!("Failed to read JPEG data from {file_path}: {e}"))?;
             buf.truncate(8 + n);
-            read_jpeg_dimensions(&buf)
+
+            match read_jpeg_dimensions(&buf) {
+                Ok(dim) => Ok(dim),
+                Err(_) if 8 + n >= JPEG_INITIAL_READ_BYTES => {
+                    // 64KB で見つからなかった場合、マーカーベースで seek して続行
+                    // SOF が大きなメタデータセグメント群の後にある場合に対応
+                    read_jpeg_dimensions_from_file_seek(&mut file, file_path)
+                }
+                Err(e) => Err(e), // ファイルが 64KB 未満で見つからなかった → 本当にない
+            }
         }
         ImageFormat::Unknown => {
             Err(format!("Unknown image format: {file_path}"))
         }
+    }
+}
+
+/// JPEG ファイルをマーカーごとに seek してSOF を探す（フォールバック）。
+///
+/// 背景: 先頭 64KB の一括読み込みで SOF が見つからなかった場合に呼ばれる。
+/// 大きな APP1 (EXIF) や複数の APPn セグメントがある場合に対応する。
+/// ファイルの先頭（SOI の直後）から seek を開始する。
+fn read_jpeg_dimensions_from_file_seek(
+    file: &mut File,
+    file_path: &str,
+) -> Result<ImageDimensions, String> {
+    // SOI の直後（offset 2）から開始
+    file.seek(SeekFrom::Start(2))
+        .map_err(|e| format!("Failed to seek in {file_path}: {e}"))?;
+
+    let mut marker_buf = [0u8; 2];
+    let mut length_buf = [0u8; 2];
+    // SOF ペイロード: length(2) + precision(1) + height(2) + width(2) = 7 bytes
+    let mut sof_buf = [0u8; 7];
+
+    loop {
+        // マーカー（0xFF + type）を読む
+        file.read_exact(&mut marker_buf)
+            .map_err(|e| format!("Failed to read JPEG marker from {file_path}: {e}"))?;
+
+        if marker_buf[0] != 0xFF {
+            return Err(format!(
+                "Invalid JPEG marker in {file_path}: expected 0xFF, got 0x{:02X}",
+                marker_buf[0]
+            ));
+        }
+
+        // 0xFF パディングをスキップ
+        let mut marker_type = marker_buf[1];
+        while marker_type == 0xFF {
+            let mut single = [0u8; 1];
+            file.read_exact(&mut single)
+                .map_err(|e| format!("Failed to read JPEG marker from {file_path}: {e}"))?;
+            marker_type = single[0];
+        }
+
+        // SOF マーカー
+        if matches!(marker_type, 0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF) {
+            file.read_exact(&mut sof_buf)
+                .map_err(|e| format!("Failed to read SOF data from {file_path}: {e}"))?;
+            let height = u16::from_be_bytes([sof_buf[3], sof_buf[4]]) as u32;
+            let width = u16::from_be_bytes([sof_buf[5], sof_buf[6]]) as u32;
+            return Ok(ImageDimensions { width, height });
+        }
+
+        // SOS / EOI → 打ち切り
+        if marker_type == 0xDA || marker_type == 0xD9 {
+            return Err(format!("SOF marker not found in {file_path}"));
+        }
+
+        // スタンドアロンマーカー
+        if (0xD0..=0xD7).contains(&marker_type) || marker_type == 0x01 {
+            continue;
+        }
+
+        // length を読んでスキップ
+        file.read_exact(&mut length_buf)
+            .map_err(|e| format!("Failed to read marker length from {file_path}: {e}"))?;
+        let length = u16::from_be_bytes(length_buf) as u64;
+        if length < 2 {
+            return Err(format!("Invalid marker length in {file_path}"));
+        }
+        // length にはlength フィールド自体の 2 バイトを含むので、残り length-2 バイトをスキップ
+        file.seek(SeekFrom::Current((length - 2) as i64))
+            .map_err(|e| format!("Failed to seek past marker in {file_path}: {e}"))?;
     }
 }
 
@@ -450,6 +528,58 @@ mod tests {
         let result = read_jpeg_dimensions(&[0xFF]);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("too short"));
+    }
+
+    // ========================================================================
+    // 境界値テスト
+    // ========================================================================
+
+    #[test]
+    fn reads_png_zero_dimensions() {
+        // 0x0 画像は PNG 仕様上は不正だが、パーサーはバイトをそのまま読む
+        let data = build_png_header(0, 0);
+        let dim = read_png_dimensions(&data).unwrap();
+        assert_eq!(dim, ImageDimensions { width: 0, height: 0 });
+    }
+
+    #[test]
+    fn reads_jpeg_zero_height_in_sof() {
+        // DNL JPEG: SOF の height が 0（後から DNL マーカーで設定される仕様）
+        // パーサーは height=0 をそのまま返す
+        let data = build_jpeg_with_sof(1920, 0, 0xC0, &[]);
+        let dim = read_jpeg_dimensions(&data).unwrap();
+        assert_eq!(dim, ImageDimensions { width: 1920, height: 0 });
+    }
+
+    #[test]
+    fn skips_c8_jpg_extension_marker_and_finds_sof0() {
+        // 0xC8 (JPG extension) は SOF ではない — length 付きマーカーとしてスキップされる
+        let mut data = Vec::new();
+        data.extend_from_slice(&[0xFF, 0xD8]); // SOI
+        // 0xC8 marker with dummy payload
+        data.extend_from_slice(&[0xFF, 0xC8]);
+        data.extend_from_slice(&[0x00, 0x04]); // length=4 (2 for length + 2 dummy)
+        data.extend_from_slice(&[0x00, 0x00]); // dummy data
+        // SOF0
+        data.push(0xFF);
+        data.push(0xC0);
+        let sof_length: u16 = 11;
+        data.extend_from_slice(&sof_length.to_be_bytes());
+        data.push(8); // precision
+        data.extend_from_slice(&1080u16.to_be_bytes()); // height
+        data.extend_from_slice(&1920u16.to_be_bytes()); // width
+        data.push(1);
+        data.extend_from_slice(&[0, 0x11, 0]);
+        data.extend_from_slice(&[0xFF, 0xD9]); // EOI
+
+        let dim = read_jpeg_dimensions(&data).unwrap();
+        assert_eq!(
+            dim,
+            ImageDimensions {
+                width: 1920,
+                height: 1080
+            }
+        );
     }
 
     // ========================================================================
