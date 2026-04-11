@@ -24,6 +24,8 @@ const config: KnipConfig = {
     'only-allow',
     // grit binary comes from @getgrit/cli package
     'grit',
+    // napi-rs CLI — CI で npx -p @napi-rs/cli napi build として使用
+    'napi',
   ],
   ignoreDependencies: [
     '@antfu/ni',
