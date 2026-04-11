@@ -109,47 +109,6 @@ export const readXmpTags = (
     },
   });
 
-/**
- * ファイルパスから EXIF/XMP タグを読み取る。
- *
- * readXmpTags と同じ結果を返す（exif-native は XMP のみ読み取る）。
- */
-export const readExif = async (
-  filePath: string,
-): Promise<Record<string, unknown>> => {
-  return Effect.runPromise(readXmpTags(filePath));
-};
-
-/**
- * バッファから EXIF/XMP タグを読み取る。
- */
-export const readExifByBuffer = (
-  buffer: Buffer,
-): Effect.Effect<Record<string, unknown>, ExifOperationError> =>
-  Effect.try({
-    try: () => {
-      const native = getExifNative();
-      const result = native.readVrcXmpFromBuffer(buffer);
-      if (result === null) {
-        return {} as Record<string, unknown>;
-      }
-      return {
-        AuthorID: result.authorId ?? undefined,
-        Author: result.author ?? undefined,
-        WorldID: result.worldId ?? undefined,
-        WorldDisplayName: result.worldDisplayName ?? undefined,
-      } as Record<string, unknown>;
-    },
-    catch: (error): ExifOperationError => {
-      logger.debug('Failed to read EXIF from buffer', error);
-      return new ExifOperationError({
-        code: 'EXIF_READ_FAILED',
-        message: error instanceof Error ? error.message : String(error),
-        cause: error,
-      });
-    },
-  });
-
 // ============================================================================
 // EXIF 書き込み
 // ============================================================================
