@@ -114,7 +114,7 @@ const warn = (params: LogParams | string): void => {
 /**
  * エラーログ
  *
- * @remarks
+ * @description
  * Sentryにエラーを送信し、詳細情報をextraとして添付。
  */
 const error = (params: LogParams | string): void => {

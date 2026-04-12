@@ -23,8 +23,7 @@ vi.mock('fs', () => ({
 }));
 
 vi.mock('../backupService/backupService', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../backupService/backupService')>();
+  const actual = await importOriginal<typeof backupServiceModule>();
   return {
     ...actual,
     backupService: {

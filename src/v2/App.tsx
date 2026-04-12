@@ -271,7 +271,6 @@ const ToasterWrapper = () => {
                 if (variant === 'warning') {
                   return '警告';
                 }
-                return;
               })(),
             });
           },

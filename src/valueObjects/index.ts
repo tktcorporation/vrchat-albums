@@ -50,7 +50,7 @@ const VRCHAT_PHOTO_FILENAME_PATTERN =
  * パスの末尾がVRChat写真のファイル名形式であることを検証済み。
  * 例: /path/to/VRChat/VRChat_2023-10-01_03-01-18.551_2560x1440.png
  *
- * @remarks
+ * @description
  * fileNameとdirPathはコンストラクタ時に計算・キャッシュされる。
  * これにより、頻繁なアクセス時のパース処理オーバーヘッドを削減。
  *

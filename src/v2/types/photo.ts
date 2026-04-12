@@ -11,7 +11,7 @@ import {
  * 軽量メタデータ・完全ロード両方で利用される基本情報。
  * これらのプロパティはハイブリッドローディングの初期段階から利用可能。
  *
- * @remarks
+ * @description
  * - id は string 型（UUID）。DBモデル VRChatPhotoPathModel と一致。
  * - location.joinedAt は軽量メタデータ取得時は photoTakenAt で近似される（実際のワールド参加時刻はログ解析が必要）
  */
@@ -23,7 +23,7 @@ export interface PhotoBase {
   /**
    * 写真の撮影場所に関する情報
    *
-   * @remarks
+   * @description
    * 軽量メタデータ取得時は joinedAt は photoTakenAt で近似される。
    * 正確なワールド参加時刻はログファイル解析後にのみ取得可能。
    * グルーピングは takenAt を基準に行うため、近似値でも実用上の問題はない。
@@ -32,7 +32,7 @@ export interface PhotoBase {
     /**
      * ワールドに参加した時刻
      *
-     * @remarks
+     * @description
      * 軽量メタデータ: photoTakenAt で近似（ログ解析前のため）
      * 完全ロード: 実際のワールド参加時刻（将来対応予定）
      */
@@ -122,7 +122,7 @@ export function isPhotoLoaded(photo: Photo): photo is PhotoFullyLoaded {
  *
  * DBから取得した最小限のデータ。photoPathを含まないことでメモリ削減。
  *
- * @remarks
+ * @description
  * バックエンド側に同等の型 VRChatPhotoMetadata が存在する。
  * tRPC の Date→string 変換があるため、フロントエンド専用として維持。
  *
@@ -141,7 +141,7 @@ export interface PhotoMetadata {
  * @param metadata DBから取得した軽量メタデータ
  * @returns 軽量メタデータ状態のPhoto（loadingState: 'metadata'）
  *
- * @remarks
+ * @description
  * location.joinedAt は photoTakenAt で近似される。
  * これはログ解析を行わずに高速にメタデータを取得するためのトレードオフ。
  * グルーピングは takenAt を基準に行うため、実用上の問題はない。
@@ -170,7 +170,7 @@ export function createMetadataOnlyPhoto(
  * @param photoPathStr 写真ファイルのフルパス（文字列）
  * @returns 完全ロード状態のPhoto、またはファイル名が無効な場合はnull
  *
- * @remarks
+ * @description
  * - VRChatPhotoPathSchema でパスを検証し、VRChat写真形式でない場合はnullを返す
  * - location.joinedAt は現時点では photoTakenAt で近似（将来的にログ解析結果を使用予定）
  */
@@ -236,7 +236,7 @@ export interface CreatePhotoArrayOptions {
  * @param options オプション（無効パス検出時のコールバック等）
  * @returns Photo配列（VRChat写真形式でないパスを持つエントリは除外される）
  *
- * @remarks
+ * @description
  * VRChat写真形式でないパスが検出された場合:
  * - onInvalidPath が指定されていれば各パスについてコールバック
  * - 最終的に除外された件数をサマリーログとして記録

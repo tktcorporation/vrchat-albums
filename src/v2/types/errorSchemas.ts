@@ -116,6 +116,4 @@ export function extractStructuredError(error: unknown) {
       return found as z.infer<typeof StructuredErrorSchema>;
     }
   }
-
-  return;
 }

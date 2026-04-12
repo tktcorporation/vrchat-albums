@@ -78,10 +78,8 @@ function generatePlayerElements(
     return { elements: '', height: 0 };
   }
 
-  const elements: string[] = [];
-
-  // PLAYERSヘッダーを追加
-  elements.push(`
+  const elements: string[] = [
+    `
     <g>
       <text
         x="0"
@@ -96,10 +94,10 @@ function generatePlayerElements(
         PLAYERS (${players.length})
       </text>
     </g>
-  `);
-
-  // プレイヤーリストのコンテナを開始（間隔を24pxに設定）
-  elements.push('<g transform="translate(0, 22)">');
+  `,
+    // プレイヤーリストのコンテナを開始（間隔を24pxに設定）
+    '<g transform="translate(0, 22)">',
+  ];
 
   let x = 0;
   let y = 0;
@@ -158,18 +156,12 @@ function generatePlayerElements(
   for (const player of displayPlayers) {
     const playerWidth = estimatePlayerNameWidth(player.playerName);
 
-    const lineWrapping = match(currentLineWidth + playerWidth > maxLineWidth)
-      .with(true, () => ({
-        x: 0,
-        y: y + 30,
-        currentLineWidth: 0,
-      }))
-      .with(false, () => ({ x, y, currentLineWidth }))
-      .exhaustive();
-
-    x = lineWrapping.x;
-    y = lineWrapping.y;
-    currentLineWidth = lineWrapping.currentLineWidth;
+    // 行折り返し判定: 現在行に収まらない場合は次の行へ
+    if (currentLineWidth + playerWidth > maxLineWidth) {
+      x = 0;
+      y += 30;
+      currentLineWidth = 0;
+    }
 
     elements.push(`
       <g transform="translate(${x}, ${y})">

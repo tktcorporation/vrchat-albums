@@ -58,7 +58,7 @@ interface PhotoGridProps {
  * - **高さの一致**: 予測値と実測値の差を最小化
  * - **パフォーマンス**: 共通化されたロジックで効率的な計算
  *
- * @note レイアウト定数は LAYOUT_CONSTANTS で一元管理され、
+ * レイアウト定数は LAYOUT_CONSTANTS で一元管理され、
  * 計算ロジックは JustifiedLayoutCalculator で統一されています。
  */
 export default function PhotoGrid({

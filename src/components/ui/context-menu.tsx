@@ -21,7 +21,7 @@ const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
  * ContextMenu 内部でサブ階層を表示するときに利用される。
  */
 const ContextMenuSubTrigger = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.SubTrigger>,
+  React.ComponentRef<typeof ContextMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubTrigger> & {
     inset?: boolean;
   }
@@ -46,7 +46,7 @@ ContextMenuSubTrigger.displayName = ContextMenuPrimitive.SubTrigger.displayName;
  * ContextMenuSubTrigger から表示される要素として利用される。
  */
 const ContextMenuSubContent = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.SubContent>,
+  React.ComponentRef<typeof ContextMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubContent>
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.SubContent
@@ -65,7 +65,7 @@ ContextMenuSubContent.displayName = ContextMenuPrimitive.SubContent.displayName;
  * ContextMenuTrigger から開かれるメニューの中身に相当する。
  */
 const ContextMenuContent = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.Content>,
+  React.ComponentRef<typeof ContextMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.Portal>
@@ -86,7 +86,7 @@ ContextMenuContent.displayName = ContextMenuPrimitive.Content.displayName;
  * クリック時に指定されたアクションを実行する。
  */
 const ContextMenuItem = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.Item>,
+  React.ComponentRef<typeof ContextMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & {
     inset?: boolean;
   }
@@ -108,7 +108,7 @@ ContextMenuItem.displayName = ContextMenuPrimitive.Item.displayName;
  * ON/OFF 設定などに使用される。
  */
 const ContextMenuCheckboxItem = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.CheckboxItem>,
+  React.ComponentRef<typeof ContextMenuPrimitive.CheckboxItem>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>
 >(({ className, children, checked, ...props }, ref) => (
   <ContextMenuPrimitive.CheckboxItem
@@ -136,7 +136,7 @@ ContextMenuCheckboxItem.displayName =
  * 同一グループ内で排他的に選択される。
  */
 const ContextMenuRadioItem = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.RadioItem>,
+  React.ComponentRef<typeof ContextMenuPrimitive.RadioItem>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.RadioItem>
 >(({ className, children, ...props }, ref) => (
   <ContextMenuPrimitive.RadioItem
@@ -161,7 +161,7 @@ ContextMenuRadioItem.displayName = ContextMenuPrimitive.RadioItem.displayName;
  * メニュー内の区切り見出しとして利用するラベル。
  */
 const ContextMenuLabel = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.Label>,
+  React.ComponentRef<typeof ContextMenuPrimitive.Label>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Label> & {
     inset?: boolean;
   }
@@ -182,7 +182,7 @@ ContextMenuLabel.displayName = ContextMenuPrimitive.Label.displayName;
  * メニュー項目の間に挿入する区切り線。
  */
 const ContextMenuSeparator = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.Separator>,
+  React.ComponentRef<typeof ContextMenuPrimitive.Separator>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Separator>
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.Separator

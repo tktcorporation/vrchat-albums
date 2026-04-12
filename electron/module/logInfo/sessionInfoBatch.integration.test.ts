@@ -108,6 +108,7 @@ describe('SessionInfoBatch world change behavior', () => {
 
     // テスト実行
     const router = logInfoRouter();
+    // oxlint-disable-next-line unicorn/prefer-event-target -- tRPC context requires EventEmitter for emit() support
     const eventEmitter = new EventEmitter();
 
     // World A のセッション情報を取得（10:00の時点）
@@ -228,6 +229,7 @@ describe('SessionInfoBatch world change behavior', () => {
 
     // バッチで全セッション情報を取得
     const router = logInfoRouter();
+    // oxlint-disable-next-line unicorn/prefer-event-target -- tRPC context requires EventEmitter for emit() support
     const eventEmitter = new EventEmitter();
 
     const batchResult = await router

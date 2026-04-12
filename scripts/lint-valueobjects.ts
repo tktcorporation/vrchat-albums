@@ -30,7 +30,7 @@ export class ValueObjectLinter {
     const compilerOptions: ts.CompilerOptions = {
       target: ts.ScriptTarget.ESNext,
       module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.NodeJs,
+      moduleResolution: ts.ModuleResolutionKind.Node10,
       allowJs: false,
       checkJs: false,
       strict: true,

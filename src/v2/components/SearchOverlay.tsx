@@ -242,6 +242,7 @@ const SearchOverlay = memo(
         <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none">
           <div
             className="max-w-2xl mx-auto bg-popover/95 backdrop-blur-2xl rounded-2xl border border-border/20 shadow-2xl pointer-events-auto"
+            role="search"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >

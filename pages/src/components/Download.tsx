@@ -33,8 +33,8 @@ function Download() {
         }
 
         setRelease(data);
-      } catch (err) {
-        console.error('Failed to fetch release:', err);
+      } catch (error_) {
+        console.error('Failed to fetch release:', error_);
         setError(
           'リリース情報の取得に失敗しました。しばらくしてから再度お試しください。',
         );

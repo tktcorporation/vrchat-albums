@@ -47,7 +47,9 @@ const getVariantIcon = (variant: InfoBoxVariantProps['variant']) => {
       return AlertTriangle;
     case 'success':
       return Lightbulb;
-    default:
+    case 'info':
+    case undefined:
+    case null:
       return Info;
   }
 };
@@ -61,7 +63,9 @@ const getTextColorClass = (variant: InfoBoxVariantProps['variant']) => {
       return STATUS_COLOR.warning.text;
     case 'success':
       return STATUS_COLOR.success.text;
-    default:
+    case 'info':
+    case undefined:
+    case null:
       return 'text-primary';
   }
 };

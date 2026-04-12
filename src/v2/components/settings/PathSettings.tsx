@@ -295,8 +295,10 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
                       className={`${TYPOGRAPHY.caption.default} ${TEXT_COLOR.secondary}`}
                     >
                       {progressMessage || t('pullToRefresh.refreshing')}
-                      {progress?.details?.current != null &&
-                        progress?.details?.total != null &&
+                      {progress?.details?.current !== null &&
+                        progress?.details?.current !== undefined &&
+                        progress?.details?.total !== null &&
+                        progress?.details?.total !== undefined &&
                         ` (${progress.details.current}/${progress.details.total})`}
                     </p>
                   </div>

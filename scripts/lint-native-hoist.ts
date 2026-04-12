@@ -143,7 +143,9 @@ function checkAsarUnpackCompleteness(
 ): string[] {
   const errors: string[] = [];
 
-  const nativeModules = externalModules.filter(hasPlatformSpecificDeps);
+  const nativeModules = externalModules.filter((pkg) =>
+    hasPlatformSpecificDeps(pkg),
+  );
 
   for (const mod of nativeModules) {
     const inAsarUnpack = asarPatterns.some((p) =>

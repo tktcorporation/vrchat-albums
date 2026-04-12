@@ -45,6 +45,7 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
    */
   const getPlayersFromSessionBatch = async (datetime: Date) => {
     const router = logInfoRouter();
+    // oxlint-disable-next-line unicorn/prefer-event-target -- tRPC context requires EventEmitter for emit() support
     const eventEmitter = new EventEmitter();
     const batchResult = await router
       .createCaller({ eventEmitter })

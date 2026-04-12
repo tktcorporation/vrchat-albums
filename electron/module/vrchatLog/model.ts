@@ -175,6 +175,8 @@ class VRChatWorldInstanceId extends BaseValueObject<
         return 'Group Public';
       case 'unknown':
         return 'Unknown';
+      case null:
+        return '';
       default:
         return '';
     }

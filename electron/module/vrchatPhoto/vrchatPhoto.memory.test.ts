@@ -2,7 +2,7 @@
  * 画像処理のメモリプロファイリングテスト
  *
  * このテストは初回起動時の大量写真処理におけるメモリ問題を検証します。
- * @napi-rs/image (Rust製) のメモリ使用量を監視します。
+ * napi-rs/image (Rust製) のメモリ使用量を監視します。
  *
  * 実行方法:
  *   pnpm test electron/module/vrchatPhoto/vrchatPhoto.memory.test.ts
@@ -318,8 +318,7 @@ describe('画像処理 メモリプロファイリング', () => {
       global.gc();
     }
 
-    const snapshots: MemorySnapshot[] = [];
-    snapshots.push(takeMemorySnapshot('before'));
+    const snapshots: MemorySnapshot[] = [takeMemorySnapshot('before')];
 
     await Promise.all(
       photos.map(async (photoPath) => {
