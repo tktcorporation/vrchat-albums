@@ -193,18 +193,31 @@ const executeSyncRDB = async (options: { force: boolean }) => {
 
 /**
  * 必要に応じてデータベースを同期するラッパー関数。
+ *
+ * checkRequired=true（デフォルト）の場合、Migrations テーブルを確認し、
+ * 現在のアプリバージョンと一致する migration が既にあればスキーマ同期をスキップする。
+ * これにより同一バージョンでの再起動時に不要な ALTER TABLE を回避する。
  */
 export const syncRDBClient = async (options?: { checkRequired: boolean }) => {
-  // デフォルトは確認してから実行
   const checkRequired = options?.checkRequired ?? true;
   const appVersion = settingService.getAppVersion();
-  const migrationRequired = match(checkRequired)
-    .with(true, async () => checkMigrationRDBClient(appVersion))
-    .with(false, () => true);
+
+  // match() の結果を await して、async コールバックの Promise を正しく解決する。
+  // 旧コードでは await が欠落しており、Promise オブジェクト（truthy）が
+  // そのまま評価されていたため、スキップ判定が機能していなかった。
+  const migrationRequired = await match(checkRequired)
+    .with(true, () => checkMigrationRDBClient(appVersion))
+    .with(false, () => true)
+    .exhaustive();
 
   if (!migrationRequired) {
+    logger.info(
+      `syncRDBClient: schema already up-to-date for v${appVersion}, skipping sync`,
+    );
     return;
   }
+
+  logger.info(`syncRDBClient: migration required for v${appVersion}, syncing`);
   await executeSyncRDB({ force: false });
 };
 
