@@ -19,6 +19,6 @@ export function missingExhaustive(result: Result): string {
 export function anotherMissingExhaustive(value: unknown): string {
   return match(value)
     .with(P.string, (s) => s)
-    .with(P.number, (n) => String(n))
+    .with(P.number, String)
     .otherwise(() => 'unknown');
 }

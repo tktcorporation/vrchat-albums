@@ -12,7 +12,7 @@ const ToastProvider = ToastPrimitives.Provider;
  * Toaster コンポーネントから参照される。
  */
 const ToastViewport = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitives.Viewport>,
+  React.ComponentRef<typeof ToastPrimitives.Viewport>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Viewport>
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Viewport
@@ -47,7 +47,7 @@ const toastVariants = cva(
  * 単一のトースト通知を表すコンポーネント。
  */
 const Toast = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitives.Root>,
+  React.ComponentRef<typeof ToastPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
     VariantProps<typeof toastVariants>
 >(({ className, variant, ...props }, ref) => {
@@ -65,7 +65,7 @@ Toast.displayName = ToastPrimitives.Root.displayName;
  * トースト内で使用するアクションボタン。
  */
 const ToastAction = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitives.Action>,
+  React.ComponentRef<typeof ToastPrimitives.Action>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Action>
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Action
@@ -83,7 +83,7 @@ ToastAction.displayName = ToastPrimitives.Action.displayName;
  * トーストを閉じるためのボタン。
  */
 const ToastClose = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitives.Close>,
+  React.ComponentRef<typeof ToastPrimitives.Close>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Close>
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Close
@@ -104,7 +104,7 @@ ToastClose.displayName = ToastPrimitives.Close.displayName;
  * トーストのタイトル部分を表示するコンポーネント。
  */
 const ToastTitle = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitives.Title>,
+  React.ComponentRef<typeof ToastPrimitives.Title>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Title>
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
@@ -119,7 +119,7 @@ ToastTitle.displayName = ToastPrimitives.Title.displayName;
  * トーストの説明文部分を表示するコンポーネント。
  */
 const ToastDescription = React.forwardRef<
-  React.ElementRef<typeof ToastPrimitives.Description>,
+  React.ComponentRef<typeof ToastPrimitives.Description>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Description>
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description

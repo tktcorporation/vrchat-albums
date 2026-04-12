@@ -123,7 +123,7 @@ export const settingsRouter = () =>
     installUpdate: procedure.mutation(() =>
       runEffect(
         settingService.installUpdate().pipe(
-          Effect.map(() => {
+          Effect.tap(() => {
             reloadMainWindow();
           }),
           Effect.catchTag('NoUpdateAvailable', (e) =>
@@ -153,7 +153,7 @@ export const settingsRouter = () =>
     installUpdatesAndReload: procedure.mutation(() =>
       runEffect(
         settingService.installUpdate().pipe(
-          Effect.map(() => {
+          Effect.tap(() => {
             reloadMainWindow();
           }),
           Effect.mapError(mapUpdateErrorGeneric),
@@ -180,7 +180,7 @@ export const settingsRouter = () =>
     installUpdatesAndReloadApp: procedure.mutation(() =>
       runEffect(
         settingService.installUpdate().pipe(
-          Effect.map(() => {
+          Effect.tap(() => {
             reloadMainWindow();
           }),
           Effect.mapError(mapUpdateErrorGeneric),

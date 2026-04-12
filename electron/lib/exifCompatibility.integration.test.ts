@@ -107,9 +107,9 @@ const writeVrcXmpWithExiftool = async (
   },
 ): Promise<void> => {
   const xmpPacket = buildVrcXmpPacket(metadata);
-  await instance.write(filePath, { XMP: xmpPacket } as Record<string, string>, [
-    '-overwrite_original',
-  ]);
+  await instance.write(filePath, { XMP: xmpPacket } as Record<string, string>, {
+    writeArgs: ['-overwrite_original'],
+  });
 };
 
 /**

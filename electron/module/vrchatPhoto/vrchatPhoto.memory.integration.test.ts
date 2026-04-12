@@ -226,8 +226,7 @@ describe('写真インデックス作成のメモリプロファイリング', (
     console.log(`Photos directory: ${getVRChatPhotoDirPath().value}`);
 
     // メモリスナップショットを収集
-    const snapshots: MemorySnapshot[] = [];
-    snapshots.push(takeMemorySnapshot('before_indexing'));
+    const snapshots: MemorySnapshot[] = [takeMemorySnapshot('before_indexing')];
 
     // メモリ監視のインターバル
     const monitoringInterval = setInterval(() => {

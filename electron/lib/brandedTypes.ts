@@ -39,7 +39,7 @@ export const VRChatWorldIdSchema = z
   .superRefine((value, ctx) => {
     if (!isValidVRChatWorldId(value)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Invalid VRChat World ID format. Expected: wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Received: "${value}"`,
       });
     }
@@ -61,7 +61,7 @@ export const VRChatPlayerIdSchema = z
   .superRefine((value, ctx) => {
     if (!isValidVRChatPlayerId(value)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Invalid VRChat Player ID format. Expected: usr_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx. Received: "${value}"`,
       });
     }
@@ -96,7 +96,7 @@ export const VRChatPlayerNameSchema = z
   .superRefine((value, ctx) => {
     if (!isValidVRChatPlayerName(value)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Invalid VRChat Player Name. Cannot be empty. Received: "${value}"`,
       });
     }
@@ -118,7 +118,7 @@ export const VRChatWorldNameSchema = z
   .superRefine((value, ctx) => {
     if (!isValidVRChatWorldName(value)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Invalid VRChat World Name. Cannot be empty. Received: "${value}"`,
       });
     }

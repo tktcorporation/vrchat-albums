@@ -43,7 +43,8 @@
   },
   "runArgs": ["--shm-size=2g", "--env-file", ".devcontainer/.env.devcontainer"],
   "containerEnv": {
-    "VNC_RESOLUTION": "1920x1080x24"
+    "VNC_RESOLUTION": "1920x1080x24",
+    "DISPLAY": ":1"
   },
   "customizations": {
     "vscode": {
@@ -98,11 +99,13 @@
     "install-packages": [
       "bash",
       "-c",
-      "set -e; sudo apt-get update && sudo apt-get install -y build-essential fzf ripgrep bc gpg ca-certificates curl tmux"
+      "set -e; sudo apt-get update && sudo apt-get install -y build-essential fzf ripgrep bc gpg ca-certificates curl tmux libgtk-3-0 dbus-x11"
     ],
     // named volume は root 所有で作成されるため、vscode ユーザーに権限を付与する
     // 対象:
     //   .pnpm-store: pnpm のパッケージキャッシュ (named volume)
+    //   ~/.local/share: mise volume マウント時に Docker が root 所有で作成する親ディレクトリ。
+    //                   pnpm が ~/.local/share/pnpm/.tools/ にツールを配置するため書き込み権限が必要
     //   ~/.local/share/mise: mise のインストール済みツール (named volume)
     //   ~/.local/state/mise: mise trust の trusted-configs 保存先
     //   ~/.cache/mise: mise のダウンロードキャッシュ
@@ -110,7 +113,7 @@
     "fix-volume-permissions": [
       "bash",
       "-c",
-      "set -e; sudo mkdir -p ~/.local/state/mise ~/.cache/mise && sudo chown -R $(whoami) .pnpm-store ~/.local/share/mise ~/.local/state/mise ~/.cache/mise ~/.claude"
+      "set -e; sudo mkdir -p ~/.local/state/mise ~/.cache/mise && sudo chown -R $(whoami) .pnpm-store ~/.local/share ~/.local/state/mise ~/.cache/mise ~/.claude"
     ]
   },
   "updateContentCommand": {

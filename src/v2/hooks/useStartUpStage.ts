@@ -168,10 +168,20 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
   }, [stages.initialization]);
 
   // 自動的に初期化を開始（subscription接続完了後）
+  // subscription が接続できない環境でも初期化が開始されるよう、タイムアウトフォールバックを設ける。
+  // subscription なしでも初期化自体は正常に動作する（進捗表示が出ないだけ）。
   useEffect(() => {
     if (isSubscriptionReady) {
       startInitialization();
+      return;
     }
+    const fallbackTimer = setTimeout(() => {
+      console.warn(
+        'Init progress subscription timed out, starting initialization without progress tracking',
+      );
+      startInitialization();
+    }, 3000);
+    return () => clearTimeout(fallbackTimer);
   }, [isSubscriptionReady, startInitialization]);
 
   // リトライ処理

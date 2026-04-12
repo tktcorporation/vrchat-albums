@@ -42,7 +42,11 @@ const getCountByYearMonthList = async () => {
 };
 
 const setVRChatPhotoDirPathByDialog = async (): Promise<'ok' | 'canceled'> => {
-  const exit = await Effect.runPromiseExit(utilsService.openGetDirDialog());
+  const exit = await Effect.runPromiseExit(
+    utilsService
+      .openElectronDialog(['openDirectory'])
+      .pipe(Effect.map((paths) => paths[0])),
+  );
   if (Exit.isSuccess(exit)) {
     vrchatPhotoService.setVRChatPhotoDirPathToSettingStore(
       VRChatPhotoDirPathSchema.parse(exit.value),

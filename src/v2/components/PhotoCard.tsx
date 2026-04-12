@@ -69,7 +69,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
     onCopySelected,
   }) => {
     const { t } = useI18n();
-    const elementRef = useRef<HTMLDivElement>(null);
+    const elementRef = useRef<HTMLButtonElement>(null);
     const [isHovering, setIsHovering] = useState(false);
     // Intersection Observer でビューポート内に入ったか判定
     const isIntersecting = useIntersectionObserver(elementRef, {
@@ -223,11 +223,13 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
 
     // --- Render ---
     return (
-      <div
+      <button
+        type="button"
         ref={elementRef}
         className={clsx(
           'photo-card group relative overflow-hidden transition-all duration-150',
           'cursor-pointer flex items-center justify-center',
+          'appearance-none border-none p-0 text-left',
           isSelected ? 'bg-muted' : 'bg-muted/60',
           !isMultiSelectMode && 'hover:brightness-105 hover:shadow-sm',
         )}
@@ -238,12 +240,6 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         onClick={handleClick}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            handleClick();
-          }
-        }}
-        tabIndex={0}
         aria-pressed={isSelected}
       >
         <ContextMenu>
@@ -351,7 +347,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
-      </div>
+      </button>
     );
   },
 );

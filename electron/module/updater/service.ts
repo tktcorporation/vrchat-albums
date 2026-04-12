@@ -36,7 +36,7 @@ export class UpdaterService {
         logger.warn(`アップデートの確認中にエラーが発生しました: ${message}`);
         return new UpdateCheckFailed({ message, cause: error });
       },
-    }).pipe(Effect.map(() => {}));
+    }).pipe(Effect.asVoid);
   }
 
   public async quitAndInstall() {

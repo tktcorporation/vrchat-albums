@@ -139,6 +139,8 @@ export const getInstanceTypeLabel = (instanceId: string | null): string => {
       return 'Group Public';
     case 'unknown':
       return 'Unknown';
+    case null:
+      return '';
     default:
       return '';
   }
@@ -171,6 +173,8 @@ export const getInstanceTypeColor = (instanceId: string | null): string => {
       // グループパブリック: 薄めの灰色（グループと同系色）
       return 'bg-gray-400/20 text-gray-600 dark:text-gray-300 border-gray-400/30';
     case 'unknown':
+      return 'bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30';
+    case null:
       return 'bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30';
     default:
       return 'bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30';

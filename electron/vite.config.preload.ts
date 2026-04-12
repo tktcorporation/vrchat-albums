@@ -31,7 +31,7 @@ export default defineConfig({
     rolldownOptions: {
       /**
        * サンドボックス内で唯一 require() できるのは 'electron' のみ。
-       * @sentry/electron/preload 等はバンドルに含める必要がある。
+       * `@sentry/electron/preload` 等はバンドルに含める必要がある。
        */
       external: ['electron'],
       output: {

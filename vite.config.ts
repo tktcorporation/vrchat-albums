@@ -7,7 +7,7 @@ import type { ConfigEnv, UserConfig } from 'vite';
 
 const srcRoot = join(__dirname, 'src');
 
-export default ({ command }: ConfigEnv): UserConfig => {
+const defineConfig = ({ command }: ConfigEnv): UserConfig => {
   // DEV
   if (command === 'serve') {
     return {
@@ -95,3 +95,5 @@ export default ({ command }: ConfigEnv): UserConfig => {
     },
   };
 };
+
+export default defineConfig;

@@ -56,7 +56,7 @@ describe('detectUnknownPatterns', () => {
       '2024.01.15 12:34:57 Log - [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789012:12345',
       '2024.01.15 12:34:58 Log - [Behaviour] OnPlayerLeft Bob (usr_yyy)',
       '2024.01.15 12:34:59 Log - [Behaviour] Joining or Creating Room: Test World',
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     const result = detectUnknownPatterns(lines);
     expect(result.totalCount).toBe(0);
@@ -68,7 +68,7 @@ describe('detectUnknownPatterns', () => {
       '2024.01.15 12:34:56 Log - [Behaviour] OnPlayerJoined Alice (usr_xxx)',
       '2024.01.15 12:34:57 Log - [Behaviour] OnGroupInvite someGroup',
       '2024.01.15 12:35:00 Log - [Behaviour] OnGroupInvite anotherGroup',
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     const result = detectUnknownPatterns(lines);
     expect(result.totalCount).toBe(2);
@@ -79,7 +79,7 @@ describe('detectUnknownPatterns', () => {
     const lines = [
       '2024.01.15 12:34:56 Log - [Network] Something happened',
       '2024.01.15 12:34:57 Log - VRC Analytics Initialized',
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     const result = detectUnknownPatterns(lines);
     expect(result.totalCount).toBe(0);
@@ -91,7 +91,7 @@ describe('detectUnknownPatterns', () => {
       '2024.01.15 12:34:56 Log - [Behaviour] OnGroupInvite someGroup',
       '2024.01.15 12:34:57 Log - [Behaviour] OnAvatarChanged avatar_xxx',
       '2024.01.15 12:34:58 Log - [Behaviour] OnGroupInvite anotherGroup',
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     const result = detectUnknownPatterns(lines);
     expect(result.totalCount).toBe(3);
@@ -111,7 +111,7 @@ describe('detectAndReportUnknownPatterns', () => {
     const { logger } = await import('../../../lib/logger');
     const lines = [
       '2024.01.15 12:34:56 Log - [Behaviour] OnPlayerJoined Alice (usr_xxx)',
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     detectAndReportUnknownPatterns(lines);
 
@@ -123,7 +123,7 @@ describe('detectAndReportUnknownPatterns', () => {
     const { logger } = await import('../../../lib/logger');
     const lines = [
       '2024.01.15 12:34:56 Log - [Behaviour] OnGroupInvite someGroup',
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     detectAndReportUnknownPatterns(lines);
 
@@ -142,7 +142,7 @@ describe('detectAndReportUnknownPatterns', () => {
     const { logger } = await import('../../../lib/logger');
     const lines = [
       '2024.01.15 12:34:56 Log - [Behaviour] OnGroupInvite someGroup',
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     detectAndReportUnknownPatterns(lines);
     expect(logger.error).toHaveBeenCalledTimes(1);
@@ -161,7 +161,7 @@ describe('detectAndReportUnknownPatterns', () => {
     // 1回目: OnGroupInvite
     detectAndReportUnknownPatterns(
       ['2024.01.15 12:34:56 Log - [Behaviour] OnGroupInvite someGroup'].map(
-        asLogLine,
+        (line) => asLogLine(line),
       ),
     );
     expect(logger.error).toHaveBeenCalledTimes(1);
@@ -173,7 +173,7 @@ describe('detectAndReportUnknownPatterns', () => {
       [
         '2024.01.15 12:35:00 Log - [Behaviour] OnGroupInvite anotherGroup',
         '2024.01.15 12:35:01 Log - [Behaviour] OnAvatarChanged avatar_xxx',
-      ].map(asLogLine),
+      ].map((line) => asLogLine(line)),
     );
 
     expect(logger.error).toHaveBeenCalledWith(
@@ -193,7 +193,7 @@ describe('detectAndReportUnknownPatterns', () => {
       vi.clearAllMocks();
       detectAndReportUnknownPatterns(
         [`2024.01.15 12:34:5${i} Log - [Behaviour] Pattern${i} data`].map(
-          asLogLine,
+          (line) => asLogLine(line),
         ),
       );
       expect(logger.error).toHaveBeenCalledTimes(1);
@@ -203,7 +203,9 @@ describe('detectAndReportUnknownPatterns', () => {
 
     // 4回目 → error は呼ばれず warn のみ
     detectAndReportUnknownPatterns(
-      ['2024.01.15 12:35:00 Log - [Behaviour] Pattern3 data'].map(asLogLine),
+      ['2024.01.15 12:35:00 Log - [Behaviour] Pattern3 data'].map((line) =>
+        asLogLine(line),
+      ),
     );
     expect(logger.error).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalledTimes(1);
@@ -218,7 +220,7 @@ describe('detectUnknownPatterns - ノイズパターン除外', () => {
     const lines = [
       '2025.06.22 10:49:18 Debug - [Behaviour] Sanity check passed for ID: 1, Path: 386',
       '2025.06.22 10:49:19 Debug - [Behaviour] Sanity check passed for ID: 2, Path: 500',
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     const result = detectUnknownPatterns(lines);
     expect(result.totalCount).toBe(0);
@@ -229,7 +231,7 @@ describe('detectUnknownPatterns - ノイズパターン除外', () => {
     const lines = [
       "2026.01.01 00:39:01 Error - [Behaviour] Avatar Expression Parameter 'GestureLeft' duplicate definition",
       "2026.01.01 00:39:02 Error - [Behaviour] Avatar Expression Parameter 'GestureRight' duplicate definition",
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     const result = detectUnknownPatterns(lines);
     expect(result.totalCount).toBe(0);
@@ -240,7 +242,7 @@ describe('detectUnknownPatterns - ノイズパターン除外', () => {
     const lines = [
       '2025.06.22 10:49:18 Debug - [Behaviour] Sanity check passed for ID: 99, Path: 1234',
       "2026.03.15 12:00:00 Error - [Behaviour] Avatar Expression Parameter 'VRCEmote' duplicate definition",
-    ].map(asLogLine);
+    ].map((line) => asLogLine(line));
 
     const result = detectUnknownPatterns(lines);
     expect(result.totalCount).toBe(0);

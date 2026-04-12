@@ -78,9 +78,9 @@ const launchElectronApp = async () => {
       } catch {
         console.log(`Waiting for server... (attempt ${i + 1}/${maxAttempts})`);
       }
-      await new Promise((resolve) =>
-        setTimeout(resolve, SERVER_CHECK_INTERVAL_MS),
-      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, SERVER_CHECK_INTERVAL_MS);
+      });
     }
     console.warn('Could not verify development server, but proceeding anyway');
     return true;
