@@ -162,8 +162,12 @@ fn read_xmp_from_jpeg_stream(reader: &mut BufReader<File>) -> Result<Option<VrcX
 ///
 /// シグネチャの後、チャンクヘッダー (8B: length + type) を順に走査する。
 /// iTXt + keyword "XML:com.adobe.xmp" が見つかったらそのチャンクだけ読む。
-/// IEND に到達したら打ち切り。IDAT はスキップして走査を続行する
-/// （サードパーティツールで iTXt が IDAT 後に移動する場合に対応）。
+/// IEND または IDAT に到達したら打ち切り。
+///
+/// VRChat は XMP を必ず IDAT の前に配置するため、IDAT 以降を走査する必要はない。
+/// IDAT 後も走査を続行すると、数百の IDAT チャンク（各数十KB）を 1 つずつ
+/// スキップしながら読み進めることになり、BufReader の 64KB バッファが毎回
+/// 破棄・再充填されて膨大な I/O が発生する（3,210 ファイルで約 100GB）。
 ///
 /// reader は read_xmp_from_file でフォーマット判定後の状態。絶対シークで開始位置に移動する。
 fn read_xmp_from_png_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXmpMetadata>, String> {
@@ -199,11 +203,12 @@ fn read_xmp_from_png_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXm
             return Ok(None);
         }
 
-        // IDAT は画像データ本体。VRChat は XMP を IDAT の前に配置するが、
-        // サードパーティツールで再エンコードされた写真では iTXt が IDAT の後に
-        // 移動する可能性がある (PNG spec では ancillary chunk の位置は自由)。
-        // 互換性のため IDAT はスキップして走査を続行する。
-        // IDAT のデータ本体は読まず seek で飛ばすのでI/Oコストは最小限。
+        // IDAT — 画像データ本体の開始。VRChat は XMP を必ず IDAT の前に配置する。
+        // ここで打ち切ることで、大きな PNG (16MB+) の数百の IDAT チャンクを
+        // スキャンする I/O を完全に回避する。
+        if chunk_type == *b"IDAT" {
+            return Ok(None);
+        }
 
         if chunk_type == *b"iTXt" {
             // サイズ上限チェック: 異常に大きい iTXt はスキップ（OOM 防止）
@@ -607,11 +612,12 @@ mod tests {
     }
 
     #[test]
-    fn png_with_xmp_after_idat_still_extracts() {
-        // サードパーティツールで再エンコードされた PNG では
-        // iTXt (XMP) が IDAT の後に配置される場合がある。
-        // streaming_reader は IDAT をスキップして走査を続行するため、
-        // IDAT 後の XMP も正しく抽出できる。
+    fn png_stops_at_idat_for_performance() {
+        // VRChat は XMP を必ず IDAT の前に配置する。
+        // IDAT 到達で走査を打ち切ることで、大きな PNG ファイルの IDAT チャンク群を
+        // スキャンする膨大な I/O を回避する。
+        // （サードパーティツールで IDAT 後に移動した XMP は読めないが、
+        //   VRChat 直撮り写真が対象の99%以上のため許容する）
         let mut buf = Vec::new();
         buf.extend_from_slice(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
@@ -625,14 +631,14 @@ mod tests {
             &[0x78, 0x01, 0x62, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01],
         );
 
-        // iTXt (XMP) AFTER IDAT
+        // iTXt (XMP) AFTER IDAT — IDAT で打ち切るため読まれない
         let mut itxt_data = Vec::new();
         itxt_data.extend_from_slice(b"XML:com.adobe.xmp");
-        itxt_data.push(0); // null
-        itxt_data.push(0); // compression flag
-        itxt_data.push(0); // compression method
-        itxt_data.push(0); // language tag
-        itxt_data.push(0); // translated keyword
+        itxt_data.push(0);
+        itxt_data.push(0);
+        itxt_data.push(0);
+        itxt_data.push(0);
+        itxt_data.push(0);
         itxt_data.extend_from_slice(VRCHAT_XMP.as_bytes());
         write_png_chunk(&mut buf, b"iTXt", &itxt_data);
 
@@ -641,10 +647,53 @@ mod tests {
         let tmp = write_temp_file(&buf);
         let result = read_xmp_from_file(tmp.path().to_str().unwrap());
         assert!(result.is_ok());
-        let meta = result.unwrap().expect("Expected Some metadata for XMP after IDAT");
+        // IDAT 到達で打ち切り → XMP なし
+        assert!(result.unwrap().is_none(), "XMP after IDAT should not be found (early termination)");
+    }
+
+    #[test]
+    fn png_with_xmp_before_idat_extracts_correctly() {
+        // VRChat 標準配置: iTXt (XMP) が IDAT の前にある場合は正常に抽出
+        let data = build_png_with_xmp(VRCHAT_XMP);
+        let tmp = write_temp_file(&data);
+        let result = read_xmp_from_file(tmp.path().to_str().unwrap());
+        assert!(result.is_ok());
+        let meta = result.unwrap().expect("Expected Some metadata for XMP before IDAT");
         assert_eq!(
-            meta.author_id.as_deref(),
-            Some("usr_3ba2a992-724c-4463-bc75-7e9f6674e8e0")
+            meta.world_id.as_deref(),
+            Some("wrld_b7280487-a1bc-41e2-80f2-942a72e7d2c7")
+        );
+    }
+
+    #[test]
+    fn png_with_many_idat_chunks_returns_none_without_scanning_all() {
+        // 大きな PNG には数百の IDAT チャンクがある。
+        // IDAT 到達で打ち切るため、後続の IDAT チャンクやその後の
+        // メタデータチャンクは走査されない。
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+        let ihdr_data: [u8; 13] = [0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0, 0, 0];
+        write_png_chunk(&mut buf, b"IHDR", &ihdr_data);
+
+        // 100個の IDAT チャンク（実際のVRChat写真は数百個持つ）
+        let idat_data = vec![0u8; 32768]; // 32KB per chunk
+        for _ in 0..100 {
+            write_png_chunk(&mut buf, b"IDAT", &idat_data);
+        }
+
+        write_png_chunk(&mut buf, b"IEND", &[]);
+
+        // ファイルサイズは約 3.2MB（100 × 32KB IDAT）
+        assert!(buf.len() > 3_000_000, "Test file should be large");
+
+        let tmp = write_temp_file(&buf);
+        let result = read_xmp_from_file(tmp.path().to_str().unwrap());
+
+        assert!(result.is_ok());
+        assert!(
+            result.unwrap().is_none(),
+            "Should return None (no XMP before IDAT)"
         );
     }
 
@@ -683,4 +732,52 @@ mod tests {
             Some("お花見ワールド 🌸")
         );
     }
+
+    // ========================================================================
+    // 実 VRChat 写真 fixture テスト
+    // ========================================================================
+
+    /// VRChat 写真と同じ構造の PNG fixture で XMP 抽出を検証する。
+    ///
+    /// fixture は tests/fixtures/ に配置済み。VRChat が生成する PNG と同じ
+    /// チャンク構成（IHDR + sRGB + gAMA + pHYs + iTXt(XMP) + IDAT + IEND）を持つ。
+    #[test]
+    fn vrchat_photo_fixture_xmp_extraction() {
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/VRChat_2026-04-11_xmp_sample.png");
+        assert!(
+            fixture.exists(),
+            "Fixture not found at {}. Ensure it is committed to the repository.",
+            fixture.display()
+        );
+
+        let result = read_xmp_from_file(fixture.to_str().unwrap());
+        assert!(
+            result.is_ok(),
+            "read_xmp_from_file should not error: {:?}",
+            result.err()
+        );
+
+        let metadata = result.unwrap();
+        assert!(
+            metadata.is_some(),
+            "VRChat photo fixture should contain XMP metadata"
+        );
+
+        let meta = metadata.unwrap();
+        assert_eq!(
+            meta.author_id.as_deref(),
+            Some("usr_3ba2a992-724c-4463-bc75-7e9f6674e8e0")
+        );
+        assert_eq!(meta.author.as_deref(), Some("tkt_"));
+        assert_eq!(
+            meta.world_id.as_deref(),
+            Some("wrld_b7280487-a1bc-41e2-80f2-942a72e7d2c7")
+        );
+        assert_eq!(
+            meta.world_display_name.as_deref(),
+            Some("Hanami Days 花見の日")
+        );
+    }
+
 }
