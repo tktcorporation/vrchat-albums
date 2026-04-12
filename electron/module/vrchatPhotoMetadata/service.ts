@@ -134,33 +134,33 @@ export const extractAndSaveMetadataBatch = (
       if (!entry) {
         // Rayon 側で予期しないエラー（パニック等）により結果が欠落した場合
         errorCount++;
-        continue;
-      }
-      const { data, error } = entry;
-      if (error) {
-        errorCount++;
-        // I/O エラーは debug レベルで個別ログ（大量出力を防ぐ）
-        logger.debug(`XMP read error: ${targetPaths[i]}: ${error}`);
-      } else if (data) {
-        // extractOfficialMetadata で Zod 検証 + フィールド正規化
-        const tags = {
-          AuthorID: data.authorId ?? undefined,
-          Author: data.author ?? undefined,
-          WorldID: data.worldId ?? undefined,
-          WorldDisplayName: data.worldDisplayName ?? undefined,
-        };
-        const metadata = extractOfficialMetadata(tags);
-        if (metadata !== null) {
-          attributes.push({
-            photoPath: targetPaths[i],
-            authorId: metadata.authorId,
-            authorDisplayName: metadata.authorDisplayName,
-            worldId: metadata.worldId,
-            worldDisplayName: metadata.worldDisplayName,
-          });
-        }
       } else {
-        noXmpCount++;
+        const { data, error } = entry;
+        if (error) {
+          errorCount++;
+          // I/O エラーは debug レベルで個別ログ（大量出力を防ぐ）
+          logger.debug(`XMP read error: ${targetPaths[i]}: ${error}`);
+        } else if (data) {
+          // extractOfficialMetadata で Zod 検証 + フィールド正規化
+          const tags = {
+            AuthorID: data.authorId ?? undefined,
+            Author: data.author ?? undefined,
+            WorldID: data.worldId ?? undefined,
+            WorldDisplayName: data.worldDisplayName ?? undefined,
+          };
+          const metadata = extractOfficialMetadata(tags);
+          if (metadata !== null) {
+            attributes.push({
+              photoPath: targetPaths[i],
+              authorId: metadata.authorId,
+              authorDisplayName: metadata.authorDisplayName,
+              worldId: metadata.worldId,
+              worldDisplayName: metadata.worldDisplayName,
+            });
+          }
+        } else {
+          noXmpCount++;
+        }
       }
       processed++;
       if (
