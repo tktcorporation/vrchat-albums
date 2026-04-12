@@ -1078,7 +1078,7 @@ async function processPhotoBatch(
   }
 
   // Step 2: Rust バッチで画像サイズ取得（rayon 並列、先頭バイトのみ読み込み）
-  // チャンク分割でイベントループに制御を返し、UI フリーズを防止する。
+  // AsyncTask で libuv スレッドプール上で実行するため、メインスレッドをブロックしない。
   const dimensions = await readImageDimensionsBatch(
     pathsWithDates.map((p) => p.photoPath),
   );

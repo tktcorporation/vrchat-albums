@@ -110,7 +110,7 @@ export const extractAndSaveMetadataBatch = (
     }
 
     // Rust バッチ呼び出し: Rayon 全コア並列 + 部分読み込みで XMP を抽出。
-    // チャンク分割でイベントループに制御を返し、UI フリーズを防止する。
+    // AsyncTask で libuv スレッドプール上で実行するため、メインスレッドをブロックしない。
     logger.info(`Metadata extraction starting: ${targetPaths.length} files`);
     const batchResults = yield* Effect.tryPromise({
       try: () => readXmpTagsBatch(targetPaths),

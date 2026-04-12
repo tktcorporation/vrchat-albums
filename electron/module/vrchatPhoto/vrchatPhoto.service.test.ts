@@ -32,7 +32,7 @@ vi.mock('@napi-rs/image', () => {
 vi.mock('./../../lib/wrappedExifTool', () => ({
   readImageDimensionsBatch: vi
     .fn()
-    .mockReturnValue([{ width: 1920, height: 1080 }]),
+    .mockResolvedValue([{ width: 1920, height: 1080 }]),
   readXmpTags: vi.fn(),
   writeDateTimeWithTimezone: vi.fn(),
   setExifToBuffer: vi.fn(),
