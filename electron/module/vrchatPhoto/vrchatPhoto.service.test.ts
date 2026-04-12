@@ -29,6 +29,15 @@ vi.mock('@napi-rs/image', () => {
   }
   return { Transformer: MockTransformer };
 });
+vi.mock('./../../lib/wrappedExifTool', () => ({
+  readImageDimensionsBatch: vi
+    .fn()
+    .mockReturnValue([{ width: 1920, height: 1080 }]),
+  readXmpTags: vi.fn(),
+  writeDateTimeWithTimezone: vi.fn(),
+  setExifToBuffer: vi.fn(),
+  closeExiftoolInstance: vi.fn(),
+}));
 vi.mock('./../../lib/logger', () => ({
   logger: {
     debug: vi.fn(),
@@ -40,6 +49,8 @@ vi.mock('./../../lib/logger', () => ({
 
 // hash-wasm のインポート
 import { xxhash128 } from 'hash-wasm';
+
+import { readImageDimensionsBatch } from './../../lib/wrappedExifTool';
 
 /**
  * ファイル名リストからモックダイジェストを生成（hash-wasm モック用）
@@ -219,9 +230,14 @@ describe('createVRChatPhotoPathIndex', () => {
       >;
     });
 
-    // readFile モック - 画像処理エンジン（@napi-rs/image）用のダミーバッファを返す
+    // readFile モック - サムネイル生成（@napi-rs/image）用のダミーバッファを返す
     vi.mocked(nodefsPromises.readFile).mockResolvedValue(
       Buffer.from('fake_image_data'),
+    );
+
+    // readImageDimensionsBatch モック - 渡されたパス数に応じて結果を返す
+    vi.mocked(readImageDimensionsBatch).mockImplementation((paths) =>
+      paths.map(() => ({ width: 1920, height: 1080 })),
     );
 
     // DB model モック
@@ -758,6 +774,70 @@ describe('createVRChatPhotoPathIndex', () => {
         await expect(service.createVRChatPhotoPathIndex(true)).rejects.toThrow(
           'EMFILE: too many open files',
         );
+      });
+    });
+
+    describe('readImageDimensionsBatch エラー', () => {
+      it('null が返った写真はデフォルトサイズ(1920x1080)でDB保存する', async () => {
+        // file1Path の dimensions だけ null を返す
+        vi.mocked(readImageDimensionsBatch).mockImplementation((paths) =>
+          paths.map((p) =>
+            p.includes(file1Name) ? null : { width: 3840, height: 2160 },
+          ),
+        );
+
+        await service.createVRChatPhotoPathIndex(false);
+
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+
+        // file1Path はデフォルトサイズで保存される（スキップされない）
+        const file1Data = allSavedData.find((d) => d.photoPath === file1Path);
+        expect(file1Data).toBeDefined();
+        expect(file1Data?.width).toBe(1920);
+        expect(file1Data?.height).toBe(1080);
+
+        // 他のファイルは正常なサイズで処理
+        const file2Data = allSavedData.find((d) => d.photoPath === file2Path);
+        expect(file2Data?.width).toBe(3840);
+        expect(file2Data?.height).toBe(2160);
+      });
+
+      it('全て null が返った場合もデフォルトサイズでDB保存する', async () => {
+        vi.mocked(readImageDimensionsBatch).mockReturnValue([null, null, null]);
+
+        await service.createVRChatPhotoPathIndex(false);
+
+        // 全てデフォルトサイズで保存される
+        expect(model.createOrUpdateListVRChatPhotoPath).toHaveBeenCalled();
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+        for (const data of allSavedData) {
+          expect(data.width).toBe(1920);
+          expect(data.height).toBe(1080);
+        }
+      });
+
+      it('undefined が返った写真もデフォルトサイズでDB保存する', async () => {
+        vi.mocked(readImageDimensionsBatch).mockImplementation((paths) =>
+          paths.map((p) =>
+            p.includes(file1Name) ? undefined : { width: 1920, height: 1080 },
+          ),
+        );
+
+        await service.createVRChatPhotoPathIndex(false);
+
+        const allSavedData = vi
+          .mocked(model.createOrUpdateListVRChatPhotoPath)
+          .mock.calls.flatMap((call) => call[0]);
+
+        // file1Path もデフォルトサイズで保存される
+        const file1Data = allSavedData.find((d) => d.photoPath === file1Path);
+        expect(file1Data).toBeDefined();
+        expect(file1Data?.width).toBe(1920);
+        expect(file1Data?.height).toBe(1080);
       });
     });
   });

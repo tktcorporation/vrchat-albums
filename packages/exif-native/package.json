@@ -9,6 +9,9 @@
     "build:debug": "napi build --platform",
     "prepare": "which napi > /dev/null 2>&1 && napi build --platform || true"
   },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.6.1"
+  },
   "napi": {
     "binaryName": "exif-native",
     "targets": [
