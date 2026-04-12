@@ -35,27 +35,27 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 
 ## ルールファイル
 
-### 常時読み込み（コアルール）
+### 汎用ルール（`.claude/rules/`）
 
 | ファイル                       | 内容                                                   |
 | ------------------------------ | ------------------------------------------------------ |
 | `robustness.md`                | 堅牢性設計 + ts-pattern（型保証、exhaustive checking） |
 | `error-handling.md`            | Effect TS エラーハンドリング（try-catch回避）          |
-| `log-sync.md`                  | ログ同期（実行順序、データ整合性）**CRITICAL**         |
 | `parallel-work.md`             | 並列作業・Worktree 運用（競合防止）                    |
 | `code-intent-documentation.md` | コメント・JSDoc（WHYを残す）                           |
 | `codex-pairing.md`             | Codex CLI セカンドオピニオン                           |
+| `ci-workflow.md`               | CI/PR ワークフロー（`paths` 制限あり）                 |
 
-### 条件付き読み込み（`paths` で対象ファイル作業時のみ）
+### プロジェクト固有ルール（`.claude/rules/project/`）
 
-| ファイル             | 対象パス                                      | 内容                    |
-| -------------------- | --------------------------------------------- | ----------------------- |
-| `ui-ux-design.md`    | `src/**/*.tsx`, `src/**/*.css`, `src/v2/**/*` | UI/UXデザイン           |
-| `testing.md`         | `**/*.test.ts`, `**/*.spec.ts`, `e2e/**/*`    | テストガイドライン      |
-| `electron-import.md` | `electron/**/*`                               | Electron インポート規約 |
-| `timezone.md`        | `electron/module/vrchatLog/**/*` 等           | タイムゾーン処理        |
-| `valueobject.md`     | `electron/lib/valueObject/**/*` 等            | ValueObject パターン    |
-| `ci-workflow.md`     | `.github/workflows/**`, `.changeset/**`       | CI/PR ワークフロー      |
+| ファイル             | 条件（`paths`）                               | 内容                               |
+| -------------------- | --------------------------------------------- | ---------------------------------- |
+| `log-sync.md`        | 常時 **CRITICAL**                             | ログ同期（実行順序、データ整合性） |
+| `ui-ux-design.md`    | `src/**/*.tsx`, `src/**/*.css`, `src/v2/**/*` | UI/UXデザイン                      |
+| `testing.md`         | `**/*.test.ts`, `**/*.spec.ts`, `e2e/**/*`    | テストガイドライン                 |
+| `electron-import.md` | `electron/**/*`                               | Electron インポート規約            |
+| `timezone.md`        | `electron/module/vrchatLog/**/*` 等           | タイムゾーン処理                   |
+| `valueobject.md`     | `electron/lib/valueObject/**/*` 等            | ValueObject パターン               |
 
 ---
 
