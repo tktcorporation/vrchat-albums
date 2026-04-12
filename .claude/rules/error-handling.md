@@ -68,7 +68,7 @@ catch (error) {
 | レイヤー | 責務                               | パターン                       |
 | -------- | ---------------------------------- | ------------------------------ |
 | Service  | エラー分類、予期されたエラーの返却 | `Effect.Effect<T, E>`          |
-| tRPC     | Effect→UserFacingError変換         | `runEffectForTRPC()`           |
+| tRPC     | Effect→UserFacingError変換         | `runEffect()`                  |
 | Frontend | ユーザー向けメッセージ表示         | Toast + `parseErrorFromTRPC()` |
 
 ## 関連リンター

@@ -44,7 +44,7 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 | `parallel-work.md`             | 並列作業・Worktree 運用（競合防止）                    |
 | `code-intent-documentation.md` | コメント・JSDoc（WHYを残す）                           |
 | `codex-pairing.md`             | Codex CLI セカンドオピニオン                           |
-| `ci-workflow.md`               | CI/PR ワークフロー（`paths` 制限あり）                 |
+| `ci-workflow.md`               | CI/PR ワークフロー                                     |
 
 ### プロジェクト固有ルール（`.claude/rules/project/`）
 
@@ -78,7 +78,7 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 
 - ts-pattern: 条件分岐・exhaustive checking
 - Zod: 外部境界のバリデーション
-- neverthrow: 予期されたエラーの型安全な伝播
+- Effect TS: 予期されたエラーの型安全な伝播
 
 詳細: `.claude/rules/robustness.md`
 
@@ -87,7 +87,7 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 **レイヤー構造**:
 
 - Service: `Effect.Effect<T, E>` (Effect TS)
-- tRPC: `UserFacingError`（`runEffectForTRPC()` で変換）
+- tRPC: `UserFacingError`（`runEffect()` で変換）
 - Frontend: `parseErrorFromTRPC` + Toast
 
 **重要**: 予期されたエラーのみ `Effect.fail()` でラップ。予期しないエラーは re-throw（Sentry送信のため）。

@@ -10,7 +10,7 @@
 
 ## ts-pattern（パターンマッチング）
 
-**すべての条件分岐で `match()` + `exhaustive()` を使用する。** if文への書き換え禁止。
+**Union型の網羅チェックには `match()` + `.exhaustive()` を使用する。** if文への書き換え禁止。
 
 ```typescript
 import { match, P } from 'ts-pattern';
@@ -32,7 +32,7 @@ const getMessage = (status: Status): string =>
 
 - `P.union('a', 'b')` — 複数値マッチ
 - `P.instanceOf(Error)` — 型ガード
-- `.otherwise()` — デフォルト分岐
+- `.otherwise()` — デフォルト分岐（網羅性より柔軟性を優先する場合）
 
 ---
 

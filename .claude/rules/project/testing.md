@@ -1,8 +1,11 @@
 ---
 paths:
   - '**/*.test.ts'
+  - '**/*.test.tsx'
   - '**/*.spec.ts'
+  - '**/*.spec.tsx'
   - '**/*.integration.test.ts'
+  - '**/*.integration.test.tsx'
   - 'e2e/**/*'
   - 'playwright.config.*'
 ---

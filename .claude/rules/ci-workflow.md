@@ -1,9 +1,3 @@
----
-paths:
-  - '.github/workflows/**'
-  - '.changeset/**'
----
-
 # CI / PR ワークフロー
 
 ## プッシュ前の必須手順
