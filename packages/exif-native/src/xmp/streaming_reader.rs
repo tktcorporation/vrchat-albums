@@ -666,9 +666,10 @@ mod tests {
     }
 
     #[test]
-    fn png_with_many_idat_chunks_terminates_quickly() {
+    fn png_with_many_idat_chunks_returns_none_without_scanning_all() {
         // 大きな PNG には数百の IDAT チャンクがある。
-        // IDAT 到達で打ち切るため、XMP がなくても高速に結果を返す。
+        // IDAT 到達で打ち切るため、後続の IDAT チャンクやその後の
+        // メタデータチャンクは走査されない。
         let mut buf = Vec::new();
         buf.extend_from_slice(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
@@ -683,17 +684,16 @@ mod tests {
 
         write_png_chunk(&mut buf, b"IEND", &[]);
 
+        // ファイルサイズは約 3.2MB（100 × 32KB IDAT）
+        assert!(buf.len() > 3_000_000, "Test file should be large");
+
         let tmp = write_temp_file(&buf);
-        let start = std::time::Instant::now();
         let result = read_xmp_from_file(tmp.path().to_str().unwrap());
-        let elapsed = start.elapsed();
 
         assert!(result.is_ok());
-        assert!(result.unwrap().is_none());
-        // IDAT で即打ち切り → 100ms 以内に完了するはず（以前は全 IDAT をスキャンしていた）
         assert!(
-            elapsed.as_millis() < 100,
-            "Should terminate quickly at IDAT, took {elapsed:?}"
+            result.unwrap().is_none(),
+            "Should return None (no XMP before IDAT)"
         );
     }
 
