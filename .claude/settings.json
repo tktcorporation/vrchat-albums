@@ -31,6 +31,10 @@
           {
             "type": "command",
             "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+worktree\\s+add'; then if ! echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+worktree\\s+add\\s+\\.claude/worktrees/'; then echo 'BLOCKED: worktree は .claude/worktrees/ 配下に作成すること。例: git worktree add .claude/worktrees/<タスク名> -b <ブランチ名> origin/master。または EnterWorktree ツールを使うこと。' >&2; exit 2; fi; fi"
+          },
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'gh\\s+pr\\s+create'; then cat | \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require-pr-self-review.sh; fi"
           }
         ]
       }
