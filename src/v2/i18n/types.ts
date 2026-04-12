@@ -163,6 +163,11 @@ export interface Translations {
     updateTitle: string;
     accept: string;
   };
+  startup: {
+    title: string;
+    stepIndicator: string;
+    itemsProgress: string;
+  };
   migration: {
     title: string;
     description: string;

@@ -558,6 +558,11 @@ export function loadLogInfoIndexFromVRChatLog({
           stack: metadataResult.left,
         });
       }
+      emitProgress({
+        stage: 'photo_metadata',
+        progress: 100,
+        message: '写真メタデータの抽出が完了しました',
+      });
       const metadataEndTime = performance.now();
       logger.debug(
         `Photo metadata extraction took ${

@@ -100,6 +100,24 @@ export const useInitProgress = () => {
     return calculateOverallProgress(progress.stage, progress.progress ?? 0);
   }, [progress?.stage, progress?.progress]);
 
+  /**
+   * 現在のステップ番号（1-based）と総ステップ数
+   * ステージの順序に基づいて計算する
+   */
+  const stepInfo = useMemo(() => {
+    if (!progress?.stage) {
+      return { current: 0, total: STAGE_CONFIG.length };
+    }
+    if (progress.stage === 'completed') {
+      return { current: STAGE_CONFIG.length, total: STAGE_CONFIG.length };
+    }
+    const idx = STAGE_CONFIG.findIndex((c) => c.stage === progress.stage);
+    return {
+      current: idx === -1 ? 0 : idx + 1,
+      total: STAGE_CONFIG.length,
+    };
+  }, [progress?.stage]);
+
   return {
     /** subscription接続完了フラグ */
     isSubscriptionReady,
@@ -109,6 +127,8 @@ export const useInitProgress = () => {
     overallProgress,
     /** 進捗メッセージ */
     message: progress?.message ?? '',
+    /** 現在のステップ番号と総ステップ数 */
+    stepInfo,
     /** subscription エラー */
     error,
     /** 進捗情報をリセット */

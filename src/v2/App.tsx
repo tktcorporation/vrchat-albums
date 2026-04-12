@@ -23,7 +23,12 @@ import { terms } from './constants/terms/ja';
 import { StartupProvider, useStartup } from './contexts/StartupContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useToast } from './hooks/use-toast';
+import {
+  type InitProgressPayload,
+  STAGE_LABELS,
+} from './hooks/useInitProgress';
 import { useLoadingState } from './hooks/useLoadingState';
+import { useI18n } from './i18n/store';
 
 interface ErrorEvent extends Event {
   type: undefined;
@@ -309,6 +314,181 @@ const ToasterWrapper = () => {
 };
 
 /**
+ * ローディング画面コンポーネント
+ *
+ * 初期化処理の進行状況をステージ名・件数・ステップ番号で詳細に表示する。
+ * バックエンドから送られる InitProgressPayload の details（current/total）を活用し、
+ * ユーザーが「今どの処理が何件中何件まで進んでいるか」を把握できるようにする。
+ */
+const LoadingScreen = memo(
+  ({
+    progressMessage,
+    progressPercent,
+    progress,
+    stepInfo,
+  }: {
+    progressMessage: string;
+    progressPercent: number;
+    progress: InitProgressPayload | null;
+    stepInfo: { current: number; total: number };
+  }) => {
+    const { t } = useI18n();
+
+    // ステージラベルを取得（バックエンドの STAGE_LABELS を使用）
+    const stageLabel =
+      progress?.stage && progress.stage !== 'ready'
+        ? STAGE_LABELS[progress.stage]
+        : null;
+
+    // 件数情報をフォーマット（details.current/total が存在する場合のみ）
+    const detailsText = (() => {
+      const details = progress?.details;
+      if (!details?.current || !details?.total) {
+        return null;
+      }
+      return t('startup.itemsProgress')
+        .replace('{current}', String(details.current))
+        .replace('{total}', String(details.total));
+    })();
+
+    // ステップインジケーター（ステップ番号が有効な場合のみ表示）
+    const stepText =
+      stepInfo.current > 0
+        ? t('startup.stepIndicator')
+            .replace('{current}', String(stepInfo.current))
+            .replace('{total}', String(stepInfo.total))
+        : null;
+
+    return (
+      <div
+        className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]"
+        data-testid="loading-screen"
+      >
+        <AppHeader showGalleryControls={false} />
+        <div className="flex items-center justify-center flex-1">
+          <div className="text-center p-8 w-full max-w-md">
+            {/* ローディングアニメーション */}
+            <div className="relative mb-8">
+              <div className="mx-auto w-20 h-20 relative">
+                {/* ベースの円 */}
+                <div className="absolute inset-0 rounded-full bg-gray-100 dark:bg-gray-800" />
+
+                {/* プログレス - 実際の進捗を反映 */}
+                <svg
+                  className="absolute inset-0 w-full h-full -rotate-90"
+                  viewBox="0 0 80 80"
+                  aria-label="ローディングインジケーター"
+                >
+                  <title>ローディングインジケーター</title>
+                  {/* 背景の円 */}
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="36"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    className="text-gray-200 dark:text-gray-700"
+                  />
+                  {/* 進捗の円 */}
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="36"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    className="text-primary transition-all duration-300"
+                    strokeDasharray="226"
+                    strokeDashoffset={226 - (226 * progressPercent) / 100}
+                    strokeLinecap="round"
+                  />
+                </svg>
+
+                {/* 中央のパーセント表示 */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span
+                    className="text-sm font-medium text-gray-600 dark:text-gray-400"
+                    data-testid="progress-percent"
+                  >
+                    {progressPercent > 0 ? `${progressPercent}%` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* テキストエリア */}
+            <div className="space-y-2">
+              {/* タイトル: ステージラベルがあればそれを、なければ汎用タイトルを表示 */}
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 tracking-tight">
+                {stageLabel ?? t('startup.title')}
+              </h2>
+
+              {/* メッセージ + 件数 */}
+              <p
+                className="text-sm text-gray-500 dark:text-gray-500 min-h-[1.5em]"
+                data-testid="progress-message"
+              >
+                {progressMessage || t('common.loading')}
+                {detailsText && (
+                  <span className="ml-1.5 text-gray-400 dark:text-gray-600">
+                    ({detailsText})
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* プログレスバー */}
+            <div className="mt-6 w-full max-w-xs mx-auto">
+              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                  style={{
+                    width: `${Math.min(Math.max(progressPercent, 5), 100)}%`,
+                  }}
+                  data-testid="progress-bar"
+                  data-progress={progressPercent}
+                />
+              </div>
+            </div>
+
+            {/* ステップインジケーター */}
+            <div className="mt-3 flex justify-center items-center">
+              {stepText ? (
+                <span
+                  className="text-xs text-gray-400 dark:text-gray-600"
+                  data-testid="step-indicator"
+                >
+                  {stepText}
+                </span>
+              ) : (
+                /* 進捗情報がない場合のドットインジケーター */
+                <div className="flex items-center space-x-1.5 py-0.5">
+                  <div
+                    className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
+                    style={{ animationDelay: '0ms' }}
+                  />
+                  <div
+                    className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
+                    style={{ animationDelay: '200ms' }}
+                  />
+                  <div
+                    className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
+                    style={{ animationDelay: '400ms' }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  },
+);
+
+LoadingScreen.displayName = 'LoadingScreen';
+
+/**
  * 起動処理の進行状況に応じて UI を切り替えるメインコンテンツ部分。
  * 初期同期やエラー状態を監視しながら各画面を表示する。
  */
@@ -318,8 +498,10 @@ const Contents = memo(() => {
     error,
     originalError,
     retry,
+    progress,
     progressMessage,
     progressPercent,
+    stepInfo,
   } = useStartup();
   const loadingState = useLoadingState();
 
@@ -478,111 +660,13 @@ const Contents = memo(() => {
   // idle: 初期化開始待ち（subscription未接続）、syncing: 初期化実行中
   // どちらもローディング画面を表示し、PhotoGallery のマウント（＝DB未初期化でのクエリ発火）を防ぐ
   if (stage === 'idle' || stage === 'syncing') {
-    const displayMessage = progressMessage || '読み込み中...';
-
     return (
-      <div
-        className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]"
-        data-testid="loading-screen"
-      >
-        <AppHeader showGalleryControls={false} />
-        <div className="flex items-center justify-center flex-1">
-          <div className="text-center p-8 w-full max-w-md">
-            {/* ローディングアニメーション */}
-            <div className="relative mb-8">
-              <div className="mx-auto w-20 h-20 relative">
-                {/* ベースの円 */}
-                <div className="absolute inset-0 rounded-full bg-gray-100 dark:bg-gray-800" />
-
-                {/* プログレス - 実際の進捗を反映 */}
-                <svg
-                  className="absolute inset-0 w-full h-full -rotate-90"
-                  viewBox="0 0 80 80"
-                  aria-label="ローディングインジケーター"
-                >
-                  <title>ローディングインジケーター</title>
-                  {/* 背景の円 */}
-                  <circle
-                    cx="40"
-                    cy="40"
-                    r="36"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    className="text-gray-200 dark:text-gray-700"
-                  />
-                  {/* 進捗の円 */}
-                  <circle
-                    cx="40"
-                    cy="40"
-                    r="36"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    className="text-primary transition-all duration-300"
-                    strokeDasharray="226"
-                    strokeDashoffset={226 - (226 * progressPercent) / 100}
-                    strokeLinecap="round"
-                  />
-                </svg>
-
-                {/* 中央のパーセント表示 */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span
-                    className="text-sm font-medium text-gray-600 dark:text-gray-400"
-                    data-testid="progress-percent"
-                  >
-                    {progressPercent > 0 ? `${progressPercent}%` : ''}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* テキストエリア - タイポグラフィ */}
-            <div className="space-y-3">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 tracking-tight">
-                データを読み込み中...
-              </h2>
-              <p
-                className="text-sm text-gray-500 dark:text-gray-500 min-h-[1.5em]"
-                data-testid="progress-message"
-              >
-                {displayMessage}
-              </p>
-            </div>
-
-            {/* プログレスバー */}
-            <div className="mt-6 w-full max-w-xs mx-auto">
-              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
-                  style={{
-                    width: `${Math.min(Math.max(progressPercent, 5), 100)}%`,
-                  }}
-                  data-testid="progress-bar"
-                  data-progress={progressPercent}
-                />
-              </div>
-            </div>
-
-            {/* シンプルなドットインジケーター */}
-            <div className="mt-6 flex justify-center items-center space-x-1.5">
-              <div
-                className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
-                style={{ animationDelay: '0ms' }}
-              />
-              <div
-                className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
-                style={{ animationDelay: '200ms' }}
-              />
-              <div
-                className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
-                style={{ animationDelay: '400ms' }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <LoadingScreen
+        progressMessage={progressMessage}
+        progressPercent={progressPercent}
+        progress={progress}
+        stepInfo={stepInfo}
+      />
     );
   }
 

@@ -153,6 +153,11 @@ const ja: Translations = {
         'エラーが正常に発生しました。Sentryを確認してください。',
     },
   },
+  startup: {
+    title: 'データを読み込み中...',
+    stepIndicator: 'ステップ {current}/{total}',
+    itemsProgress: '{current}/{total} 件',
+  },
   migration: {
     title: '旧アプリからのデータ移行',
     description:

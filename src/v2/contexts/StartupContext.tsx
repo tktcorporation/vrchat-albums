@@ -9,6 +9,11 @@ import { useStartupStage } from '../hooks/useStartUpStage';
 
 type Stage = 'idle' | 'syncing' | 'ready' | 'error';
 
+interface StepInfo {
+  current: number;
+  total: number;
+}
+
 interface StartupContextValue {
   stage: Stage;
   error: string | null;
@@ -21,6 +26,8 @@ interface StartupContextValue {
   progressMessage: string;
   /** 進捗パーセント (0-100) */
   progressPercent: number;
+  /** 現在のステップ番号と総ステップ数 */
+  stepInfo: StepInfo;
 }
 
 const StartupContext = createContext<StartupContextValue | null>(null);
@@ -41,6 +48,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
     progress,
     message,
     overallProgress,
+    stepInfo,
     reset: resetProgress,
   } = useInitProgress();
 
@@ -81,6 +89,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       progress,
       progressMessage: message,
       progressPercent: overallProgress,
+      stepInfo,
     }),
     [
       stage,
@@ -91,6 +100,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       progress,
       message,
       overallProgress,
+      stepInfo,
     ],
   );
 

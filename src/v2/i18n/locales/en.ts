@@ -152,6 +152,11 @@ const en: Translations = {
       errorThrownSuccess: 'Error thrown successfully. Check Sentry.',
     },
   },
+  startup: {
+    title: 'Loading data...',
+    stepIndicator: 'Step {current}/{total}',
+    itemsProgress: '{current}/{total} items',
+  },
   migration: {
     title: 'Data Migration from Old App',
     description:
