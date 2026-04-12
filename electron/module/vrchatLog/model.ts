@@ -192,7 +192,7 @@ export const VRChatLogStoreFilePathSchema = z
   .superRefine((value, ctx) => {
     if (!VRChatLogStoreFilePathRegex.test(value)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Invalid log store file path. Expected format: 'logStore-YYYY-MM.txt', 'logStore-YYYY-MM-YYYYMMDDHHMMSS.txt', or 'logStore.txt'. Received: "${value}"`,
       });
     }
@@ -206,7 +206,7 @@ export const VRChatWorldInstanceIdSchema = z
   .superRefine((value, ctx) => {
     if (!isValidVRChatWorldInstanceId(value)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: `Invalid VRChat World Instance ID format. Expected: alphanumeric string, UUID, or with ~region(region_code) suffix. Received: "${value}"`,
       });
     }

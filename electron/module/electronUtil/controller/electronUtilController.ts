@@ -194,7 +194,11 @@ export const electronUtilRouter = () =>
         ),
       ),
     openGetDirDialog: procedure.query(async () => {
-      const exit = await Effect.runPromiseExit(utilsService.openGetDirDialog());
+      const exit = await Effect.runPromiseExit(
+        utilsService
+          .openElectronDialog(['openDirectory'])
+          .pipe(Effect.map((paths) => paths[0])),
+      );
       if (Exit.isSuccess(exit)) {
         return DirectoryPathSchema.parse(exit.value);
       }
@@ -234,7 +238,7 @@ export const electronUtilRouter = () =>
       .input(z.array(z.enum(['openDirectory', 'openFile', 'multiSelections'])))
       .query(async (ctx) => {
         const exit = await Effect.runPromiseExit(
-          utilsService.openGetFileDialog(ctx.input),
+          utilsService.openElectronDialog(ctx.input),
         );
         if (Exit.isSuccess(exit)) {
           return exit.value;

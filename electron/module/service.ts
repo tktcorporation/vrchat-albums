@@ -3,11 +3,15 @@ import path from 'node:path';
 import { Effect } from 'effect';
 
 import { logger } from './../lib/logger';
-import * as utilsService from './electronUtil/service';
+import { openElectronDialog, openPathInExplorer } from './electronUtil/service';
 import { getSettingStore } from './settingStore';
 import * as vrchatLogFileDirService from './vrchatLogFileDir/service';
 
-/** @deprecated Use tagged errors from vrchatLogFileDir/errors.ts instead */
+/**
+ * VRChat ログディレクトリ検証時のエラー型
+ * 'logFilesNotFound': ログファイルが存在しない
+ * 'logFileDirNotFound': ログディレクトリが存在しない
+ */
 export type VRChatLogFilesDirError = 'logFilesNotFound' | 'logFileDirNotFound';
 
 export interface VRChatLogFilesDirResult {
@@ -47,20 +51,20 @@ export const clearStoredSetting = (
 /** OS のエクスプローラーでファイルを開く */
 export const openPathOnExplorer = (filePath: string) => {
   logger.debug(`openPathOnExplorer ${filePath}`);
-  return utilsService.openPathInExplorer(filePath);
+  return openPathInExplorer(filePath);
 };
 
 /** アプリのログフォルダをエクスプローラーで開く */
 export const openElectronLogOnExplorer = () => {
   const electronLogPath = logger.electronLogFilePath;
   logger.debug(`electronLogPath ${electronLogPath}`);
-  return utilsService.openPathInExplorer(electronLogPath);
+  return openPathInExplorer(electronLogPath);
 };
 
 /** 指定ディレクトリをエクスプローラーで開く */
 export const openDirOnExplorer = (dirPath: string) => {
   const dir = path.dirname(dirPath);
-  return utilsService.openPathInExplorer(dir);
+  return openPathInExplorer(dir);
 };
 
 /** ダイアログからログ保存先を設定する */
@@ -68,7 +72,8 @@ export const setVRChatLogFilesDirByDialog = (): Effect.Effect<
   void,
   Error | 'canceled'
 > => {
-  return utilsService.openGetDirDialog().pipe(
+  return openElectronDialog(['openDirectory']).pipe(
+    Effect.map((paths) => paths[0]),
     Effect.tap((dirPath) => {
       const settingStore = getSettingStore();
       settingStore.setLogFilesDir(dirPath);

@@ -35,9 +35,7 @@ export const FolderScanStateSchema = z.object({
    * 最終スキャン完了日時（ISO 8601形式、UTC）
    * このフォルダの処理が完了した時点で更新される
    */
-  lastScannedAt: z
-    .string()
-    .datetime({ message: 'Invalid ISO datetime format' }),
+  lastScannedAt: z.iso.datetime({ message: 'Invalid ISO datetime format' }),
 });
 
 /** フォルダパス → スキャン状態のマップ */

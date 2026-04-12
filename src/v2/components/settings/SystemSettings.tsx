@@ -15,7 +15,7 @@ import { SettingsItem, SettingsSection } from './common';
 const SystemSettings = memo(() => {
   const { t } = useI18n();
   const { toast } = useToast();
-  const utils = trpcReact.useContext();
+  const utils = trpcReact.useUtils();
 
   const { data: startupLaunch, isLoading: isStartupLoading } =
     trpcReact.backgroundSettings.getIsAppAutoStartEnabled.useQuery();

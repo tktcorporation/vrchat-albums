@@ -333,7 +333,7 @@ const DataImport = memo(() => {
       <div className="border-t border-border pt-6">
         <div className="flex items-center justify-between mb-4">
           <h4
-            className={`${TYPOGRAPHY.heading.subsection} ${TEXT_COLOR.primary}`}
+            className={`${TYPOGRAPHY.heading.tertiary} ${TEXT_COLOR.primary}`}
           >
             インポート履歴・ロールバック
           </h4>

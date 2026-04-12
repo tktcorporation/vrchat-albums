@@ -89,28 +89,6 @@ const openElectronDialog = (
 };
 
 /**
- * ディレクトリ選択ダイアログを表示し、選択されたパスを返す。
- * 設定画面からフォルダ指定する際に使用される。
- * @deprecated Use openElectronDialog with ['openDirectory'] instead
- */
-const openGetDirDialog = (): Effect.Effect<string, OperationCanceled> => {
-  return openElectronDialog(['openDirectory']).pipe(
-    Effect.map((paths) => paths[0]),
-  );
-};
-
-/**
- * ファイル/ディレクトリ選択ダイアログを表示する汎用関数。
- * VRChat ログフォルダなどの設定入力で利用される。
- * @deprecated Use openElectronDialog instead
- */
-const openGetFileDialog = (
-  properties: ('openDirectory' | 'openFile' | 'multiSelections')[],
-): Effect.Effect<string[], OperationCanceled> => {
-  return openElectronDialog(properties);
-};
-
-/**
  * 既定のブラウザで URL を開くシンプルなヘルパー。
  * ShareDialog などからリンクを開く際に使用される。
  */
@@ -360,8 +338,6 @@ const copyMultipleFilesToClipboard = (
 export {
   openPathInExplorer,
   openElectronDialog,
-  openGetDirDialog,
-  openGetFileDialog,
   openUrlInDefaultBrowser,
   openPhotoPathWithPhotoApp,
   openPathWithAssociatedApp,

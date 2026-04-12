@@ -6,8 +6,8 @@ import { ERROR_CATEGORIES, ERROR_CODES } from './errorConstants';
  * 構造化エラー情報のスキーマ
  */
 export const StructuredErrorSchema = z.object({
-  code: z.nativeEnum(ERROR_CODES),
-  category: z.nativeEnum(ERROR_CATEGORIES),
+  code: z.enum(ERROR_CODES),
+  category: z.enum(ERROR_CATEGORIES),
   userMessage: z.string(),
 });
 

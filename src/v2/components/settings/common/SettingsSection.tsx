@@ -49,7 +49,7 @@ const SettingsSection = memo<SettingsSectionProps>(
           <h3
             className={cn(
               'flex items-center',
-              TYPOGRAPHY.heading.section,
+              TYPOGRAPHY.heading.secondary,
               TEXT_COLOR.primary,
             )}
           >
