@@ -1,3 +1,10 @@
+---
+paths:
+  - 'electron/lib/valueObject/**/*'
+  - 'electron/module/**/model.ts'
+  - 'electron/module/**/valueObject*'
+---
+
 # ValueObject パターン
 
 型安全なカプセル化を実現するための ValueObject 実装規約。

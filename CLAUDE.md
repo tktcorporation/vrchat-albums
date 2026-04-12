@@ -14,7 +14,7 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 - Electron + React 18 + TypeScript + Vite
 - tRPC (IPC通信) + SQLite/Sequelize
 - Tailwind CSS + Radix UI
-- ts-pattern + neverthrow + Zod
+- ts-pattern + Effect TS + Zod
 
 ## 環境
 
@@ -33,19 +33,29 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 
 ---
 
-## ルールファイル（詳細）
+## ルールファイル
 
-| ファイル                           | 内容                                                            |
-| ---------------------------------- | --------------------------------------------------------------- |
-| `.claude/rules/robustness.md`      | 堅牢性設計（型による保証、Parse Don't Validate）                |
-| `.claude/rules/error-handling.md`  | エラーハンドリング（neverthrow、try-catch回避）                 |
-| `.claude/rules/ts-pattern.md`      | ts-pattern 使用規約（exhaustive checking）                      |
-| `.claude/rules/log-sync.md`        | ログ同期（実行順序、データ整合性）                              |
-| `.claude/rules/timezone.md`        | タイムゾーン処理（ローカルタイム統一）                          |
-| `.claude/rules/valueobject.md`     | ValueObject パターン（型のみエクスポート）                      |
-| `.claude/rules/electron-import.md` | Electron インポート（Playwright互換性）                         |
-| `.claude/rules/testing.md`         | テストガイドライン（Vitest、Playwright）                        |
-| `.claude/rules/ui-ux-design.md`    | UI/UXデザイン（デザイントークン、アンチパターン、実装プロセス） |
+### 汎用ルール（`.claude/rules/`）
+
+| ファイル                       | 内容                                                   |
+| ------------------------------ | ------------------------------------------------------ |
+| `robustness.md`                | 堅牢性設計 + ts-pattern（型保証、exhaustive checking） |
+| `error-handling.md`            | Effect TS エラーハンドリング（try-catch回避）          |
+| `parallel-work.md`             | 並列作業・Worktree 運用（競合防止）                    |
+| `code-intent-documentation.md` | コメント・JSDoc（WHYを残す）                           |
+| `codex-pairing.md`             | Codex CLI セカンドオピニオン                           |
+| `ci-workflow.md`               | CI/PR ワークフロー                                     |
+
+### プロジェクト固有ルール（`.claude/rules/project/`）
+
+| ファイル             | 条件（`paths`）                               | 内容                               |
+| -------------------- | --------------------------------------------- | ---------------------------------- |
+| `log-sync.md`        | 常時 **CRITICAL**                             | ログ同期（実行順序、データ整合性） |
+| `ui-ux-design.md`    | `src/**/*.tsx`, `src/**/*.css`, `src/v2/**/*` | UI/UXデザイン                      |
+| `testing.md`         | `**/*.test.ts`, `**/*.spec.ts`, `e2e/**/*`    | テストガイドライン                 |
+| `electron-import.md` | `electron/**/*`                               | Electron インポート規約            |
+| `timezone.md`        | `electron/module/vrchatLog/**/*` 等           | タイムゾーン処理                   |
+| `valueobject.md`     | `electron/lib/valueObject/**/*` 等            | ValueObject パターン               |
 
 ---
 
@@ -68,7 +78,7 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 
 - ts-pattern: 条件分岐・exhaustive checking
 - Zod: 外部境界のバリデーション
-- neverthrow: 予期されたエラーの型安全な伝播
+- Effect TS: 予期されたエラーの型安全な伝播
 
 詳細: `.claude/rules/robustness.md`
 
@@ -76,11 +86,11 @@ VRChat の写真をログファイルと自動的に関連付けて整理する 
 
 **レイヤー構造**:
 
-- Service: `Result<T, E>` (neverthrow)
-- tRPC: `UserFacingError`
+- Service: `Effect.Effect<T, E>` (Effect TS)
+- tRPC: `UserFacingError`（`runEffect()` で変換）
 - Frontend: `parseErrorFromTRPC` + Toast
 
-**重要**: 予期されたエラーのみ `Result` でラップ。予期しないエラーは re-throw（Sentry送信のため）。
+**重要**: 予期されたエラーのみ `Effect.fail()` でラップ。予期しないエラーは re-throw（Sentry送信のため）。
 
 詳細: `.claude/rules/error-handling.md`
 
