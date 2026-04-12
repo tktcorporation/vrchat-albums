@@ -93,10 +93,14 @@ export const extractAndSaveMetadataBatch = (
     });
 
     // PNG/JPEGファイルのみフィルタ（XMPメタデータはPNG/JPEGどちらにも存在し得る）
-    const targetPaths = dateFilteredPaths.filter(
-      (p) =>
-        p.toLowerCase().endsWith('.png') || p.toLowerCase().endsWith('.jpg'),
-    );
+    const targetPaths = dateFilteredPaths.filter((p) => {
+      const lower = p.toLowerCase();
+      return (
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg')
+      );
+    });
 
     const skippedByDb = photoPaths.length - newPaths.length;
     const skippedByDate = newPaths.length - dateFilteredPaths.length;
@@ -129,6 +133,8 @@ export const extractAndSaveMetadataBatch = (
     let processed = 0;
     let noXmpCount = 0;
     let errorCount = 0;
+    /** Zod 検証で reject された件数（data はあるが extractOfficialMetadata が null を返した） */
+    let zodRejectCount = 0;
     for (let i = 0; i < targetPaths.length; i++) {
       const entry = batchResults[i];
       if (entry) {
@@ -146,7 +152,13 @@ export const extractAndSaveMetadataBatch = (
             WorldDisplayName: data.worldDisplayName ?? undefined,
           };
           const metadata = extractOfficialMetadata(tags);
-          if (metadata !== null) {
+          if (metadata === null) {
+            zodRejectCount++;
+            logger.debug(
+              `XMP data found but Zod validation rejected: ${targetPaths[i]}`,
+              { tags },
+            );
+          } else {
             attributes.push({
               photoPath: targetPaths[i],
               authorId: metadata.authorId,
@@ -173,20 +185,17 @@ export const extractAndSaveMetadataBatch = (
       }
     }
 
-    // サマリーログ: XMP なし件数と I/O エラー件数を分離して出力
+    // サマリーログ: 結果の内訳を出力（問題切り分け用）
+    logger.info(
+      `Photo metadata results: ${attributes.length} extracted, ${noXmpCount} no XMP, ${errorCount} errors, ${zodRejectCount} Zod rejected (total: ${targetPaths.length})`,
+    );
     if (errorCount > 0) {
       logger.warn(
         `Photo metadata: ${errorCount}/${targetPaths.length} files had read errors`,
       );
     }
-    if (noXmpCount > 0) {
-      logger.info(
-        `Photo metadata: ${noXmpCount}/${targetPaths.length} files had no XMP (normal for pre-2025.3.1 photos)`,
-      );
-    }
 
     if (attributes.length === 0) {
-      logger.info('Photo metadata extracted: 0 new records');
       return 0;
     }
 
