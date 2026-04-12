@@ -1,6 +1,19 @@
 #!/bin/bash
-# DBus設定
-eval `dbus-launch --sh-syntax`
+
+# X ディスプレイ設定: desktop-lite feature が DISPLAY を提供するが、
+# コンテナ未再ビルド時やCI環境でも動くよう Xvfb をフォールバックで起動する
+if [ -z "$DISPLAY" ]; then
+  export DISPLAY=:1
+fi
+if ! xdpyinfo -display "$DISPLAY" &>/dev/null 2>&1; then
+  Xvfb "$DISPLAY" -screen 0 1920x1080x24 &>/dev/null &
+  sleep 0.5
+fi
+
+# DBus セッションバス設定（dbus-x11 パッケージ必須）
+if command -v dbus-launch &>/dev/null; then
+  eval "$(dbus-launch --sh-syntax)"
+fi
 
 # 開発環境のための環境変数設定
 export NODE_ENV=development
