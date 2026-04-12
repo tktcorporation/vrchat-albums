@@ -1,11 +1,20 @@
 import type React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  PLAYER_LIST_FONT,
+  calculateVisiblePlayerCount,
+  measureTextWidth,
+} from '../../../utils/textMeasurement';
 import type { Player } from '../PlayerList';
 
 /**
- * プレイヤーリストの表示を管理するカスタムフック
- * 画面幅に応じて表示可能なプレイヤー数を動的に計算
+ * プレイヤーリストの表示を管理するカスタムフック。
+ * 画面幅に応じて表示可能なプレイヤー数を動的に計算する。
+ *
+ * 背景: 以前は隠し DOM 要素の getBoundingClientRect() ループで計測していたが、
+ * layout thrashing を引き起こしていた。pretext の Canvas ベース計測に置き換えることで
+ * DOM リフローを排除。
  */
 export const usePlayerListDisplay = (players: Player[] | null) => {
   const [maxVisiblePlayers, setMaxVisiblePlayers] = useState(6);
@@ -15,90 +24,47 @@ export const usePlayerListDisplay = (players: Player[] | null) => {
 
   const playerListRef = useRef<HTMLSpanElement>(null);
   const playerListContainerRef = useRef<HTMLButtonElement>(null);
-  // パフォーマンス改善: 幅計算用の一時DOM要素をキャッシュ
-  const measureElementRef = useRef<HTMLDivElement | null>(null);
 
-  // 一時測定要素の初期化とクリーンアップ
-  useEffect(() => {
-    // 測定用DOM要素を一度だけ作成
-    if (!measureElementRef.current) {
-      const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.visibility = 'hidden';
-      tempDiv.style.whiteSpace = 'nowrap';
-      tempDiv.style.fontSize = '0.875rem'; // text-sm
-      tempDiv.style.pointerEvents = 'none'; // イベントを無効化
-      document.body.append(tempDiv);
-      measureElementRef.current = tempDiv;
-    }
-
-    // クリーンアップ時に要素を削除
-    return () => {
-      if (measureElementRef.current) {
-        measureElementRef.current.remove();
-        measureElementRef.current = null;
-      }
-    };
-  }, []);
+  /** pretext を使った幅計測関数（Canvas ベース、DOM リフローなし） */
+  const measurePlayerName = useCallback(
+    (name: string) => measureTextWidth(name, PLAYER_LIST_FONT),
+    [],
+  );
 
   useEffect(() => {
     /** コンテナ幅から表示可能なプレイヤー数を計算する */
-    const calculateMaxVisiblePlayers = () => {
-      if (
-        !playerListContainerRef.current ||
-        !Array.isArray(players) ||
-        !measureElementRef.current
-      ) {
+    const recalculate = () => {
+      if (!playerListContainerRef.current || !Array.isArray(players)) {
         return;
       }
 
       const containerWidth = playerListContainerRef.current.offsetWidth;
-      const separatorWidth = 24; // セパレータ（ / ）の幅
-      const moreTextWidth = 48; // "/ +X" テキストの幅
-      const tempDiv = measureElementRef.current;
+      const playerNames = players.map((p) => p.playerName);
 
-      let totalWidth = 0;
-      let maxPlayers = 0;
-
-      for (let i = 0; i < players.length; i++) {
-        tempDiv.textContent = players[i].playerName;
-        const playerNameWidth = tempDiv.getBoundingClientRect().width;
-        const widthWithSeparator =
-          playerNameWidth + (i < players.length - 1 ? separatorWidth : 0);
-
-        if (
-          totalWidth +
-            widthWithSeparator +
-            (i < players.length - 1 ? moreTextWidth : 0) >
-          containerWidth
-        ) {
-          break;
-        }
-
-        totalWidth += widthWithSeparator;
-        maxPlayers = i + 1;
-      }
-
-      setMaxVisiblePlayers(Math.max(3, maxPlayers)); // 最低3人は表示
+      const count = calculateVisiblePlayerCount(
+        playerNames,
+        containerWidth,
+        measurePlayerName,
+      );
+      setMaxVisiblePlayers(count);
     };
 
-    // 初回計算
-    calculateMaxVisiblePlayers();
+    recalculate();
 
     // ResizeObserverを使用してコンテナのサイズ変更を監視
-    const resizeObserver = new ResizeObserver(calculateMaxVisiblePlayers);
+    const resizeObserver = new ResizeObserver(recalculate);
     if (playerListContainerRef.current) {
       resizeObserver.observe(playerListContainerRef.current);
     }
 
     // ウィンドウリサイズ時も再計算
-    window.addEventListener('resize', calculateMaxVisiblePlayers);
+    window.addEventListener('resize', recalculate);
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', calculateMaxVisiblePlayers);
+      window.removeEventListener('resize', recalculate);
     };
-  }, [players]);
+  }, [players, measurePlayerName]);
 
   useEffect(() => {
     /** ツールチップの位置をプレイヤーリストの下に更新する */

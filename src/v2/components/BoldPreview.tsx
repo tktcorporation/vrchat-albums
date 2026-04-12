@@ -1,7 +1,12 @@
 import type React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { extractDominantColors } from '../utils/colorExtractor';
+import {
+  BOLD_PREVIEW_FONT,
+  calculateVisiblePlayersForRows,
+  measureTextWidth,
+} from '../utils/textMeasurement';
 
 interface Player {
   id: string;
@@ -40,7 +45,6 @@ export function BoldPreviewSvg({
     accent: 'rgb(79, 70, 229)',
   });
   const containerRef = useRef<HTMLDivElement>(null);
-  const tempContainerRef = useRef<HTMLDivElement>(null);
   const internalPreviewRef = useRef<SVGSVGElement>(null);
   const previewRef = externalPreviewRef ?? internalPreviewRef;
 
@@ -60,52 +64,46 @@ export function BoldPreviewSvg({
     }
   }, [imageSource]);
 
+  /**
+   * pretext を使った幅計測関数（Canvas ベース、DOM リフローなし）。
+   * 背景: 以前は一時 DOM 要素の getBoundingClientRect() ループで計測していた。
+   */
+  const measurePlayerName = useCallback(
+    (name: string) => measureTextWidth(name, BOLD_PREVIEW_FONT),
+    [],
+  );
+
   useEffect(() => {
-    if (!tempContainerRef.current || !players) {
+    if (!players) {
+      return;
+    }
+
+    if (showAllPlayers) {
+      setVisiblePlayers(players);
+      setHiddenCount(0);
       return;
     }
 
     const containerWidth = 740;
-    const gap = 8;
-    const visible: Player[] = [];
-
     const reservedWidth = 100;
     const effectiveWidth = containerWidth - reservedWidth;
 
-    let currentRow = 0;
-    let currentWidth = 0;
+    const playerNames = players.map((p) => p.playerName);
+    const { visibleCount, hiddenCount: hidden } =
+      calculateVisiblePlayersForRows(
+        playerNames,
+        effectiveWidth,
+        measurePlayerName,
+        {
+          padding: 24, // 左12px + 右12px
+          gap: 8,
+          maxRows: 2,
+        },
+      );
 
-    const tempDiv = document.createElement('div');
-    tempDiv.style.position = 'absolute';
-    tempDiv.style.visibility = 'hidden';
-    tempDiv.style.padding = '6px 12px';
-    tempDiv.style.whiteSpace = 'nowrap';
-    tempDiv.style.fontSize = '14px';
-    tempDiv.style.fontWeight = '500';
-    document.body.append(tempDiv);
-
-    for (const player of players) {
-      tempDiv.textContent = player.playerName;
-      const width = tempDiv.getBoundingClientRect().width;
-
-      if (currentWidth + width + gap > effectiveWidth) {
-        currentRow++;
-        currentWidth = width + gap;
-      } else {
-        currentWidth += width + gap;
-      }
-
-      if (showAllPlayers || currentRow < 2) {
-        visible.push(player);
-      } else {
-        break;
-      }
-    }
-
-    tempDiv.remove();
-    setVisiblePlayers(visible);
-    setHiddenCount(showAllPlayers ? 0 : players.length - visible.length);
-  }, [players, showAllPlayers]);
+    setVisiblePlayers(players.slice(0, visibleCount));
+    setHiddenCount(hidden);
+  }, [players, showAllPlayers, measurePlayerName]);
   /**
    * プレイヤー表示数に応じてSVG全体の高さを計算するヘルパー。
    * 同ファイル内でプレビューサイズを決定するためにのみ使用される。
@@ -275,10 +273,6 @@ export function BoldPreviewSvg({
         </g>
 
         <foreignObject x="0" y="24" width="740" height={playerListHeight}>
-          <div
-            ref={tempContainerRef}
-            style={{ position: 'absolute', visibility: 'hidden' }}
-          />
           <div
             ref={containerRef}
             style={{
