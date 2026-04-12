@@ -30,13 +30,22 @@ pub fn read_xmp_from_file(path: &str) -> Result<Option<VrcXmpMetadata>, String> 
         File::open(path).map_err(|e| format!("Failed to open {path}: {e}"))?;
     let mut reader = BufReader::with_capacity(BUF_READER_CAPACITY, file);
 
-    // フォーマット判定: 先頭 8 バイトだけ読む（BufReader から提供）
+    // フォーマット判定: 先頭 8 バイトを確実に読む（BufReader から提供）。
+    // read() ではなく read_exact() を使用: read() はバッファを満たさずに返る可能性があり、
+    // 部分的な読み取りでフォーマット誤判定になりうるため。
+    // 8B 未満のファイルは UnexpectedEof → Unknown format として扱う。
     let mut magic = [0u8; 8];
-    let n = reader
-        .read(&mut magic)
-        .map_err(|e| format!("Failed to read magic bytes from {path}: {e}"))?;
+    match reader.read_exact(&mut magic) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            return Ok(None); // 8B 未満のファイル — 画像ではないので XMP なし
+        }
+        Err(e) => {
+            return Err(format!("Failed to read magic bytes from {path}: {e}"));
+        }
+    }
 
-    match detect_image_format(&magic[..n]) {
+    match detect_image_format(&magic) {
         ImageFormat::Png => read_xmp_from_png_stream(&mut reader),
         ImageFormat::Jpeg => read_xmp_from_jpeg_stream(&mut reader),
         ImageFormat::Unknown => Ok(None),
