@@ -5,25 +5,49 @@
 /// いずれもファイル先頭付近にある。画像データ本体（PNG IDAT / JPEG SOS 以降）を
 /// 読む必要はないため、チャンクヘッダーだけ走査して XMP 部分だけ読み込む。
 ///
-/// dimensions.rs と同じ部分読み込みパターン。3000枚超のバッチ処理で
-/// 数GB の I/O を数百MB に削減し、10〜50 倍の高速化を実現する。
+/// BufReader(64KB) で小さな read_exact を OS syscall に変換せずバッファ上で処理し、
+/// dimensions.rs と同等の I/O 効率を実現する。
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 
-use crate::detect::{detect_image_format_from_file, ImageFormat};
+use crate::detect::{detect_image_format, ImageFormat};
 use crate::xmp::reader::{parse_vrc_xmp, VrcXmpMetadata};
+
+/// BufReader のバッファサイズ。
+///
+/// 背景: JPEG は SOI(2B) + APPn セグメント群の後に SOS が来る。
+/// 典型的な VRChat 写真では APP0(JFIF) + APP1(EXIF/XMP) + DQT + DHT + SOF で
+/// 数 KB〜数十 KB。64KB あればほぼ全てのマーカー走査を 1 回の read で賄える。
+/// dimensions.rs の JPEG_INITIAL_READ_BYTES と同じサイズ。
+const BUF_READER_CAPACITY: usize = 65536;
 
 /// ファイルフォーマットを自動判定し、部分読み込みで XMP メタデータを抽出する。
 ///
 /// PNG / JPEG いずれもファイル全体を読まず、チャンク/セグメントヘッダーを
 /// 走査して XMP データだけを読み取る。XMP が存在しなければ None を返す。
 pub fn read_xmp_from_file(path: &str) -> Result<Option<VrcXmpMetadata>, String> {
-    let mut file =
+    let file =
         File::open(path).map_err(|e| format!("Failed to open {path}: {e}"))?;
+    let mut reader = BufReader::with_capacity(BUF_READER_CAPACITY, file);
 
-    match detect_image_format_from_file(&mut file)? {
-        ImageFormat::Png => read_xmp_from_png_stream(&mut file),
-        ImageFormat::Jpeg => read_xmp_from_jpeg_stream(&mut file),
+    // フォーマット判定: 先頭 8 バイトを確実に読む（BufReader から提供）。
+    // read() ではなく read_exact() を使用: read() はバッファを満たさずに返る可能性があり、
+    // 部分的な読み取りでフォーマット誤判定になりうるため。
+    // 8B 未満のファイルは UnexpectedEof → Unknown format として扱う。
+    let mut magic = [0u8; 8];
+    match reader.read_exact(&mut magic) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            return Ok(None); // 8B 未満のファイル — 画像ではないので XMP なし
+        }
+        Err(e) => {
+            return Err(format!("Failed to read magic bytes from {path}: {e}"));
+        }
+    }
+
+    match detect_image_format(&magic) {
+        ImageFormat::Png => read_xmp_from_png_stream(&mut reader),
+        ImageFormat::Jpeg => read_xmp_from_jpeg_stream(&mut reader),
         ImageFormat::Unknown => Ok(None),
     }
 }
@@ -34,11 +58,11 @@ pub fn read_xmp_from_file(path: &str) -> Result<Option<VrcXmpMetadata>, String> 
 /// APP1 (0xE1) + XMP プレフィックス が見つかったらそのセグメントだけ読む。
 /// SOS (0xDA) / EOI (0xD9) に到達したら打ち切り（XMP は SOS の前に格納される）。
 ///
-/// file は先頭にシーク済みであること（detect_image_format_from_file が先頭を読む）。
-fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, String> {
-    // detect_image_format_from_file がファイル先頭から最大 8B を読むため
+/// reader は read_xmp_from_file でフォーマット判定後の状態。絶対シークで開始位置に移動する。
+fn read_xmp_from_jpeg_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXmpMetadata>, String> {
+    // read_xmp_from_file がフォーマット判定で先頭 8B を読むため
     // オフセットが不定。絶対シークで SOI 直後 (offset 2) に移動する。
-    file.seek(SeekFrom::Start(2))
+    reader.seek(SeekFrom::Start(2))
         .map_err(|e| format!("Failed to seek past SOI: {e}"))?;
 
     const XMP_PREFIX: &[u8] = b"http://ns.adobe.com/xap/1.0/\0";
@@ -46,7 +70,7 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
     loop {
         // マーカー先頭 0xFF を読む
         let mut byte = [0u8; 1];
-        match file.read_exact(&mut byte) {
+        match reader.read_exact(&mut byte) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
                 return Ok(None); // 正常な EOF — XMP なし
@@ -62,10 +86,10 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
 
         // fill bytes (0xFF の連続) をスキップして実際のマーカー種別を取得。
         // JPEG spec では 0xFF の後に任意個の 0xFF fill bytes を挿入できる。
-        // 0xFF 以外のバイトが見つかるまで1バイトずつ読み進める。
+        // BufReader により、1バイトずつの read_exact はバッファから提供される。
         let marker_type;
         loop {
-            file.read_exact(&mut byte)
+            reader.read_exact(&mut byte)
                 .map_err(|e| format!("Failed to read JPEG marker type: {e}"))?;
             if byte[0] != 0xFF {
                 break;
@@ -91,7 +115,7 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
 
         // セグメント長 (2 bytes, big-endian, 自身を含む)
         let mut len_bytes = [0u8; 2];
-        file.read_exact(&mut len_bytes)
+        reader.read_exact(&mut len_bytes)
             .map_err(|e| format!("Failed to read segment length: {e}"))?;
         let seg_len = u16::from_be_bytes(len_bytes) as usize;
 
@@ -105,14 +129,14 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
         if marker_type == 0xE1 && data_len > XMP_PREFIX.len() {
             // プレフィックスだけ読んで XMP か判定
             let mut prefix_buf = vec![0u8; XMP_PREFIX.len()];
-            file.read_exact(&mut prefix_buf)
+            reader.read_exact(&mut prefix_buf)
                 .map_err(|e| format!("Failed to read APP1 prefix: {e}"))?;
 
             if prefix_buf == XMP_PREFIX {
                 // XMP データ本体だけ読み取り
                 let xmp_len = data_len - XMP_PREFIX.len();
                 let mut xmp_buf = vec![0u8; xmp_len];
-                file.read_exact(&mut xmp_buf)
+                reader.read_exact(&mut xmp_buf)
                     .map_err(|e| format!("Failed to read XMP data: {e}"))?;
 
                 let xml_text = match String::from_utf8(xmp_buf) {
@@ -124,11 +148,11 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
 
             // XMP ではない APP1 — 残りをスキップ
             let remaining = (data_len - XMP_PREFIX.len()) as i64;
-            file.seek(SeekFrom::Current(remaining))
+            reader.seek(SeekFrom::Current(remaining))
                 .map_err(|e| format!("Failed to skip non-XMP APP1: {e}"))?;
         } else {
             // APP1 以外のセグメント — スキップ
-            file.seek(SeekFrom::Current(data_len as i64))
+            reader.seek(SeekFrom::Current(data_len as i64))
                 .map_err(|e| format!("Failed to skip segment: {e}"))?;
         }
     }
@@ -141,11 +165,11 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
 /// IEND に到達したら打ち切り。IDAT はスキップして走査を続行する
 /// （サードパーティツールで iTXt が IDAT 後に移動する場合に対応）。
 ///
-/// file は先頭にシーク済みであること（detect_image_format_from_file が先頭を読む）。
-fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, String> {
-    // detect_image_format_from_file がファイル先頭から最大 8B を読むため
+/// reader は read_xmp_from_file でフォーマット判定後の状態。絶対シークで開始位置に移動する。
+fn read_xmp_from_png_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXmpMetadata>, String> {
+    // read_xmp_from_file がフォーマット判定で先頭 8B を読むため
     // オフセットが不定。絶対シークでシグネチャ直後 (offset 8) に移動する。
-    file.seek(SeekFrom::Start(8))
+    reader.seek(SeekFrom::Start(8))
         .map_err(|e| format!("Failed to seek past PNG signature: {e}"))?;
 
     const XMP_KEYWORD: &[u8] = b"XML:com.adobe.xmp";
@@ -156,7 +180,7 @@ fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, S
     loop {
         // チャンクヘッダー: length (4B) + type (4B)
         let mut header = [0u8; 8];
-        match file.read_exact(&mut header) {
+        match reader.read_exact(&mut header) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
                 return Ok(None); // 正常な EOF — XMP なし
@@ -185,17 +209,17 @@ fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, S
             // サイズ上限チェック: 異常に大きい iTXt はスキップ（OOM 防止）
             if chunk_len > MAX_ITXT_CHUNK_SIZE {
                 let skip = chunk_len as i64 + 4; // data + CRC
-                file.seek(SeekFrom::Current(skip))
+                reader.seek(SeekFrom::Current(skip))
                     .map_err(|e| format!("Failed to skip oversized iTXt chunk: {e}"))?;
                 continue;
             }
             // iTXt チャンクデータを読み取り
             let mut chunk_data = vec![0u8; chunk_len];
-            file.read_exact(&mut chunk_data)
+            reader.read_exact(&mut chunk_data)
                 .map_err(|e| format!("Failed to read iTXt chunk: {e}"))?;
 
             // CRC (4B) をスキップ
-            file.seek(SeekFrom::Current(4))
+            reader.seek(SeekFrom::Current(4))
                 .map_err(|e| format!("Failed to skip CRC: {e}"))?;
 
             // keyword チェック (null-terminated)
@@ -243,7 +267,7 @@ fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, S
         } else {
             // iTXt 以外のチャンク — データ + CRC (4B) をスキップ
             let skip = chunk_len as i64 + 4;
-            file.seek(SeekFrom::Current(skip))
+            reader.seek(SeekFrom::Current(skip))
                 .map_err(|e| format!("Failed to skip chunk: {e}"))?;
         }
     }

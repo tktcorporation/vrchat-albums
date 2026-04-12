@@ -1047,9 +1047,11 @@ const filterNewFilesByMtime = async (
  * 従来は @napi-rs/image の Transformer でファイル全体をデコードしていたが、
  * 画像サイズだけなら PNG の IHDR (24B) / JPEG の SOF マーカーで十分。
  */
-function processPhotoBatch(
+async function processPhotoBatch(
   photoPaths: string[],
-): { photoPath: string; takenAt: Date; width: number; height: number }[] {
+): Promise<
+  { photoPath: string; takenAt: Date; width: number; height: number }[]
+> {
   // Step 1: ファイル名から takenAt をパース（I/O なし）
   const pathsWithDates: { photoPath: string; takenAt: Date }[] = [];
   for (const photoPath of photoPaths) {
@@ -1076,7 +1078,8 @@ function processPhotoBatch(
   }
 
   // Step 2: Rust バッチで画像サイズ取得（rayon 並列、先頭バイトのみ読み込み）
-  const dimensions = readImageDimensionsBatch(
+  // AsyncTask で libuv スレッドプール上で実行するため、メインスレッドをブロックしない。
+  const dimensions = await readImageDimensionsBatch(
     pathsWithDates.map((p) => p.photoPath),
   );
 
@@ -1257,7 +1260,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
           await memoryMonitor.checkMemory(`batch ${batchNumber} start`);
 
           const batchStartTime = performance.now();
-          const processedBatch = processPhotoBatch(batch);
+          const processedBatch = await processPhotoBatch(batch);
 
           if (processedBatch.length > 0) {
             const dbStartTime = performance.now();

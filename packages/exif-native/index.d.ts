@@ -52,12 +52,14 @@ export interface JsVrcXmpMetadata {
 export declare function readImageDimensions(filePath: string): JsImageDimensions | null
 
 /**
- * 複数ファイルから画像サイズをバッチ読み取り。
+ * 複数ファイルから画像サイズをバッチ読み取り（非同期版）。
  *
- * Rayon でスレッドプール並列化する。
+ * libuv スレッドプール上で Rayon 並列処理を実行し、Promise を返す。
+ * メインスレッドをブロックしないため、Electron の UI がフリーズしない。
+ *
  * 個別のファイルでエラーが発生しても null を返し、他のファイルの処理を続行する。
  */
-export declare function readImageDimensionsBatch(filePaths: Array<string>): Array<JsImageDimensions | undefined | null>
+export declare function readImageDimensionsBatch(filePaths: Array<string>): Promise<Array<JsImageDimensions | undefined | null>>
 
 /**
  * ファイルパスから VRChat XMP メタデータを読み取る（部分読み込み版）。
@@ -73,9 +75,12 @@ export declare function readImageDimensionsBatch(filePaths: Array<string>): Arra
 export declare function readVrcXmp(filePath: string): JsVrcXmpMetadata | null
 
 /**
- * 複数ファイルから VRChat XMP メタデータをバッチ読み取り（部分読み込み版）。
+ * 複数ファイルから VRChat XMP メタデータをバッチ読み取り（非同期版）。
  *
- * Rayon でスレッドプール並列化する。各ファイルはチャンク/セグメントヘッダーだけ走査し、
+ * libuv スレッドプール上で Rayon 並列処理を実行し、Promise を返す。
+ * メインスレッドをブロックしないため、Electron の UI がフリーズしない。
+ *
+ * 各ファイルはチャンク/セグメントヘッダーだけ走査し、
  * XMP データ部分だけを読み取る（ファイル全体をメモリに載せない）。
  *
  * 戻り値は JsVrcXmpBatchResult の配列で、エラーと「XMP なし」を区別できる:
@@ -83,7 +88,7 @@ export declare function readVrcXmp(filePath: string): JsVrcXmpMetadata | null
  * - data: None, error: None → XMP が存在しない（正常）
  * - data: None, error: Some → I/O エラー等
  */
-export declare function readVrcXmpBatch(filePaths: Array<string>): Array<JsVrcXmpBatchResult>
+export declare function readVrcXmpBatch(filePaths: Array<string>): Promise<JsVrcXmpBatchResult[]>
 
 /** バッファから VRChat XMP メタデータを読み取る。 */
 export declare function readVrcXmpFromBuffer(buffer: Buffer): JsVrcXmpMetadata | null
