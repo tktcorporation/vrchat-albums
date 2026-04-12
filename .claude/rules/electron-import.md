@@ -1,3 +1,8 @@
+---
+paths:
+  - 'electron/**/*'
+---
+
 # Electron モジュールインポート規約
 
 Playwright テストとの互換性を確保するための Electron インポート規約。

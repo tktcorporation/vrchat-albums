@@ -1,3 +1,10 @@
+---
+paths:
+  - 'electron/module/vrchatLog/**/*'
+  - 'electron/module/vrchatPhoto/**/*'
+  - 'electron/module/logInfo/**/*'
+---
+
 # タイムゾーン処理ガイドライン
 
 VRChat ログと写真の日時データを正しく処理するための規約。

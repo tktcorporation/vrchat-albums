@@ -1,44 +1,24 @@
 # Codex ペアプロ活用ルール
 
-## 原則
+Codex CLI (`codex`) はセカンドオピニオンを得るためのツール。判断が分かれる場面では Codex に壁打ちする。
 
-Codex CLI (`codex`) はセカンドオピニオンを得るためのツール。
-**自分（Claude Code）だけで完結させず、判断が分かれる場面では Codex に壁打ちする。**
+## 必ず使う場面（MUST）
 
-## 必ず Codex を使う場面（MUST）
+- **PR 作成・push 前のレビュー**: `codex review --uncommitted` / `codex review --base main`
+- **設計方針が2つ以上あり迷う**: `codex exec "2案のトレードオフを分析して: ..."`
+- **バグ原因が10分以上特定できない**: `codex exec "このエラーの原因を調査して: ..."`
 
-| トリガー                             | コマンド例                                                         |
-| ------------------------------------ | ------------------------------------------------------------------ |
-| **PR 作成・push 前のレビュー**       | `codex review --uncommitted` または `codex review --base main`     |
-| **設計方針が2つ以上あり迷っている**  | `codex exec "以下の2案のトレードオフを分析して: ..."`              |
-| **バグの原因が10分以上特定できない** | `codex exec "このエラーの原因を調査して: $(cat relevant_file.py)"` |
+## 積極的に使う場面（SHOULD）
 
-## 積極的に Codex を使う場面（SHOULD）
-
-- リファクタリング案の比較検討
-- テストケース・エッジケースの洗い出し
-- 複雑なSQLの妥当性チェック
-- 既存コードの意図がわからないときの解読
+リファクタ案比較、エッジケース洗い出し、SQL妥当性チェック、既存コード解読
 
 ## 使い方
 
 ```bash
-# 非インタラクティブ実行（結果をそのまま受け取る）
-codex exec "プロンプト"
-
-# コードレビュー（専用サブコマンド）
-codex review --uncommitted                    # ワークツリーの変更をレビュー
-codex review --base main                      # main からの差分をレビュー
-codex review --commit <SHA>                   # 特定コミットをレビュー
-
-# ファイル内容を渡して分析
-codex exec "この関数のエッジケースを洗い出して" < path/to/file.py
+codex exec "プロンプト"                        # 非インタラクティブ実行
+codex review --uncommitted                     # ワークツリーのレビュー
+codex review --base main                       # main差分レビュー
+codex exec "エッジケースを洗い出して" < file   # ファイル渡し
 ```
 
-## 実行時の注意
-
-- `codex exec` は非インタラクティブなので Bash ツールから直接実行できる
-- `codex review` も同様に非インタラクティブ
-- **インタラクティブモード（引数なしの `codex`）は使わない**（Bash ツールと相性が悪い）
-- タイムアウトに注意: 大きなプロンプトは `timeout 120` を付ける
-- Codex の出力は参考意見。最終判断は自分（Claude Code）が行う
+**注意**: インタラクティブモード（引数なし `codex`）は使わない。大きなプロンプトは `timeout 120` を付ける。Codex の出力は参考意見、最終判断は自分が行う。

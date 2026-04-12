@@ -1,3 +1,12 @@
+---
+paths:
+  - '**/*.test.ts'
+  - '**/*.spec.ts'
+  - '**/*.integration.test.ts'
+  - 'e2e/**/*'
+  - 'playwright.config.*'
+---
+
 # テストガイドライン
 
 Vitest を使用したユニットテストと Playwright を使用した E2E テストのガイドライン。
