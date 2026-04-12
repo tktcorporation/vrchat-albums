@@ -19,24 +19,26 @@ export interface JsImageDimensions {
   height: number
 }
 
+/**
+ * XMP バッチ読み取りの個別結果。
+ *
+ * エラーと「XMP なし」を区別するため、data/error を分離して返す。
+ * - data が Some: XMP メタデータ抽出成功
+ * - data が None かつ error が None: ファイルに XMP が存在しない（正常）
+ * - data が None かつ error が Some: I/O エラーやパースエラー
+ */
+export interface JsVrcXmpBatchResult {
+  data?: JsVrcXmpMetadata
+  /** エラーが発生した場合のメッセージ。XMP なしの場合は null。 */
+  error?: string
+}
+
 /** VRChat XMP メタデータ（読み取り結果） */
 export interface JsVrcXmpMetadata {
   authorId?: string
   author?: string
   worldId?: string
   worldDisplayName?: string
-}
-
-/**
- * VRChat XMP バッチ読み取り結果。
- * エラーと「XMP なし」を区別できる:
- * - data: Some, error: None → XMP 抽出成功
- * - data: None, error: None → XMP が存在しない（正常）
- * - data: None, error: Some → I/O エラー等
- */
-export interface JsVrcXmpBatchResult {
-  data?: JsVrcXmpMetadata | null
-  error?: string | null
 }
 
 /**
@@ -58,19 +60,28 @@ export declare function readImageDimensions(filePath: string): JsImageDimensions
 export declare function readImageDimensionsBatch(filePaths: Array<string>): Array<JsImageDimensions | undefined | null>
 
 /**
- * ファイルパスから VRChat XMP メタデータを読み取る。
+ * ファイルパスから VRChat XMP メタデータを読み取る（部分読み込み版）。
  *
  * VRChat メタデータが存在しなければ null を返す。
- * PNG の iTXt チャンク / JPEG の APP1 セグメントから XMP XML を抽出し、
- * roxmltree でパースして vrc: ネームスペースの属性を読む。
+ * ファイル全体をメモリに載せず、チャンク/セグメントヘッダーだけ走査して
+ * XMP データ部分だけを読み取る。
+ *
+ * 背景: 従来は fs::read でファイル全体（数MB）を読んでいたが、
+ * XMP は PNG iTXt / JPEG APP1 に格納され先頭付近にあるため、
+ * 部分読み込みで I/O を大幅に削減できる。
  */
 export declare function readVrcXmp(filePath: string): JsVrcXmpMetadata | null
 
 /**
- * 複数ファイルから VRChat XMP メタデータをバッチ読み取り。
+ * 複数ファイルから VRChat XMP メタデータをバッチ読み取り（部分読み込み版）。
  *
- * Rayon でスレッドプール並列化する。
- * 個別のファイルでエラーが発生しても null を返し、他のファイルの処理を続行する。
+ * Rayon でスレッドプール並列化する。各ファイルはチャンク/セグメントヘッダーだけ走査し、
+ * XMP データ部分だけを読み取る（ファイル全体をメモリに載せない）。
+ *
+ * 戻り値は JsVrcXmpBatchResult の配列で、エラーと「XMP なし」を区別できる:
+ * - data: Some, error: None → XMP 抽出成功
+ * - data: None, error: None → XMP が存在しない（正常）
+ * - data: None, error: Some → I/O エラー等
  */
 export declare function readVrcXmpBatch(filePaths: Array<string>): Array<JsVrcXmpBatchResult>
 
