@@ -327,7 +327,7 @@ const Contents = memo(() => {
   const { startLoadingStartupSync, finishLoadingStartupSync } = loadingState;
 
   useEffect(() => {
-    if (stage === 'syncing') {
+    if (stage === 'idle' || stage === 'syncing') {
       startLoadingStartupSync();
     } else {
       finishLoadingStartupSync();
@@ -475,8 +475,9 @@ const Contents = memo(() => {
     );
   }
 
-  if (stage === 'syncing') {
-    // 進捗メッセージがあれば表示、なければデフォルト
+  // idle: 初期化開始待ち（subscription未接続）、syncing: 初期化実行中
+  // どちらもローディング画面を表示し、PhotoGallery のマウント（＝DB未初期化でのクエリ発火）を防ぐ
+  if (stage === 'idle' || stage === 'syncing') {
     const displayMessage = progressMessage || '読み込み中...';
 
     return (
