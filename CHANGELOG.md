@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.30.0
+
+### Minor Changes
+
+- [#788](https://github.com/tktcorporation/vrchat-albums/pull/788) [`fea539d`](https://github.com/tktcorporation/vrchat-albums/commit/fea539d97ae77cd7546b99d4514bb06f6e7ec571) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Replace exiftool-vendored with Rust napi-rs native module for faster EXIF/XMP handling
+
+### Patch Changes
+
+- [#780](https://github.com/tktcorporation/vrchat-albums/pull/780) [`af3c895`](https://github.com/tktcorporation/vrchat-albums/commit/af3c895070b1e149328eafa0f86ff228afb38eb3) Thanks [@tktcorporation](https://github.com/tktcorporation)! - feat: インデックス再構築時に進捗バーとメッセージを表示
+
+  設定画面の「更新」ボタンでインデックスを再構築する際、
+  ログファイル読み込みや DB 保存の進捗がリアルタイムで表示されるようになりました。
+
+- [#789](https://github.com/tktcorporation/vrchat-albums/pull/789) [`2d6dd10`](https://github.com/tktcorporation/vrchat-albums/commit/2d6dd106cd6439df80832b13c7f386b722b5faa0) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真インデックスの画像サイズ取得を高速化: Rust 部分読み込み + Rayon 並列化で Transformer.metadata() を置き換え
+
+- [#784](https://github.com/tktcorporation/vrchat-albums/pull/784) [`df7b9a3`](https://github.com/tktcorporation/vrchat-albums/commit/df7b9a3babbcd814058df93832b7c7edf9f586af) Thanks [@tktcorporation](https://github.com/tktcorporation)! - ローカルワールドのログエラーノイズを修正
+
+  - ローカルワールド参加時（wrld_xxx:wrld_xxx 形式）の INVALID_INSTANCE_ID を Sentry エラーから warn に降格
+  - [Behaviour] OnPlayerJoinComplete と [Behaviour] RPC を既知ノイズパターンに追加し、未知パターン検出の誤報を抑制
+
+- [#785](https://github.com/tktcorporation/vrchat-albums/pull/785) [`080ea9a`](https://github.com/tktcorporation/vrchat-albums/commit/080ea9aa9fa19209089285f8ecfb7e6806f6ffe5) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真メタデータ抽出の連鎖ハング問題を修正: Promise.race のタイムアウト後も instance.read() がキューに残る問題に対処するため、タイムアウト時に exiftool インスタンスを強制リセットするリカバリロジックを追加
+
+- [#782](https://github.com/tktcorporation/vrchat-albums/pull/782) [`70eeeaa`](https://github.com/tktcorporation/vrchat-albums/commit/70eeeaaef2d10196add17081045f5c209e8e1bd8) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真メタデータ抽出のハング問題を修正: EXIF 読み取りに 60 秒タイムアウトを追加し、バッチ処理に進捗ログとエラーカウントを追加
+
 ## 0.29.4
 
 ### Patch Changes
