@@ -236,7 +236,7 @@ describe('createVRChatPhotoPathIndex', () => {
     );
 
     // readImageDimensionsBatch モック - 渡されたパス数に応じて結果を返す
-    vi.mocked(readImageDimensionsBatch).mockImplementation((paths) =>
+    vi.mocked(readImageDimensionsBatch).mockImplementation(async (paths) =>
       paths.map(() => ({ width: 1920, height: 1080 })),
     );
 
@@ -780,7 +780,7 @@ describe('createVRChatPhotoPathIndex', () => {
     describe('readImageDimensionsBatch エラー', () => {
       it('null が返った写真はデフォルトサイズ(1920x1080)でDB保存する', async () => {
         // file1Path の dimensions だけ null を返す
-        vi.mocked(readImageDimensionsBatch).mockImplementation((paths) =>
+        vi.mocked(readImageDimensionsBatch).mockImplementation(async (paths) =>
           paths.map((p) =>
             p.includes(file1Name) ? null : { width: 3840, height: 2160 },
           ),
@@ -805,7 +805,11 @@ describe('createVRChatPhotoPathIndex', () => {
       });
 
       it('全て null が返った場合もデフォルトサイズでDB保存する', async () => {
-        vi.mocked(readImageDimensionsBatch).mockReturnValue([null, null, null]);
+        vi.mocked(readImageDimensionsBatch).mockResolvedValue([
+          null,
+          null,
+          null,
+        ]);
 
         await service.createVRChatPhotoPathIndex(false);
 
@@ -821,7 +825,7 @@ describe('createVRChatPhotoPathIndex', () => {
       });
 
       it('undefined が返った写真もデフォルトサイズでDB保存する', async () => {
-        vi.mocked(readImageDimensionsBatch).mockImplementation((paths) =>
+        vi.mocked(readImageDimensionsBatch).mockImplementation(async (paths) =>
           paths.map((p) =>
             p.includes(file1Name) ? undefined : { width: 1920, height: 1080 },
           ),

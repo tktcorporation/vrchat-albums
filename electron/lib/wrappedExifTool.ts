@@ -48,14 +48,16 @@ export class ExifOperationError extends Data.TaggedError('ExifOperationError')<{
 interface ExifNativeModule {
   readVrcXmp(filePath: string): JsVrcXmpMetadata | null;
   readVrcXmpFromBuffer(buffer: Buffer): JsVrcXmpMetadata | null;
-  readVrcXmpBatch(filePaths: string[]): JsVrcXmpBatchResult[];
+  /** AsyncTask を返すため JS 側では Promise になる */
+  readVrcXmpBatch(filePaths: string[]): Promise<JsVrcXmpBatchResult[]>;
   writeExif(filePath: string, params: JsExifWriteParams): void;
   writeExifToBuffer(buffer: Buffer, params: JsExifWriteParams): Buffer;
   detectImageFormatJs(buffer: Buffer): string;
   readImageDimensions(filePath: string): JsImageDimensions | null;
+  /** AsyncTask を返すため JS 側では Promise になる */
   readImageDimensionsBatch(
     filePaths: string[],
-  ): (JsImageDimensions | null | undefined)[];
+  ): Promise<(JsImageDimensions | null | undefined)[]>;
 }
 
 let _exifNative: ExifNativeModule | null = null;
@@ -129,9 +131,9 @@ export const readXmpTags = (
 /**
  * 複数ファイルから VRChat XMP メタデータをバッチ読み取り。
  *
- * 背景: 従来は readXmpTags を1ファイルずつ N 回呼んでいたが、
- * Rust 側の readVrcXmpBatch は Rayon 全コア並列 + 部分読み込みで処理する。
- * N-API 境界の往復を 1 回に削減し、I/O もファイル先頭の���ッダーだけ読む。
+ * 背景: Rust 側の readVrcXmpBatch は Rayon 全コア並列 + 部分読み込みで処理する。
+ * AsyncTask で libuv スレッドプール上で実行されるため、
+ * メインスレッドをブロックせず Electron の UI がフリーズしない。
  *
  * 戻り値は入力と同じ長さの JsVrcXmpBatchResult 配列。
  * エラーと「XMP なし」を区別できる:
@@ -143,7 +145,7 @@ export const readXmpTags = (
  */
 export const readXmpTagsBatch = (
   filePaths: string[],
-): JsVrcXmpBatchResult[] => {
+): Promise<JsVrcXmpBatchResult[]> => {
   const native = getExifNative();
   return native.readVrcXmpBatch(filePaths);
 };
@@ -227,16 +229,15 @@ export const setExifToBuffer = (
 /**
  * 複数ファイルから画像サイズ（width/height）をバッチ読み取り。
  *
- * 背景: 写真インデックスでは width/height だけが必要だが、
- * 従来は @napi-rs/image の Transformer でファイル全体をデコードしていた。
- * Rust ネイティブモジュールでファイルの先頭バイトだけを読み取り、
- * Rayon でスレッドプール並列化することで 10〜50 倍の高速化を実現する。
+ * 背景: Rust ネイティブモジュールでファイルの先頭バイトだけを部分読み込みし、
+ * Rayon でスレッドプール並列化する。AsyncTask で libuv スレッドプール上で
+ * 実行されるため、メインスレッドをブロックしない。
  *
  * 呼び出し元: processPhotoBatch() (vrchatPhoto.service.ts)
  */
 export const readImageDimensionsBatch = (
   filePaths: string[],
-): (JsImageDimensions | null | undefined)[] => {
+): Promise<(JsImageDimensions | null | undefined)[]> => {
   const native = getExifNative();
   return native.readImageDimensionsBatch(filePaths);
 };

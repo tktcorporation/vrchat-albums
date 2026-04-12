@@ -633,9 +633,9 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
         worldDisplayName: null,
       });
 
-      // readXmpTagsBatch で Rust バッチ一発呼び
+      // readXmpTagsBatch で Rust バッチ呼び出し（チャンク分割版）
       const { readXmpTagsBatch } = await import('./wrappedExifTool');
-      const results = readXmpTagsBatch(paths);
+      const results = await readXmpTagsBatch(paths);
 
       // 入力と同じ長さの配列が返る
       expect(results).toHaveLength(3);

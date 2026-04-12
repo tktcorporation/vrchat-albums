@@ -109,10 +109,10 @@ export const extractAndSaveMetadataBatch = (
       return 0;
     }
 
-    // Rust バッチ一発呼び: Rayon 全コア並列 + 部分読み込みで XMP を抽出。
-    // N-API 往復は 1 回だけ。各ファイルはチャンクヘッダーだけ走査する。
+    // Rust バッチ呼び出し: Rayon 全コア並列 + 部分読み込みで XMP を抽出。
+    // チャンク分割でイベントループに制御を返し、UI フリーズを防止する。
     logger.info(`Metadata extraction starting: ${targetPaths.length} files`);
-    const batchResults = yield* Effect.try({
+    const batchResults = yield* Effect.tryPromise({
       try: () => readXmpTagsBatch(targetPaths),
       catch: (e): MetadataDbError =>
         new MetadataDbError({

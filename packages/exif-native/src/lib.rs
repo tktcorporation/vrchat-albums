@@ -12,6 +12,7 @@ mod exif;
 mod xmp;
 
 use napi::bindgen_prelude::*;
+use napi::Task;
 use std::fs;
 
 use container::{jpeg, png};
@@ -102,36 +103,77 @@ pub fn read_vrc_xmp_from_buffer(buffer: Buffer) -> Result<Option<JsVrcXmpMetadat
     read_vrc_xmp_from_bytes(buffer.as_ref())
 }
 
-/// 複数ファイルから VRChat XMP メタデータをバッチ読み取り（部分読み込み版）。
+/// XMP バッチ読み取りの中間結果（Send な Rust 型）。
 ///
-/// Rayon でスレッドプール並列化する。各ファイルはチャンク/セグメントヘッダーだけ走査し、
+/// AsyncTask::compute() は libuv スレッドプール上で実行されるため、
+/// 結果は Send である必要がある。JsVrcXmpBatchResult は napi オブジェクトなので
+/// この中間型を経由し、resolve() でメインスレッド上に変換する。
+struct XmpBatchResultInner {
+    data: Option<VrcXmpMetadata>,
+    error: Option<String>,
+}
+
+/// XMP バッチ読み取りの非同期タスク。
+///
+/// libuv スレッドプール上で Rayon 並列処理を実行する。
+/// メインスレッドをブロックしないため、Electron の IPC が停止しない。
+struct XmpBatchTask {
+    file_paths: Vec<String>,
+}
+
+impl Task for XmpBatchTask {
+    type Output = Vec<XmpBatchResultInner>;
+    type JsValue = Vec<JsVrcXmpBatchResult>;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        use rayon::prelude::*;
+
+        Ok(self
+            .file_paths
+            .par_iter()
+            .map(|path| match read_xmp_from_file(path) {
+                Ok(Some(meta)) => XmpBatchResultInner {
+                    data: Some(meta),
+                    error: None,
+                },
+                Ok(None) => XmpBatchResultInner {
+                    data: None,
+                    error: None,
+                },
+                Err(e) => XmpBatchResultInner {
+                    data: None,
+                    error: Some(e),
+                },
+            })
+            .collect())
+    }
+
+    fn resolve(&mut self, _env: napi::Env, output: Self::Output) -> Result<Self::JsValue> {
+        Ok(output
+            .into_iter()
+            .map(|r| JsVrcXmpBatchResult {
+                data: r.data.map(JsVrcXmpMetadata::from),
+                error: r.error,
+            })
+            .collect())
+    }
+}
+
+/// 複数ファイルから VRChat XMP メタデータをバッチ読み取り（非同期版）。
+///
+/// libuv スレッドプール上で Rayon 並列処理を実行し、Promise を返す。
+/// メインスレッドをブロックしないため、Electron の UI がフリーズしない。
+///
+/// 各ファイルはチャンク/セグメントヘッダーだけ走査し、
 /// XMP データ部分だけを読み取る（ファイル全体をメモリに載せない）。
 ///
 /// 戻り値は JsVrcXmpBatchResult の配列で、エラーと「XMP なし」を区別できる:
 /// - data: Some, error: None → XMP 抽出成功
 /// - data: None, error: None → XMP が存在しない（正常）
 /// - data: None, error: Some → I/O エラー等
-#[napi]
-pub fn read_vrc_xmp_batch(file_paths: Vec<String>) -> Vec<JsVrcXmpBatchResult> {
-    use rayon::prelude::*;
-
-    file_paths
-        .par_iter()
-        .map(|path| match read_xmp_from_file(path) {
-            Ok(Some(meta)) => JsVrcXmpBatchResult {
-                data: Some(JsVrcXmpMetadata::from(meta)),
-                error: None,
-            },
-            Ok(None) => JsVrcXmpBatchResult {
-                data: None,
-                error: None,
-            },
-            Err(e) => JsVrcXmpBatchResult {
-                data: None,
-                error: Some(e),
-            },
-        })
-        .collect()
+#[napi(ts_return_type = "Promise<JsVrcXmpBatchResult[]>")]
+pub fn read_vrc_xmp_batch(file_paths: Vec<String>) -> AsyncTask<XmpBatchTask> {
+    AsyncTask::new(XmpBatchTask { file_paths })
 }
 
 // ============================================================================
@@ -212,25 +254,50 @@ pub fn read_image_dimensions(file_path: String) -> Option<JsImageDimensions> {
         })
 }
 
-/// 複数ファイルから画像サイズをバッチ読み取り。
+/// 画像サイズバッチ読み取りの非同期タスク。
 ///
-/// Rayon でスレッドプール並列化する。
-/// 個別のファイルでエラーが発生しても null を返し、他のファイルの処理を続行する。
-#[napi]
-pub fn read_image_dimensions_batch(file_paths: Vec<String>) -> Vec<Option<JsImageDimensions>> {
-    use rayon::prelude::*;
+/// libuv スレッドプール上で Rayon 並列処理を実行する。
+/// メインスレッドをブロックしないため、Electron の IPC が停止しない。
+struct DimensionsBatchTask {
+    file_paths: Vec<String>,
+}
 
-    file_paths
-        .par_iter()
-        .map(|path| {
-            read_image_dimensions_from_file(path)
-                .ok()
-                .map(|d| JsImageDimensions {
-                    width: d.width,
-                    height: d.height,
-                })
-        })
-        .collect()
+impl Task for DimensionsBatchTask {
+    /// (width, height) のタプルで Send を保証
+    type Output = Vec<Option<(u32, u32)>>;
+    type JsValue = Vec<Option<JsImageDimensions>>;
+
+    fn compute(&mut self) -> Result<Self::Output> {
+        use rayon::prelude::*;
+
+        Ok(self
+            .file_paths
+            .par_iter()
+            .map(|path| {
+                read_image_dimensions_from_file(path)
+                    .ok()
+                    .map(|d| (d.width, d.height))
+            })
+            .collect())
+    }
+
+    fn resolve(&mut self, _env: napi::Env, output: Self::Output) -> Result<Self::JsValue> {
+        Ok(output
+            .into_iter()
+            .map(|opt| opt.map(|(w, h)| JsImageDimensions { width: w, height: h }))
+            .collect())
+    }
+}
+
+/// 複数ファイルから画像サイズをバッチ読み取り（非同期版）。
+///
+/// libuv スレッドプール上で Rayon 並列処理を実行し、Promise を返す。
+/// メインスレッドをブロックしないため、Electron の UI がフリーズしない。
+///
+/// 個別のファイルでエラーが発生しても null を返し、他のファイルの処理を続行する。
+#[napi(ts_return_type = "Promise<Array<JsImageDimensions | undefined | null>>")]
+pub fn read_image_dimensions_batch(file_paths: Vec<String>) -> AsyncTask<DimensionsBatchTask> {
+    AsyncTask::new(DimensionsBatchTask { file_paths })
 }
 
 // ============================================================================
