@@ -123,64 +123,7 @@ export const parsePhotoMetadata = (
     return metadata;
   });
 
-/** バッチ処理の進捗をログ出力する間隔（ファイル数） */
-const PROGRESS_LOG_INTERVAL = 100;
-
-/**
- * 複数の写真からメタデータをバッチ抽出する
- *
- * メモリ使用量を抑えるため、並列数を制限して処理する。
- * 個別のファイルでエラーが発生しても、他のファイルの処理は継続する。
- * 進捗状況とエラーをログに記録し、処理の可観測性を確保する。
- */
-export const parsePhotoMetadataBatch = async (
-  filePaths: string[],
-  // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
-  readExifTags: (filePath: string) => Promise<Record<string, any>>,
-  concurrency = 5,
-  onProgress?: (processed: number, total: number, errors: number) => void,
-): Promise<Map<string, VRChatPhotoMetadata>> => {
-  const results = new Map<string, VRChatPhotoMetadata>();
-  const total = filePaths.length;
-  let processed = 0;
-  let parseErrors = 0;
-
-  // 並列数制限付きで処理
-  // タイムアウトとプロセスリカバリは readExifTags 実装側（readXmpTags）に委譲する。
-  // parser はファイル読み取りの詳細に依存せず、純粋にパース処理のみを担う。
-  for (let i = 0; i < filePaths.length; i += concurrency) {
-    const batch = filePaths.slice(i, i + concurrency);
-    const promises = batch.map(async (filePath) => {
-      const result = await Effect.runPromiseExit(
-        parsePhotoMetadata(filePath, readExifTags),
-      );
-      if (result._tag === 'Success') {
-        results.set(filePath, result.value);
-      } else if (
-        result._tag === 'Failure' &&
-        '_tag' in result.cause &&
-        result.cause._tag === 'Fail' &&
-        typeof result.cause.error === 'object' &&
-        result.cause.error !== null &&
-        '_tag' in result.cause.error &&
-        result.cause.error._tag === 'MetadataParseError'
-      ) {
-        // NoMetadataFound はメタデータ非対応の写真なので正常系（カウント不要）
-        // MetadataParseError は EXIF 読み取り失敗なのでカウント
-        parseErrors++;
-      }
-    });
-    await Promise.all(promises);
-    processed += batch.length;
-
-    // 定期的に進捗をコールバック通知
-    if (
-      processed % PROGRESS_LOG_INTERVAL < concurrency ||
-      processed === total
-    ) {
-      onProgress?.(processed, total, parseErrors);
-    }
-  }
-
-  return results;
-};
+// parsePhotoMetadataBatch は削除済み。
+// 従来は1ファイルずつ readXmpTags を並列呼びしていたが、
+// readXmpTagsBatch (Rust Rayon + 部分読み込み) で一発呼びに切り替えた。
+// 新しいフローは service.ts の extractAndSaveMetadataBatch を参照。

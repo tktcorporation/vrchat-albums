@@ -13,6 +13,9 @@ img-parts = "0.3"
 roxmltree = "0.20"
 rayon = "1.10"
 
+[dev-dependencies]
+tempfile = "3"
+
 [build-dependencies]
 napi-build = "2"
 
