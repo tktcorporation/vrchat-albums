@@ -639,14 +639,14 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
 
       // 入力と同じ長さの配列が返る
       expect(results).toHaveLength(3);
-      // XMP ありの2ファイル: data にメタデータ、error は null
+      // XMP ありの2ファイル: data にメタデータ、error は undefined (napi-rs の None)
       expect(results[0].data?.authorId).toBe('usr_batch1');
-      expect(results[0].error).toBeNull();
+      expect(results[0].error).toBeUndefined();
       expect(results[1].data?.authorId).toBe('usr_batch2');
-      expect(results[1].error).toBeNull();
-      // XMP なしファイル: data も error も null
-      expect(results[2].data).toBeNull();
-      expect(results[2].error).toBeNull();
+      expect(results[1].error).toBeUndefined();
+      // XMP なしファイル: data も error も undefined
+      expect(results[2].data).toBeUndefined();
+      expect(results[2].error).toBeUndefined();
 
       // extractOfficialMetadata で Zod 検証もパスすることを確認
       const { extractOfficialMetadata } =
