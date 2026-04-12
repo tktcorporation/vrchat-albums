@@ -10,13 +10,13 @@
 import { Effect } from 'effect';
 
 import { logger } from '../../lib/logger';
-import { readXmpTags } from '../../lib/wrappedExifTool';
+import { readXmpTags, readXmpTagsBatch } from '../../lib/wrappedExifTool';
 import {
   MetadataDbError,
   type MetadataParseError,
   type NoMetadataFound,
 } from './errors';
-import { parsePhotoMetadata, parsePhotoMetadataBatch } from './parser';
+import { extractOfficialMetadata, parsePhotoMetadata } from './parser';
 import type { VRChatPhotoMetadata } from './schema';
 import {
   createOrUpdatePhotoMetadataBatch,
@@ -28,26 +28,6 @@ import {
 } from './vrchatPhotoMetadata.model';
 
 // ============================================================================
-// ExifTool アダプター
-// ============================================================================
-
-/**
- * readXmpTags（Effect）を parser の ExifTagReader（Promise）型に変換するアダプター。
- *
- * readXmpTags は XMP タグのみを高速に読み取る（-XMP:all）。
- * VRChat メタデータは XMP に格納されるため、全タグ読み取りの readExif より効率的。
- * タイムアウトとプロセスリカバリは wrappedExifTool 側で管理される。
- * 失敗時は Effect が ExifOperationError を throw するが、
- * parser 層の Effect.tryPromise がそれを MetadataParseError にラップする。
- */
-const exifTagReader = (
-  filePath: string,
-  // biome-ignore lint/suspicious/noExplicitAny: parser が Record<string, any> を期待するため
-): Promise<Record<string, any>> =>
-  // biome-ignore lint/suspicious/noExplicitAny: exiftool.Tags は Record<string, any> と互換
-  Effect.runPromise(readXmpTags(filePath)) as Promise<Record<string, any>>;
-
-// ============================================================================
 // サービス関数
 // ============================================================================
 
@@ -57,8 +37,18 @@ const exifTagReader = (
 export const extractMetadataFromPhoto = (
   photoPath: string,
 ): Effect.Effect<VRChatPhotoMetadata, NoMetadataFound | MetadataParseError> => {
+  // readXmpTags (Effect) → Promise アダプター。parsePhotoMetadata が Promise を要求するため。
+  const exifTagReader = (
+    fp: string,
+    // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
+  ): Promise<Record<string, any>> =>
+    // biome-ignore lint/suspicious/noExplicitAny: exiftool.Tags は Record<string, any> と互換
+    Effect.runPromise(readXmpTags(fp)) as Promise<Record<string, any>>;
   return parsePhotoMetadata(photoPath, exifTagReader);
 };
+
+/** バッチ処理の進捗をログ出力する間隔（ファイル数） */
+const PROGRESS_LOG_INTERVAL = 100;
 
 /**
  * 複数の写真からメタデータを抽出してDBに保存する
@@ -66,11 +56,14 @@ export const extractMetadataFromPhoto = (
  * 差分処理: 既にメタデータ抽出済みの写真はスキップする。
  * 写真インデックス作成時（loadLogInfoIndexFromVRChatLog）から呼び出される。
  *
+ * 背景: 従来は parsePhotoMetadataBatch で1ファイルずつ readXmpTags を呼んでいたが、
+ * readXmpTagsBatch で Rust 側の Rayon 全コア並列 + 部分読み込みを一発呼びに変更。
+ * N-API 境界の往復を N 回→1 回に削減し、I/O もファイルヘッダーだけ読む。
+ *
  * @returns 新たに抽出・保存したメタデータの件数
  */
 export const extractAndSaveMetadataBatch = (
   photoPaths: string[],
-  concurrency = 20,
 ): Effect.Effect<number, MetadataDbError> =>
   Effect.gen(function* () {
     if (photoPaths.length === 0) {
@@ -116,35 +109,85 @@ export const extractAndSaveMetadataBatch = (
       return 0;
     }
 
-    // バッチでメタデータ抽出（進捗ログ付き）
-    const metadataMap = yield* Effect.promise(() =>
-      parsePhotoMetadataBatch(
-        targetPaths,
-        exifTagReader,
-        concurrency,
-        (processed, total, errors) => {
-          const errorSuffix = errors > 0 ? ` (${errors} errors)` : '';
-          logger.info(
-            `Metadata extraction progress: ${processed}/${total}${errorSuffix}`,
-          );
-        },
-      ),
-    );
+    // Rust バッチ一発呼び: Rayon 全コア並列 + 部分読み込みで XMP を抽出。
+    // N-API 往復は 1 回だけ。各ファイルはチャンクヘッダーだけ走査する。
+    logger.info(`Metadata extraction starting: ${targetPaths.length} files`);
+    const batchResults = yield* Effect.try({
+      try: () => readXmpTagsBatch(targetPaths),
+      catch: (e): MetadataDbError =>
+        new MetadataDbError({
+          message: `readXmpTagsBatch failed: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+    });
 
-    if (metadataMap.size === 0) {
-      return 0;
+    // Rust の結果を Zod バリデーション付きでパース。
+    // JsVrcXmpBatchResult でエラーと「XMP なし」を区別する:
+    //   data あり → XMP 抽出成功
+    //   data なし, error なし → XMP が存在しない（正常）
+    //   data なし, error あり → I/O エラー等
+    const attributes: VRChatPhotoMetadataCreationAttributes[] = [];
+    let processed = 0;
+    let noXmpCount = 0;
+    let errorCount = 0;
+    for (let i = 0; i < targetPaths.length; i++) {
+      const entry = batchResults[i];
+      if (entry) {
+        const { data, error } = entry;
+        if (error) {
+          errorCount++;
+          // I/O エラーは debug レベルで個別ログ（大量出力を防ぐ）
+          logger.debug(`XMP read error: ${targetPaths[i]}: ${error}`);
+        } else if (data) {
+          // extractOfficialMetadata で Zod 検証 + フィールド正規化
+          const tags = {
+            AuthorID: data.authorId ?? undefined,
+            Author: data.author ?? undefined,
+            WorldID: data.worldId ?? undefined,
+            WorldDisplayName: data.worldDisplayName ?? undefined,
+          };
+          const metadata = extractOfficialMetadata(tags);
+          if (metadata !== null) {
+            attributes.push({
+              photoPath: targetPaths[i],
+              authorId: metadata.authorId,
+              authorDisplayName: metadata.authorDisplayName,
+              worldId: metadata.worldId,
+              worldDisplayName: metadata.worldDisplayName,
+            });
+          }
+        } else {
+          noXmpCount++;
+        }
+      } else {
+        // Rayon 側で予期しないエラー（パニック等）により結果が欠落した場合
+        errorCount++;
+      }
+      processed++;
+      if (
+        processed % PROGRESS_LOG_INTERVAL === 0 ||
+        processed === targetPaths.length
+      ) {
+        logger.info(
+          `Metadata extraction progress: ${processed}/${targetPaths.length}`,
+        );
+      }
     }
 
-    // DB保存用の属性リストを構築
-    const attributes: VRChatPhotoMetadataCreationAttributes[] = [];
-    for (const [photoPath, metadata] of metadataMap) {
-      attributes.push({
-        photoPath,
-        authorId: metadata.authorId,
-        authorDisplayName: metadata.authorDisplayName,
-        worldId: metadata.worldId,
-        worldDisplayName: metadata.worldDisplayName,
-      });
+    // サマリーログ: XMP なし件数と I/O エラー件数を分離して出力
+    if (errorCount > 0) {
+      logger.warn(
+        `Photo metadata: ${errorCount}/${targetPaths.length} files had read errors`,
+      );
+    }
+    if (noXmpCount > 0) {
+      logger.info(
+        `Photo metadata: ${noXmpCount}/${targetPaths.length} files had no XMP (normal for pre-2025.3.1 photos)`,
+      );
+    }
+
+    if (attributes.length === 0) {
+      logger.info('Photo metadata extracted: 0 new records');
+      return 0;
     }
 
     // DBに保存

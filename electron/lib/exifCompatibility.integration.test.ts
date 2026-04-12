@@ -606,10 +606,10 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
   // ==========================================================================
 
   describe('プロダクション呼び出しパターン', () => {
-    it('parsePhotoMetadataBatch → exifTagReader → readXmpTags のバッチフロー', async () => {
+    it('readXmpTagsBatch の Rust バッチ一発呼びフロー', async () => {
       // プロダクションの実際のフロー:
-      //   service.ts の exifTagReader が readXmpTags を呼び、
-      //   parser.ts の parsePhotoMetadataBatch がそれをバッチ実行する
+      //   service.ts が readXmpTagsBatch を一発呼びし、Rust 側で
+      //   Rayon 全コア並列 + 部分読み込みでバッチ処理する
 
       // 3ファイル用意（XMP あり2, なし1）
       const paths: string[] = [];
@@ -633,21 +633,33 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
         worldDisplayName: null,
       });
 
-      // プロダクションと同じアダプター: readXmpTags → Record<string, any>
-      const exifTagReader = (fp: string): Promise<Record<string, unknown>> =>
-        Effect.runPromise(readXmpTags(fp));
+      // readXmpTagsBatch で Rust バッチ一発呼び
+      const { readXmpTagsBatch } = await import('./wrappedExifTool');
+      const results = readXmpTagsBatch(paths);
 
-      // parsePhotoMetadataBatch を import してバッチ実行
-      const { parsePhotoMetadataBatch } =
+      // 入力と同じ長さの配列が返る
+      expect(results).toHaveLength(3);
+      // XMP ありの2ファイル: data にメタデータ、error は undefined (napi-rs の None)
+      expect(results[0].data?.authorId).toBe('usr_batch1');
+      expect(results[0].error).toBeUndefined();
+      expect(results[1].data?.authorId).toBe('usr_batch2');
+      expect(results[1].error).toBeUndefined();
+      // XMP なしファイル: data も error も undefined
+      expect(results[2].data).toBeUndefined();
+      expect(results[2].error).toBeUndefined();
+
+      // extractOfficialMetadata で Zod 検証もパスすることを確認
+      const { extractOfficialMetadata } =
         await import('../module/vrchatPhotoMetadata/parser');
-      const results = await parsePhotoMetadataBatch(paths, exifTagReader, 5);
-
-      // XMP ありの2ファイルがメタデータ取得成功
-      expect(results.size).toBe(2);
-      expect(results.get(paths[0])?.authorId).toBe('usr_batch1');
-      expect(results.get(paths[1])?.authorId).toBe('usr_batch2');
-      // XMP なしファイルは結果に含まれない
-      expect(results.has(paths[2])).toBe(false);
+      const r0 = results[0].data;
+      const meta0 = extractOfficialMetadata({
+        AuthorID: r0?.authorId,
+        Author: r0?.author,
+        WorldID: r0?.worldId,
+        WorldDisplayName: r0?.worldDisplayName,
+      });
+      expect(meta0?.authorId).toBe('usr_batch1');
+      expect(meta0?.worldId).toBe('wrld_batch1');
     });
 
     it('electronUtilController のハイフン区切り日時フォーマット', async () => {

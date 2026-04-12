@@ -21,6 +21,24 @@ pub fn detect_image_format(data: &[u8]) -> ImageFormat {
     }
 }
 
+/// ファイルの先頭バイトだけ読んでフォーマットを判定する。
+///
+/// streaming_reader.rs から使用。File はオフセット 0 にシーク済みであること。
+/// 判定後のファイルオフセットはマジックバイト分だけ進む。
+pub fn detect_image_format_from_file(
+    file: &mut std::fs::File,
+) -> Result<ImageFormat, String> {
+    use std::io::Read;
+
+    // PNG マジック (8B) が最長なので 8B 読めば十分
+    let mut buf = [0u8; 8];
+    let n = file
+        .read(&mut buf)
+        .map_err(|e| format!("Failed to read magic bytes: {e}"))?;
+
+    Ok(detect_image_format(&buf[..n]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
