@@ -1,4 +1,10 @@
 {
+  "@chenglou/pretext@0.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/chenglou/pretext",
+    "path": "node_modules/@chenglou/pretext",
+    "licenseFile": "node_modules/@chenglou/pretext/LICENSE"
+  },
   "@napi-rs/image@1.12.0": {
     "licenses": "MIT",
     "repository": "https://github.com/Brooooooklyn/Image",
