@@ -46,8 +46,14 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
     loop {
         // マーカー読み取り (2 bytes: 0xFF + marker_type)
         let mut marker = [0u8; 2];
-        if file.read_exact(&mut marker).is_err() {
-            return Ok(None); // EOF — XMP なし
+        match file.read_exact(&mut marker) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                return Ok(None); // 正常な EOF — XMP なし
+            }
+            Err(e) => {
+                return Err(format!("Failed to read JPEG marker: {e}"));
+            }
         }
 
         if marker[0] != 0xFF {
@@ -126,7 +132,8 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
 ///
 /// シグネチャの後、チャンクヘッダー (8B: length + type) を順に走査する。
 /// iTXt + keyword "XML:com.adobe.xmp" が見つかったらそのチャンクだけ読む。
-/// IDAT / IEND に到達したら打ち切り（VRChat は XMP を IDAT の前に配置する）。
+/// IEND に到達したら打ち切り。IDAT はスキップして走査を続行する
+/// （サードパーティツールで iTXt が IDAT 後に移動する場合に対応）。
 ///
 /// file は先頭にシーク済みであること（detect_image_format_from_file が先頭を読む）。
 fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, String> {
@@ -136,12 +143,21 @@ fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, S
         .map_err(|e| format!("Failed to seek past PNG signature: {e}"))?;
 
     const XMP_KEYWORD: &[u8] = b"XML:com.adobe.xmp";
+    // VRChat XMP は通常 1KB 未満。8MB を超える iTXt は異常値として扱いスキップする。
+    // 悪意のある PNG でメモリを枯渇させる攻撃を防ぐ。
+    const MAX_ITXT_CHUNK_SIZE: usize = 8 * 1024 * 1024;
 
     loop {
         // チャンクヘッダー: length (4B) + type (4B)
         let mut header = [0u8; 8];
-        if file.read_exact(&mut header).is_err() {
-            return Ok(None); // EOF — XMP なし
+        match file.read_exact(&mut header) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                return Ok(None); // 正常な EOF — XMP なし
+            }
+            Err(e) => {
+                return Err(format!("Failed to read PNG chunk header: {e}"));
+            }
         }
 
         let chunk_len =
@@ -160,6 +176,13 @@ fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, S
         // IDAT のデータ本体は読まず seek で飛ばすのでI/Oコストは最小限。
 
         if chunk_type == *b"iTXt" {
+            // サイズ上限チェック: 異常に大きい iTXt はスキップ（OOM 防止）
+            if chunk_len > MAX_ITXT_CHUNK_SIZE {
+                let skip = chunk_len as i64 + 4; // data + CRC
+                file.seek(SeekFrom::Current(skip))
+                    .map_err(|e| format!("Failed to skip oversized iTXt chunk: {e}"))?;
+                continue;
+            }
             // iTXt チャンクデータを読み取り
             let mut chunk_data = vec![0u8; chunk_len];
             file.read_exact(&mut chunk_data)
