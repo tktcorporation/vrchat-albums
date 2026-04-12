@@ -45,6 +45,19 @@ impl From<VrcXmpMetadata> for JsVrcXmpMetadata {
     }
 }
 
+/// XMP バッチ読み取りの個別結果。
+///
+/// エラーと「XMP なし」を区別するため、data/error を分離して返す。
+/// - data が Some: XMP メタデータ抽出成功
+/// - data が None かつ error が None: ファイルに XMP が存在しない（正常）
+/// - data が None かつ error が Some: I/O エラーやパースエラー
+#[napi(object)]
+pub struct JsVrcXmpBatchResult {
+    pub data: Option<JsVrcXmpMetadata>,
+    /// エラーが発生した場合のメッセージ。XMP なしの場合は null。
+    pub error: Option<String>,
+}
+
 /// 画像サイズ（width/height）の読み取り結果
 #[napi(object)]
 pub struct JsImageDimensions {
@@ -93,18 +106,30 @@ pub fn read_vrc_xmp_from_buffer(buffer: Buffer) -> Result<Option<JsVrcXmpMetadat
 ///
 /// Rayon でスレッドプール並列化する。各ファイルはチャンク/セグメントヘッダーだけ走査し、
 /// XMP データ部分だけを読み取る（ファイル全体をメモリに載せない）。
-/// 個別のファイルでエラーが発生しても null を返し、他のファイルの処理を続行する。
+///
+/// 戻り値は JsVrcXmpBatchResult の配列で、エラーと「XMP なし」を区別できる:
+/// - data: Some, error: None → XMP 抽出成功
+/// - data: None, error: None → XMP が存在しない（正常）
+/// - data: None, error: Some → I/O エラー等
 #[napi]
-pub fn read_vrc_xmp_batch(file_paths: Vec<String>) -> Vec<Option<JsVrcXmpMetadata>> {
+pub fn read_vrc_xmp_batch(file_paths: Vec<String>) -> Vec<JsVrcXmpBatchResult> {
     use rayon::prelude::*;
 
     file_paths
         .par_iter()
-        .map(|path| {
-            read_xmp_from_file(path)
-                .ok()
-                .flatten()
-                .map(JsVrcXmpMetadata::from)
+        .map(|path| match read_xmp_from_file(path) {
+            Ok(Some(meta)) => JsVrcXmpBatchResult {
+                data: Some(JsVrcXmpMetadata::from(meta)),
+                error: None,
+            },
+            Ok(None) => JsVrcXmpBatchResult {
+                data: None,
+                error: None,
+            },
+            Err(e) => JsVrcXmpBatchResult {
+                data: None,
+                error: Some(e),
+            },
         })
         .collect()
 }

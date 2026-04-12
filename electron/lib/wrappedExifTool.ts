@@ -10,6 +10,7 @@
 import type {
   JsExifWriteParams,
   JsImageDimensions,
+  JsVrcXmpBatchResult,
   JsVrcXmpMetadata,
 } from '@vrchat-albums/exif-native';
 import { Data, Effect } from 'effect';
@@ -47,7 +48,7 @@ export class ExifOperationError extends Data.TaggedError('ExifOperationError')<{
 interface ExifNativeModule {
   readVrcXmp(filePath: string): JsVrcXmpMetadata | null;
   readVrcXmpFromBuffer(buffer: Buffer): JsVrcXmpMetadata | null;
-  readVrcXmpBatch(filePaths: string[]): (JsVrcXmpMetadata | null)[];
+  readVrcXmpBatch(filePaths: string[]): JsVrcXmpBatchResult[];
   writeExif(filePath: string, params: JsExifWriteParams): void;
   writeExifToBuffer(buffer: Buffer, params: JsExifWriteParams): Buffer;
   detectImageFormatJs(buffer: Buffer): string;
@@ -132,13 +133,17 @@ export const readXmpTags = (
  * Rust 側の readVrcXmpBatch は Rayon 全コア並列 + 部分読み込みで処理する。
  * N-API 境界の往復を 1 回に削減し、I/O もファイル先頭の���ッダーだけ読む。
  *
- * 戻り値は入力と同じ長さの配列。XMP が存在しないファイルは null。
+ * 戻り値は入力と同じ長さの JsVrcXmpBatchResult 配列。
+ * エラーと「XMP なし」を区別できる:
+ * - data あり, error null → XMP 抽出成功
+ * - data null, error null → XMP が存在しない（正常）
+ * - data null, error あり → I/O エラー等
  *
  * 呼び出し元: extractAndSaveMetadataBatch (vrchatPhotoMetadata/service.ts)
  */
 export const readXmpTagsBatch = (
   filePaths: string[],
-): (JsVrcXmpMetadata | null)[] => {
+): JsVrcXmpBatchResult[] => {
   const native = getExifNative();
   return native.readVrcXmpBatch(filePaths);
 };

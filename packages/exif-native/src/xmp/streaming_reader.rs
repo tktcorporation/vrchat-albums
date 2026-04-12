@@ -36,7 +36,8 @@ pub fn read_xmp_from_file(path: &str) -> Result<Option<VrcXmpMetadata>, String> 
 ///
 /// file は先頭にシーク済みであること（detect_image_format_from_file が先頭を読む）。
 fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, String> {
-    // SOI (2 bytes) は detect で読み済み → オフセット 2 から開始
+    // detect_image_format_from_file がファイル先頭から最大 8B を読むため
+    // オフセットが不定。絶対シークで SOI 直後 (offset 2) に移動する。
     file.seek(SeekFrom::Start(2))
         .map_err(|e| format!("Failed to seek past SOI: {e}"))?;
 
@@ -129,7 +130,8 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
 ///
 /// file は先頭にシーク済みであること（detect_image_format_from_file が先頭を読む）。
 fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, String> {
-    // PNG シグネチャ (8 bytes) は detect で読み済み → オフセット 8 から開始
+    // detect_image_format_from_file がファイル先頭から最大 8B を読むため
+    // オフセットが不定。絶対シークでシグネチャ直後 (offset 8) に移動する。
     file.seek(SeekFrom::Start(8))
         .map_err(|e| format!("Failed to seek past PNG signature: {e}"))?;
 
@@ -146,10 +148,16 @@ fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, S
             u32::from_be_bytes([header[0], header[1], header[2], header[3]]) as usize;
         let chunk_type = [header[4], header[5], header[6], header[7]];
 
-        // IDAT / IEND — XMP は IDAT の前に配置されるため打ち切り
-        if chunk_type == *b"IDAT" || chunk_type == *b"IEND" {
+        // IEND — ファイル末尾なので打ち切り
+        if chunk_type == *b"IEND" {
             return Ok(None);
         }
+
+        // IDAT は画像データ本体。VRChat は XMP を IDAT の前に配置するが、
+        // サードパーティツールで再エンコードされた写真では iTXt が IDAT の後に
+        // 移動する可能性がある (PNG spec では ancillary chunk の位置は自由)。
+        // 互換性のため IDAT はスキップして走査を続行する。
+        // IDAT のデータ本体は読まず seek で飛ばすのでI/Oコストは最小限。
 
         if chunk_type == *b"iTXt" {
             // iTXt チャンクデータを読み取り
@@ -167,9 +175,7 @@ fn read_xmp_from_png_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, S
                 None => continue, // 不正な iTXt — 次のチャンクへ
             };
 
-            if keyword_end > chunk_data.len()
-                || &chunk_data[..keyword_end] != XMP_KEYWORD
-            {
+            if &chunk_data[..keyword_end] != XMP_KEYWORD {
                 continue; // XMP ではない iTXt
             }
 
@@ -514,6 +520,48 @@ mod tests {
         let result = read_xmp_from_file(tmp.path().to_str().unwrap());
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
+    }
+
+    #[test]
+    fn png_with_xmp_after_idat_still_extracts() {
+        // サードパーティツールで再エンコードされた PNG では
+        // iTXt (XMP) が IDAT の後に配置される場合がある。
+        // streaming_reader は IDAT をスキップして走査を続行するため、
+        // IDAT 後の XMP も正しく抽出できる。
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+        let ihdr_data: [u8; 13] = [0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0, 0, 0];
+        write_png_chunk(&mut buf, b"IHDR", &ihdr_data);
+
+        // IDAT first (画像データ)
+        write_png_chunk(
+            &mut buf,
+            b"IDAT",
+            &[0x78, 0x01, 0x62, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01],
+        );
+
+        // iTXt (XMP) AFTER IDAT
+        let mut itxt_data = Vec::new();
+        itxt_data.extend_from_slice(b"XML:com.adobe.xmp");
+        itxt_data.push(0); // null
+        itxt_data.push(0); // compression flag
+        itxt_data.push(0); // compression method
+        itxt_data.push(0); // language tag
+        itxt_data.push(0); // translated keyword
+        itxt_data.extend_from_slice(VRCHAT_XMP.as_bytes());
+        write_png_chunk(&mut buf, b"iTXt", &itxt_data);
+
+        write_png_chunk(&mut buf, b"IEND", &[]);
+
+        let tmp = write_temp_file(&buf);
+        let result = read_xmp_from_file(tmp.path().to_str().unwrap());
+        assert!(result.is_ok());
+        let meta = result.unwrap().expect("Expected Some metadata for XMP after IDAT");
+        assert_eq!(
+            meta.author_id.as_deref(),
+            Some("usr_3ba2a992-724c-4463-bc75-7e9f6674e8e0")
+        );
     }
 
     #[test]

@@ -639,20 +639,24 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
 
       // 入力と同じ長さの配列が返る
       expect(results).toHaveLength(3);
-      // XMP ありの2ファイル
-      expect(results[0]?.authorId).toBe('usr_batch1');
-      expect(results[1]?.authorId).toBe('usr_batch2');
-      // XMP なしファイルは null
-      expect(results[2]).toBeNull();
+      // XMP ありの2ファイル: data にメタデータ、error は null
+      expect(results[0].data?.authorId).toBe('usr_batch1');
+      expect(results[0].error).toBeNull();
+      expect(results[1].data?.authorId).toBe('usr_batch2');
+      expect(results[1].error).toBeNull();
+      // XMP なしファイル: data も error も null
+      expect(results[2].data).toBeNull();
+      expect(results[2].error).toBeNull();
 
       // extractOfficialMetadata で Zod 検証もパスすることを確認
       const { extractOfficialMetadata } =
         await import('../module/vrchatPhotoMetadata/parser');
+      const r0 = results[0].data;
       const meta0 = extractOfficialMetadata({
-        AuthorID: results[0]?.authorId,
-        Author: results[0]?.author,
-        WorldID: results[0]?.worldId,
-        WorldDisplayName: results[0]?.worldDisplayName,
+        AuthorID: r0?.authorId,
+        Author: r0?.author,
+        WorldID: r0?.worldId,
+        WorldDisplayName: r0?.worldDisplayName,
       });
       expect(meta0?.authorId).toBe('usr_batch1');
       expect(meta0?.worldId).toBe('wrld_batch1');

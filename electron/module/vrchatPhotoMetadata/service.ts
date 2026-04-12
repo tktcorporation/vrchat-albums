@@ -120,18 +120,28 @@ export const extractAndSaveMetadataBatch = (
         }),
     });
 
-    // Rust の結果を Zod バリデーション付きでパース
+    // Rust の結果を Zod バリデーション付きでパース。
+    // JsVrcXmpBatchResult でエラーと「XMP なし」を区別する:
+    //   data あり → XMP 抽出成功
+    //   data なし, error なし → XMP が存在しない（正常）
+    //   data なし, error あり → I/O エラー等
     const attributes: VRChatPhotoMetadataCreationAttributes[] = [];
     let processed = 0;
+    let noXmpCount = 0;
+    let errorCount = 0;
     for (let i = 0; i < targetPaths.length; i++) {
-      const result = batchResults[i];
-      if (result !== null && result !== undefined) {
+      const { data, error } = batchResults[i];
+      if (error) {
+        errorCount++;
+        // I/O エラーは debug レベルで個別ログ（大量出力を防ぐ）
+        logger.debug(`XMP read error: ${targetPaths[i]}: ${error}`);
+      } else if (data) {
         // extractOfficialMetadata で Zod 検証 + フィールド正規化
         const tags = {
-          AuthorID: result.authorId ?? undefined,
-          Author: result.author ?? undefined,
-          WorldID: result.worldId ?? undefined,
-          WorldDisplayName: result.worldDisplayName ?? undefined,
+          AuthorID: data.authorId ?? undefined,
+          Author: data.author ?? undefined,
+          WorldID: data.worldId ?? undefined,
+          WorldDisplayName: data.worldDisplayName ?? undefined,
         };
         const metadata = extractOfficialMetadata(tags);
         if (metadata !== null) {
@@ -143,6 +153,8 @@ export const extractAndSaveMetadataBatch = (
             worldDisplayName: metadata.worldDisplayName,
           });
         }
+      } else {
+        noXmpCount++;
       }
       processed++;
       if (
@@ -153,6 +165,18 @@ export const extractAndSaveMetadataBatch = (
           `Metadata extraction progress: ${processed}/${targetPaths.length}`,
         );
       }
+    }
+
+    // サマリーログ: XMP なし件数と I/O エラー件数を分離して出力
+    if (errorCount > 0) {
+      logger.warn(
+        `Photo metadata: ${errorCount}/${targetPaths.length} files had read errors`,
+      );
+    }
+    if (noXmpCount > 0) {
+      logger.info(
+        `Photo metadata: ${noXmpCount}/${targetPaths.length} files had no XMP (normal for pre-2025.3.1 photos)`,
+      );
     }
 
     if (attributes.length === 0) {
