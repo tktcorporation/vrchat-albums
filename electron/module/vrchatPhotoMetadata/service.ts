@@ -130,7 +130,13 @@ export const extractAndSaveMetadataBatch = (
     let noXmpCount = 0;
     let errorCount = 0;
     for (let i = 0; i < targetPaths.length; i++) {
-      const { data, error } = batchResults[i];
+      const entry = batchResults[i];
+      if (!entry) {
+        // Rayon 側で予期しないエラー（パニック等）により結果が欠落した場合
+        errorCount++;
+        continue;
+      }
+      const { data, error } = entry;
       if (error) {
         errorCount++;
         // I/O エラーは debug レベルで個別ログ（大量出力を防ぐ）

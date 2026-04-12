@@ -44,9 +44,9 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
     const XMP_PREFIX: &[u8] = b"http://ns.adobe.com/xap/1.0/\0";
 
     loop {
-        // マーカー読み取り (2 bytes: 0xFF + marker_type)
-        let mut marker = [0u8; 2];
-        match file.read_exact(&mut marker) {
+        // マーカー先頭 0xFF を読む
+        let mut byte = [0u8; 1];
+        match file.read_exact(&mut byte) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
                 return Ok(None); // 正常な EOF — XMP なし
@@ -56,25 +56,31 @@ fn read_xmp_from_jpeg_stream(file: &mut File) -> Result<Option<VrcXmpMetadata>, 
             }
         }
 
-        if marker[0] != 0xFF {
+        if byte[0] != 0xFF {
             return Ok(None); // 不正なマーカー — 安全側に倒して None
         }
 
-        let marker_type = marker[1];
+        // fill bytes (0xFF の連続) をスキップして実際のマーカー種別を取得。
+        // JPEG spec では 0xFF の後に任意個の 0xFF fill bytes を挿入できる。
+        // 0xFF 以外のバイトが見つかるまで1バイトずつ読み進める。
+        let marker_type;
+        loop {
+            file.read_exact(&mut byte)
+                .map_err(|e| format!("Failed to read JPEG marker type: {e}"))?;
+            if byte[0] != 0xFF {
+                break;
+            }
+        }
+        marker_type = byte[0];
 
-        // パディング 0xFF をスキップ
-        if marker_type == 0xFF {
-            // 次のバイトを再読み込み（ループ先頭に戻る）
-            file.seek(SeekFrom::Current(-1))
-                .map_err(|e| format!("Failed to seek back for padding: {e}"))?;
+        // 0xFF 0x00 はバイトスタッフィング（SOS 以降のスキャンデータ内で使われる）。
+        // ヘッダー領域では出現しないはずだが、不正なファイルの場合はスキップする。
+        if marker_type == 0x00 {
             continue;
         }
 
         // スタンドアロンマーカー（長さフィールドなし）: RST0-RST7, TEM
-        if marker_type == 0x00
-            || (0xD0..=0xD7).contains(&marker_type)
-            || marker_type == 0x01
-        {
+        if (0xD0..=0xD7).contains(&marker_type) || marker_type == 0x01 {
             continue;
         }
 
@@ -429,6 +435,37 @@ mod tests {
         assert_eq!(
             meta.world_display_name.as_deref(),
             Some("Hanami Days")
+        );
+    }
+
+    #[test]
+    fn jpeg_with_ff_fill_bytes_before_marker() {
+        // JPEG spec: マーカー前に任意個の 0xFF fill bytes を挿入できる。
+        // 以前のコードは seek(-1) で無限ループしていたバグの回帰テスト。
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&[0xFF, 0xD8]); // SOI
+
+        // 0xFF fill bytes (3個) + APP1 XMP marker
+        buf.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]); // 3 fill bytes + marker start
+        buf.push(0xE1); // APP1
+
+        let xmp_prefix = b"http://ns.adobe.com/xap/1.0/\0";
+        let app1_data_len = xmp_prefix.len() + VRCHAT_XMP.len();
+        let app1_seg_len = (app1_data_len + 2) as u16;
+        buf.extend_from_slice(&app1_seg_len.to_be_bytes());
+        buf.extend_from_slice(xmp_prefix);
+        buf.extend_from_slice(VRCHAT_XMP.as_bytes());
+
+        buf.extend_from_slice(&[0xFF, 0xDA, 0x00, 0x02]); // SOS
+        buf.extend_from_slice(&[0xFF, 0xD9]); // EOI
+
+        let tmp = write_temp_file(&buf);
+        let result = read_xmp_from_file(tmp.path().to_str().unwrap());
+        assert!(result.is_ok());
+        let meta = result.unwrap().expect("Expected metadata after fill bytes");
+        assert_eq!(
+            meta.author_id.as_deref(),
+            Some("usr_3ba2a992-724c-4463-bc75-7e9f6674e8e0")
         );
     }
 
