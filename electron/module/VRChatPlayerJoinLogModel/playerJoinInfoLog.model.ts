@@ -5,6 +5,7 @@ import {
   type InferCreationAttributes,
   Model,
   Op,
+  type Transaction,
 } from '@sequelize/core';
 import {
   AllowNull,
@@ -87,6 +88,7 @@ export class VRChatPlayerJoinLogModel extends Model<
  */
 export const createVRChatPlayerJoinLog = async (
   playerJoinLogList: VRChatPlayerJoinLog[],
+  transaction?: Transaction,
 ): Promise<VRChatPlayerJoinLogModel[]> => {
   // バッチ内の重複を排除（findAll 不要、O(n) で済む）
   const seen = new Set<string>();
@@ -111,6 +113,7 @@ export const createVRChatPlayerJoinLog = async (
 
   return VRChatPlayerJoinLogModel.bulkCreate(newLogs, {
     ignoreDuplicates: true,
+    transaction,
   });
 };
 

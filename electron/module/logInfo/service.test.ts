@@ -93,6 +93,18 @@ vi.mock('../vrchatPhotoMetadata/service', () => ({
   extractAndSaveMetadataBatch: vi.fn().mockReturnValue(Effect.succeed(0)),
 }));
 
+// getRDBClient のモック: トランザクション管理をスタブ化
+vi.mock('../../lib/sequelize', () => ({
+  getRDBClient: vi.fn().mockReturnValue({
+    __client: {
+      startUnmanagedTransaction: vi.fn().mockResolvedValue({
+        commit: vi.fn().mockResolvedValue(undefined),
+        rollback: vi.fn().mockResolvedValue(undefined),
+      }),
+    },
+  }),
+}));
+
 // getAppUserDataPathのモック
 vi.mock('../../lib/wrappedApp', () => ({
   getAppUserDataPath: vi.fn().mockReturnValue('/mock/user/data'),

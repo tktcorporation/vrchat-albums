@@ -1,4 +1,4 @@
-import { Op } from '@sequelize/core';
+import { Op, type Transaction } from '@sequelize/core';
 
 import { VRChatPlayerLeaveLogModel } from './playerLeaveLog.model';
 
@@ -8,6 +8,7 @@ export const createVRChatPlayerLeaveLogModel = async (
     playerName: string;
     playerId: string | null;
   }[],
+  options?: { transaction?: Transaction },
 ): Promise<VRChatPlayerLeaveLogModel[]> => {
   const newLogs = leaveLogList.map((logInfo) => ({
     leaveDateTime: logInfo.leaveDate,
@@ -20,6 +21,7 @@ export const createVRChatPlayerLeaveLogModel = async (
       newLogs,
       {
         ignoreDuplicates: true,
+        transaction: options?.transaction,
       },
     );
 
