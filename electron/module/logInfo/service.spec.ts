@@ -79,7 +79,9 @@ describe('logInfo service', () => {
         },
       ];
 
-      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
 
       const result = await Effect.runPromise(getFrequentPlayerNames(3));
 
@@ -216,7 +218,9 @@ describe('logInfo service', () => {
         },
       ];
 
-      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
 
       // 上位2名のみ取得
       const result = await Effect.runPromise(getFrequentPlayerNames(2));
@@ -278,7 +282,9 @@ describe('logInfo service', () => {
         },
       ];
 
-      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
 
       const result = await Effect.runPromise(getFrequentPlayerNames(3));
 
@@ -330,8 +336,9 @@ describe('logInfo service', () => {
         },
       ];
 
-      const createdEntries =
-        await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      const createdEntries = await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
       expect(createdEntries).toHaveLength(4); // 全て異なる時刻なので4つ作成される
 
       const result = await Effect.runPromise(getFrequentPlayerNames(2));

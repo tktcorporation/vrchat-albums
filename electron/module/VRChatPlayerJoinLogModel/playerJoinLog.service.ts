@@ -19,11 +19,20 @@ import * as model from './playerJoinInfoLog.model';
 export const createVRChatPlayerJoinLogModel = (
   playerJoinLogList: VRChatPlayerJoinLog[],
   options?: { transaction?: Transaction },
-) => {
-  return model.createVRChatPlayerJoinLog(
-    playerJoinLogList,
-    options?.transaction,
-  );
+): Effect.Effect<
+  model.VRChatPlayerJoinLogModel[],
+  PlayerJoinLogServiceError
+> => {
+  return Effect.tryPromise({
+    try: () =>
+      model.createVRChatPlayerJoinLog(playerJoinLogList, options?.transaction),
+    catch: (e) =>
+      new PlayerJoinLogDatabaseError({
+        message: `プレイヤー参加ログの作成に失敗しました: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      }),
+  });
 };
 
 /**

@@ -5,8 +5,8 @@ import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
+import { getDBQueue } from '../../lib/dbQueue';
 import { logger } from '../../lib/logger';
-import { getRDBClient } from '../../lib/sequelize';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import type { VRChatLogFileError } from '../vrchatLog/error';
 import type { VRChatLogError } from '../vrchatLog/errors';
@@ -394,13 +394,11 @@ export function loadLogInfoIndexFromVRChatLog({
     );
     emitStageStart('log_load', 'ログデータをDBに書き込み中...', newLogs.length);
 
-    // Effect.gen 内では await が使えないため、トランザクション管理を含むバッチ処理全体を
-    // Effect.promise で囲む。SQLite は単一ライターなので順次実行する。
-    yield* Effect.promise(async () => {
-      const sequelize = getRDBClient().__client;
-      const transaction = await sequelize.startUnmanagedTransaction();
-      // effect-lint-allow-try-catch: トランザクションの commit/rollback に try-finally が必要
-      try {
+    // DB Queue の transaction() を使い、書き込みをキュー経由でシリアライズする。
+    // Sequelize の managed transaction により自動 commit/rollback される。
+    // DBQueueError は予期しないエラー（DB接続断等）なので defect として Sentry に送信する。
+    yield* getDBQueue()
+      .transaction(async (transaction) => {
         for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
           const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
           const batch = newLogs.slice(i, i + BATCH_SIZE);
@@ -421,11 +419,12 @@ export function loadLogInfoIndexFromVRChatLog({
               { transaction },
             ),
           );
-          const playerJoinResults =
-            await playerJoinLogService.createVRChatPlayerJoinLogModel(
+          const playerJoinResults = await Effect.runPromise(
+            playerJoinLogService.createVRChatPlayerJoinLogModel(
               playerJoinLogBatch,
               { transaction },
-            );
+            ),
+          );
           const playerLeaveResults =
             await playerLeaveLogService.createVRChatPlayerLeaveLogModel(
               playerLeaveLogBatch.map((logInfo) => ({
@@ -452,12 +451,8 @@ export function loadLogInfoIndexFromVRChatLog({
             details: { current, total: newLogs.length },
           });
         }
-        await transaction.commit();
-      } catch (error) {
-        await transaction.rollback();
-        throw error;
-      }
-    });
+      })
+      .pipe(Effect.orDie);
     const batchProcessEndTime = performance.now();
     logger.info(
       `done DB batch insert: ${(batchProcessEndTime - batchProcessStartTime).toFixed(0)} ms`,

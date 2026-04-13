@@ -75,7 +75,7 @@ vi.mock('../vrchatWorldJoinLog/service', () => ({
 
 vi.mock('../VRChatPlayerJoinLogModel/playerJoinLog.service', () => ({
   findLatestPlayerJoinLog: vi.fn().mockReturnValue(Effect.succeed(null)),
-  createVRChatPlayerJoinLogModel: vi.fn().mockResolvedValue([]),
+  createVRChatPlayerJoinLogModel: vi.fn().mockReturnValue(Effect.succeed([])),
 }));
 
 vi.mock('../VRChatPlayerLeaveLogModel/playerLeaveLog.service', () => ({
@@ -93,15 +93,19 @@ vi.mock('../vrchatPhotoMetadata/service', () => ({
   extractAndSaveMetadataBatch: vi.fn().mockReturnValue(Effect.succeed(0)),
 }));
 
-// getRDBClient のモック: トランザクション管理をスタブ化
-vi.mock('../../lib/sequelize', () => ({
-  getRDBClient: vi.fn().mockReturnValue({
-    __client: {
-      startUnmanagedTransaction: vi.fn().mockResolvedValue({
-        commit: vi.fn().mockResolvedValue(undefined),
-        rollback: vi.fn().mockResolvedValue(undefined),
+// getDBQueue のモック: DB Queue のトランザクション管理をスタブ化
+// transaction() は callback に Transaction を渡して実行し、Effect でラップして返す
+vi.mock('../../lib/dbQueue', () => ({
+  getDBQueue: vi.fn().mockReturnValue({
+    transaction: vi
+      .fn()
+      .mockImplementation((callback: (tx: unknown) => Promise<unknown>) => {
+        // モックトランザクションオブジェクトで callback を実行し、結果を Effect.tryPromise でラップ
+        return Effect.tryPromise({
+          try: () => callback({}),
+          catch: (e) => ({ type: 'TASK_TIMEOUT' as const, message: String(e) }),
+        });
       }),
-    },
   }),
 }));
 

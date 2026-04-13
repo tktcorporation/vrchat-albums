@@ -1,4 +1,5 @@
 import * as datefns from 'date-fns';
+import { Effect } from 'effect';
 import {
   afterAll,
   beforeAll,
@@ -96,7 +97,9 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
       },
     ];
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel(testData);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel(testData),
+    );
 
     // logInfoRouter をインポートしてテスト
     const { logInfoRouter } = await import('./logInfoCointroller');
@@ -169,7 +172,9 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
       },
     ];
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel(testData);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel(testData),
+    );
 
     const { logInfoRouter } = await import('./logInfoCointroller');
     const router = logInfoRouter();
@@ -245,7 +250,9 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
       },
     ];
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel(testData);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel(testData),
+    );
 
     const { logInfoRouter } = await import('./logInfoCointroller');
     const router = logInfoRouter();

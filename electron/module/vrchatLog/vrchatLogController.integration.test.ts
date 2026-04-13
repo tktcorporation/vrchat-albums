@@ -394,10 +394,9 @@ vi.mock('../../logInfo/service', async (importOriginal) => {
           if (mockState.importedPlayerLogs.length > 0) {
             // Create actual player join logs in the database
             for (const logData of mockState.importedPlayerLogs) {
-              const createdLogs =
-                await playerJoinLogService.createVRChatPlayerJoinLogModel([
-                  logData,
-                ]);
+              const createdLogs = await Effect.runPromise(
+                playerJoinLogService.createVRChatPlayerJoinLogModel([logData]),
+              );
               playerLogs.push(...createdLogs);
             }
           }
@@ -495,14 +494,16 @@ describe('vrchatLogController integration - Import and Rollback', () => {
   };
 
   const createTestPlayerJoinLog = async (joinDateTime: Date) => {
-    const logs = await playerJoinLogService.createVRChatPlayerJoinLogModel([
-      {
-        logType: 'playerJoin' as const,
-        playerName: VRChatPlayerNameSchema.parse('TestPlayer'),
-        playerId: VRChatPlayerIdSchema.parse(`usr_${uuidv7()}`),
-        joinDate: joinDateTime,
-      },
-    ]);
+    const logs = await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel([
+        {
+          logType: 'playerJoin' as const,
+          playerName: VRChatPlayerNameSchema.parse('TestPlayer'),
+          playerId: VRChatPlayerIdSchema.parse(`usr_${uuidv7()}`),
+          joinDate: joinDateTime,
+        },
+      ]),
+    );
     return logs[0];
   };
 
