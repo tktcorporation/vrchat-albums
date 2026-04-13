@@ -5,6 +5,7 @@ import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
+import { getDBQueue } from '../../lib/dbQueue';
 import { logger } from '../../lib/logger';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import type { VRChatLogFileError } from '../vrchatLog/error';
@@ -384,64 +385,74 @@ export function loadLogInfoIndexFromVRChatLog({
     };
 
     // 5. ログのバッチ処理
+    // 全バッチを1トランザクションで囲み、WAL sync を1回に集約して I/O を削減する。
     const batchProcessStartTime = performance.now();
-    const BATCH_SIZE = 1000;
+    const BATCH_SIZE = 5000;
     const totalBatches = Math.ceil(newLogs.length / BATCH_SIZE);
     logger.info(
       `start DB batch insert: ${newLogs.length} logs (${totalBatches} batches)`,
     );
     emitStageStart('log_load', 'ログデータをDBに書き込み中...', newLogs.length);
 
-    for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
-      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-      const batch = newLogs.slice(i, i + BATCH_SIZE);
+    // DB Queue の transaction() を使い、書き込みをキュー経由でシリアライズする。
+    // Sequelize の managed transaction により自動 commit/rollback される。
+    // DBQueueError は予期しないエラー（DB接続断等）なので defect として Sentry に送信する。
+    yield* getDBQueue()
+      .transaction(async (transaction) => {
+        for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
+          const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+          const batch = newLogs.slice(i, i + BATCH_SIZE);
 
-      const worldJoinLogBatch = batch.filter(
-        (log): log is VRChatWorldJoinLog => log.logType === 'worldJoin',
-      );
-      const playerJoinLogBatch = batch.filter(
-        (log): log is VRChatPlayerJoinLog => log.logType === 'playerJoin',
-      );
-      const playerLeaveLogBatch = batch.filter(
-        (log): log is VRChatPlayerLeaveLog => log.logType === 'playerLeave',
-      );
+          const worldJoinLogBatch = batch.filter(
+            (log): log is VRChatWorldJoinLog => log.logType === 'worldJoin',
+          );
+          const playerJoinLogBatch = batch.filter(
+            (log): log is VRChatPlayerJoinLog => log.logType === 'playerJoin',
+          );
+          const playerLeaveLogBatch = batch.filter(
+            (log): log is VRChatPlayerLeaveLog => log.logType === 'playerLeave',
+          );
 
-      // SQLite は単一ライターなので、Promise.all での並列書き込みは
-      // シリアライズされてロック競合オーバーヘッドだけが増える。順次実行する。
-      // worldJoinLogService は Effect を返すが、DBHelperError を関数シグネチャの
-      // エラー型に含めていないため、runPromise で Promise 経由にしてエラー型を分離する。
-      const worldJoinResults = yield* Effect.promise(() =>
-        Effect.runPromise(
-          worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogBatch),
-        ),
-      );
-      const playerJoinResults = yield* Effect.promise(() =>
-        playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogBatch),
-      );
-      const playerLeaveResults = yield* Effect.promise(() =>
-        playerLeaveLogService.createVRChatPlayerLeaveLogModel(
-          playerLeaveLogBatch.map((logInfo) => ({
-            leaveDate: logInfo.leaveDate,
-            playerName: logInfo.playerName,
-            playerId: logInfo.playerId ?? null,
-          })),
-        ),
-      );
+          const worldJoinResults = await Effect.runPromise(
+            worldJoinLogService.createVRChatWorldJoinLogModel(
+              worldJoinLogBatch,
+              { transaction },
+            ),
+          );
+          const playerJoinResults = await Effect.runPromise(
+            playerJoinLogService.createVRChatPlayerJoinLogModel(
+              playerJoinLogBatch,
+              { transaction },
+            ),
+          );
+          const playerLeaveResults =
+            await playerLeaveLogService.createVRChatPlayerLeaveLogModel(
+              playerLeaveLogBatch.map((logInfo) => ({
+                leaveDate: logInfo.leaveDate,
+                playerName: logInfo.playerName,
+                playerId: logInfo.playerId ?? null,
+              })),
+              { transaction },
+            );
 
-      results.createdWorldJoinLogModelList.push(...worldJoinResults);
-      results.createdPlayerJoinLogModelList.push(...playerJoinResults);
-      results.createdPlayerLeaveLogModelList.push(...playerLeaveResults);
+          results.createdWorldJoinLogModelList.push(...worldJoinResults);
+          results.createdPlayerJoinLogModelList.push(...playerJoinResults);
+          results.createdPlayerLeaveLogModelList.push(...playerLeaveResults);
 
-      // 進捗をUIプログレスバーに反映（毎バッチ）
-      const current = i + batch.length;
-      emitProgress({
-        stage: 'log_load',
-        progress:
-          newLogs.length > 0 ? Math.round((current / newLogs.length) * 100) : 0,
-        message: `ログデータを処理中... (${batchNumber}/${totalBatches})`,
-        details: { current, total: newLogs.length },
-      });
-    }
+          // 進捗をUIプログレスバーに反映（毎バッチ）
+          const current = i + batch.length;
+          emitProgress({
+            stage: 'log_load',
+            progress:
+              newLogs.length > 0
+                ? Math.round((current / newLogs.length) * 100)
+                : 0,
+            message: `ログデータを処理中... (${batchNumber}/${totalBatches})`,
+            details: { current, total: newLogs.length },
+          });
+        }
+      })
+      .pipe(Effect.orDie);
     const batchProcessEndTime = performance.now();
     logger.info(
       `done DB batch insert: ${(batchProcessEndTime - batchProcessStartTime).toFixed(0)} ms`,

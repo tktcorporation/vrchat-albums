@@ -89,7 +89,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
       },
     ];
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs),
+    );
 
     // 関数を実行（Effect を返すので Effect.runPromise で実行）
     const result = await Effect.runPromise(
@@ -206,7 +208,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
       },
     ];
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs),
+    );
 
     // 基準時刻で関数を実行（Afternoon World のセッション中）
     const result = await Effect.runPromise(
@@ -289,7 +293,9 @@ describe('getPlayerJoinListInSameWorld 統合テスト', () => {
       },
     ];
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogs),
+    );
 
     // 関数を実行（Effect を返すので Effect.runPromise で実行）
     const result = await Effect.runPromise(

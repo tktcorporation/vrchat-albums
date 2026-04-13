@@ -100,11 +100,21 @@ export const extractWorldJoinInfoFromLogs = (
   let foundWorldName: string | null = null;
 
   // 後続のログ行からワールド名を抽出
-  for (const l of logLines.slice(index + 1)) {
-    const worldNameRegex = /\[Behaviour\] Joining or Creating Room: (.+)/;
-    const [, worldName] = l.match(worldNameRegex) ?? [];
-    if (worldName && !foundWorldName) {
+  // VRChat のログでは "Joining or Creating Room:" は "Joining wrld_" の直後数行以内に出現する。
+  // 全残り行をスキャンすると O(n²) になるため、最大20行に限定して前方検索する。
+  // 実測値: 通常は 2-5行以内に出現。20行は安全マージンを含んだ上限値。
+  // VRChat のログ形式が変わり、20行以上離れるケースが発生した場合は上限を引き上げること。
+  const WORLD_NAME_SEARCH_LIMIT = 20;
+  const worldNameRegex = /\[Behaviour\] Joining or Creating Room: (.+)/;
+  const searchEnd = Math.min(
+    index + 1 + WORLD_NAME_SEARCH_LIMIT,
+    logLines.length,
+  );
+  for (let i = index + 1; i < searchEnd; i++) {
+    const [, worldName] = logLines[i].match(worldNameRegex) ?? [];
+    if (worldName) {
       foundWorldName = worldName;
+      break;
     }
   }
 

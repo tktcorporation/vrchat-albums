@@ -1,3 +1,4 @@
+import type { Transaction } from '@sequelize/core';
 import { Effect } from 'effect';
 
 import { type DBHelperError, enqueueTask } from '../../lib/dbHelper';
@@ -10,9 +11,14 @@ import * as model from './VRChatWorldJoinLogModel/s_model';
  */
 export const createVRChatWorldJoinLogModel = (
   vrchatWorldJoinLogList: VRChatWorldJoinLog[],
+  options?: { transaction?: Transaction },
 ): Effect.Effect<model.VRChatWorldJoinLogModel[], DBHelperError> => {
   return Effect.tryPromise({
-    try: () => model.createVRChatWorldJoinLog(vrchatWorldJoinLogList),
+    try: () =>
+      model.createVRChatWorldJoinLog(
+        vrchatWorldJoinLogList,
+        options?.transaction,
+      ),
     catch: (error): DBHelperError => ({
       type: 'BATCH_OPERATION_FAILED',
       message: `Failed to create world join logs: ${

@@ -75,7 +75,7 @@ vi.mock('../vrchatWorldJoinLog/service', () => ({
 
 vi.mock('../VRChatPlayerJoinLogModel/playerJoinLog.service', () => ({
   findLatestPlayerJoinLog: vi.fn().mockReturnValue(Effect.succeed(null)),
-  createVRChatPlayerJoinLogModel: vi.fn().mockResolvedValue([]),
+  createVRChatPlayerJoinLogModel: vi.fn().mockReturnValue(Effect.succeed([])),
 }));
 
 vi.mock('../VRChatPlayerLeaveLogModel/playerLeaveLog.service', () => ({
@@ -91,6 +91,22 @@ vi.mock('../vrchatPhoto/vrchatPhoto.service', () => ({
 
 vi.mock('../vrchatPhotoMetadata/service', () => ({
   extractAndSaveMetadataBatch: vi.fn().mockReturnValue(Effect.succeed(0)),
+}));
+
+// getDBQueue のモック: DB Queue のトランザクション管理をスタブ化
+// transaction() は callback に Transaction を渡して実行し、Effect でラップして返す
+vi.mock('../../lib/dbQueue', () => ({
+  getDBQueue: vi.fn().mockReturnValue({
+    transaction: vi
+      .fn()
+      .mockImplementation((callback: (tx: unknown) => Promise<unknown>) => {
+        // モックトランザクションオブジェクトで callback を実行し、結果を Effect.tryPromise でラップ
+        return Effect.tryPromise({
+          try: () => callback({}),
+          catch: (e) => ({ type: 'TASK_TIMEOUT' as const, message: String(e) }),
+        });
+      }),
+  }),
 }));
 
 // getAppUserDataPathのモック

@@ -140,14 +140,16 @@ describe('vrchatLogController integration test with minimal mocks', () => {
   };
 
   const createTestPlayerJoinLog = async (joinDateTime: Date) => {
-    const logs = await playerJoinLogService.createVRChatPlayerJoinLogModel([
-      {
-        logType: 'playerJoin' as const,
-        playerName: VRChatPlayerNameSchema.parse('TestPlayer'),
-        playerId: VRChatPlayerIdSchema.parse(`usr_${uuidv7()}`),
-        joinDate: joinDateTime,
-      },
-    ]);
+    const logs = await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel([
+        {
+          logType: 'playerJoin' as const,
+          playerName: VRChatPlayerNameSchema.parse('TestPlayer'),
+          playerId: VRChatPlayerIdSchema.parse(`usr_${uuidv7()}`),
+          joinDate: joinDateTime,
+        },
+      ]),
+    );
     return logs[0];
   };
 

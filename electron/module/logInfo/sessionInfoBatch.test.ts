@@ -119,8 +119,8 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
         const playerJoinDate1 = parseISO('2024-01-01T11:45:00Z');
         const playerJoinDate2 = parseISO('2024-01-01T12:15:00Z');
 
-        const playerResults =
-          await playerJoinLogService.createVRChatPlayerJoinLogModel([
+        const playerResults = await Effect.runPromise(
+          playerJoinLogService.createVRChatPlayerJoinLogModel([
             {
               logType: 'playerJoin' as const,
               playerId: OptionalVRChatPlayerIdSchema.parse(
@@ -137,7 +137,8 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
               playerName: VRChatPlayerNameSchema.parse('TestPlayer2'),
               joinDate: playerJoinDate2,
             },
-          ]);
+          ]),
+        );
 
         if (playerResults.length > 0) {
           // 両方のメソッドを実行
@@ -225,8 +226,8 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
         const playerJoinDate1 = parseISO('2024-01-02T13:45:00Z');
         const playerJoinDate2 = parseISO('2024-01-02T14:15:00Z');
 
-        const playerResults =
-          await playerJoinLogService.createVRChatPlayerJoinLogModel([
+        const playerResults = await Effect.runPromise(
+          playerJoinLogService.createVRChatPlayerJoinLogModel([
             {
               logType: 'playerJoin' as const,
               playerId: OptionalVRChatPlayerIdSchema.parse(
@@ -247,7 +248,8 @@ describe('SessionInfoBatch vs getPlayerListInSameWorld logic comparison', () => 
               ),
               joinDate: playerJoinDate2,
             },
-          ]);
+          ]),
+        );
 
         if (playerResults.length > 0) {
           const originalResult =

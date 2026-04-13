@@ -32,7 +32,9 @@ describe('VRChatPlayerJoinLogModel', () => {
           playerId: null,
         },
       ];
-      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
       const logs = await Effect.runPromise(
         service.getVRChatPlayerJoinLogListByJoinDateTime({
           startJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'),
@@ -108,7 +110,9 @@ describe('VRChatPlayerJoinLogModel', () => {
           playerId: null,
         },
       ];
-      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
       const logs = await Effect.runPromise(
         service.getVRChatPlayerJoinLogListByJoinDateTime({
           startJoinDateTime: datefns.parseISO('2021-01-01T00:00:00Z'),
@@ -147,8 +151,9 @@ describe('VRChatPlayerJoinLogModel', () => {
           playerId: null,
         },
       ];
-      const result1 =
-        await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      const result1 = await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
       expect(
         result1.map((log) => ({
           joinDateTime: log.joinDateTime,
@@ -163,7 +168,9 @@ describe('VRChatPlayerJoinLogModel', () => {
       // 2回目: DB既存レコードとの重複は INSERT OR IGNORE で無視される。
       // bulkCreate の戻り値にはスキップされたレコードも含まれうるため、
       // 戻り値の件数ではなく下の findAll で DB の最終状態を検証する。
-      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
 
       const logs = await Effect.runPromise(
         service.getVRChatPlayerJoinLogListByJoinDateTime({
@@ -200,7 +207,9 @@ describe('VRChatPlayerJoinLogModel', () => {
           playerId: null,
         },
       ];
-      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
 
       const value = await Effect.runPromise(service.getLatestDetectedDate());
 
@@ -223,7 +232,9 @@ describe('VRChatPlayerJoinLogModel', () => {
           playerId: null,
         },
       ];
-      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
+      await Effect.runPromise(
+        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
+      );
 
       const value = await Effect.runPromise(service.findLatestPlayerJoinLog());
 

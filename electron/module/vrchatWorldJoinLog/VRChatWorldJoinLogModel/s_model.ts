@@ -5,6 +5,7 @@ import {
   type InferCreationAttributes,
   Model,
   Op,
+  type Transaction,
 } from '@sequelize/core';
 import {
   Attribute,
@@ -81,6 +82,7 @@ export class VRChatWorldJoinLogModel extends Model<
  */
 export const createVRChatWorldJoinLog = async (
   vrchatWorldJoinLogList: VRChatWorldJoinLog[],
+  transaction?: Transaction,
 ): Promise<VRChatWorldJoinLogModel[]> => {
   const newLogs = vrchatWorldJoinLogList.map((logInfo) => ({
     joinDateTime: logInfo.joinDate,
@@ -94,6 +96,7 @@ export const createVRChatWorldJoinLog = async (
       newLogs,
       {
         ignoreDuplicates: true,
+        transaction,
       },
     );
 

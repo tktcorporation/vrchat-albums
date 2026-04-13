@@ -60,24 +60,26 @@ describe('SessionInfoBatch world change behavior', () => {
     );
 
     // World A でプレイヤーが参加
-    await playerJoinLogService.createVRChatPlayerJoinLogModel([
-      {
-        logType: 'playerJoin' as const,
-        playerId: OptionalVRChatPlayerIdSchema.parse(
-          'usr_11111111-1111-1111-1111-111111111111',
-        ),
-        playerName: VRChatPlayerNameSchema.parse('Player1'),
-        joinDate: player1JoinTime,
-      },
-      {
-        logType: 'playerJoin' as const,
-        playerId: OptionalVRChatPlayerIdSchema.parse(
-          'usr_22222222-2222-2222-2222-222222222222',
-        ),
-        playerName: VRChatPlayerNameSchema.parse('Player2'),
-        joinDate: player2JoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel([
+        {
+          logType: 'playerJoin' as const,
+          playerId: OptionalVRChatPlayerIdSchema.parse(
+            'usr_11111111-1111-1111-1111-111111111111',
+          ),
+          playerName: VRChatPlayerNameSchema.parse('Player1'),
+          joinDate: player1JoinTime,
+        },
+        {
+          logType: 'playerJoin' as const,
+          playerId: OptionalVRChatPlayerIdSchema.parse(
+            'usr_22222222-2222-2222-2222-222222222222',
+          ),
+          playerName: VRChatPlayerNameSchema.parse('Player2'),
+          joinDate: player2JoinTime,
+        },
+      ]),
+    );
 
     // World B に参加（World A から退出）
     await Effect.runPromise(
@@ -95,16 +97,18 @@ describe('SessionInfoBatch world change behavior', () => {
     );
 
     // World B でプレイヤーが参加
-    await playerJoinLogService.createVRChatPlayerJoinLogModel([
-      {
-        logType: 'playerJoin' as const,
-        playerId: OptionalVRChatPlayerIdSchema.parse(
-          'usr_33333333-3333-3333-3333-333333333333',
-        ),
-        playerName: VRChatPlayerNameSchema.parse('Player3'),
-        joinDate: player3JoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel([
+        {
+          logType: 'playerJoin' as const,
+          playerId: OptionalVRChatPlayerIdSchema.parse(
+            'usr_33333333-3333-3333-3333-333333333333',
+          ),
+          playerName: VRChatPlayerNameSchema.parse('Player3'),
+          joinDate: player3JoinTime,
+        },
+      ]),
+    );
 
     // テスト実行
     const router = logInfoRouter();
@@ -166,16 +170,18 @@ describe('SessionInfoBatch world change behavior', () => {
       ]),
     );
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel([
-      {
-        logType: 'playerJoin' as const,
-        playerId: OptionalVRChatPlayerIdSchema.parse(
-          'usr_12345678-1234-5678-abcd-123456789abc',
-        ),
-        playerName: VRChatPlayerNameSchema.parse('PlayerX'),
-        joinDate: playerXJoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel([
+        {
+          logType: 'playerJoin' as const,
+          playerId: OptionalVRChatPlayerIdSchema.parse(
+            'usr_12345678-1234-5678-abcd-123456789abc',
+          ),
+          playerName: VRChatPlayerNameSchema.parse('PlayerX'),
+          joinDate: playerXJoinTime,
+        },
+      ]),
+    );
 
     await Effect.runPromise(
       worldJoinLogService.createVRChatWorldJoinLogModel([
@@ -191,16 +197,18 @@ describe('SessionInfoBatch world change behavior', () => {
       ]),
     );
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel([
-      {
-        logType: 'playerJoin' as const,
-        playerId: OptionalVRChatPlayerIdSchema.parse(
-          'usr_87654321-4321-8765-dcba-987654321cba',
-        ),
-        playerName: VRChatPlayerNameSchema.parse('PlayerY'),
-        joinDate: playerYJoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel([
+        {
+          logType: 'playerJoin' as const,
+          playerId: OptionalVRChatPlayerIdSchema.parse(
+            'usr_87654321-4321-8765-dcba-987654321cba',
+          ),
+          playerName: VRChatPlayerNameSchema.parse('PlayerY'),
+          joinDate: playerYJoinTime,
+        },
+      ]),
+    );
 
     await Effect.runPromise(
       worldJoinLogService.createVRChatWorldJoinLogModel([
@@ -216,16 +224,18 @@ describe('SessionInfoBatch world change behavior', () => {
       ]),
     );
 
-    await playerJoinLogService.createVRChatPlayerJoinLogModel([
-      {
-        logType: 'playerJoin' as const,
-        playerId: OptionalVRChatPlayerIdSchema.parse(
-          'usr_abcdef12-3456-7890-abcd-ef1234567890',
-        ),
-        playerName: VRChatPlayerNameSchema.parse('PlayerZ'),
-        joinDate: playerZJoinTime,
-      },
-    ]);
+    await Effect.runPromise(
+      playerJoinLogService.createVRChatPlayerJoinLogModel([
+        {
+          logType: 'playerJoin' as const,
+          playerId: OptionalVRChatPlayerIdSchema.parse(
+            'usr_abcdef12-3456-7890-abcd-ef1234567890',
+          ),
+          playerName: VRChatPlayerNameSchema.parse('PlayerZ'),
+          joinDate: playerZJoinTime,
+        },
+      ]),
+    );
 
     // バッチで全セッション情報を取得
     const router = logInfoRouter();
