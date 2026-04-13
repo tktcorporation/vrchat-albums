@@ -20,7 +20,6 @@ export const createVRChatPlayerLeaveLogModel = async (
       newLogs,
       {
         ignoreDuplicates: true,
-        validate: true,
       },
     );
 

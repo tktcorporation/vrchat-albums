@@ -73,31 +73,31 @@ export class VRChatPlayerJoinLogModel extends Model<
 }
 
 /**
- * 重複を除外しつつプレイヤー参加ログを一括登録する
- * サービス層の createVRChatPlayerJoinLogModel から利用される
+ * プレイヤー参加ログを一括登録する
+ *
+ * バッチ内の重複は playerName+joinDateTime キーで JS 側で排除し、
+ * DB 既存レコードとの重複は SQLite の INSERT OR IGNORE（PlayerNameJoinDateTimeIndex
+ * ユニーク制約）で排除する。
+ * 従来は毎回 findAll() で全テーブルをメモリロードしていたが、バッチ呼び出しごとに
+ * 全テーブルスキャンが走りフルロード時のボトルネックになっていたため除去した。
+ *
+ * 注意: ignoreDuplicates の場合、bulkCreate の戻り値にはスキップされたレコードも
+ * 含まれうる（worldJoin/playerLeave と同じ挙動）。戻り値の件数を「新規作成数」
+ * として使う場合は注意が必要。
  */
 export const createVRChatPlayerJoinLog = async (
   playerJoinLogList: VRChatPlayerJoinLog[],
 ): Promise<VRChatPlayerJoinLogModel[]> => {
-  const existingLogs = await VRChatPlayerJoinLogModel.findAll({
-    attributes: ['joinDateTime', 'playerName'],
-  });
-
-  const existingSet = new Set(
-    existingLogs.map(
-      (log) => `${log.joinDateTime.toISOString()}|${log.playerName}`,
-    ),
-  );
-
-  const seen = new Set();
-  const newLogsExcludeDup = playerJoinLogList
+  // バッチ内の重複を排除（findAll 不要、O(n) で済む）
+  const seen = new Set<string>();
+  const newLogs = playerJoinLogList
     .filter((logInfo) => {
       const key = `${logInfo.joinDate.toISOString()}|${logInfo.playerName}`;
-      if (existingSet.has(key) || seen.has(key)) {
-        return false; // 既存セットまたは新しいセットに重複が見つかった場合は除外
+      if (seen.has(key)) {
+        return false;
       }
-      seen.add(key); // 初めて見た組み合わせを新しいセットに追加
-      return true; // ユニークな組み合わせの場合は残す
+      seen.add(key);
+      return true;
     })
     .map((logInfo) => ({
       joinDateTime: logInfo.joinDate,
@@ -105,10 +105,13 @@ export const createVRChatPlayerJoinLog = async (
       playerName: logInfo.playerName,
     }));
 
-  if (newLogsExcludeDup.length === 0) {
+  if (newLogs.length === 0) {
     return [];
   }
-  return VRChatPlayerJoinLogModel.bulkCreate(newLogsExcludeDup);
+
+  return VRChatPlayerJoinLogModel.bulkCreate(newLogs, {
+    ignoreDuplicates: true,
+  });
 };
 
 /**
