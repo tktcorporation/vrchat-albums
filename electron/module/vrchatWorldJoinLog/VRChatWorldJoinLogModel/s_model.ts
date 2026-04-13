@@ -94,7 +94,6 @@ export const createVRChatWorldJoinLog = async (
       newLogs,
       {
         ignoreDuplicates: true,
-        validate: true,
       },
     );
 

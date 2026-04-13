@@ -257,6 +257,7 @@ export function loadLogInfoIndexFromVRChatLog({
       );
 
       // 3. ログファイルからログ情報を取得（部分的な成功を許容）
+      logger.info(`start log file read: ${logStoreFilePaths.length} files`);
       emitProgress({
         stage: 'log_load',
         progress: 10,
@@ -270,10 +271,8 @@ export function loadLogInfoIndexFromVRChatLog({
           logStoreFilePaths,
         );
       const getLogInfoEndTime = performance.now();
-      logger.debug(
-        `Get VRChat log info from log files took ${
-          getLogInfoEndTime - getLogInfoStartTime
-        } ms`,
+      logger.info(
+        `done log file read: ${(getLogInfoEndTime - getLogInfoStartTime).toFixed(0)} ms`,
       );
 
       // エラーがあった場合は警告を出力し、Sentryにも送信
@@ -301,6 +300,9 @@ export function loadLogInfoIndexFromVRChatLog({
       logInfoList = logInfoListFromLogFile.data;
     }
 
+    logger.info(
+      `start log filtering: ${logInfoList.length} logs, excludeOldLogLoad=${String(excludeOldLogLoad)}`,
+    );
     const filterLogsStartTime = performance.now();
     const newLogs = yield* Effect.promise(() =>
       match(excludeOldLogLoad)
@@ -368,8 +370,8 @@ export function loadLogInfoIndexFromVRChatLog({
         .exhaustive(),
     );
     const filterLogsEndTime = performance.now();
-    logger.debug(
-      `Filtering logs took ${filterLogsEndTime - filterLogsStartTime} ms`,
+    logger.info(
+      `done log filtering: ${newLogs.length} logs to insert (${(filterLogsEndTime - filterLogsStartTime).toFixed(0)} ms)`,
     );
 
     const results: LogProcessingResults = {
@@ -384,30 +386,15 @@ export function loadLogInfoIndexFromVRChatLog({
     // 5. ログのバッチ処理
     const batchProcessStartTime = performance.now();
     const BATCH_SIZE = 1000;
-    /** 進捗報告を行うバッチ間隔 */
-    const PROGRESS_REPORT_INTERVAL = 5;
     const totalBatches = Math.ceil(newLogs.length / BATCH_SIZE);
+    logger.info(
+      `start DB batch insert: ${newLogs.length} logs (${totalBatches} batches)`,
+    );
+    emitStageStart('log_load', 'ログデータをDBに書き込み中...', newLogs.length);
 
     for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
       const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-      const batchStartTime = performance.now();
       const batch = newLogs.slice(i, i + BATCH_SIZE);
-
-      // 進捗を報告（PROGRESS_REPORT_INTERVALバッチごとまたは最初と最後）
-      if (
-        batchNumber === 1 ||
-        batchNumber === totalBatches ||
-        batchNumber % PROGRESS_REPORT_INTERVAL === 0
-      ) {
-        const current = i + batch.length;
-        const total = newLogs.length;
-        emitProgress({
-          stage: 'log_load',
-          progress: total > 0 ? Math.round((current / total) * 100) : 0,
-          message: `ログデータを処理中... (${batchNumber}/${totalBatches})`,
-          details: { current, total },
-        });
-      }
 
       const worldJoinLogBatch = batch.filter(
         (log): log is VRChatWorldJoinLog => log.logType === 'worldJoin',
@@ -418,109 +405,50 @@ export function loadLogInfoIndexFromVRChatLog({
       const playerLeaveLogBatch = batch.filter(
         (log): log is VRChatPlayerLeaveLog => log.logType === 'playerLeave',
       );
-      // TODO: アプリイベントの処理は今後実装
-      // const appEventLogBatch = batch.filter(
-      //   (
-      //     log,
-      //   ): log is VRChatAppStartLog | VRChatAppExitLog | VRChatAppVersionLog =>
-      //     log.logType === 'appStart' ||
-      //     log.logType === 'appExit' ||
-      //     log.logType === 'appVersion',
-      // );
 
-      logger.debug(`worldJoinLogBatch: ${worldJoinLogBatch.length}`);
-      logger.debug(`playerJoinLogBatch: ${playerJoinLogBatch.length}`);
-      logger.debug(`playerLeaveLogBatch: ${playerLeaveLogBatch.length}`);
-      // TODO: アプリイベントの処理は今後実装
-      // logger.debug(`appEventLogBatch: ${appEventLogBatch.length}`);
-
-      const dbInsertStartTime = performance.now();
-      const [
-        worldJoinResults,
-        playerJoinResults,
-        playerLeaveResults,
-        // TODO: アプリイベントの処理は今後実装
-        // appEventResult,
-      ] = yield* Effect.promise(() =>
-        Promise.all([
-          Effect.runPromise(
-            worldJoinLogService.createVRChatWorldJoinLogModel(
-              worldJoinLogBatch,
-            ),
-          ),
-          playerJoinLogService.createVRChatPlayerJoinLogModel(
-            playerJoinLogBatch,
-          ),
-          playerLeaveLogService.createVRChatPlayerLeaveLogModel(
-            playerLeaveLogBatch.map((logInfo) => ({
-              leaveDate: logInfo.leaveDate,
-              playerName: logInfo.playerName,
-              playerId: logInfo.playerId ?? null,
-            })),
-          ),
-          // TODO: アプリイベントの処理は今後実装
-          // appEventLogBatch.length > 0
-          //   ? appEventService.saveAppEventLogs(appEventLogBatch)
-          //   : Effect.succeed([]),
-        ]),
+      // SQLite は単一ライターなので、Promise.all での並列書き込みは
+      // シリアライズされてロック競合オーバーヘッドだけが増える。順次実行する。
+      const worldJoinResults = yield* Effect.promise(() =>
+        Effect.runPromise(
+          worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogBatch),
+        ),
       );
-      const dbInsertEndTime = performance.now();
-      logger.debug(
-        `Batch ${i / BATCH_SIZE + 1}: DB insert took ${
-          dbInsertEndTime - dbInsertStartTime
-        } ms`,
+      const playerJoinResults = yield* Effect.promise(() =>
+        playerJoinLogService.createVRChatPlayerJoinLogModel(playerJoinLogBatch),
+      );
+      const playerLeaveResults = yield* Effect.promise(() =>
+        playerLeaveLogService.createVRChatPlayerLeaveLogModel(
+          playerLeaveLogBatch.map((logInfo) => ({
+            leaveDate: logInfo.leaveDate,
+            playerName: logInfo.playerName,
+            playerId: logInfo.playerId ?? null,
+          })),
+        ),
       );
 
-      results.createdWorldJoinLogModelList = [
-        ...results.createdWorldJoinLogModelList,
-        ...worldJoinResults,
-      ];
-      results.createdPlayerJoinLogModelList = [
-        ...results.createdPlayerJoinLogModelList,
-        ...playerJoinResults,
-      ];
-      results.createdPlayerLeaveLogModelList = [
-        ...results.createdPlayerLeaveLogModelList,
-        ...playerLeaveResults,
-      ];
-      // TODO: アプリイベントの処理は今後実装
-      // if (appEventResult.isOk()) {
-      //   results.createdAppEventCount += appEventResult.value.length;
-      // }
+      results.createdWorldJoinLogModelList.push(...worldJoinResults);
+      results.createdPlayerJoinLogModelList.push(...playerJoinResults);
+      results.createdPlayerLeaveLogModelList.push(...playerLeaveResults);
 
-      const batchEndTime = performance.now();
-      logger.debug(
-        `Batch ${i / BATCH_SIZE + 1} processing took ${
-          batchEndTime - batchStartTime
-        } ms`,
-      );
-
-      // メモリ使用量をモニタリング（10バッチごと）
-      if ((i / BATCH_SIZE + 1) % 10 === 0) {
-        const memUsage = process.memoryUsage();
-        const heapUsedMB = memUsage.heapUsed / 1024 / 1024;
-        logger.debug(
-          `Memory usage after batch ${i / BATCH_SIZE + 1}: Heap=${heapUsedMB.toFixed(2)}MB`,
-        );
-
-        // メモリ使用量が500MBを超えた場合は警告
-        if (heapUsedMB > 500) {
-          logger.warn(
-            `High memory usage detected during log processing: ${heapUsedMB.toFixed(2)}MB`,
-          );
-        }
-      }
+      // 進捗をUIプログレスバーに反映（毎バッチ）
+      const current = i + batch.length;
+      emitProgress({
+        stage: 'log_load',
+        progress:
+          newLogs.length > 0 ? Math.round((current / newLogs.length) * 100) : 0,
+        message: `ログデータを処理中... (${batchNumber}/${totalBatches})`,
+        details: { current, total: newLogs.length },
+      });
     }
     const batchProcessEndTime = performance.now();
-    logger.debug(
-      `Total batch processing took ${
-        batchProcessEndTime - batchProcessStartTime
-      } ms`,
+    logger.info(
+      `done DB batch insert: ${(batchProcessEndTime - batchProcessStartTime).toFixed(0)} ms`,
     );
 
     // 6. 写真のインデックス処理
     // excludeOldLogLoad=true → 差分スキャン（ダイジェスト・mtime使用）
     // excludeOldLogLoad=false → フルスキャン
+    logger.info('start photo index creation');
     emitStageStart('photo_index', '写真をインデックス中...');
     const photoIndexStartTime = performance.now();
     const photoResults = yield* Effect.promise(() =>
@@ -533,14 +461,15 @@ export function loadLogInfoIndexFromVRChatLog({
       message: '写真インデックスが完了しました',
     });
     const photoIndexEndTime = performance.now();
-    logger.debug(
-      `Create photo path index took ${
-        photoIndexEndTime - photoIndexStartTime
-      } ms`,
+    logger.info(
+      `done photo index creation: ${photoResults?.length ?? 0} photos (${(photoIndexEndTime - photoIndexStartTime).toFixed(0)} ms)`,
     );
 
     // 6.5. 写真メタデータ抽出 (VRChat公式XMP)
     if (photoResults && photoResults.length > 0) {
+      logger.info(
+        `start photo metadata extraction: ${photoResults.length} photos`,
+      );
       emitStageStart('photo_metadata', '写真メタデータを抽出中...');
       const metadataStartTime = performance.now();
       const photoPaths = photoResults.map((p) => p.photoPath);
@@ -559,14 +488,13 @@ export function loadLogInfoIndexFromVRChatLog({
         });
       }
       const metadataEndTime = performance.now();
-      logger.debug(
-        `Photo metadata extraction took ${
-          metadataEndTime - metadataStartTime
-        } ms`,
+      logger.info(
+        `done photo metadata extraction: ${(metadataEndTime - metadataStartTime).toFixed(0)} ms`,
       );
     }
 
     // 7. 写真フォルダからのログインポート（通常ログ処理後に実行）
+    logger.info('start photo dir log import');
     const importLogPhotoStartTime = performance.now();
     const vrChatPhotoDirPath = vrchatPhotoService.getVRChatPhotoDirPath();
     if (vrChatPhotoDirPath) {
@@ -577,10 +505,8 @@ export function loadLogInfoIndexFromVRChatLog({
       );
     }
     const importLogPhotoEndTime = performance.now();
-    logger.debug(
-      `Import log lines from photo dir took ${
-        importLogPhotoEndTime - importLogPhotoStartTime
-      } ms`,
+    logger.info(
+      `done photo dir log import: ${(importLogPhotoEndTime - importLogPhotoStartTime).toFixed(0)} ms`,
     );
 
     const totalEndTime = performance.now();

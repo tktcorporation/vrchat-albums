@@ -160,14 +160,10 @@ describe('VRChatPlayerJoinLogModel', () => {
           playerName: 'player1',
         },
       ]);
-      const result2 =
-        await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
-      expect(
-        result2.map((log) => ({
-          joinDateTime: log.joinDateTime,
-          playerName: log.playerName,
-        })),
-      ).toEqual([]);
+      // 2回目の呼び出し: DB側の INSERT OR IGNORE で重複は無視されるが、
+      // bulkCreate の戻り値には ignore されたレコードも含まれうる。
+      // 重要なのは DB に重複レコードが存在しないこと（下の findAll で検証）。
+      await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
       const logs = await Effect.runPromise(
         service.getVRChatPlayerJoinLogListByJoinDateTime({

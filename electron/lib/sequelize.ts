@@ -57,11 +57,19 @@ const _newRDBClient = (props: { db_url: string }) => {
  * SQLite の PRAGMA を設定する。
  * - journal_mode=WAL: 読み書きの並行処理を可能にする
  * - busy_timeout=5000: DB ロック時に最大5秒待機する
+ * - synchronous=NORMAL: WAL モード下では安全。各トランザクションの fsync を省略し書き込み I/O を削減
+ * - cache_size=-50000: ページキャッシュを 50MB に拡張（デフォルト ~2MB）。バッチ処理時のページ入れ替えを抑制
+ * - temp_store=MEMORY: ソート等のテンポラリ処理をメモリで実行
  */
 const configureSQLitePragmas = async (client: Sequelize): Promise<void> => {
   await client.query('PRAGMA journal_mode=WAL');
   await client.query('PRAGMA busy_timeout=5000');
-  logger.info('SQLite PRAGMAs configured: journal_mode=WAL, busy_timeout=5000');
+  await client.query('PRAGMA synchronous=NORMAL');
+  await client.query('PRAGMA cache_size=-50000');
+  await client.query('PRAGMA temp_store=MEMORY');
+  logger.info(
+    'SQLite PRAGMAs configured: journal_mode=WAL, busy_timeout=5000, synchronous=NORMAL, cache_size=50MB, temp_store=MEMORY',
+  );
 };
 
 /**
