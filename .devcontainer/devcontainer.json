@@ -29,7 +29,9 @@
     // },
     "ghcr.io/devcontainers/features/aws-cli:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers-extra/features/mise:1": {},
+    "ghcr.io/devcontainers-extra/features/mise:1": {
+      "version": "2026.4.10"
+    },
     "ghcr.io/devcontainers/features/desktop-lite:1": {
       "webPort": "6080",
       "vncPort": "5901"
@@ -107,13 +109,14 @@
     //   ~/.local/share: mise volume マウント時に Docker が root 所有で作成する親ディレクトリ。
     //                   pnpm が ~/.local/share/pnpm/.tools/ にツールを配置するため書き込み権限が必要
     //   ~/.local/share/mise: mise のインストール済みツール (named volume)
+    //   ~/.local/share/pnpm: pnpm のツールキャッシュ（oxfmt 等）
     //   ~/.local/state/mise: mise trust の trusted-configs 保存先
     //   ~/.cache/mise: mise のダウンロードキャッシュ
     //   ~/.claude: Claude Code データ全体 (named volume)
     "fix-volume-permissions": [
       "bash",
       "-c",
-      "set -e; sudo mkdir -p ~/.local/state/mise ~/.cache/mise && sudo chown -R $(whoami) .pnpm-store ~/.local/share ~/.local/state/mise ~/.cache/mise ~/.claude"
+      "set -e; sudo mkdir -p ~/.local/state/mise ~/.cache/mise ~/.local/share/pnpm && sudo chown -R $(whoami) .pnpm-store ~/.local/share/mise ~/.local/share/pnpm ~/.local/state/mise ~/.cache/mise ~/.claude"
     ]
   },
   "updateContentCommand": {
