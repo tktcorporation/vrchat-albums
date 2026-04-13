@@ -408,6 +408,8 @@ export function loadLogInfoIndexFromVRChatLog({
 
       // SQLite は単一ライターなので、Promise.all での並列書き込みは
       // シリアライズされてロック競合オーバーヘッドだけが増える。順次実行する。
+      // worldJoinLogService は Effect を返すが、DBHelperError を関数シグネチャの
+      // エラー型に含めていないため、runPromise で Promise 経由にしてエラー型を分離する。
       const worldJoinResults = yield* Effect.promise(() =>
         Effect.runPromise(
           worldJoinLogService.createVRChatWorldJoinLogModel(worldJoinLogBatch),

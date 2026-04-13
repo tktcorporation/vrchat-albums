@@ -80,6 +80,10 @@ export class VRChatPlayerJoinLogModel extends Model<
  * ユニーク制約）で排除する。
  * 従来は毎回 findAll() で全テーブルをメモリロードしていたが、バッチ呼び出しごとに
  * 全テーブルスキャンが走りフルロード時のボトルネックになっていたため除去した。
+ *
+ * 注意: ignoreDuplicates の場合、bulkCreate の戻り値にはスキップされたレコードも
+ * 含まれうる（worldJoin/playerLeave と同じ挙動）。戻り値の件数を「新規作成数」
+ * として使う場合は注意が必要。
  */
 export const createVRChatPlayerJoinLog = async (
   playerJoinLogList: VRChatPlayerJoinLog[],

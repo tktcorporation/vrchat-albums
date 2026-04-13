@@ -160,9 +160,9 @@ describe('VRChatPlayerJoinLogModel', () => {
           playerName: 'player1',
         },
       ]);
-      // 2回目の呼び出し: DB側の INSERT OR IGNORE で重複は無視されるが、
-      // bulkCreate の戻り値には ignore されたレコードも含まれうる。
-      // 重要なのは DB に重複レコードが存在しないこと（下の findAll で検証）。
+      // 2回目: DB既存レコードとの重複は INSERT OR IGNORE で無視される。
+      // bulkCreate の戻り値にはスキップされたレコードも含まれうるため、
+      // 戻り値の件数ではなく下の findAll で DB の最終状態を検証する。
       await service.createVRChatPlayerJoinLogModel(playerJoinLogList);
 
       const logs = await Effect.runPromise(
