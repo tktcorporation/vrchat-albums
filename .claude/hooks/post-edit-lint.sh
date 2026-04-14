@@ -20,6 +20,9 @@ if [[ -z "${CLAUDE_FILE_PATHS:-}" ]]; then
   exit 0
 fi
 
+# 先に cd してからパス解決する（相対パスが正しく解決されるように）
+cd "${CLAUDE_PROJECT_DIR:-.}"
+
 # TypeScript/TSX ファイルのみ対象
 ts_files=()
 while IFS= read -r file; do
@@ -35,8 +38,6 @@ done <<< "$CLAUDE_FILE_PATHS"
 if [[ ${#ts_files[@]} -eq 0 ]]; then
   exit 0
 fi
-
-cd "${CLAUDE_PROJECT_DIR:-.}"
 
 # ツール存在チェック（なければ早期 exit、ミリ秒単位で完了）
 OXFMT="./node_modules/.bin/oxfmt"
