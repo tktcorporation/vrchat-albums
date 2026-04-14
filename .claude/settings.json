@@ -13,21 +13,24 @@
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": ["chrome-devtools"],
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-edit-lint.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'lsof.*-ti.*\\|.*xargs.*kill|lsof.*-ti.*\\|.*kill|kill.*\\$\\(lsof|kill.*lsof|fuser.*-k'; then echo 'BLOCKED: lsof+kill / fuser+kill はポートフォワーディングプロセスを巻き込んで devcontainer を殺す。代わりに pkill -f で特定プロセス名を指定して kill すること。' >&2; exit 2; fi"
-          },
-          {
-            "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+checkout\\s+--\\s+\\.|git\\s+restore\\s+\\.|git\\s+reset\\s+--hard|git\\s+clean\\s+-[a-z]*f|jj\\s+restore\\s+--(from|to|changes-in)'; then echo 'BLOCKED: 全ファイル対象の revert/reset は他プロセスの変更を巻き込む。特定ファイルを指定するか、ワークスペース (jj workspace add / git worktree add) を作成して作業すること。' >&2; exit 2; fi"
-          },
-          {
-            "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+worktree\\s+add'; then if ! echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'git\\s+worktree\\s+add\\s+\\.claude/worktrees/'; then echo 'BLOCKED: worktree は .claude/worktrees/ 配下に作成すること。例: git worktree add .claude/worktrees/<タスク名> -b <ブランチ名> origin/master。または EnterWorktree ツールを使うこと。' >&2; exit 2; fi; fi"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-bash-guard.sh"
           },
           {
             "type": "command",
