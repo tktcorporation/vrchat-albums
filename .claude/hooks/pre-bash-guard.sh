@@ -17,21 +17,24 @@ INPUT="${CLAUDE_TOOL_INPUT:-}"
 
 deny_with_json() {
   local reason="$1"
-  cat <<DENY_JSON
-{
-  "hookSpecificOutput": {
-    "hookEventName": "PreToolUse",
-    "permissionDecision": "deny",
-    "permissionDecisionReason": "${reason}"
-  }
-}
-DENY_JSON
+  # jq があれば安全にエスケープ、なければ printf フォールバック
+  if command -v jq >/dev/null 2>&1; then
+    jq -n --arg reason "$reason" '{
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: $reason
+      }
+    }'
+  else
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
+  fi
   exit 0
 }
 
-# 1. lsof+kill / fuser+kill ブロック
-if echo "$INPUT" | grep -qE 'lsof.*-ti.*\|.*xargs.*kill|lsof.*-ti.*\|.*kill|kill.*\$\(lsof|kill.*lsof|fuser.*-k'; then
-  deny_with_json "lsof+kill / fuser+kill はポートフォワーディングプロセスを巻き込んで devcontainer を殺す危険がある。代わりに: 1) lsof -i :PORT でプロセスを確認 2) 対象PIDを特定 3) kill <PID> で個別に停止すること。"
+# 1. 無差別プロセス kill ブロック (hookify.block-blind-kill.local.md と同等)
+if echo "$INPUT" | grep -qE 'lsof.*-ti.*\|.*xargs.*kill|lsof.*-ti.*\|.*kill|kill.*\$\(lsof|kill.*lsof|fuser.*-k|kill\s+%[0-9]|kill\s+-9?\s*\$\(|pkill\s+-f'; then
+  deny_with_json "無差別 kill はポートフォワーディングプロセスを巻き込んで devcontainer を殺す危険がある。代わりに: 1) lsof -i :PORT でプロセスを確認 2) 対象PIDを特定 3) kill <PID> で個別に停止すること。"
 fi
 
 # 2. 全ファイル revert/reset ブロック

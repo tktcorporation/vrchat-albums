@@ -34,7 +34,7 @@
           },
           {
             "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'gh\\s+pr\\s+create'; then \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require-pr-self-review.sh; fi"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require-pr-self-review.sh"
           }
         ]
       }

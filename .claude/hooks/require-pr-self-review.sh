@@ -12,6 +12,12 @@
 
 set -euo pipefail
 
+# gh pr create 以外のコマンドは通過させる
+INPUT="${CLAUDE_TOOL_INPUT:-}"
+if ! printf '%s' "$INPUT" | grep -qE 'gh\s+pr\s+create'; then
+  exit 0
+fi
+
 REVIEW_COUNT_FILE="${CLAUDE_PROJECT_DIR:-.}/.claude/.pr-review-count"
 REQUIRED_REVIEWS=2
 

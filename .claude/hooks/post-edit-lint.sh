@@ -7,11 +7,13 @@
 #
 # 出力形式:
 #   hookSpecificOutput.additionalContext (JSON) でエージェントにフィードバック。
-#   参照: Harness Engineering Best Practices (2026)
+#   jq でエスケープし、不正な JSON 出力を防止する。
 #
 # ADR: ADR-003 (PostToolUse auto-lint)
 
-set -euo pipefail
+# set -e は使わない。ツールの欠如やフォーマットエラーで
+# フック全体が中断するのを防ぎ、可能な限りフィードバックを返す。
+set -uo pipefail
 
 # CLAUDE_FILE_PATHS: 変更されたファイルパスのリスト (改行区切り)
 if [[ -z "${CLAUDE_FILE_PATHS:-}" ]]; then
@@ -36,47 +38,49 @@ fi
 
 cd "${CLAUDE_PROJECT_DIR:-.}"
 
-violations=""
+# ツール存在チェック（なければ早期 exit、ミリ秒単位で完了）
+OXFMT="./node_modules/.bin/oxfmt"
+OXLINT="./node_modules/.bin/oxlint"
+if [[ ! -x "$OXFMT" ]] || [[ ! -x "$OXLINT" ]]; then
+  exit 0
+fi
 
 # 1. oxfmt で自動フォーマット (修正は適用、差分をレポート)
 fmt_output=""
 for f in "${ts_files[@]}"; do
-  # --check で差分検出、あれば --write で自動修正
-  if ! npx oxfmt --check "$f" >/dev/null 2>&1; then
-    npx oxfmt --write "$f" 2>/dev/null || true
-    fmt_output="${fmt_output}formatted: ${f}\n"
+  if ! "$OXFMT" --check "$f" >/dev/null 2>&1; then
+    "$OXFMT" --write "$f" 2>/dev/null || true
+    fmt_output="${fmt_output}formatted: ${f}; "
   fi
 done
 
-# 2. oxlint で静的解析 (修正可能なものは自動修正)
+# 2. oxlint で静的解析
+# 改行区切りで結果を蓄積（リテラル \n ではなく実際の改行を使用）
 lint_output=""
 for f in "${ts_files[@]}"; do
-  result=$(npx oxlint "$f" 2>&1) || true
-  if echo "$result" | grep -qE '^\s*(error|warning)\['; then
-    lint_output="${lint_output}${result}\n"
+  result=$("$OXLINT" "$f" 2>&1) || true
+  if printf '%s' "$result" | grep -qE '^\s*(error|warning)\['; then
+    lint_output="${lint_output}${result}"$'\n'
   fi
 done
 
-# フィードバック生成
+# フィードバック生成（jq で安全に JSON エスケープ）
 if [[ -n "$fmt_output" || -n "$lint_output" ]]; then
   context=""
   if [[ -n "$fmt_output" ]]; then
-    context="[auto-fixed] oxfmt がフォーマットを修正しました: $(echo -e "$fmt_output" | tr '\n' ' ')"
+    context="[auto-fixed] oxfmt がフォーマットを修正しました: ${fmt_output}"
   fi
   if [[ -n "$lint_output" ]]; then
-    # lint 出力を1行に圧縮 (JSON安全)
-    lint_summary=$(echo -e "$lint_output" | grep -E '^\s*(error|warning)\[' | head -10 | tr '\n' '; ' | sed 's/"/\\"/g')
+    lint_summary=$(printf '%s' "$lint_output" | grep -E '^\s*(error|warning)\[' | head -10 | tr '\n' '; ')
     context="${context}[要修正] oxlint 違反: ${lint_summary}"
   fi
 
-  cat <<HOOK_JSON
-{
-  "hookSpecificOutput": {
-    "hookEventName": "PostToolUse",
-    "additionalContext": "${context}"
-  }
-}
-HOOK_JSON
+  jq -n --arg ctx "$context" '{
+    hookSpecificOutput: {
+      hookEventName: "PostToolUse",
+      additionalContext: $ctx
+    }
+  }'
 fi
 
 exit 0
