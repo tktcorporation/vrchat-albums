@@ -58,20 +58,14 @@
       "Bash(gh run view:*)",
       "Bash(npx tsx:*)",
       "Bash(npm run lint:*)",
-      "Bash(diff:*)"
+      "Bash(diff:*)",
+      "Bash(rm .claude/commit-msg.tmp)",
+      "Bash(git push:*)"
     ],
     "deny": []
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": ["context7", "serena"],
-  "extraKnownMarketplaces": {
-    "anthropic-agent-skills": {
-      "source": {
-        "source": "github",
-        "repo": "anthropics/skills"
-      }
-    }
-  },
   "enabledPlugins": {
     "document-skills@anthropic-agent-skills": true,
     "example-skills@anthropic-agent-skills": true,
@@ -88,5 +82,13 @@
     "pr-review-toolkit@claude-code-plugins": true,
     "ralph-wiggum@claude-code-plugins": true,
     "security-guidance@claude-code-plugins": true
+  },
+  "extraKnownMarketplaces": {
+    "anthropic-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/skills"
+      }
+    }
   }
 }
