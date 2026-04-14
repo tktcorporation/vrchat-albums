@@ -46,21 +46,25 @@ if [[ ! -x "$OXFMT" ]] || [[ ! -x "$OXLINT" ]]; then
   exit 0
 fi
 
-# 1. oxfmt で自動フォーマット (修正は適用、差分をレポート)
+# 1. oxfmt で自動フォーマット (修正は適用、成功時のみレポート)
 fmt_output=""
 for f in "${ts_files[@]}"; do
   if ! "$OXFMT" --check "$f" >/dev/null 2>&1; then
-    "$OXFMT" --write "$f" 2>/dev/null || true
-    fmt_output="${fmt_output}formatted: ${f}; "
+    if "$OXFMT" --write "$f" 2>/dev/null; then
+      fmt_output="${fmt_output}formatted: ${f}; "
+    fi
   fi
 done
 
 # 2. oxlint で静的解析
-# 改行区切りで結果を蓄積（リテラル \n ではなく実際の改行を使用）
+# oxlint の出力形式: "x eslint(rule-name): message" (エラー) / "! eslint(rule-name): message" (警告)
+# サマリー行: "Found N warnings and M errors."
 lint_output=""
 for f in "${ts_files[@]}"; do
   result=$("$OXLINT" "$f" 2>&1) || true
-  if printf '%s' "$result" | grep -qE '^\s*(error|warning)\['; then
+  # サマリー行でエラー/警告の有無を判定（"0 warnings and 0 errors" 以外なら違反あり）
+  if printf '%s' "$result" | grep -qE 'Found [0-9]+ warnings and [0-9]+ errors' \
+     && ! printf '%s' "$result" | grep -qE 'Found 0 warnings and 0 errors'; then
     lint_output="${lint_output}${result}"$'\n'
   fi
 done
@@ -72,7 +76,8 @@ if [[ -n "$fmt_output" || -n "$lint_output" ]]; then
     context="[auto-fixed] oxfmt がフォーマットを修正しました: ${fmt_output}"
   fi
   if [[ -n "$lint_output" ]]; then
-    lint_summary=$(printf '%s' "$lint_output" | grep -E '^\s*(error|warning)\[' | head -10 | tr '\n' '; ')
+    # "x eslint(...)" 行と "! eslint(...)" 行を診断として抽出
+    lint_summary=$(printf '%s' "$lint_output" | grep -E '^\s*(x|!) ' | head -10 | tr '\n' '; ')
     context="${context}[要修正] oxlint 違反: ${lint_summary}"
   fi
 
