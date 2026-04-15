@@ -3,7 +3,6 @@ import { memo } from 'react';
 
 import { cn } from '@/components/lib/utils';
 
-import { TEXT_COLOR, TYPOGRAPHY } from '../constants/ui';
 import { useI18n } from '../i18n/store';
 import type { Language } from '../i18n/types';
 import { SettingsSection } from './settings/common';
@@ -29,20 +28,13 @@ const LanguageSelector = memo(() => {
             type="button"
             onClick={() => setLanguage(value)}
             className={cn(
-              'flex items-center justify-center p-3 rounded-lg border-2 transition-colors',
+              'flex items-center justify-center py-4 px-6 rounded-xl transition-all duration-200 ease-spring',
               language === value
-                ? 'border-primary bg-primary/10'
-                : 'border-border hover:border-primary/50',
+                ? 'bg-muted/60 text-foreground shadow-subtle'
+                : 'text-muted-foreground/60 hover:bg-muted/30 hover:text-foreground',
             )}
           >
-            <span
-              className={cn(
-                TYPOGRAPHY.body.emphasis,
-                language === value ? 'text-primary' : TEXT_COLOR.secondary,
-              )}
-            >
-              {label}
-            </span>
+            <span className="text-[13px] font-medium">{label}</span>
           </button>
         ))}
       </div>

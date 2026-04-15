@@ -78,7 +78,7 @@ const SystemSettings = memo(() => {
 
   return (
     <SettingsSection icon={Settings} title={t('settings.system.title')}>
-      <div className="space-y-4">
+      <div className="space-y-2">
         <SettingsItem
           label={t('settings.system.startupLaunch')}
           description={t('settings.system.startupDescription')}

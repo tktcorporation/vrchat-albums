@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 
 import { cn } from '../../../../components/lib/utils';
-import { SPACING, TEXT_COLOR } from '../../../constants/ui';
 
 interface SettingsSectionProps {
   /** セクションアイコン */
@@ -21,55 +20,30 @@ interface SettingsSectionProps {
 /**
  * 設定セクションコンテナ
  *
- * アイコン付きヘッダーと一貫したスペーシングを提供。
- * 設定画面内の各セクションを統一的にレイアウトする。
- *
- * @example
- * <SettingsSection icon={Palette} title="テーマ設定">
- *   <ThemeOptions />
- * </SettingsSection>
- *
- * @example
- * <SettingsSection
- *   icon={Settings}
- *   title="システム設定"
- *   description="アプリの動作に関する設定"
- * >
- *   <SettingsItem label="自動起動">
- *     <Switch />
- *   </SettingsItem>
- * </SettingsSection>
+ * Arc風の広大な余白を持つセクションレイアウト。
+ * タイトルは控えめな overline スタイル、コンテンツは大きな余白で呼吸させる。
  */
 const SettingsSection = memo<SettingsSectionProps>(
   ({ icon: Icon, title, description, children, className }) => {
     return (
-      <section className={cn('mb-10', className)}>
-        {/* ヘッダー — 余白を広めに取ってセクション感を出す */}
-        <div className="mb-6">
-          <h3
-            className={cn(
-              'flex items-center',
-              'text-[13px] font-semibold uppercase tracking-wider',
-              'text-muted-foreground/50',
-            )}
-          >
+      <section className={cn('mb-14', className)}>
+        {/* セクションヘッダー — 控えめだが明確 */}
+        <div className="mb-8">
+          <h3 className="flex items-center text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/40">
             {Icon && (
-              <Icon
-                className="h-3.5 w-3.5 mr-2 opacity-50"
-                aria-hidden="true"
-              />
+              <Icon className="h-3 w-3 mr-2 opacity-40" aria-hidden="true" />
             )}
             {title}
           </h3>
           {description && (
-            <p className={cn('mt-1.5 text-sm', TEXT_COLOR.secondary)}>
+            <p className="mt-2 text-[13px] text-muted-foreground/60 leading-relaxed">
               {description}
             </p>
           )}
         </div>
 
-        {/* コンテンツ — ゆったりスペース */}
-        <div className={SPACING.stack.loose}>{children}</div>
+        {/* コンテンツ — 各アイテム間を大きく空ける */}
+        <div className="space-y-6">{children}</div>
       </section>
     );
   },

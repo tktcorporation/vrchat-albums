@@ -3,7 +3,6 @@ import { memo } from 'react';
 
 import { cn } from '@/components/lib/utils';
 
-import { TYPOGRAPHY } from '../../constants/ui';
 import { useTheme } from '../../hooks/useTheme';
 import { useI18n } from '../../i18n/store';
 import type { ThemeOption } from '../../utils/theme';
@@ -25,26 +24,26 @@ const ThemeSelector = memo(() => {
 
   return (
     <SettingsSection icon={Sun} title={t('settings.theme.title')}>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {themeOptions.map(({ value, label, icon: Icon }) => (
           <button
             type="button"
             key={value}
             onClick={() => setTheme(value)}
             className={cn(
-              'flex items-center justify-center gap-2 p-3 rounded-xl transition-all duration-200 ease-spring',
+              'flex flex-col items-center justify-center gap-2.5 py-6 px-4 rounded-xl transition-all duration-200 ease-spring',
               theme === value
-                ? 'bg-muted/70 shadow-subtle text-foreground'
-                : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
+                ? 'bg-muted/50 text-foreground'
+                : 'text-muted-foreground/50 hover:bg-muted/25 hover:text-foreground',
             )}
           >
             <Icon
               className={cn(
-                'h-4 w-4',
-                theme === value ? 'text-primary' : 'text-muted-foreground/50',
+                'h-5 w-5',
+                theme === value ? 'text-primary' : 'opacity-40',
               )}
             />
-            <span className={cn(TYPOGRAPHY.body.emphasis)}>{label}</span>
+            <span className="text-[13px] font-medium">{label}</span>
           </button>
         ))}
       </div>

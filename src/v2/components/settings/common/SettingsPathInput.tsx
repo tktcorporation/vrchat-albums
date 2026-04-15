@@ -38,20 +38,7 @@ interface SettingsPathInputProps {
 /**
  * 設定画面用のパス入力コンポーネント
  *
- * Input + 参照/保存ボタン + エラー表示を提供。
- * 写真ディレクトリやログファイルのパス設定に使用。
- *
- * @example
- * <SettingsPathInput
- *   label="写真ディレクトリ"
- *   value={photoPath}
- *   onChange={setPhotoPath}
- *   onBrowse={handleBrowse}
- *   onSave={handleSave}
- *   isManuallyChanged={hasChanges}
- *   error={validationError}
- *   placeholder="/path/to/photos"
- * />
+ * Arc風：ラベルは小さく控えめ、入力欄は広い余白の中に浮く。
  */
 const SettingsPathInput = memo<SettingsPathInputProps>(
   ({
@@ -76,17 +63,17 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
     const inputId = `path-input-${label.replaceAll(/\s+/g, '-').toLowerCase()}`;
 
     return (
-      <div className={cn('space-y-2.5', className)}>
-        {/* ラベル */}
+      <div className={cn('space-y-3', className)}>
+        {/* ラベル — 極めて控えめ */}
         <label
           htmlFor={inputId}
-          className="text-xs font-medium text-muted-foreground/70"
+          className="text-[12px] font-medium text-muted-foreground/60"
         >
           {label}
         </label>
 
-        {/* 入力欄とボタン */}
-        <div className="flex gap-2.5">
+        {/* 入力欄とボタン — ゆったりした gap */}
+        <div className="flex gap-3">
           <Input
             id={inputId}
             type="text"
@@ -125,8 +112,8 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
 
         {/* エラーメッセージ */}
         {error && (
-          <div className="flex items-center text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
+          <div className="flex items-center text-[12px] text-destructive/80">
+            <AlertCircle className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}

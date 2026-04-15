@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 
 import { cn } from '../../../../components/lib/utils';
-import { TEXT_COLOR } from '../../../constants/ui';
 
 interface SettingsItemProps {
   /** 設定項目のラベル */
@@ -20,45 +19,29 @@ interface SettingsItemProps {
 /**
  * 設定項目コンポーネント
  *
- * ラベル + 説明 + 操作要素のレイアウトを提供。
- * トグルスイッチ、セレクトボックスなどの設定項目に使用。
- *
- * @example
- * <SettingsItem
- *   label="自動起動"
- *   description="システム起動時にアプリを自動的に起動します"
- * >
- *   <Switch checked={autoStart} onCheckedChange={setAutoStart} />
- * </SettingsItem>
- *
- * @example
- * <SettingsItem label="言語">
- *   <Select value={language} onValueChange={setLanguage}>
- *     <SelectItem value="ja">日本語</SelectItem>
- *     <SelectItem value="en">English</SelectItem>
- *   </Select>
- * </SettingsItem>
+ * Arc風：ラベルと操作要素を広い余白で配置。
+ * 各項目間の「呼吸」を最大化する。
  */
 const SettingsItem = memo<SettingsItemProps>(
   ({ label, description, children, disabled, className }) => {
     return (
       <div
         className={cn(
-          'flex items-center justify-between py-2',
-          disabled && 'opacity-40',
+          'flex items-center justify-between py-3',
+          disabled && 'opacity-35',
           className,
         )}
       >
-        {/* ラベルと説明 */}
-        <div className="flex-1 min-w-0 mr-6">
+        {/* ラベルと説明 — 広いマージンで操作要素と分離 */}
+        <div className="flex-1 min-w-0 mr-8">
           <div
-            className={cn('text-sm font-medium', TEXT_COLOR.primary)}
+            className="text-[13px] font-medium text-foreground"
             id={`settings-item-${label.replaceAll(/\s+/g, '-').toLowerCase()}`}
           >
             {label}
           </div>
           {description && (
-            <div className={cn('text-xs mt-0.5', TEXT_COLOR.secondary)}>
+            <div className="text-[12px] mt-1 text-muted-foreground/60 leading-relaxed">
               {description}
             </div>
           )}

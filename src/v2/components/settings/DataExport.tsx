@@ -159,28 +159,26 @@ const DataExport = memo(() => {
           </Label>
 
           {/* プリセット選択 - ThemeSelectorパターン */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-3">
             {periodPresets.map(({ value, label, icon: Icon }) => (
               <button
                 type="button"
                 key={value}
                 onClick={() => handlePresetSelect(value)}
                 className={cn(
-                  'flex items-center justify-center gap-2 p-3 rounded-xl transition-all duration-200 ease-spring',
+                  'flex flex-col items-center justify-center gap-2.5 py-5 px-4 rounded-xl transition-all duration-200 ease-spring',
                   selectedPreset === value
-                    ? 'bg-muted/70 shadow-subtle text-foreground'
-                    : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground',
+                    ? 'bg-muted/50 text-foreground'
+                    : 'text-muted-foreground/50 hover:bg-muted/25 hover:text-foreground',
                 )}
               >
                 <Icon
                   className={cn(
-                    'h-4 w-4',
-                    selectedPreset === value
-                      ? 'text-primary'
-                      : 'text-muted-foreground/50',
+                    'h-5 w-5',
+                    selectedPreset === value ? 'text-primary' : 'opacity-40',
                   )}
                 />
-                <span className={cn(TYPOGRAPHY.body.emphasis)}>{label}</span>
+                <span className="text-[13px] font-medium">{label}</span>
               </button>
             ))}
           </div>
