@@ -21,7 +21,7 @@ if [[ -z "${CLAUDE_FILE_PATHS:-}" ]]; then
 fi
 
 # 先に cd してからパス解決する（相対パスが正しく解決されるように）
-cd "${CLAUDE_PROJECT_DIR:-.}"
+cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
 # TypeScript/TSX ファイルのみ対象
 ts_files=()
@@ -82,12 +82,16 @@ if [[ -n "$fmt_output" || -n "$lint_output" ]]; then
     context="${context}[要修正] oxlint 違反: ${lint_summary}"
   fi
 
-  jq -n --arg ctx "$context" '{
-    hookSpecificOutput: {
-      hookEventName: "PostToolUse",
-      additionalContext: $ctx
-    }
-  }'
+  if command -v jq >/dev/null 2>&1; then
+    jq -n --arg ctx "$context" '{
+      hookSpecificOutput: {
+        hookEventName: "PostToolUse",
+        additionalContext: $ctx
+      }
+    }'
+  else
+    printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$context"
+  fi
 fi
 
 exit 0

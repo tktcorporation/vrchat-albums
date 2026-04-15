@@ -45,6 +45,7 @@ DENY_JSON
   exit 0
 fi
 
-# レビュー完了済み — PR作成を許可し、カウンターをリセット
-rm -f "$REVIEW_COUNT_FILE"
+# レビュー完了済み — PR作成を許可
+# カウンターのリセットは PostToolUse フック (reset-pr-review-count.sh) で行う。
+# PreToolUse でリセットすると、PR作成が失敗した場合にレビューやり直しになるため。
 exit 0

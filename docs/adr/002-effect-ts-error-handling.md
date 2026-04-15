@@ -27,6 +27,6 @@ try-catch を禁止し、Effect TS の `Effect.try` / `Effect.tryPromise` を標
 ## 結果
 
 - Service 層: `Effect.Effect<T, E>` で返却
-- tRPC 層: `runEffect()` で `UserFacingError` に変換
+- tRPC 層: `runEffect()` で `Effect.Effect<T, UserFacingError>` を `Promise<T>` / `TRPCError` に橋渡し
 - Frontend 層: `parseErrorFromTRPC()` + Toast で表示
 - Linter: `pnpm lint:effect`

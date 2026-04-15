@@ -22,6 +22,15 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-edit-lint.sh"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/reset-pr-review-count.sh"
+          }
+        ]
       }
     ],
     "PreToolUse": [
