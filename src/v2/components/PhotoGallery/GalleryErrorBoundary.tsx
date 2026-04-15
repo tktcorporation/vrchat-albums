@@ -46,8 +46,8 @@ export class GalleryErrorBoundary extends React.Component<Props, State> {
               </h2>
             </div>
 
-            <div className="mb-8 rounded-md bg-white p-4">
-              <p className="font-mono text-sm text-red-500">
+            <div className="mb-8 rounded-md bg-card p-4 border border-border">
+              <p className="font-mono text-sm text-destructive">
                 {this.state.errorMessage}
               </p>
             </div>

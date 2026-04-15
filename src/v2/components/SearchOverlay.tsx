@@ -228,7 +228,7 @@ const SearchOverlay = memo(
 
     return (
       <div
-        className="fixed inset-0 z-50 bg-black/20 dark:bg-black/40 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm"
         onClick={handleBackdropClick}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
@@ -241,7 +241,7 @@ const SearchOverlay = memo(
       >
         <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none">
           <div
-            className="max-w-2xl mx-auto bg-popover/95 backdrop-blur-2xl rounded-2xl border border-border/20 shadow-2xl pointer-events-auto"
+            className="max-w-2xl mx-auto bg-popover rounded-lg border border-border shadow-elevated pointer-events-auto"
             role="search"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
@@ -307,10 +307,10 @@ const SearchOverlay = memo(
                     {suggestions.map((suggestion, index) => (
                       <div
                         key={suggestion.id}
-                        className={`flex items-center px-3 py-2.5 rounded-xl cursor-pointer transition-colors duration-150 ${
+                        className={`flex items-center px-3 py-2.5 rounded-md cursor-pointer transition-colors duration-150 ${
                           index === highlightedIndex
-                            ? 'bg-primary/10 dark:bg-primary/20'
-                            : 'hover:bg-muted/50'
+                            ? 'bg-accent'
+                            : 'hover:bg-muted'
                         }`}
                         onClick={() => handleSelect(suggestion)}
                         onKeyDown={(e) => {
@@ -359,7 +359,7 @@ const SearchOverlay = memo(
                 <button
                   type="button"
                   onClick={handleSearch}
-                  className="w-full flex items-center justify-center px-4 py-2 bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 text-primary font-medium rounded-xl transition-colors duration-150"
+                  className="w-full flex items-center justify-center px-4 py-2 bg-primary/10 hover:bg-primary/15 text-primary font-medium rounded-md transition-colors duration-150"
                 >
                   <Search className={`${ICON_SIZE.sm.class} mr-2`} />「{query}
                   」で検索

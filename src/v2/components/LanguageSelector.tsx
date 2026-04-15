@@ -31,7 +31,7 @@ const LanguageSelector = memo(() => {
             className={cn(
               'flex items-center justify-center p-3 rounded-lg border-2 transition-colors',
               language === value
-                ? 'border-primary bg-primary/10 dark:bg-primary/20'
+                ? 'border-primary bg-primary/10'
                 : 'border-border hover:border-primary/50',
             )}
           >

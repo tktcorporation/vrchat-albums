@@ -361,25 +361,25 @@ const Contents = memo(() => {
           {match(errorDisplayType)
             .with('setup', () => (
               <div className="w-full max-w-2xl mx-auto p-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                <h2 className="text-xl font-semibold text-foreground mb-2">
                   初期セットアップ
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                <p className="text-muted-foreground mb-6">
                   VRChatのログフォルダと写真フォルダを設定して、アプリケーションを使用する準備をしましょう。
                 </p>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="bg-card rounded-lg shadow-subtle p-6 border border-border">
                   <div className="space-y-4">
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                           <span className="text-primary">1</span>
                         </div>
                       </div>
                       <div>
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <h3 className="text-sm font-medium text-foreground">
                           フォルダを設定
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-sm text-muted-foreground">
                           以下の設定画面からVRChatのログフォルダと写真フォルダを選択してください。
                         </p>
                       </div>
@@ -387,15 +387,15 @@ const Contents = memo(() => {
                     <PathSettings showRefreshAll={false} />
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                           <span className="text-primary">2</span>
                         </div>
                       </div>
                       <div>
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <h3 className="text-sm font-medium text-foreground">
                           設定を確認
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-sm text-muted-foreground">
                           フォルダを設定したら、下のボタンをクリックして設定を確認します。
                         </p>
                       </div>
@@ -415,14 +415,14 @@ const Contents = memo(() => {
             ))
             .otherwise(() => (
               <div className="text-center p-4 max-w-md mx-auto">
-                <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">
+                <h2 className="text-xl font-semibold text-destructive">
                   {match(errorDisplayType)
                     .with('permission', () => 'アクセス許可エラー')
                     .with('database', () => 'データベースエラー')
                     .with('network', () => 'ネットワークエラー')
                     .otherwise(() => 'アプリケーションエラー')}
                 </h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">
+                <p className="mt-2 text-muted-foreground">
                   {match(errorDisplayType)
                     .with(
                       'permission',
@@ -453,10 +453,10 @@ const Contents = memo(() => {
                 </p>
                 {errorInfo && (
                   <details className="mt-4 text-left" open>
-                    <summary className="cursor-pointer text-sm text-gray-500">
+                    <summary className="cursor-pointer text-sm text-muted-foreground">
                       エラー詳細
                     </summary>
-                    <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto">
+                    <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto">
                       {errorInfo.userMessage}
                     </pre>
                   </details>
@@ -482,7 +482,7 @@ const Contents = memo(() => {
 
     return (
       <div
-        className="h-screen flex flex-col overflow-hidden bg-[#f9f9fa] dark:bg-[#1c1c1e]"
+        className="h-screen flex flex-col overflow-hidden bg-background"
         data-testid="loading-screen"
       >
         <AppHeader showGalleryControls={false} />
@@ -492,7 +492,7 @@ const Contents = memo(() => {
             <div className="relative mb-8">
               <div className="mx-auto w-20 h-20 relative">
                 {/* ベースの円 */}
-                <div className="absolute inset-0 rounded-full bg-gray-100 dark:bg-gray-800" />
+                <div className="absolute inset-0 rounded-full bg-muted" />
 
                 {/* プログレス - 実際の進捗を反映 */}
                 <svg
@@ -509,7 +509,7 @@ const Contents = memo(() => {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3"
-                    className="text-gray-200 dark:text-gray-700"
+                    className="text-border"
                   />
                   {/* 進捗の円 */}
                   <circle
@@ -529,7 +529,7 @@ const Contents = memo(() => {
                 {/* 中央のパーセント表示 */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span
-                    className="text-sm font-medium text-gray-600 dark:text-gray-400"
+                    className="text-sm font-medium text-muted-foreground"
                     data-testid="progress-percent"
                   >
                     {progressPercent > 0 ? `${progressPercent}%` : ''}
@@ -540,11 +540,11 @@ const Contents = memo(() => {
 
             {/* テキストエリア - タイポグラフィ */}
             <div className="space-y-3">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 tracking-tight">
+              <h2 className="text-lg font-medium text-foreground tracking-tight">
                 データを読み込み中...
               </h2>
               <p
-                className="text-sm text-gray-500 dark:text-gray-500 min-h-[1.5em]"
+                className="text-sm text-muted-foreground min-h-[1.5em]"
                 data-testid="progress-message"
               >
                 {displayMessage}
@@ -553,7 +553,7 @@ const Contents = memo(() => {
 
             {/* プログレスバー */}
             <div className="mt-6 w-full max-w-xs mx-auto">
-              <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-1 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
                   style={{
@@ -568,15 +568,15 @@ const Contents = memo(() => {
             {/* シンプルなドットインジケーター */}
             <div className="mt-6 flex justify-center items-center space-x-1.5">
               <div
-                className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
+                className="w-1 h-1 bg-muted-foreground/30 rounded-full animate-dot-fade"
                 style={{ animationDelay: '0ms' }}
               />
               <div
-                className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
+                className="w-1 h-1 bg-muted-foreground/30 rounded-full animate-dot-fade"
                 style={{ animationDelay: '200ms' }}
               />
               <div
-                className="w-1.5 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full animate-dot-fade"
+                className="w-1 h-1 bg-muted-foreground/30 rounded-full animate-dot-fade"
                 style={{ animationDelay: '400ms' }}
               />
             </div>

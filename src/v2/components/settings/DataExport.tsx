@@ -168,7 +168,7 @@ const DataExport = memo(() => {
                 className={cn(
                   'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors',
                   selectedPreset === value
-                    ? 'border-primary bg-primary/10 dark:bg-primary/20'
+                    ? 'border-primary bg-primary/10'
                     : 'border-border hover:border-primary/50',
                 )}
               >

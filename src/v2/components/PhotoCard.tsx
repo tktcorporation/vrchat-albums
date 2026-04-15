@@ -227,11 +227,11 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         type="button"
         ref={elementRef}
         className={clsx(
-          'photo-card group relative overflow-hidden transition-all duration-150',
+          'photo-card group relative overflow-hidden transition-[opacity,padding] duration-150 ease-spring',
           'cursor-pointer flex items-center justify-center',
           'appearance-none border-none p-0 text-left',
           isSelected ? 'bg-muted' : 'bg-muted/60',
-          !isMultiSelectMode && 'hover:brightness-105 hover:shadow-sm',
+          !isMultiSelectMode && 'hover:opacity-90',
         )}
         style={{
           height: displayHeight ? `${displayHeight}px` : undefined,
@@ -271,7 +271,7 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
               ) : (
                 <Circle
                   size={ICON_SIZE.photo.pixels}
-                  className="text-white/90 bg-gray-900/40 backdrop-blur-sm rounded-full hover:bg-gray-900/60 transition-colors duration-150"
+                  className="text-white/80 bg-black/30 rounded-full hover:bg-black/40 transition-colors duration-150"
                   strokeWidth={2}
                 />
               )}

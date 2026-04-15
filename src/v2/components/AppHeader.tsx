@@ -191,7 +191,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => quitAndInstall.mutate()}
-            className="h-7 w-7 p-0 hover:bg-success/15 text-success/70 hover:text-success transition-colors duration-150"
+            className="h-7 w-7 p-0 text-success/80 hover:text-success hover:bg-success/10 transition-colors duration-150"
             title="アップデートをインストール"
           >
             <Download className={ICON_SIZE.sm.class} />
@@ -201,7 +201,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleMinimize}
-          className="h-7 w-7 p-0 hover:bg-muted/40 text-muted-foreground/60 hover:text-muted-foreground transition-colors duration-150"
+          className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors duration-150"
         >
           <Minus className={ICON_SIZE.sm.class} />
         </Button>
@@ -209,7 +209,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleMaximize}
-          className="h-7 w-7 p-0 hover:bg-muted/40 text-muted-foreground/60 hover:text-muted-foreground transition-colors duration-150"
+          className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors duration-150"
         >
           <Square className={ICON_SIZE.sm.class} />
         </Button>
@@ -217,7 +217,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleClose}
-          className="h-7 w-7 p-0 hover:bg-destructive/80 text-muted-foreground/60 hover:text-white transition-colors duration-150"
+          className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors duration-150"
         >
           <X className={ICON_SIZE.sm.class} />
         </Button>

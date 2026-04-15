@@ -230,9 +230,7 @@ const DataImport = memo(() => {
           {/* ドロップエリア */}
           <div
             className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-              isDragOver
-                ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                : 'border-border'
+              isDragOver ? 'border-primary bg-primary/10' : 'border-border'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
