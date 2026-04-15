@@ -12,6 +12,12 @@
 
 set -euo pipefail
 
+# gh pr create 以外のコマンドは通過させる
+INPUT="${CLAUDE_TOOL_INPUT:-}"
+if ! printf '%s' "$INPUT" | grep -qE 'gh\s+pr\s+create'; then
+  exit 0
+fi
+
 REVIEW_COUNT_FILE="${CLAUDE_PROJECT_DIR:-.}/.claude/.pr-review-count"
 REQUIRED_REVIEWS=2
 
@@ -39,6 +45,7 @@ DENY_JSON
   exit 0
 fi
 
-# レビュー完了済み — PR作成を許可し、カウンターをリセット
-rm -f "$REVIEW_COUNT_FILE"
+# レビュー完了済み — PR作成を許可
+# カウンターのリセットは PostToolUse フック (reset-pr-review-count.sh) で行う。
+# PreToolUse でリセットすると、PR作成が失敗した場合にレビューやり直しになるため。
 exit 0

@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# PostToolUse フック: Write/Edit/MultiEdit 後に自動 lint を実行する。
+#
+# 目的:
+#   フィードバック速度の最速化 (PostToolUse = ミリ秒レベル)
+#   エージェントが lint 違反を即座に認識し、自動修正サイクルを回す。
+#
+# 出力形式:
+#   hookSpecificOutput.additionalContext (JSON) でエージェントにフィードバック。
+#   jq でエスケープし、不正な JSON 出力を防止する。
+#
+# ADR: ADR-003 (PostToolUse auto-lint)
+
+# set -e は使わない。ツールの欠如やフォーマットエラーで
+# フック全体が中断するのを防ぎ、可能な限りフィードバックを返す。
+set -uo pipefail
+
+# CLAUDE_FILE_PATHS: 変更されたファイルパスのリスト (改行区切り)
+if [[ -z "${CLAUDE_FILE_PATHS:-}" ]]; then
+  exit 0
+fi
+
+# 先に cd してからパス解決する（相対パスが正しく解決されるように）
+cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
+
+# TypeScript/TSX ファイルのみ対象
+ts_files=()
+while IFS= read -r file; do
+  case "$file" in
+    *.ts|*.tsx)
+      if [[ -f "$file" ]]; then
+        ts_files+=("$file")
+      fi
+      ;;
+  esac
+done <<< "$CLAUDE_FILE_PATHS"
+
+if [[ ${#ts_files[@]} -eq 0 ]]; then
+  exit 0
+fi
+
+# ツール存在チェック（なければ早期 exit、ミリ秒単位で完了）
+OXFMT="./node_modules/.bin/oxfmt"
+OXLINT="./node_modules/.bin/oxlint"
+if [[ ! -x "$OXFMT" ]] || [[ ! -x "$OXLINT" ]]; then
+  exit 0
+fi
+
+# 1. oxfmt で自動フォーマット (修正は適用、成功時のみレポート)
+fmt_output=""
+for f in "${ts_files[@]}"; do
+  if ! "$OXFMT" --check "$f" >/dev/null 2>&1; then
+    if "$OXFMT" --write "$f" 2>/dev/null; then
+      fmt_output="${fmt_output}formatted: ${f}; "
+    fi
+  fi
+done
+
+# 2. oxlint で静的解析
+# oxlint の出力形式: "x eslint(rule-name): message" (エラー) / "! eslint(rule-name): message" (警告)
+# サマリー行: "Found N warnings and M errors."
+lint_output=""
+for f in "${ts_files[@]}"; do
+  result=$("$OXLINT" "$f" 2>&1) || true
+  # サマリー行でエラー/警告の有無を判定（単数形 error/warning にも対応）
+  # "Found 0 warnings and 0 errors." のみクリーン
+  if printf '%s' "$result" | grep -qE 'Found [0-9]+ warnings? and [0-9]+ errors?' \
+     && ! printf '%s' "$result" | grep -qE 'Found 0 warnings and 0 errors'; then
+    lint_output="${lint_output}${result}"$'\n'
+  fi
+done
+
+# フィードバック生成（jq で安全に JSON エスケープ）
+if [[ -n "$fmt_output" || -n "$lint_output" ]]; then
+  context=""
+  if [[ -n "$fmt_output" ]]; then
+    context="[auto-fixed] oxfmt がフォーマットを修正しました: ${fmt_output}"
+  fi
+  if [[ -n "$lint_output" ]]; then
+    # "x eslint(...)" 行と "! eslint(...)" 行を診断として抽出
+    lint_summary=$(printf '%s' "$lint_output" | grep -E '^\s*(x|!) ' | head -10 | tr '\n' '; ')
+    context="${context}[要修正] oxlint 違反: ${lint_summary}"
+  fi
+
+  if command -v jq >/dev/null 2>&1; then
+    jq -n --arg ctx "$context" '{
+      hookSpecificOutput: {
+        hookEventName: "PostToolUse",
+        additionalContext: $ctx
+      }
+    }'
+  else
+    printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$context"
+  fi
+fi
+
+exit 0
