@@ -43,8 +43,9 @@ if echo "$INPUT" | grep -qE 'git\s+checkout\s+--\s+\.|git\s+restore\s+\.|git\s+r
 fi
 
 # 3. worktree パス制約
+# git worktree add [-b <branch>] [--detach] <path> のようにオプションがパスの前に来る
 if echo "$INPUT" | grep -qE 'git\s+worktree\s+add'; then
-  if ! echo "$INPUT" | grep -qE 'git\s+worktree\s+add\s+\.claude/worktrees/'; then
+  if ! echo "$INPUT" | grep -qE '\.claude/worktrees/'; then
     deny_with_json "worktree は .claude/worktrees/ 配下に作成すること。例: git worktree add .claude/worktrees/<タスク名> -b <ブランチ名> origin/main"
   fi
 fi

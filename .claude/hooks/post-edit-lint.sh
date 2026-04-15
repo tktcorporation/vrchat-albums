@@ -62,8 +62,9 @@ done
 lint_output=""
 for f in "${ts_files[@]}"; do
   result=$("$OXLINT" "$f" 2>&1) || true
-  # サマリー行でエラー/警告の有無を判定（"0 warnings and 0 errors" 以外なら違反あり）
-  if printf '%s' "$result" | grep -qE 'Found [0-9]+ warnings and [0-9]+ errors' \
+  # サマリー行でエラー/警告の有無を判定（単数形 error/warning にも対応）
+  # "Found 0 warnings and 0 errors." のみクリーン
+  if printf '%s' "$result" | grep -qE 'Found [0-9]+ warnings? and [0-9]+ errors?' \
      && ! printf '%s' "$result" | grep -qE 'Found 0 warnings and 0 errors'; then
     lint_output="${lint_output}${result}"$'\n'
   fi
