@@ -115,35 +115,41 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="h-[90vh] w-[800px] max-w-[800px] p-0 glass-panel">
-        <DialogHeader className="px-6 py-4 border-b border-border/40 backdrop-blur-sm">
-          <DialogTitle className="text-xl font-semibold">
+      <DialogContent className="h-[85vh] w-[840px] max-w-[840px] p-0 overflow-hidden">
+        {/* ヘッダー — ミニマル、余白で存在感 */}
+        <DialogHeader className="px-10 pt-10 pb-4">
+          <DialogTitle className="text-xl font-semibold tracking-tight">
             {t('common.settings')}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 flex h-[calc(90vh-80px)]">
-          <div className="flex-none w-48 border-r border-border/30">
-            <nav className="flex flex-col p-2" aria-label="Tabs">
+        <div className="flex-1 flex h-[calc(85vh-90px)]">
+          {/* サイドバー — 広い余白、ゆったりしたタブ */}
+          <div className="flex-none w-52">
+            <nav
+              className="flex flex-col px-5 py-3 space-y-0.5"
+              aria-label="Tabs"
+            >
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button
                   type="button"
                   key={id}
                   onClick={() => setActiveTab(id)}
-                  className={`relative py-3 px-4 flex items-center text-sm font-medium transition-all duration-200 rounded-lg m-1 ${
+                  className={`relative py-2.5 px-4 flex items-center text-[13px] font-medium transition-all duration-200 ease-spring rounded-xl ${
                     activeTab === id
-                      ? 'text-primary bg-primary/8 shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                      ? 'text-foreground bg-muted/60'
+                      : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted/30'
                   }`}
                 >
-                  <Icon className="h-4 w-4 mr-3 flex-shrink-0" />
+                  <Icon className="h-4 w-4 mr-3.5 flex-shrink-0 opacity-60" />
                   <span className="truncate">{label}</span>
                 </button>
               ))}
             </nav>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 bg-background/30 backdrop-blur-sm">
+          {/* コンテンツ — 広大な余白でエレガントに */}
+          <div className="flex-1 overflow-y-auto px-10 py-6">
             <ActiveComponent />
           </div>
         </div>

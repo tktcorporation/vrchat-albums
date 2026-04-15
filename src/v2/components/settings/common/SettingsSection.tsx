@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 
 import { cn } from '../../../../components/lib/utils';
-import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../../constants/ui';
+import { SPACING, TEXT_COLOR } from '../../../constants/ui';
 
 interface SettingsSectionProps {
   /** セクションアイコン */
@@ -43,30 +43,33 @@ interface SettingsSectionProps {
 const SettingsSection = memo<SettingsSectionProps>(
   ({ icon: Icon, title, description, children, className }) => {
     return (
-      <section className={cn(SPACING.stack.loose, className)}>
-        {/* ヘッダー */}
-        <div className={SPACING.stack.tight}>
+      <section className={cn('mb-10', className)}>
+        {/* ヘッダー — 余白を広めに取ってセクション感を出す */}
+        <div className="mb-6">
           <h3
             className={cn(
               'flex items-center',
-              TYPOGRAPHY.heading.secondary,
-              TEXT_COLOR.primary,
+              'text-[13px] font-semibold uppercase tracking-wider',
+              'text-muted-foreground/50',
             )}
           >
             {Icon && (
-              <Icon className="h-5 w-5 mr-2 text-primary" aria-hidden="true" />
+              <Icon
+                className="h-3.5 w-3.5 mr-2 opacity-50"
+                aria-hidden="true"
+              />
             )}
             {title}
           </h3>
           {description && (
-            <p className={cn(TYPOGRAPHY.body.default, TEXT_COLOR.secondary)}>
+            <p className={cn('mt-1.5 text-sm', TEXT_COLOR.secondary)}>
               {description}
             </p>
           )}
         </div>
 
-        {/* コンテンツ */}
-        <div className={SPACING.stack.relaxed}>{children}</div>
+        {/* コンテンツ — ゆったりスペース */}
+        <div className={SPACING.stack.loose}>{children}</div>
       </section>
     );
   },

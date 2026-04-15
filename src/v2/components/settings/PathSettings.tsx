@@ -6,12 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { trpcReact } from '@/trpc';
 
-import {
-  SPACING,
-  SURFACE_COLOR,
-  TEXT_COLOR,
-  TYPOGRAPHY,
-} from '../../constants/ui';
+import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useInitProgress } from '../../hooks/useInitProgress';
 import { LOG_SYNC_MODE, useLogSync } from '../../hooks/useLogSync';
 import { useVRChatPhotoExtraDirList } from '../../hooks/useVRChatPhotoExtraDirList';
@@ -203,124 +198,118 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   return (
     <SettingsSection icon={FolderOpen} title="パス設定">
-      <div
-        className={`${SURFACE_COLOR.muted} rounded-lg ${SPACING.padding.card}`}
-      >
-        <div className={SPACING.stack.relaxed}>
-          {/* Photo Directory Section */}
-          <SettingsPathInput
-            label={t('settings.paths.photoDirectory')}
-            value={photoInputValue}
-            onChange={handlePhotoInputChange}
-            onBrowse={() => void handleBrowsePhotoDirectory()}
-            onSave={() => void handlePhotoPathSave()}
-            isManuallyChanged={isPhotoPathManuallyChanged}
-            error={photoValidationErrorMessage}
-            placeholder="/path/to/photos"
-            browseLabel={`${t('settings.paths.browse')}-${t('settings.paths.photoDirectory')}`}
-            saveLabel={`${t('common.submit')}-${t('settings.paths.photoDirectory')}`}
-          />
+      <div className={SPACING.stack.relaxed}>
+        {/* Photo Directory Section */}
+        <SettingsPathInput
+          label={t('settings.paths.photoDirectory')}
+          value={photoInputValue}
+          onChange={handlePhotoInputChange}
+          onBrowse={() => void handleBrowsePhotoDirectory()}
+          onSave={() => void handlePhotoPathSave()}
+          isManuallyChanged={isPhotoPathManuallyChanged}
+          error={photoValidationErrorMessage}
+          placeholder="/path/to/photos"
+          browseLabel={`${t('settings.paths.browse')}-${t('settings.paths.photoDirectory')}`}
+          saveLabel={`${t('common.submit')}-${t('settings.paths.photoDirectory')}`}
+        />
 
-          {/* Extra Directories */}
+        {/* Extra Directories */}
+        <div className={SPACING.stack.default}>
+          <span
+            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
+          >
+            追加で読み込ませる写真フォルダ
+          </span>
           <div className={SPACING.stack.default}>
-            <span
-              className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
-            >
-              追加で読み込ませる写真フォルダ
-            </span>
-            <div className={SPACING.stack.default}>
-              {extraDirs.map((dir: string, index: number) => (
-                <div key={`extra-dir-${dir}`} className="flex gap-2">
-                  <Input type="text" value={dir} readOnly className="flex-1" />
-                  <Button
-                    type="button"
-                    onClick={() => handleRemoveExtraDirectory(index)}
-                    aria-label={t('settings.paths.removeExtraDirectory')}
-                    variant="secondary"
-                    size="sm"
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                onClick={() => void handleBrowseExtraDirectory()}
-                aria-label={t('settings.paths.addExtraDirectory')}
-                variant="secondary"
-                size="sm"
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                フォルダを追加
-              </Button>
-            </div>
-          </div>
-
-          {/* Log File Section */}
-          <SettingsPathInput
-            label={t('settings.paths.logFile')}
-            value={logInputValue}
-            onChange={handleLogInputChange}
-            onBrowse={() => void handleBrowseLogFile()}
-            onSave={() => void handleLogPathSave()}
-            isManuallyChanged={isLogPathManuallyChanged}
-            error={logValidationErrorMessage}
-            placeholder="/path/to/photo-logs.json"
-            browseLabel={`${t('settings.paths.browse')}-${t('settings.paths.logFile')}`}
-            saveLabel={`${t('common.submit')}-${t('settings.paths.logFile')}`}
-          />
-
-          {/* Refresh All Section */}
-          {showRefreshAll && (
-            <div className="pt-4 border-t border-border">
-              <div className={SPACING.stack.default}>
-                <p
-                  className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
+            {extraDirs.map((dir: string, index: number) => (
+              <div key={`extra-dir-${dir}`} className="flex gap-2">
+                <Input type="text" value={dir} readOnly className="flex-1" />
+                <Button
+                  type="button"
+                  onClick={() => handleRemoveExtraDirectory(index)}
+                  aria-label={t('settings.paths.removeExtraDirectory')}
+                  variant="secondary"
+                  size="sm"
                 >
-                  設定したVRChatのログファイルから、過去のワールド訪問履歴を含む全てのインデックスを再構築します。
-                  初回設定時や、インデックスの不整合が発生した場合に使用してください。
-                </p>
-                {isRefreshing && (
-                  <div className={SPACING.stack.tight}>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
-                        style={{
-                          width: `${Math.max(progress?.progress ?? 0, 5)}%`,
-                        }}
-                      />
-                    </div>
-                    <p
-                      className={`${TYPOGRAPHY.caption.default} ${TEXT_COLOR.secondary}`}
-                    >
-                      {progressMessage || t('pullToRefresh.refreshing')}
-                      {progress?.details?.current !== null &&
-                        progress?.details?.current !== undefined &&
-                        progress?.details?.total !== null &&
-                        progress?.details?.total !== undefined &&
-                        ` (${progress.details.current}/${progress.details.total})`}
-                    </p>
-                  </div>
-                )}
-                <div className="flex justify-end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void handleRefreshAll()}
-                    disabled={isRefreshing}
-                    aria-label={t('common.refresh')}
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`}
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              onClick={() => void handleBrowseExtraDirectory()}
+              aria-label={t('settings.paths.addExtraDirectory')}
+              variant="secondary"
+              size="sm"
+              className="w-full"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              フォルダを追加
+            </Button>
+          </div>
+        </div>
+
+        {/* Log File Section */}
+        <SettingsPathInput
+          label={t('settings.paths.logFile')}
+          value={logInputValue}
+          onChange={handleLogInputChange}
+          onBrowse={() => void handleBrowseLogFile()}
+          onSave={() => void handleLogPathSave()}
+          isManuallyChanged={isLogPathManuallyChanged}
+          error={logValidationErrorMessage}
+          placeholder="/path/to/photo-logs.json"
+          browseLabel={`${t('settings.paths.browse')}-${t('settings.paths.logFile')}`}
+          saveLabel={`${t('common.submit')}-${t('settings.paths.logFile')}`}
+        />
+
+        {/* Refresh All Section — 余白で区切り、ボーダーなし */}
+        {showRefreshAll && (
+          <div className="pt-4">
+            <div className={SPACING.stack.default}>
+              <p className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}>
+                設定したVRChatのログファイルから、過去のワールド訪問履歴を含む全てのインデックスを再構築します。
+                初回設定時や、インデックスの不整合が発生した場合に使用してください。
+              </p>
+              {isRefreshing && (
+                <div className={SPACING.stack.tight}>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                      style={{
+                        width: `${Math.max(progress?.progress ?? 0, 5)}%`,
+                      }}
                     />
-                    {t('common.refresh')}
-                  </Button>
+                  </div>
+                  <p
+                    className={`${TYPOGRAPHY.caption.default} ${TEXT_COLOR.secondary}`}
+                  >
+                    {progressMessage || t('pullToRefresh.refreshing')}
+                    {progress?.details?.current !== null &&
+                      progress?.details?.current !== undefined &&
+                      progress?.details?.total !== null &&
+                      progress?.details?.total !== undefined &&
+                      ` (${progress.details.current}/${progress.details.total})`}
+                  </p>
                 </div>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void handleRefreshAll()}
+                  disabled={isRefreshing}
+                  aria-label={t('common.refresh')}
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`}
+                  />
+                  {t('common.refresh')}
+                </Button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </SettingsSection>
   );

@@ -227,11 +227,11 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
         type="button"
         ref={elementRef}
         className={clsx(
-          'photo-card group relative overflow-hidden transition-[opacity,padding] duration-150 ease-spring',
+          'photo-card group relative overflow-hidden rounded-lg transition-all duration-200 ease-spring',
           'cursor-pointer flex items-center justify-center',
           'appearance-none border-none p-0 text-left',
-          isSelected ? 'bg-muted' : 'bg-muted/60',
-          !isMultiSelectMode && 'hover:opacity-90',
+          isSelected ? 'bg-muted ring-2 ring-primary/30' : 'bg-muted/40',
+          !isMultiSelectMode && 'hover:shadow-float hover:scale-[1.008]',
         )}
         style={{
           height: displayHeight ? `${displayHeight}px` : undefined,
@@ -280,14 +280,14 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
 
             <div
               className={clsx(
-                'absolute inset-0 transition-all duration-150',
-                isSelected ? 'p-4' : 'p-0',
+                'absolute inset-0 transition-all duration-250 ease-spring',
+                isSelected ? 'p-3' : 'p-0',
               )}
             >
               <div
                 className={clsx(
                   'relative w-full h-full overflow-hidden',
-                  isSelected ? 'rounded-sm' : '',
+                  isSelected ? 'rounded-md' : '',
                 )}
               >
                 {shouldLoad ? (
@@ -316,8 +316,8 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
             {!isMultiSelectMode && photoLoaded && (
               <div
                 className={clsx(
-                  'absolute inset-0 bg-gradient-to-t from-foreground/60 via-transparent to-transparent',
-                  'opacity-0 group-hover:opacity-100 transition-opacity duration-150',
+                  'absolute inset-0 bg-gradient-to-t from-foreground/50 via-transparent to-transparent',
+                  'opacity-0 group-hover:opacity-100 transition-opacity duration-250 ease-spring',
                 )}
               >
                 <div className="absolute bottom-0 left-0 right-0 p-3">

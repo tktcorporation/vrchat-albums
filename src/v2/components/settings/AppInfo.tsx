@@ -14,14 +14,7 @@ import { trpcClient, trpcReact } from '@/trpc';
 
 import packageJson from '../../../../package.json';
 import { Button } from '../../../components/ui/button';
-import {
-  ICON_SIZE,
-  SPACING,
-  STATUS_COLOR,
-  SURFACE_COLOR,
-  TEXT_COLOR,
-  TYPOGRAPHY,
-} from '../../constants/ui';
+import { ICON_SIZE, STATUS_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import { SettingsSection } from './common';
 import SqliteConsole from './SqliteConsole';
@@ -140,35 +133,33 @@ const AppInfo = memo(() => {
 
   return (
     <SettingsSection icon={Info} title={t('settings.info.title')}>
-      <div
-        className={`${SURFACE_COLOR.muted} rounded-lg ${SPACING.padding.card} ${SPACING.stack.tight}`}
-      >
-        <div className="flex justify-between">
-          <span className={TEXT_COLOR.secondary}>
+      <div className="space-y-5">
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">
             {t('settings.info.version')}
           </span>
           <button
             type="button"
-            className={`font-mono ${TEXT_COLOR.primary} cursor-pointer appearance-none border-none bg-transparent p-0`}
+            className="font-mono text-sm text-foreground cursor-pointer appearance-none border-none bg-transparent p-0"
             onClick={handleVersionClick}
             onKeyDown={handleKeyDown}
           >
             {appVersion}
           </button>
         </div>
-        <div className="flex justify-between">
-          <span className={TEXT_COLOR.secondary}>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">
             {t('settings.info.name')}
           </span>
-          <span className={`font-mono ${TEXT_COLOR.primary}`}>
+          <span className="font-mono text-sm text-foreground">
             {packageJson.name}
           </span>
         </div>
 
         {/* アップデートセクション */}
-        <div className="flex flex-col gap-2 mt-4">
+        <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <span className={TEXT_COLOR.secondary}>
+            <span className="text-sm text-muted-foreground">
               {t('settings.info.update.checkForUpdates')}
             </span>
             <Button
@@ -256,8 +247,8 @@ const AppInfo = memo(() => {
           )}
         </div>
 
-        <div className="flex justify-between mt-4">
-          <span className={TEXT_COLOR.secondary}>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-muted-foreground">
             {t('settings.info.openLog')}
           </span>
           <Button variant="outline" size="sm" onClick={handleOpenLog}>

@@ -47,9 +47,9 @@ describe('LAYOUT_CONSTANTS', () => {
   it('期待される値が設定されている', () => {
     // Tailwind CSS クラスとの対応を確認
     expect(LAYOUT_CONSTANTS.TARGET_ROW_HEIGHT).toBe(200);
-    expect(LAYOUT_CONSTANTS.GAP).toBe(8); // 8pxベースグリッドに準拠
-    expect(LAYOUT_CONSTANTS.HEADER_HEIGHT).toBe(96); // h-24 = 96px
-    expect(LAYOUT_CONSTANTS.SPACING).toBe(8); // space-y-2 = 8px
+    expect(LAYOUT_CONSTANTS.GAP).toBe(6); // gap-1.5 = 6px
+    expect(LAYOUT_CONSTANTS.HEADER_HEIGHT).toBe(80); // py-4 + 内部コンテンツ
+    expect(LAYOUT_CONSTANTS.SPACING).toBe(0); // ヘッダーとグリッド間の余白なし
     expect(LAYOUT_CONSTANTS.MAX_LAST_ROW_SCALE).toBe(1.5);
   });
 

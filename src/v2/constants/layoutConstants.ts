@@ -16,14 +16,14 @@ export const LAYOUT_CONSTANTS: LayoutConstants = {
   /** 写真グリッドの目標行高さ (px) */
   TARGET_ROW_HEIGHT: 200,
 
-  /** 写真間のギャップ (px) - 8pxベースグリッドに準拠 */
-  GAP: 8,
+  /** 写真間のギャップ (px) - Tailwind gap-1.5 に対応 */
+  GAP: 6,
 
-  /** LocationGroupHeader の高さ (px) - Tailwind の h-24 に対応 */
-  HEADER_HEIGHT: 96,
+  /** LocationGroupHeader の高さ (px) - py-4 + 内部コンテンツの近似値 */
+  HEADER_HEIGHT: 80,
 
-  /** ヘッダーとグリッド間のスペース (px) - Tailwind の space-y-2 に対応 */
-  SPACING: 8,
+  /** ヘッダーとグリッド間のスペース (px) - ヘッダーとグリッド間の余白 */
+  SPACING: 0,
 
   /** 最後の行の最大スケール倍率 */
   MAX_LAST_ROW_SCALE: 1.5,

@@ -3,7 +3,6 @@ import { memo } from 'react';
 
 import licenseJsonFile from '@/assets/licenses.json';
 
-import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import { SettingsSection } from './common';
 
@@ -37,29 +36,30 @@ const LicenseInfo = memo(() => {
 
   return (
     <SettingsSection icon={Book} title={t('settings.info.licenses.title')}>
-      <div className="divide-y divide-border">
+      <div className="space-y-1">
         {libraries.map((lib) => (
-          <div key={lib.path} className="py-3">
-            <div className="flex items-center justify-between mb-1">
-              <span
-                className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.primary}`}
-              >
+          <div
+            key={lib.path}
+            className="py-2.5 px-3 rounded-lg hover:bg-muted/30 transition-colors duration-150"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">
                 {lib.name}
               </span>
-              <span className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
+              <span className="text-xs text-muted-foreground/50">
                 {lib.licenses}
               </span>
             </div>
             {lib.repository && (
-              <div
-                className={`flex items-center justify-between ${TYPOGRAPHY.body.small}`}
-              >
-                <span className={TEXT_COLOR.secondary}>Repository</span>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-xs text-muted-foreground/40">
+                  Repository
+                </span>
                 <a
                   href={lib.repository}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:text-primary/80"
+                  className="text-xs text-primary/70 hover:text-primary transition-colors"
                 >
                   {lib.repository}
                 </a>

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 
 import { cn } from '../../../../components/lib/utils';
-import { TEXT_COLOR, TYPOGRAPHY } from '../../../constants/ui';
+import { TEXT_COLOR } from '../../../constants/ui';
 
 interface SettingsItemProps {
   /** 設定項目のラベル */
@@ -44,21 +44,21 @@ const SettingsItem = memo<SettingsItemProps>(
     return (
       <div
         className={cn(
-          'flex items-center justify-between',
-          disabled && 'opacity-50',
+          'flex items-center justify-between py-2',
+          disabled && 'opacity-40',
           className,
         )}
       >
         {/* ラベルと説明 */}
-        <div className="flex-1 min-w-0 mr-4">
+        <div className="flex-1 min-w-0 mr-6">
           <div
-            className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}
+            className={cn('text-sm font-medium', TEXT_COLOR.primary)}
             id={`settings-item-${label.replaceAll(/\s+/g, '-').toLowerCase()}`}
           >
             {label}
           </div>
           {description && (
-            <div className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.secondary)}>
+            <div className={cn('text-xs mt-0.5', TEXT_COLOR.secondary)}>
               {description}
             </div>
           )}

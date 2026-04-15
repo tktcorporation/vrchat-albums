@@ -109,7 +109,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   return (
     <div
-      className="flex h-11 items-center justify-between px-2 select-none border-b border-border"
+      className="flex h-11 items-center justify-between px-3 select-none minimal-header"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       onDoubleClick={handleMaximize}
     >
@@ -201,7 +201,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleMinimize}
-          className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors duration-150"
+          className="h-7 w-7 p-0 text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/60 rounded-full transition-all duration-200 ease-spring"
         >
           <Minus className={ICON_SIZE.sm.class} />
         </Button>
@@ -209,7 +209,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleMaximize}
-          className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors duration-150"
+          className="h-7 w-7 p-0 text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/60 rounded-full transition-all duration-200 ease-spring"
         >
           <Square className={ICON_SIZE.sm.class} />
         </Button>
@@ -217,7 +217,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleClose}
-          className="h-7 w-7 p-0 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors duration-150"
+          className="h-7 w-7 p-0 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/8 rounded-full transition-all duration-200 ease-spring"
         >
           <X className={ICON_SIZE.sm.class} />
         </Button>

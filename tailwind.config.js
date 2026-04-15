@@ -129,19 +129,26 @@ module.exports = {
         '3xl': '64px',
       },
       boxShadow: {
-        /* Neutral soft shadows — Apple-inspired */
-        glass: '0 2px 12px rgba(0, 0, 0, 0.08)',
+        /* Neutral soft shadows — Apple/Arc-inspired layered depth */
+        glass: '0 2px 12px rgba(0, 0, 0, 0.06)',
         'glass-inset': 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
-        'glass-hover': '0 4px 16px rgba(0, 0, 0, 0.1)',
-        /* Elevated surface — dialogs, popovers */
+        'glass-hover': '0 8px 24px rgba(0, 0, 0, 0.1)',
+        /* Elevated surface — dialogs, popovers, floating cards */
         elevated:
-          '0 8px 32px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04)',
-        /* Subtle — cards, inputs on focus */
-        subtle: '0 1px 3px rgba(0, 0, 0, 0.04)',
+          '0 8px 40px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03)',
+        /* Subtle — resting cards */
+        subtle: '0 1px 4px rgba(0, 0, 0, 0.03)',
+        /* Float — hovered cards, interactive surfaces */
+        float: '0 8px 30px rgba(0, 0, 0, 0.07), 0 2px 6px rgba(0, 0, 0, 0.03)',
+        /* Glow — primary action hover */
+        glow: '0 4px 20px hsl(32 92% 56% / 0.2)',
       },
       transitionTimingFunction: {
         /* Spring-like easing for delightful interactions */
         spring: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
+      transitionDuration: {
+        250: '250ms',
       },
     },
   },

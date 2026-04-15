@@ -11,10 +11,9 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Badge } from '@/components/ui/badge';
 import { trpcReact } from '@/trpc';
 
-import { ICON_SIZE, SPACING, TEXT_COLOR } from '../../constants/ui';
+import { ICON_SIZE, TEXT_COLOR } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import {
   getInstanceTypeColor,
@@ -202,19 +201,14 @@ export const LocationGroupHeader = ({
 
   if (worldId === null) {
     return (
-      <header
-        data-testid="location-group-header"
-        className={`w-full glass-panel rounded-t-xl ${SPACING.padding.section}`}
-      >
-        <div className={`flex items-center ${SPACING.inline.relaxed}`}>
-          <h2 className={`text-xl font-bold ${TEXT_COLOR.primary}`}>
-            {t('locationHeader.ungrouped')}
-          </h2>
-        </div>
+      <header data-testid="location-group-header" className="w-full px-5 py-4">
+        <h2 className={`text-lg font-semibold ${TEXT_COLOR.primary}`}>
+          {t('locationHeader.ungrouped')}
+        </h2>
         <div
-          className={`mt-2 text-sm ${TEXT_COLOR.secondary} flex items-center ${SPACING.inline.default}`}
+          className={`mt-1.5 text-xs ${TEXT_COLOR.secondary} flex items-center gap-1.5`}
         >
-          <Calendar className={ICON_SIZE.sm.class} />
+          <Calendar className={ICON_SIZE.xs.class} />
           <time dateTime={joinDateTime.toISOString()}>{formattedDate}</time>
         </div>
       </header>
@@ -225,218 +219,198 @@ export const LocationGroupHeader = ({
     <div
       ref={containerRef}
       data-testid="location-group-header"
-      className="w-full glass-panel rounded-t-lg overflow-hidden group/card"
+      className="w-full group/card rounded-xl overflow-hidden"
     >
-      <div className="relative h-24 overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 bg-muted">
-          {details?.thumbnailImageUrl && isVisible && (
-            <>
-              <div
-                className="absolute inset-0 scale-105"
-                style={{
-                  backgroundImage: `url(${details.thumbnailImageUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  filter: 'blur(24px) saturate(110%) brightness(0.95)',
-                }}
-              />
-              <div className="absolute inset-0 bg-background/80 dark:bg-background/60" />
-            </>
-          )}
-        </div>
+      <div className="relative overflow-hidden flex items-center px-6 py-5">
+        {/* 背景ブラー — ワールドの雰囲気を余韻として感じさせる */}
+        {details?.thumbnailImageUrl && isVisible && (
+          <div
+            className="absolute inset-0 scale-110 opacity-[0.06] dark:opacity-[0.1]"
+            style={{
+              backgroundImage: `url(${details.thumbnailImageUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'blur(40px) saturate(150%)',
+            }}
+          />
+        )}
 
-        <div className="absolute inset-0 flex items-center justify-center p-2">
-          {/* 左側に画像、右側に情報 */}
-          <div className="flex items-center gap-4 w-full">
-            {/* 左側 - ワールド画像 */}
-            <div className="flex-shrink-0">
-              {details?.thumbnailImageUrl ? (
-                <div
-                  className="h-20 rounded-lg overflow-hidden border border-border/20 shadow-md"
-                  style={{ aspectRatio: '4/3' }}
+        <div className="relative flex items-center gap-4 w-full">
+          {/* 左側 - ワールド画像（ボーダーなし、丸く、影で浮遊感） */}
+          <div className="flex-shrink-0">
+            {details?.thumbnailImageUrl ? (
+              <div
+                className="h-14 rounded-lg overflow-hidden shadow-subtle transition-shadow duration-250 ease-spring group-hover/card:shadow-float"
+                style={{ aspectRatio: '16/10' }}
+              >
+                <img
+                  src={details.thumbnailImageUrl}
+                  alt={(details?.name || worldName) ?? 'World'}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            ) : (
+              <div
+                className="h-14 rounded-lg bg-muted/40 flex items-center justify-center"
+                style={{ aspectRatio: '16/10' }}
+              >
+                <ImageIcon
+                  className={`${ICON_SIZE.lg.class} text-muted-foreground/20`}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 右側 - 情報 — 余白でグルーピング */}
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            {/* 1行目: ワールド名とアクション */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold flex items-center group/title text-foreground">
+                <button
+                  type="button"
+                  className="flex items-center transition-all duration-200 ease-spring hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openWorldLink(worldLink);
+                  }}
                 >
-                  <img
-                    src={details.thumbnailImageUrl}
-                    alt={(details?.name || worldName) ?? 'World'}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
+                  <span className="line-clamp-1 text-start">
+                    {details?.name ?? worldName}
+                  </span>
+                  <ExternalLink
+                    className={`${ICON_SIZE.xs.class} ml-1.5 opacity-0 group-hover/title:opacity-60 transition-opacity duration-200 flex-shrink-0`}
                   />
-                </div>
-              ) : (
-                <div
-                  className="h-20 rounded-lg bg-muted flex items-center justify-center border border-border"
-                  style={{ aspectRatio: '4/3' }}
+                </button>
+              </h3>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {worldInstanceId &&
+                  shouldShowInstanceTypeBadge(worldInstanceId) && (
+                    <div
+                      className={`flex items-center text-[11px] font-medium px-2 py-0.5 rounded-lg transition-colors duration-200 ${getInstanceTypeColor(
+                        worldInstanceId,
+                      )}`}
+                    >
+                      {getInstanceTypeLabel(worldInstanceId)}
+                    </div>
+                  )}
+                {details?.unityPackages && details.unityPackages.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    {[
+                      ...new Set(
+                        details.unityPackages.map((pkg) => pkg.platform),
+                      ),
+                    ].map((platform) => (
+                      <PlatformBadge key={platform} platform={platform} />
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={openShareModal}
+                  className="flex items-center text-sm text-muted-foreground/50 hover:text-foreground p-1.5 rounded-lg hover:bg-muted/40 transition-all duration-200 ease-spring"
                 >
-                  <ImageIcon
-                    className={`${ICON_SIZE.lg.class} text-muted-foreground/30`}
-                  />
-                </div>
-              )}
+                  <Share2 className={ICON_SIZE.sm.class} />
+                </button>
+              </div>
             </div>
 
-            {/* 右側 - 情報 */}
-            <div className="flex-1 min-w-0 flex flex-col gap-2">
-              {/* 1行目: ワールド名とアクション */}
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold flex items-center group/title text-foreground">
-                  <button
-                    type="button"
-                    className="hover:underline flex items-center transition-colors duration-150 hover:text-primary"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openWorldLink(worldLink);
-                    }}
-                  >
-                    <span className="line-clamp-1 text-start">
-                      {details?.name ?? worldName}
-                    </span>
-                    <ExternalLink
-                      className={`${ICON_SIZE.sm.class} ml-2 transition-opacity flex-shrink-0`}
-                    />
-                  </button>
-                </h3>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {worldInstanceId &&
-                    shouldShowInstanceTypeBadge(worldInstanceId) && (
-                      <div
-                        className={`flex items-center text-xs font-medium px-2 py-0.5 rounded-md border transition-colors duration-150 ${getInstanceTypeColor(
-                          worldInstanceId,
-                        )}`}
-                      >
-                        {getInstanceTypeLabel(worldInstanceId)}
-                      </div>
-                    )}
-                  <Badge variant="glass" className="flex items-center text-sm">
-                    <Calendar
-                      className={`${ICON_SIZE.sm.class} mr-1.5 ${TEXT_COLOR.accent}`}
-                    />
-                    {formattedDate}
-                  </Badge>
-                  {details?.unityPackages &&
-                    details.unityPackages.length > 0 && (
-                      <div className="flex items-center gap-1.5">
-                        {[
-                          ...new Set(
-                            details.unityPackages.map((pkg) => pkg.platform),
-                          ),
-                        ].map((platform) => (
-                          <PlatformBadge key={platform} platform={platform} />
-                        ))}
-                      </div>
-                    )}
-                  <button
-                    type="button"
-                    onClick={openShareModal}
-                    className="flex items-center text-sm font-medium text-foreground bg-muted hover:bg-muted/80 px-2.5 py-1 rounded-md transition-colors duration-150 border border-border"
-                  >
-                    <Share2 className={ICON_SIZE.sm.class} />
-                  </button>
-                </div>
-              </div>
-
-              {/* 2行目: プレイヤーリスト */}
-              <div className="flex items-center gap-2 w-full">
-                {(() => {
-                  if (isPlayersLoading || players === null) {
-                    return (
-                      <div className="flex gap-2 items-center text-xs text-foreground bg-muted/60 px-3 py-1 rounded-md border border-border flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <Users
-                            className={`${ICON_SIZE.sm.class} text-primary flex-shrink-0`}
-                          />
-                          <div className="h-4 w-6 bg-muted rounded animate-pulse" />
-                        </div>
-                        <div className="text-muted-foreground/40">|</div>
-                        <div className="flex-1 flex items-center gap-2">
-                          <div className="h-4 w-24 bg-muted rounded animate-pulse" />
-                          <div className="h-4 w-20 bg-muted rounded animate-pulse" />
-                          <div className="h-4 w-16 bg-muted rounded animate-pulse" />
-                        </div>
-                      </div>
-                    );
-                  }
-                  if (players.length > 0) {
-                    return (
-                      <div className="flex gap-2 items-center text-xs text-foreground bg-muted/60 hover:bg-muted/80 px-3 py-1 rounded-md transition-colors duration-150 border border-border group/players flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <Users
-                            className={`${ICON_SIZE.sm.class} text-primary flex-shrink-0`}
-                          />
-                          <span>{players.length}</span>
-                        </div>
-                        <div className="text-muted-foreground/40">|</div>
-                        <button
-                          type="button"
-                          ref={playerListContainerRef}
-                          className="relative cursor-pointer flex-1 min-w-0 appearance-none border-none bg-transparent p-0 text-left"
-                          onMouseEnter={() => setIsHovered(true)}
-                          onMouseLeave={() => setIsHovered(false)}
-                          onMouseMove={handleMouseMove}
-                          onClick={() => void handleCopyPlayers()}
-                          title={t('locationHeader.clickToCopy')}
-                        >
-                          <div className="flex items-center gap-2 w-full">
-                            {isCopied ? (
-                              <span className="text-success flex items-center gap-2">
-                                <CheckIcon className={ICON_SIZE.sm.class} />
-                                {t('locationHeader.copied')}
-                              </span>
-                            ) : (
-                              <PlayerList
-                                players={players}
-                                maxVisiblePlayers={maxVisiblePlayers}
-                              />
-                            )}
-                          </div>
-                          {players &&
-                            createPortal(
-                              <div
-                                style={{
-                                  position: 'fixed',
-                                  visibility: isHovered ? 'visible' : 'hidden',
-                                  opacity: isHovered ? 1 : 0,
-                                  transition: 'opacity 150ms',
-                                  top: tooltipPosition.top,
-                                  left: tooltipPosition.left,
-                                }}
-                                className="z-50 p-3 bg-popover border border-border text-foreground text-sm rounded-lg shadow-elevated"
-                              >
-                                <div className="flex flex-wrap gap-1.5">
-                                  {players.map((p: Player) => (
-                                    <span
-                                      key={p.id}
-                                      className="bg-muted text-muted-foreground px-2.5 py-0.5 rounded-md text-xs border border-border"
-                                    >
-                                      {p.playerName}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>,
-                              document.body,
-                            )}
-                        </button>
-                        <Copy
-                          className={`${ICON_SIZE.sm.class} ml-2 text-muted-foreground group-hover/players:text-foreground transition-colors flex-shrink-0`}
-                        />
-                      </div>
-                    );
-                  }
+            {/* 2行目: 日付 + プレイヤー — ボーダーなし、テキストだけで情報を伝える */}
+            <div className="flex items-center gap-3 w-full text-xs text-muted-foreground">
+              <span className="flex items-center gap-1 flex-shrink-0">
+                <Calendar className={ICON_SIZE.xs.class} />
+                {formattedDate}
+              </span>
+              <span className="text-muted-foreground/20">·</span>
+              {(() => {
+                if (isPlayersLoading || players === null) {
                   return (
-                    <div className="flex gap-2 items-center text-xs text-foreground bg-muted/60 px-3 py-1 rounded-md border border-border flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <Users
-                          className={`${ICON_SIZE.sm.class} text-primary flex-shrink-0`}
-                        />
-                        <span>0</span>
-                      </div>
-                      <div className="text-muted-foreground/40">|</div>
-                      <span className="text-muted-foreground">
-                        {t('locationHeader.noPlayerInfo')}
-                      </span>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Users
+                        className={`${ICON_SIZE.xs.class} text-muted-foreground/40 flex-shrink-0`}
+                      />
+                      <div className="h-3 w-6 bg-muted/40 rounded-full animate-pulse" />
+                      <div className="h-3 w-20 bg-muted/40 rounded-full animate-pulse" />
                     </div>
                   );
-                })()}
-              </div>
+                }
+                if (players.length > 0) {
+                  return (
+                    <div className="flex items-center gap-1.5 group/players flex-1 min-w-0">
+                      <Users
+                        className={`${ICON_SIZE.xs.class} text-muted-foreground/40 flex-shrink-0`}
+                      />
+                      <span className="text-muted-foreground/60">
+                        {players.length}
+                      </span>
+                      <button
+                        type="button"
+                        ref={playerListContainerRef}
+                        className="relative cursor-pointer flex-1 min-w-0 appearance-none border-none bg-transparent p-0 text-left"
+                        onMouseEnter={() => setIsHovered(true)}
+                        onMouseLeave={() => setIsHovered(false)}
+                        onMouseMove={handleMouseMove}
+                        onClick={() => void handleCopyPlayers()}
+                        title={t('locationHeader.clickToCopy')}
+                      >
+                        <div className="flex items-center gap-1.5 w-full">
+                          {isCopied ? (
+                            <span className="text-success flex items-center gap-1">
+                              <CheckIcon className={ICON_SIZE.xs.class} />
+                              {t('locationHeader.copied')}
+                            </span>
+                          ) : (
+                            <PlayerList
+                              players={players}
+                              maxVisiblePlayers={maxVisiblePlayers}
+                            />
+                          )}
+                        </div>
+                        {players &&
+                          createPortal(
+                            <div
+                              style={{
+                                position: 'fixed',
+                                visibility: isHovered ? 'visible' : 'hidden',
+                                opacity: isHovered ? 1 : 0,
+                                transition:
+                                  'opacity 200ms cubic-bezier(0.22, 1, 0.36, 1)',
+                                top: tooltipPosition.top,
+                                left: tooltipPosition.left,
+                              }}
+                              className="z-50 p-3 bg-popover/95 backdrop-blur-xl text-foreground text-sm rounded-xl shadow-elevated"
+                            >
+                              <div className="flex flex-wrap gap-1.5">
+                                {players.map((p: Player) => (
+                                  <span
+                                    key={p.id}
+                                    className="bg-muted/60 text-muted-foreground px-2.5 py-0.5 rounded-lg text-xs"
+                                  >
+                                    {p.playerName}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>,
+                            document.body,
+                          )}
+                      </button>
+                      <Copy
+                        className={`${ICON_SIZE.xs.class} ml-1 text-muted-foreground/30 group-hover/players:text-muted-foreground transition-colors duration-200 flex-shrink-0`}
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <Users
+                      className={`${ICON_SIZE.xs.class} text-muted-foreground/40 flex-shrink-0`}
+                    />
+                    <span className="text-muted-foreground/40">
+                      {t('locationHeader.noPlayerInfo')}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

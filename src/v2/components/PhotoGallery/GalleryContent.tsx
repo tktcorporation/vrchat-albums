@@ -306,7 +306,7 @@ const VirtualizedGallery = memo(
                   }}
                 >
                   {isGroupFullyLoaded ? (
-                    <div className="w-full space-y-0">
+                    <div className="w-full">
                       <LocationGroupHeader
                         worldId={group.worldInfo?.worldId ?? null}
                         worldName={group.worldInfo?.worldName ?? null}
@@ -316,7 +316,7 @@ const VirtualizedGallery = memo(
                         photoCount={group.photos.length}
                         joinDateTime={group.joinDateTime}
                       />
-                      <div className="w-full rounded-b-lg overflow-hidden">
+                      <div className="w-full overflow-hidden">
                         <PhotoGrid
                           photos={group.photos}
                           effectiveWidth={widthValue}
@@ -344,7 +344,7 @@ const VirtualizedGallery = memo(
             })}
           </div>
           {isLoading && (
-            <div className="fixed bottom-4 right-6 flex items-center space-x-2 bg-background/80 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
+            <div className="fixed bottom-4 right-6 flex items-center space-x-2 bg-popover/90 backdrop-blur-xl rounded-xl px-4 py-2.5 shadow-elevated">
               <LoaderCircle className="w-4 h-4 animate-spin text-muted-foreground" />
               <div className="text-sm text-muted-foreground">読み込み中...</div>
             </div>

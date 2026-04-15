@@ -553,9 +553,9 @@ const Contents = memo(() => {
 
             {/* プログレスバー */}
             <div className="mt-6 w-full max-w-xs mx-auto">
-              <div className="h-1 bg-muted rounded-full overflow-hidden">
+              <div className="h-0.5 bg-muted/60 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                  className="h-full bg-primary transition-all duration-500 ease-spring rounded-full"
                   style={{
                     width: `${Math.min(Math.max(progressPercent, 5), 100)}%`,
                   }}

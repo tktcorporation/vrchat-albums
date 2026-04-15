@@ -17,7 +17,6 @@ import { Label } from '../../../components/ui/label';
 import {
   SPACING,
   STATUS_BADGE,
-  SURFACE_COLOR,
   TEXT_COLOR,
   TYPOGRAPHY,
 } from '../../constants/ui';
@@ -229,8 +228,8 @@ const DataImport = memo(() => {
 
           {/* ドロップエリア */}
           <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-              isDragOver ? 'border-primary bg-primary/10' : 'border-border'
+            className={`rounded-2xl p-8 text-center transition-all duration-200 ease-spring ${
+              isDragOver ? 'bg-primary/8 scale-[1.01]' : 'bg-muted/30'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -328,7 +327,7 @@ const DataImport = memo(() => {
       </div>
 
       {/* インポート履歴・ロールバック */}
-      <div className="border-t border-border pt-6">
+      <div className="pt-8">
         <div className="flex items-center justify-between mb-4">
           <h4
             className={`${TYPOGRAPHY.heading.tertiary} ${TEXT_COLOR.primary}`}
@@ -362,7 +361,7 @@ const DataImport = memo(() => {
                 {importHistory.map((backup) => (
                   <div
                     key={backup.id}
-                    className={`flex items-center justify-between p-4 border border-border rounded-lg ${SURFACE_COLOR.muted}`}
+                    className="flex items-center justify-between p-4 rounded-xl bg-muted/30"
                   >
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">

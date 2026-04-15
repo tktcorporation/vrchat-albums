@@ -80,13 +80,13 @@ export default function PhotoGrid({
 
   return (
     <div className="w-full">
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {layout.map((row, rowIndex) => {
           const rowKey = `row-${rowIndex}-${row[0]?.id}`;
           return (
             <div
               key={rowKey}
-              className="flex gap-1"
+              className="flex gap-1.5"
               style={{
                 height: row[0]?.displayHeight ?? 200,
               }}

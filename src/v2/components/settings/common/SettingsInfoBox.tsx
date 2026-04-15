@@ -9,15 +9,15 @@ import { SPACING, STATUS_COLOR, TYPOGRAPHY } from '../../../constants/ui';
 /**
  * InfoBoxのバリアント定義
  */
-const infoBoxVariants = cva('rounded-lg', {
+const infoBoxVariants = cva('rounded-xl', {
   variants: {
     variant: {
-      /** 一般的な情報・ヒント */
-      info: 'bg-primary/10',
+      /** 一般的な情報・ヒント — 極めて薄い背景で主張しすぎない */
+      info: 'bg-primary/5',
       /** 注意事項 */
-      warning: STATUS_COLOR.warning.bg,
+      warning: 'bg-warning/5',
       /** 成功・完了 */
-      success: STATUS_COLOR.success.bg,
+      success: 'bg-success/5',
     },
   },
   defaultVariants: {
@@ -97,7 +97,7 @@ const SettingsInfoBox = memo<SettingsInfoBoxProps>(
       <div
         className={cn(
           infoBoxVariants({ variant }),
-          SPACING.padding.card,
+          SPACING.padding.sm,
           className,
         )}
       >

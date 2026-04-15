@@ -5,7 +5,6 @@ import { memo } from 'react';
 import { cn } from '../../../../components/lib/utils';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
-import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../../constants/ui';
 
 interface SettingsPathInputProps {
   /** ラベル */
@@ -77,17 +76,17 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
     const inputId = `path-input-${label.replaceAll(/\s+/g, '-').toLowerCase()}`;
 
     return (
-      <div className={cn(SPACING.stack.default, className)}>
+      <div className={cn('space-y-2.5', className)}>
         {/* ラベル */}
         <label
           htmlFor={inputId}
-          className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.secondary)}
+          className="text-xs font-medium text-muted-foreground/70"
         >
           {label}
         </label>
 
         {/* 入力欄とボタン */}
-        <div className="flex gap-2">
+        <div className="flex gap-2.5">
           <Input
             id={inputId}
             type="text"
