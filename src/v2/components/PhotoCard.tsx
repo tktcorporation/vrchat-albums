@@ -269,9 +269,10 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
                   {selectionOrder}
                 </div>
               ) : (
+                // 写真上の選択アイコン — テーマに依存せず写真との固定コントラストが必要なため直接色指定
                 <Circle
                   size={ICON_SIZE.photo.pixels}
-                  className="text-white/80 bg-black/30 rounded-full hover:bg-black/40 transition-colors duration-150"
+                  className="text-primary-foreground/80 bg-foreground/30 rounded-full hover:bg-foreground/40 transition-colors duration-150"
                   strokeWidth={2}
                 />
               )}
@@ -311,15 +312,16 @@ const PhotoCard: React.FC<PhotoCardProps> = memo(
               </div>
             </div>
 
+            {/* ホバー時のファイル名オーバーレイ — 写真上で固定コントラストが必要なため直接色指定 */}
             {!isMultiSelectMode && photoLoaded && (
               <div
                 className={clsx(
-                  'absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent',
+                  'absolute inset-0 bg-gradient-to-t from-foreground/60 via-transparent to-transparent',
                   'opacity-0 group-hover:opacity-100 transition-opacity duration-150',
                 )}
               >
                 <div className="absolute bottom-0 left-0 right-0 p-3">
-                  <h3 className="text-white font-medium truncate text-xs drop-shadow-sm">
+                  <h3 className="text-primary-foreground font-medium truncate text-xs drop-shadow-sm">
                     {photo.fileNameWithExt.value}
                   </h3>
                 </div>

@@ -47,7 +47,7 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --ring: 32 95% 52% / 0.3;
+    --ring: 32 95% 52%;
 
     --radius: 0.625rem;
 
@@ -103,7 +103,7 @@
     --destructive: 0 70% 55%;
     --destructive-foreground: 210 40% 98%;
 
-    --ring: 32 90% 55% / 0.25;
+    --ring: 32 90% 55%;
 
     --radius: 0.625rem;
 
@@ -239,7 +239,9 @@
 
   .glass-button {
     background: hsl(var(--primary));
-    transition: all 0.15s ease;
+    transition:
+      background-color 0.15s ease,
+      box-shadow 0.15s ease;
   }
 
   .glass-button:hover {
@@ -253,7 +255,7 @@
   }
 
   .glass-input:focus {
-    border-color: hsl(var(--ring));
+    border-color: hsl(var(--ring) / 0.3);
     box-shadow: 0 0 0 2px hsl(var(--ring) / 0.15);
   }
 

@@ -329,7 +329,7 @@ export const LocationGroupHeader = ({
                     onClick={openShareModal}
                     className="flex items-center text-sm font-medium text-foreground bg-muted hover:bg-muted/80 px-2.5 py-1 rounded-md transition-colors duration-150 border border-border"
                   >
-                    <Share2 className={`${ICON_SIZE.sm.class}`} />
+                    <Share2 className={ICON_SIZE.sm.class} />
                   </button>
                 </div>
               </div>
