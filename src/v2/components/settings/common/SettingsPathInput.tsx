@@ -36,9 +36,7 @@ interface SettingsPathInputProps {
 }
 
 /**
- * 設定画面用のパス入力コンポーネント
- *
- * Arc風：ラベルは小さく控えめ、入力欄は広い余白の中に浮く。
+ * パス入力 — ラベルと入力欄の間に十分な余白
  */
 const SettingsPathInput = memo<SettingsPathInputProps>(
   ({
@@ -63,16 +61,16 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
     const inputId = `path-input-${label.replaceAll(/\s+/g, '-').toLowerCase()}`;
 
     return (
-      <div className={cn('space-y-3', className)}>
-        {/* ラベル — 極めて控えめ */}
+      <div className={cn('space-y-4', className)}>
+        {/* ラベル */}
         <label
           htmlFor={inputId}
-          className="text-[12px] font-medium text-muted-foreground/60"
+          className="text-[12px] text-muted-foreground/45"
         >
           {label}
         </label>
 
-        {/* 入力欄とボタン — ゆったりした gap */}
+        {/* 入力欄とボタン */}
         <div className="flex gap-3">
           <Input
             id={inputId}
@@ -100,10 +98,11 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
             <Button
               type="button"
               aria-label={browseLabel ?? `参照-${label}`}
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={onBrowse}
               disabled={disabled ?? readOnly}
+              className="text-muted-foreground/50 hover:text-foreground"
             >
               <FolderOpen className="h-4 w-4" />
             </Button>
@@ -112,7 +111,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
 
         {/* エラーメッセージ */}
         {error && (
-          <div className="flex items-center text-[12px] text-destructive/80">
+          <div className="flex items-center text-[12px] text-destructive/70">
             <AlertCircle className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
             <span>{error}</span>
           </div>

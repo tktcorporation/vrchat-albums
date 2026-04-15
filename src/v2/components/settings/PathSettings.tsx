@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { trpcReact } from '@/trpc';
 
-import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useInitProgress } from '../../hooks/useInitProgress';
 import { LOG_SYNC_MODE, useLogSync } from '../../hooks/useLogSync';
 import { useVRChatPhotoExtraDirList } from '../../hooks/useVRChatPhotoExtraDirList';
@@ -198,7 +197,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   return (
     <SettingsSection icon={FolderOpen} title="パス設定">
-      <div className={SPACING.stack.relaxed}>
+      <div className="space-y-10">
         {/* Photo Directory Section */}
         <SettingsPathInput
           label={t('settings.paths.photoDirectory')}
@@ -214,13 +213,11 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
         />
 
         {/* Extra Directories */}
-        <div className={SPACING.stack.default}>
-          <span
-            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
-          >
+        <div className="space-y-4">
+          <span className="text-[12px] text-muted-foreground/45">
             追加で読み込ませる写真フォルダ
           </span>
-          <div className={SPACING.stack.default}>
+          <div className="space-y-3">
             {extraDirs.map((dir: string, index: number) => (
               <div key={`extra-dir-${dir}`} className="flex gap-2">
                 <Input type="text" value={dir} readOnly className="flex-1" />
@@ -265,25 +262,23 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
         {/* Refresh All Section — 余白で区切り、ボーダーなし */}
         {showRefreshAll && (
-          <div className="pt-4">
-            <div className={SPACING.stack.default}>
-              <p className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}>
+          <div className="pt-6">
+            <div className="space-y-5">
+              <p className="text-[12px] text-muted-foreground/45 leading-relaxed max-w-lg">
                 設定したVRChatのログファイルから、過去のワールド訪問履歴を含む全てのインデックスを再構築します。
                 初回設定時や、インデックスの不整合が発生した場合に使用してください。
               </p>
               {isRefreshing && (
-                <div className={SPACING.stack.tight}>
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className="space-y-3">
+                  <div className="h-0.5 bg-muted/40 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                      className="h-full bg-primary/60 transition-all duration-500 ease-spring rounded-full"
                       style={{
                         width: `${Math.max(progress?.progress ?? 0, 5)}%`,
                       }}
                     />
                   </div>
-                  <p
-                    className={`${TYPOGRAPHY.caption.default} ${TEXT_COLOR.secondary}`}
-                  >
+                  <p className="text-[11px] text-muted-foreground/40">
                     {progressMessage || t('pullToRefresh.refreshing')}
                     {progress?.details?.current !== null &&
                       progress?.details?.current !== undefined &&

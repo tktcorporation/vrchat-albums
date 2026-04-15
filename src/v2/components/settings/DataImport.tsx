@@ -217,45 +217,43 @@ const DataImport = memo(() => {
       title="ログデータインポート"
       description="エクスポートされたlogStoreファイルを既存のデータに統合します"
     >
-      <div className={SPACING.stack.relaxed}>
+      <div className="space-y-10">
         {/* ファイル選択・ドロップエリア */}
-        <div className={SPACING.stack.default}>
-          <Label
-            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
-          >
+        <div className="space-y-5">
+          <Label className="text-[12px] text-muted-foreground/45">
             インポートファイル
           </Label>
 
-          {/* ドロップエリア */}
+          {/* ドロップエリア — ボーダーなし、背景だけ */}
           <div
-            className={`rounded-2xl p-8 text-center transition-all duration-200 ease-spring ${
-              isDragOver ? 'bg-primary/8 scale-[1.01]' : 'bg-muted/30'
+            className={`rounded-2xl py-12 px-8 text-center transition-all duration-200 ease-spring ${
+              isDragOver ? 'bg-primary/[0.06] scale-[1.01]' : 'bg-muted/20'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <Upload className={`h-8 w-8 mx-auto mb-2 ${TEXT_COLOR.muted}`} />
-            <p
-              className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary} mb-3`}
-            >
+            <Upload className="h-6 w-6 mx-auto mb-4 text-muted-foreground/25" />
+            <p className="text-[12px] text-muted-foreground/40 mb-5 leading-relaxed">
               logStoreファイルやディレクトリをドラッグ&amp;ドロップするか、下のボタンで選択してください
             </p>
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-3 justify-center">
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => void selectFiles()}
                 size="sm"
+                className="text-muted-foreground/50 hover:text-foreground"
               >
                 <FileText className="h-4 w-4 mr-2" />
                 ファイル選択
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={() => void selectDirectory()}
                 size="sm"
+                className="text-muted-foreground/50 hover:text-foreground"
               >
                 <FolderOpen className="h-4 w-4 mr-2" />
                 ディレクトリ選択
@@ -265,20 +263,18 @@ const DataImport = memo(() => {
 
           {/* 選択されたパス一覧 */}
           {selectedPaths.length > 0 && (
-            <div className={SPACING.stack.tight}>
-              <Label
-                className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
-              >
+            <div className="space-y-4">
+              <Label className="text-[12px] text-muted-foreground/45">
                 選択されたアイテム ({selectedPaths.length}個)
               </Label>
-              <div className="max-h-32 overflow-y-auto space-y-1">
+              <div className="max-h-32 overflow-y-auto space-y-2">
                 {selectedPaths.map((pathItem) => (
                   <div
                     key={pathItem}
-                    className={`${TYPOGRAPHY.body.small} ${STATUS_BADGE.primary} p-2 rounded`}
+                    className="text-[12px] text-foreground/70 bg-muted/20 px-4 py-3 rounded-xl"
                   >
                     {getFilenameFromPath(pathItem)}
-                    <div className={`${TEXT_COLOR.muted} truncate`}>
+                    <div className="text-muted-foreground/35 truncate mt-0.5">
                       {pathItem}
                     </div>
                   </div>
@@ -286,10 +282,10 @@ const DataImport = memo(() => {
               </div>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => setSelectedPaths([])}
-                className="text-xs"
+                className="text-xs text-muted-foreground/50"
               >
                 選択をクリア
               </Button>
@@ -327,20 +323,19 @@ const DataImport = memo(() => {
       </div>
 
       {/* インポート履歴・ロールバック */}
-      <div className="pt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h4
-            className={`${TYPOGRAPHY.heading.tertiary} ${TEXT_COLOR.primary}`}
-          >
+      <div className="pt-12">
+        <div className="flex items-center justify-between mb-8">
+          <h4 className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/35">
             インポート履歴・ロールバック
           </h4>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => void refetchHistory()}
             disabled={isLoadingHistory}
+            className="text-muted-foreground/40 hover:text-foreground"
           >
-            <RotateCcw className="h-4 w-4 mr-2" />
+            <RotateCcw className="h-3.5 w-3.5 mr-2" />
             更新
           </Button>
         </div>

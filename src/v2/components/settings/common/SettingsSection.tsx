@@ -18,32 +18,30 @@ interface SettingsSectionProps {
 }
 
 /**
- * 設定セクションコンテナ
+ * 設定セクションコンテナ — Arc/Claude風の圧倒的余白
  *
- * Arc風の広大な余白を持つセクションレイアウト。
- * タイトルは控えめな overline スタイル、コンテンツは大きな余白で呼吸させる。
+ * セクション間は56px以上。タイトルは極めて控えめな overline。
+ * コンテンツは広大な余白の中に浮かぶ。
  */
 const SettingsSection = memo<SettingsSectionProps>(
   ({ icon: Icon, title, description, children, className }) => {
     return (
-      <section className={cn('mb-14', className)}>
-        {/* セクションヘッダー — 控えめだが明確 */}
-        <div className="mb-8">
-          <h3 className="flex items-center text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/40">
-            {Icon && (
-              <Icon className="h-3 w-3 mr-2 opacity-40" aria-hidden="true" />
-            )}
+      <section className={cn('mb-16', className)}>
+        {/* セクションタイトル — 極限まで控えめ */}
+        <div className="mb-10">
+          <h3 className="flex items-center text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/35">
+            {Icon && <Icon className="h-3 w-3 mr-2" aria-hidden="true" />}
             {title}
           </h3>
           {description && (
-            <p className="mt-2 text-[13px] text-muted-foreground/60 leading-relaxed">
+            <p className="mt-3 text-[13px] text-muted-foreground/50 leading-relaxed max-w-md">
               {description}
             </p>
           )}
         </div>
 
-        {/* コンテンツ — 各アイテム間を大きく空ける */}
-        <div className="space-y-6">{children}</div>
+        {/* コンテンツ — 要素間を大きく空ける */}
+        <div className="space-y-8">{children}</div>
       </section>
     );
   },

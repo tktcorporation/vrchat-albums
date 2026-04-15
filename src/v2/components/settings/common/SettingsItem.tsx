@@ -17,37 +17,35 @@ interface SettingsItemProps {
 }
 
 /**
- * 設定項目コンポーネント
+ * 設定項目 — Arc/Claude 風：各アイテムが広い余白の中に浮く
  *
- * Arc風：ラベルと操作要素を広い余白で配置。
- * 各項目間の「呼吸」を最大化する。
+ * ラベルは普通の weight、description はかなり薄い。
+ * 操作要素との間に十分なマージン。
  */
 const SettingsItem = memo<SettingsItemProps>(
   ({ label, description, children, disabled, className }) => {
     return (
       <div
         className={cn(
-          'flex items-center justify-between py-3',
-          disabled && 'opacity-35',
+          'flex items-center justify-between py-4',
+          disabled && 'opacity-30',
           className,
         )}
       >
-        {/* ラベルと説明 — 広いマージンで操作要素と分離 */}
-        <div className="flex-1 min-w-0 mr-8">
+        <div className="flex-1 min-w-0 mr-12">
           <div
-            className="text-[13px] font-medium text-foreground"
+            className="text-[13px] text-foreground/90"
             id={`settings-item-${label.replaceAll(/\s+/g, '-').toLowerCase()}`}
           >
             {label}
           </div>
           {description && (
-            <div className="text-[12px] mt-1 text-muted-foreground/60 leading-relaxed">
+            <div className="text-[12px] mt-1.5 text-muted-foreground/45 leading-relaxed">
               {description}
             </div>
           )}
         </div>
 
-        {/* 操作要素 */}
         <div className="flex-shrink-0">{children}</div>
       </div>
     );
