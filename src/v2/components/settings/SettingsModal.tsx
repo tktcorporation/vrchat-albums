@@ -118,7 +118,7 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
       <DialogContent className="h-[85vh] w-[880px] max-w-[880px] p-0 overflow-hidden">
         {/* ヘッダー — 圧倒的余白の中にタイトルだけ */}
         <DialogHeader className="px-14 pt-14 pb-4">
-          <DialogTitle className="text-lg font-medium tracking-tight text-foreground/80">
+          <DialogTitle className="text-lg font-medium tracking-tight text-foreground">
             {t('common.settings')}
           </DialogTitle>
         </DialogHeader>
@@ -138,10 +138,10 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
                   className={`relative py-2 px-3 flex items-center text-[13px] transition-all duration-200 ease-spring rounded-lg ${
                     activeTab === id
                       ? 'text-foreground bg-muted/40'
-                      : 'text-muted-foreground/50 hover:text-foreground/80 hover:bg-muted/20'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/20'
                   }`}
                 >
-                  <Icon className="h-[14px] w-[14px] mr-3 flex-shrink-0 opacity-40" />
+                  <Icon className="h-[14px] w-[14px] mr-3 flex-shrink-0 opacity-60" />
                   <span className="truncate">{label}</span>
                 </button>
               ))}

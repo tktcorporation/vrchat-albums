@@ -88,7 +88,7 @@ const SettingsInfoBox = memo<SettingsInfoBoxProps>(
             {title}
           </h4>
         )}
-        <div className={cn('text-[12px] leading-relaxed', `${textColor}/60`)}>
+        <div className={cn('text-[12px] leading-relaxed', textColor)}>
           {children}
         </div>
       </div>

@@ -34,13 +34,13 @@ const SettingsItem = memo<SettingsItemProps>(
       >
         <div className="flex-1 min-w-0 mr-12">
           <div
-            className="text-[13px] text-foreground/90"
+            className="text-[13px] text-foreground"
             id={`settings-item-${label.replaceAll(/\s+/g, '-').toLowerCase()}`}
           >
             {label}
           </div>
           {description && (
-            <div className="text-[12px] mt-1.5 text-muted-foreground/45 leading-relaxed">
+            <div className="text-[12px] mt-1.5 text-muted-foreground leading-relaxed">
               {description}
             </div>
           )}

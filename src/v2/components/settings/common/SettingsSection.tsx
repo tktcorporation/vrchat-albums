@@ -29,12 +29,12 @@ const SettingsSection = memo<SettingsSectionProps>(
       <section className={cn('mb-16', className)}>
         {/* セクションタイトル — 極限まで控えめ */}
         <div className="mb-10">
-          <h3 className="flex items-center text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/35">
+          <h3 className="flex items-center text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">
             {Icon && <Icon className="h-3 w-3 mr-2" aria-hidden="true" />}
             {title}
           </h3>
           {description && (
-            <p className="mt-3 text-[13px] text-muted-foreground/50 leading-relaxed max-w-md">
+            <p className="mt-3 text-[13px] text-muted-foreground leading-relaxed max-w-md">
               {description}
             </p>
           )}

@@ -220,7 +220,7 @@ const DataImport = memo(() => {
       <div className="space-y-10">
         {/* ファイル選択・ドロップエリア */}
         <div className="space-y-5">
-          <Label className="text-[12px] text-muted-foreground/45">
+          <Label className="text-[12px] text-muted-foreground">
             インポートファイル
           </Label>
 
@@ -233,8 +233,8 @@ const DataImport = memo(() => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <Upload className="h-6 w-6 mx-auto mb-4 text-muted-foreground/25" />
-            <p className="text-[12px] text-muted-foreground/40 mb-5 leading-relaxed">
+            <Upload className="h-6 w-6 mx-auto mb-4 text-muted-foreground/60" />
+            <p className="text-[12px] text-muted-foreground mb-5 leading-relaxed">
               logStoreファイルやディレクトリをドラッグ&amp;ドロップするか、下のボタンで選択してください
             </p>
             <div className="flex gap-3 justify-center">
@@ -264,7 +264,7 @@ const DataImport = memo(() => {
           {/* 選択されたパス一覧 */}
           {selectedPaths.length > 0 && (
             <div className="space-y-4">
-              <Label className="text-[12px] text-muted-foreground/45">
+              <Label className="text-[12px] text-muted-foreground">
                 選択されたアイテム ({selectedPaths.length}個)
               </Label>
               <div className="max-h-32 overflow-y-auto space-y-2">
@@ -274,7 +274,7 @@ const DataImport = memo(() => {
                     className="text-[12px] text-foreground/70 bg-muted/20 px-4 py-3 rounded-xl"
                   >
                     {getFilenameFromPath(pathItem)}
-                    <div className="text-muted-foreground/35 truncate mt-0.5">
+                    <div className="text-muted-foreground/70 truncate mt-0.5">
                       {pathItem}
                     </div>
                   </div>
@@ -325,7 +325,7 @@ const DataImport = memo(() => {
       {/* インポート履歴・ロールバック */}
       <div className="pt-12">
         <div className="flex items-center justify-between mb-8">
-          <h4 className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/35">
+          <h4 className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70">
             インポート履歴・ロールバック
           </h4>
           <Button
@@ -333,7 +333,7 @@ const DataImport = memo(() => {
             size="sm"
             onClick={() => void refetchHistory()}
             disabled={isLoadingHistory}
-            className="text-muted-foreground/40 hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
           >
             <RotateCcw className="h-3.5 w-3.5 mr-2" />
             更新

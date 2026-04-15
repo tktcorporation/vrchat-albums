@@ -46,13 +46,13 @@ const LicenseInfo = memo(() => {
               <span className="text-sm font-medium text-foreground">
                 {lib.name}
               </span>
-              <span className="text-xs text-muted-foreground/50">
+              <span className="text-xs text-muted-foreground">
                 {lib.licenses}
               </span>
             </div>
             {lib.repository && (
               <div className="flex items-center justify-between mt-0.5">
-                <span className="text-xs text-muted-foreground/40">
+                <span className="text-xs text-muted-foreground">
                   Repository
                 </span>
                 <a
