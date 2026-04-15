@@ -214,7 +214,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
         {/* Extra Directories */}
         <div className="space-y-4">
-          <span className="text-[12px] text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             追加で読み込ませる写真フォルダ
           </span>
           <div className="space-y-3">
@@ -264,7 +264,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
         {showRefreshAll && (
           <div className="pt-6">
             <div className="space-y-5">
-              <p className="text-[12px] text-muted-foreground leading-relaxed max-w-lg">
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">
                 設定したVRChatのログファイルから、過去のワールド訪問履歴を含む全てのインデックスを再構築します。
                 初回設定時や、インデックスの不整合が発生した場合に使用してください。
               </p>
@@ -278,7 +278,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
                       }}
                     />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {progressMessage || t('pullToRefresh.refreshing')}
                     {progress?.details?.current !== null &&
                       progress?.details?.current !== undefined &&

@@ -34,7 +34,7 @@ const LanguageSelector = memo(() => {
                 : 'text-muted-foreground/60 hover:bg-muted/30 hover:text-foreground',
             )}
           >
-            <span className="text-[13px] font-medium">{label}</span>
+            <span className="text-sm font-medium">{label}</span>
           </button>
         ))}
       </div>

@@ -74,7 +74,7 @@ const SettingsInfoBox = memo<SettingsInfoBoxProps>(
         {title && (
           <h4
             className={cn(
-              'flex items-center text-[13px] font-medium',
+              'flex items-center text-sm font-medium',
               textColor,
               'mb-3',
             )}
@@ -88,7 +88,7 @@ const SettingsInfoBox = memo<SettingsInfoBoxProps>(
             {title}
           </h4>
         )}
-        <div className={cn('text-[12px] leading-relaxed', textColor)}>
+        <div className={cn('text-sm leading-relaxed', textColor)}>
           {children}
         </div>
       </div>

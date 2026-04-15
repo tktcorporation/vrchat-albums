@@ -135,7 +135,7 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
                   type="button"
                   key={id}
                   onClick={() => setActiveTab(id)}
-                  className={`relative py-2 px-3 flex items-center text-[13px] transition-all duration-200 ease-spring rounded-lg ${
+                  className={`relative py-2 px-3 flex items-center text-sm transition-all duration-200 ease-spring rounded-lg ${
                     activeTab === id
                       ? 'text-foreground bg-muted/40'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/20'

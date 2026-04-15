@@ -178,7 +178,7 @@ const DataExport = memo(() => {
                     selectedPreset === value ? 'text-primary' : 'opacity-40',
                   )}
                 />
-                <span className="text-[13px] font-medium">{label}</span>
+                <span className="text-sm font-medium">{label}</span>
               </button>
             ))}
           </div>

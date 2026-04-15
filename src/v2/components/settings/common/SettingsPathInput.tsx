@@ -63,7 +63,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
     return (
       <div className={cn('space-y-4', className)}>
         {/* ラベル */}
-        <label htmlFor={inputId} className="text-[12px] text-muted-foreground">
+        <label htmlFor={inputId} className="text-sm text-muted-foreground">
           {label}
         </label>
 
@@ -108,7 +108,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
 
         {/* エラーメッセージ */}
         {error && (
-          <div className="flex items-center text-[12px] text-destructive">
+          <div className="flex items-center text-sm text-destructive">
             <AlertCircle className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
