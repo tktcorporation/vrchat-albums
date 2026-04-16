@@ -236,7 +236,7 @@ export const LocationGroupHeader = ({
         )}
 
         <div className="relative flex items-center gap-4 w-full">
-          {/* 左側 - ワールド画像（ボーダーなし、丸く、影で浮遊感） */}
+          {/* ワールド画像 */}
           <div className="flex-shrink-0">
             {details?.thumbnailImageUrl ? (
               <div
@@ -256,7 +256,7 @@ export const LocationGroupHeader = ({
                 style={{ aspectRatio: '16/10' }}
               >
                 <ImageIcon
-                  className={`${ICON_SIZE.lg.class} text-muted-foreground/20`}
+                  className={`${ICON_SIZE.lg.class} text-muted-foreground/40`}
                 />
               </div>
             )}
@@ -308,14 +308,14 @@ export const LocationGroupHeader = ({
                 <button
                   type="button"
                   onClick={openShareModal}
-                  className="flex items-center text-sm text-muted-foreground/50 hover:text-foreground p-1.5 rounded-lg hover:bg-muted/40 transition-all duration-200 ease-spring"
+                  className="flex items-center text-sm text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-muted/40 transition-all duration-200 ease-spring"
                 >
                   <Share2 className={ICON_SIZE.sm.class} />
                 </button>
               </div>
             </div>
 
-            {/* 2行目: 日付 + プレイヤー — ボーダーなし、テキストだけで情報を伝える */}
+            {/* 日付 + プレイヤー */}
             <div className="flex items-center gap-3 w-full text-xs text-muted-foreground">
               <span className="flex items-center gap-1 flex-shrink-0">
                 <Calendar className={ICON_SIZE.xs.class} />
@@ -395,7 +395,7 @@ export const LocationGroupHeader = ({
                           )}
                       </button>
                       <Copy
-                        className={`${ICON_SIZE.xs.class} ml-1 text-muted-foreground/30 group-hover/players:text-muted-foreground transition-colors duration-200 flex-shrink-0`}
+                        className={`${ICON_SIZE.xs.class} ml-1 text-muted-foreground/60 group-hover/players:text-muted-foreground transition-colors duration-200 flex-shrink-0`}
                       />
                     </div>
                   );

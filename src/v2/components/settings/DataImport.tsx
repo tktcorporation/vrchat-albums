@@ -220,7 +220,7 @@ const DataImport = memo(() => {
       <div className="space-y-10">
         {/* ファイル選択・ドロップエリア */}
         <SettingsField label="インポートファイル">
-          {/* ドロップエリア — ボーダーなし、背景だけ */}
+          {/* ドロップエリア */}
           <div
             className={`rounded-2xl py-12 px-8 text-center transition-all duration-200 ease-spring ${
               isDragOver ? 'bg-primary/[0.06] scale-[1.01]' : 'bg-muted/20'

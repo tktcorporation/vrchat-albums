@@ -257,7 +257,6 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
           saveLabel={`${t('common.submit')}-${t('settings.paths.logFile')}`}
         />
 
-        {/* Refresh All Section — 余白で区切り、ボーダーなし */}
         {showRefreshAll && (
           <div className="pt-6">
             <div className="space-y-5">

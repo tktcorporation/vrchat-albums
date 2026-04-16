@@ -278,7 +278,7 @@ const SearchOverlay = memo(
               )}
             </div>
 
-            {/* 検索候補部分 — ボーダーなし、余白で区切る */}
+            {/* 検索候補 */}
             <div className="max-h-80 overflow-y-auto scrollbar-hide">
               {(() => {
                 if (isLoading && debouncedQuery.length > 0) {
@@ -353,7 +353,7 @@ const SearchOverlay = memo(
               })()}
             </div>
 
-            {/* フッター — ボーダーなし、余白で分離 */}
+            {/* フッター */}
             {query.trim() && (
               <div className="px-3 pb-3">
                 <button

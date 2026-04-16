@@ -55,16 +55,16 @@ const SearchCombobox = memo(
           )}
         </button>
 
-        {/* 検索オーバーレイ — ヘッダーの backdrop-filter スタッキングコンテキストを超えるため Portal 経由 */}
-        {createPortal(
-          <SearchOverlay
-            isOpen={isOverlayOpen}
-            onClose={handleCloseOverlay}
-            onSearch={handleSearch}
-            initialQuery={searchQuery}
-          />,
-          document.body,
-        )}
+        {isOverlayOpen &&
+          createPortal(
+            <SearchOverlay
+              isOpen={isOverlayOpen}
+              onClose={handleCloseOverlay}
+              onSearch={handleSearch}
+              initialQuery={searchQuery}
+            />,
+            document.body,
+          )}
       </>
     );
   },
