@@ -219,7 +219,7 @@ const DataImport = memo(() => {
     >
       <div className="space-y-10">
         {/* ファイル選択・ドロップエリア */}
-        <div className="space-y-5">
+        <div className="space-y-6">
           <Label className="text-sm text-muted-foreground">
             インポートファイル
           </Label>

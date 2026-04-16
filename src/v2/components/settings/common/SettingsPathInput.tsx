@@ -61,7 +61,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
     const inputId = `path-input-${label.replaceAll(/\s+/g, '-').toLowerCase()}`;
 
     return (
-      <div className={cn('space-y-4', className)}>
+      <div className={cn('space-y-6', className)}>
         {/* ラベル */}
         <label htmlFor={inputId} className="text-sm text-muted-foreground">
           {label}

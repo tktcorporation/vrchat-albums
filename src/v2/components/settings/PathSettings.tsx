@@ -213,7 +213,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
         />
 
         {/* Extra Directories */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           <span className="text-sm text-muted-foreground">
             追加で読み込ませる写真フォルダ
           </span>

@@ -151,10 +151,8 @@ const DataExport = memo(() => {
     >
       <div className={SPACING.stack.relaxed}>
         {/* 期間設定 */}
-        <div className={SPACING.stack.default}>
-          <Label
-            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
-          >
+        <div className="space-y-6">
+          <Label className="text-sm text-muted-foreground">
             エクスポート期間
           </Label>
 
@@ -231,11 +229,8 @@ const DataExport = memo(() => {
         </div>
 
         {/* 出力パス設定 */}
-        <div className={SPACING.stack.tight}>
-          <Label
-            htmlFor="outputPath"
-            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
-          >
+        <div className="space-y-6">
+          <Label htmlFor="outputPath" className="text-sm text-muted-foreground">
             出力先ディレクトリ（オプション）
           </Label>
           <div className="flex gap-2">
