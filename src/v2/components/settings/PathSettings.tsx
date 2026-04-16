@@ -10,7 +10,7 @@ import { useInitProgress } from '../../hooks/useInitProgress';
 import { LOG_SYNC_MODE, useLogSync } from '../../hooks/useLogSync';
 import { useVRChatPhotoExtraDirList } from '../../hooks/useVRChatPhotoExtraDirList';
 import { useI18n } from '../../i18n/store';
-import { SettingsPathInput, SettingsSection } from './common';
+import { SettingsField, SettingsPathInput, SettingsSection } from './common';
 
 interface PathSettingsProps {
   showRefreshAll: boolean;
@@ -213,11 +213,8 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
         />
 
         {/* Extra Directories */}
-        <div className="space-y-6">
-          <span className="text-sm text-muted-foreground">
-            追加で読み込ませる写真フォルダ
-          </span>
-          <div className="space-y-3">
+        <SettingsField label="追加で読み込ませる写真フォルダ">
+          <div className="flex flex-col gap-3">
             {extraDirs.map((dir: string, index: number) => (
               <div key={`extra-dir-${dir}`} className="flex gap-2">
                 <Input type="text" value={dir} readOnly className="flex-1" />
@@ -244,7 +241,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
               フォルダを追加
             </Button>
           </div>
-        </div>
+        </SettingsField>
 
         {/* Log File Section */}
         <SettingsPathInput

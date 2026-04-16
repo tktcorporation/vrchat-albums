@@ -15,7 +15,7 @@ import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
 import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
-import { SettingsInfoBox, SettingsSection } from './common';
+import { SettingsField, SettingsInfoBox, SettingsSection } from './common';
 
 type PeriodPreset = 'all' | 'recent3months' | 'custom';
 
@@ -151,11 +151,7 @@ const DataExport = memo(() => {
     >
       <div className={SPACING.stack.relaxed}>
         {/* 期間設定 */}
-        <div className="space-y-6">
-          <Label className="text-sm text-muted-foreground">
-            エクスポート期間
-          </Label>
-
+        <SettingsField label="エクスポート期間">
           {/* プリセット選択 - ThemeSelectorパターン */}
           <div className="grid grid-cols-3 gap-3">
             {periodPresets.map(({ value, label, icon: Icon }) => (
@@ -226,13 +222,13 @@ const DataExport = memo(() => {
               </div>
             </div>
           )}
-        </div>
+        </SettingsField>
 
         {/* 出力パス設定 */}
-        <div className="space-y-6">
-          <Label htmlFor="outputPath" className="text-sm text-muted-foreground">
-            出力先ディレクトリ（オプション）
-          </Label>
+        <SettingsField
+          label="出力先ディレクトリ（オプション）"
+          htmlFor="outputPath"
+        >
           <div className="flex gap-2">
             <div className="relative flex-1">
               <FolderOpen
@@ -259,7 +255,7 @@ const DataExport = memo(() => {
           <p className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
             出力先を変更しない場合、ダウンロードフォルダ内のlogStoreディレクトリに出力されます
           </p>
-        </div>
+        </SettingsField>
 
         {/* エクスポートボタン */}
         <div className="pt-4">

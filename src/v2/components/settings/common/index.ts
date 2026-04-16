@@ -17,3 +17,6 @@ export { SettingsPathInput } from './SettingsPathInput';
 export type { SettingsSectionProps } from './SettingsSection';
 // セクションコンテナ
 export { SettingsSection } from './SettingsSection';
+export type { SettingsFieldProps } from './SettingsField';
+// フォームフィールド（label + input + error の余白統一）
+export { SettingsField } from './SettingsField';

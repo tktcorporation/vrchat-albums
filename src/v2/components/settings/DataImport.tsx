@@ -21,7 +21,7 @@ import {
   TYPOGRAPHY,
 } from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
-import { SettingsInfoBox, SettingsSection } from './common';
+import { SettingsField, SettingsInfoBox, SettingsSection } from './common';
 
 // Note: ImportHistoryItem interface is used for documentation purposes
 // The actual type comes from the tRPC query result
@@ -219,11 +219,7 @@ const DataImport = memo(() => {
     >
       <div className="space-y-10">
         {/* ファイル選択・ドロップエリア */}
-        <div className="space-y-6">
-          <Label className="text-sm text-muted-foreground">
-            インポートファイル
-          </Label>
-
+        <SettingsField label="インポートファイル">
           {/* ドロップエリア — ボーダーなし、背景だけ */}
           <div
             className={`rounded-2xl py-12 px-8 text-center transition-all duration-200 ease-spring ${
@@ -291,7 +287,7 @@ const DataImport = memo(() => {
               </Button>
             </div>
           )}
-        </div>
+        </SettingsField>
 
         {/* インポートボタン */}
         <div className="pt-4">

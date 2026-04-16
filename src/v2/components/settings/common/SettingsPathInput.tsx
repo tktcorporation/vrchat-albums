@@ -1,10 +1,10 @@
-import { AlertCircle, FolderOpen, Save } from 'lucide-react';
+import { FolderOpen, Save } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import { memo } from 'react';
 
-import { cn } from '../../../../components/lib/utils';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
+import { SettingsField } from './SettingsField';
 
 interface SettingsPathInputProps {
   /** ラベル */
@@ -36,7 +36,7 @@ interface SettingsPathInputProps {
 }
 
 /**
- * パス入力 — ラベルと入力欄の間に十分な余白
+ * パス入力 — SettingsField を使って label→input の余白を確実に確保
  */
 const SettingsPathInput = memo<SettingsPathInputProps>(
   ({
@@ -61,13 +61,12 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
     const inputId = `path-input-${label.replaceAll(/\s+/g, '-').toLowerCase()}`;
 
     return (
-      <div className={cn('space-y-6', className)}>
-        {/* ラベル */}
-        <label htmlFor={inputId} className="text-sm text-muted-foreground">
-          {label}
-        </label>
-
-        {/* 入力欄とボタン */}
+      <SettingsField
+        label={label}
+        htmlFor={inputId}
+        error={error}
+        className={className}
+      >
         <div className="flex gap-3">
           <Input
             id={inputId}
@@ -105,15 +104,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
             </Button>
           )}
         </div>
-
-        {/* エラーメッセージ */}
-        {error && (
-          <div className="flex items-center text-sm text-destructive">
-            <AlertCircle className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-      </div>
+      </SettingsField>
     );
   },
 );
