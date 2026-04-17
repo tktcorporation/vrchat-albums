@@ -270,6 +270,59 @@ describe('ng-low-contrast-dark.tsx', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ok-dark-variant.tsx: dark: バリアントを使用した両モード AA クリアの典型例
+// ---------------------------------------------------------------------------
+
+describe('ok-dark-variant.tsx', () => {
+  it('produces no errors: dark: variants resolve correctly in both modes', () => {
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ok-dark-variant.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ok-dark-variant.tsx', source);
+    expect(stacks.length).toBeGreaterThan(0);
+
+    const errors: string[] = [];
+    const unknowns: string[] = [];
+    for (const stack of stacks) {
+      const resolution = classifyStack(stack, cssVars);
+      if (resolution.kind === 'unknown') {
+        unknowns.push(resolution.reason);
+      }
+      if (resolution.kind === 'resolvable') {
+        for (const theme of ['light', 'dark'] as Theme[]) {
+          const { bg, fg } = resolution.themes[theme];
+          const ratio = wcagContrastRatio(fg, bg);
+          if (ratio < WCAG_AA_THRESHOLD) {
+            errors.push(`${theme}: ratio=${ratio.toFixed(2)}`);
+          }
+        }
+      }
+    }
+
+    // dark: バリアントが light モードで unknown に落ちていないこと
+    expect(unknowns).toHaveLength(0);
+    // 両モードで AA クリアすること
+    expect(errors).toHaveLength(0);
+  });
+
+  it('both light and dark themes are resolvable (dark: prefix does not cause unknown)', () => {
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ok-dark-variant.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ok-dark-variant.tsx', source);
+
+    const resolvable = stacks
+      .map((s) => classifyStack(s, cssVars))
+      .filter((r) => r.kind === 'resolvable');
+
+    // dark: バリアントが unknown に落ちず、resolvable として解決されること
+    expect(resolvable.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Integration: parseCssVars → resolveClass → compositeOver → evaluateContrast
 // ---------------------------------------------------------------------------
 

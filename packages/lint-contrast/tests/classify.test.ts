@@ -244,3 +244,74 @@ describe('Smoke tests via fixtures', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// dark: バリアントの正しい処理 (指摘 1 / 指摘 2 の修正検証)
+// ---------------------------------------------------------------------------
+
+describe('dark: variant handling', () => {
+  // 指摘 1: light モードで dark:bg-* はスキップされ、bg-white が採用される
+  it('dark:bg-* in bgStack is skipped in light mode (not treated as null → unknown)', () => {
+    // bg-white → white in light, dark:bg-gray-900 → skipped in light
+    // bgStack に dark: バリアントを含んでも light モードで resolvable になること
+    const stack = makeStack(
+      [staticBg('bg-white', 'dark:bg-background')],
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    // dark:bg-background は light モードでスキップされ、bg-white のみで解決できる
+    expect(result.kind).toBe('resolvable');
+  });
+
+  // 指摘 1: dark モードでは dark:bg-* が採用される
+  it('dark:bg-* in bgStack is applied in dark mode', () => {
+    const stack = makeStack(
+      [staticBg('bg-white', 'dark:bg-background')],
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // dark モードの bg は --background (dark) になるので白ではない
+      const darkBg = result.themes.dark.bg;
+      // mock CSS の dark --background: 220 27% 8% → 暗い色なので r,g,b が 0.15 未満
+      expect(darkBg.r).toBeLessThan(0.15);
+      expect(darkBg.g).toBeLessThan(0.15);
+      expect(darkBg.b).toBeLessThan(0.25);
+    }
+  });
+
+  // 指摘 2: text に dark: オーバーライドがある場合、dark モードでは後勝ちクラスが採用される
+  it('dark:text-* overrides base text class in dark mode (last applicable class wins)', () => {
+    // text-foreground は light モードの暗い色, dark:text-foreground は dark モードの明るい色
+    // light: text-foreground が採用 (dark:text-foreground はスキップ)
+    // dark:  dark:text-foreground が後勝ち (CSS cascade に準拠)
+    const stack = makeStack(
+      [staticBg('bg-background')],
+      [staticText('text-foreground', 'dark:text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // dark モードの fg は dark --foreground (明るい色: 220 15% 85%)
+      const darkFg = result.themes.dark.fg;
+      // dark foreground は明るい色なので r,g,b が 0.7 以上
+      expect(darkFg.r).toBeGreaterThan(0.7);
+    }
+  });
+
+  // bg-white + dark:bg-gray-900 の両モード独立計算 (指摘 1 の統合テスト)
+  it('bg-white dark:bg-background resolves independently per theme', () => {
+    const stack = makeStack(
+      [staticBg('bg-white', 'dark:bg-background')],
+      [staticText('text-foreground', 'dark:text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // light: bg=white (r≈1), dark: bg=dark-background (r<0.15)
+      expect(result.themes.light.bg.r).toBeGreaterThan(0.9);
+      expect(result.themes.dark.bg.r).toBeLessThan(0.15);
+    }
+  });
+});

@@ -24,6 +24,38 @@ import type {
 } from './types.js';
 
 /**
+ * あるクラスが指定されたテーマに適用されるかを判定する。
+ *
+ * - `dark:` プレフィックスを持つクラスは `dark` テーマのときのみ適用される
+ * - プレフィックスなしのクラスは常に適用される
+ * - 将来の `light:` や `hover:` 等のバリアントへの拡張を想定し、
+ *   プレフィックスと対応テーマのマップで実装している
+ *
+ * Phase 1 では `dark:` のみをサポートし、その他のバリアント (`hover:`, `focus:` 等) は
+ * 常に適用とみなす（resolveClass 側で null が返るため実質スキップされる）。
+ *
+ * @param cls - Tailwind クラス名 (例: "dark:bg-gray-900", "bg-white")
+ * @param theme - 評価中のテーマ ('light' | 'dark')
+ * @returns クラスがこのテーマで適用されるなら true
+ */
+function isApplicableForTheme(cls: string, theme: Theme): boolean {
+  // バリアントプレフィックスと、適用されるテーマのマッピング
+  // 将来の拡張: 'light:', 'md:', 'hover:' 等を追加する場合はここに追記する
+  const themeVariants: Record<string, Theme> = {
+    'dark:': 'dark',
+  };
+
+  for (const [prefix, applicableTheme] of Object.entries(themeVariants)) {
+    if (cls.startsWith(prefix)) {
+      return theme === applicableTheme;
+    }
+  }
+
+  // プレフィックスなし → 全テーマで適用
+  return true;
+}
+
+/**
  * 組合せ数が爆発するときのデフォルト上限。Rule 6/7 の分岐閾値。
  * CLI の --max-combinations オプションで上書き可能。
  */
@@ -69,14 +101,14 @@ function countCombinations(
   bgStack: ClassCandidate[],
   textCandidates: ClassCandidate[],
 ): number {
-  // Phase 1: bgStack は候補の配列 (各要素 = 1候補)
-  // 組合せ数 = textCandidates の長さ (bgStack の直積は 1^n = 1)
-  // ただし bgStack が長くなると将来的に積が増える可能性があるため
-  // 安全のため bgStack.length も因子に含める
+  // Phase 1: bgStack は flat な候補リスト（各要素 = 1候補、選択肢ではない）。
+  // 実際の組合せ数は textCandidates の数だけ。bgStack は全要素を使って合成するので
+  // 「bgStack のどれか1つを選ぶ」というバリアントは存在しない。
+  // bgStack.length を因子に含めると組合せ数を過大計上し、combinatorial-explosion 誤検知が起きる。
   if (bgStack.length === 0) {
     return 0;
   }
-  return Math.max(bgStack.length, 1) * textCandidates.length;
+  return textCandidates.length;
 }
 
 /**
@@ -92,24 +124,37 @@ function resolveForTheme(
   base: Rgba,
 ): { bg: Rgba; fg: Rgba; ratio: number } | null {
   // Resolve each bg class in sequence (Porter-Duff over)
+  // dark: バリアントなど、このテーマに非適用なクラスはスキップする。
+  // 適用クラスであるにも関わらず resolve に失敗した場合は unknown 昇格のため null を返す。
   const bgRgbas: Rgba[] = [];
   for (const candidate of bgCandidates) {
     for (const cls of candidate.classes) {
+      if (!isApplicableForTheme(cls, theme)) {
+        // 非適用バリアント (例: light モードの dark:bg-*) → スキップ
+        continue;
+      }
       const rgba = resolveClass(cls, theme, cssVars);
       if (rgba === null) {
+        // 適用クラスの resolve 失敗 → unknown 昇格
         return null;
       }
       bgRgbas.push(rgba);
     }
   }
 
-  // Resolve fg (first resolvable class wins)
+  // Resolve fg: Tailwind の CSS cascade ルールに従い、最後に出現した適用可能なクラスを採用する。
+  // "text-gray-900 dark:text-gray-100" を dark モードで評価すると dark:text-gray-100 が後勝ち。
+  // 先に break していた旧実装では dark: オーバーライドが無視されていた。
   let fgRgba: Rgba | null = null;
   for (const cls of textCandidate.classes) {
+    if (!isApplicableForTheme(cls, theme)) {
+      // 非適用バリアント → スキップ
+      continue;
+    }
     const resolved = resolveClass(cls, theme, cssVars);
     if (resolved !== null) {
+      // break せず全体を走査し、最後に出現した適用可能クラスを採用する
       fgRgba = resolved;
-      break;
     }
   }
   if (fgRgba === null) {
