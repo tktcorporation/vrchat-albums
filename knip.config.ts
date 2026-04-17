@@ -47,6 +47,8 @@ const config: KnipConfig = {
     '.grit/**',
     // napi-rs 生成コード（index.js/index.d.ts）は knip のスコープ外
     'packages/exif-native/**',
+    // lint-contrast テストフィクスチャは vitest が動的 glob で読み込むため未使用誤検出される
+    'packages/lint-contrast/test-fixtures/**',
   ],
   // Don't report unused exports in entry files (tRPC routers)
   includeEntryExports: false,
