@@ -108,8 +108,9 @@ export function resolveClass(
     const opacityStr = remaining.slice(slashIdx + 1);
     remaining = remaining.slice(0, slashIdx);
     const opacityNum = parseFloat(opacityStr);
-    if (!isNaN(opacityNum)) {
-      // Tailwind uses 0-100 for percentage or 0-1 for decimal
+    if (!Number.isNaN(opacityNum)) {
+      // Tailwind uses 0-100 for percentage or 0-1 for decimal.
+      // "bg-white/80" → 80/100 = 0.8; "bg-white/0.5" → 0.5 (直接使用)
       opacityOverride = opacityNum > 1 ? opacityNum / 100 : opacityNum;
     }
   }

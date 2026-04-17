@@ -61,19 +61,117 @@ function isJsxElement(node: AstNode): node is JsxElement {
 }
 
 /**
- * Tailwind クラス文字列から bg-* または text-* クラスを抽出する。
+ * text-* / bg-* プレフィックスを持つが色ではない Tailwind ユーティリティクラスのサフィックス。
  *
- * スペース区切りのクラスリストから bg- または text- で始まるクラスを返す。
+ * これらは抽出対象から除外することで誤検出を防ぐ。
+ * text-transparent / text-current / text-inherit は前景色が不明なため skip 対象として除外する。
+ */
+const NON_COLOR_TEXT_SUFFIXES = new Set([
+  // フォントサイズ
+  'xs',
+  'sm',
+  'base',
+  'lg',
+  'xl',
+  '2xl',
+  '3xl',
+  '4xl',
+  '5xl',
+  '6xl',
+  '7xl',
+  '8xl',
+  '9xl',
+  // テキスト整列
+  'left',
+  'center',
+  'right',
+  'justify',
+  'start',
+  'end',
+  // テキストオーバーフロー
+  'ellipsis',
+  'clip',
+  'wrap',
+  'nowrap',
+  'balance',
+  'pretty',
+  // 特殊値 (前景色不明なため除外)
+  'transparent',
+  'current',
+  'inherit',
+]);
+
+const NON_COLOR_BG_SUFFIXES = new Set([
+  // 背景画像・配置
+  'none',
+  'cover',
+  'contain',
+  'auto',
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'center',
+  // 背景固定
+  'fixed',
+  'local',
+  'scroll',
+  // クリップ・オリジン (text 等はサフィックスなので prefix チェック)
+  'transparent',
+  'current',
+  'inherit',
+]);
+
+/**
+ * Tailwind クラス文字列から bg-* または text-* の「色」クラスのみを抽出する。
+ *
+ * スペース区切りのクラスリストから bg- または text- で始まるクラスを返すが、
+ * フォントサイズ・整列・配置など色以外のユーティリティは除外する。
+ * `NON_COLOR_TEXT_SUFFIXES` / `NON_COLOR_BG_SUFFIXES` が除外リスト。
  */
 function extractColorClasses(classStr: string): string[] {
   return classStr.split(/\s+/).filter((cls) => {
     const trimmed = cls.trim();
-    return (
-      trimmed.startsWith('bg-') ||
-      trimmed.startsWith('text-') ||
-      trimmed.startsWith('dark:bg-') ||
-      trimmed.startsWith('dark:text-')
-    );
+    // dark: プレフィックスを除いた実クラスで判定
+    const base = trimmed.startsWith('dark:') ? trimmed.slice(5) : trimmed;
+
+    if (base.startsWith('text-')) {
+      const suffix = base.slice(5);
+      // bg-clip-text, bg-gradient-to-* 等: 複合プレフィックスを持つ非色クラス
+      if (
+        suffix.startsWith('opacity-') ||
+        suffix.startsWith('clip') ||
+        suffix.startsWith('decoration-') ||
+        suffix.startsWith('underline') ||
+        suffix.startsWith('overline') ||
+        suffix.startsWith('line-through') ||
+        suffix.startsWith('no-underline') ||
+        suffix.startsWith('uppercase') ||
+        suffix.startsWith('lowercase') ||
+        suffix.startsWith('capitalize') ||
+        suffix.startsWith('normal-case')
+      ) {
+        return false;
+      }
+      return !NON_COLOR_TEXT_SUFFIXES.has(suffix);
+    }
+
+    if (base.startsWith('bg-')) {
+      const suffix = base.slice(3);
+      // bg-gradient-to-*, bg-clip-*, bg-origin-*, bg-blend-* は非色
+      if (
+        suffix.startsWith('gradient-') ||
+        suffix.startsWith('clip-') ||
+        suffix.startsWith('origin-') ||
+        suffix.startsWith('blend-') ||
+        suffix.startsWith('opacity-')
+      ) {
+        return false;
+      }
+      return !NON_COLOR_BG_SUFFIXES.has(suffix);
+    }
+
+    return false;
   });
 }
 
@@ -276,40 +374,60 @@ function getElementName(nameNode: AstNode): string {
 }
 
 /**
- * 行/列番号を oxc-parser のバイトオフセットから計算する。
+ * バイトオフセット → 行/列番号の変換を効率化するインデックス。
  *
- * oxc-parser は start/end をバイトオフセットで返すため、
- * ソース文字列を逐次スキャンして行番号と列番号に変換する。
+ * ファイル単位で改行位置を一度だけ走査してキャッシュし、
+ * 二分探索で O(log n) の位置決定を実現する。
+ *
+ * 注意: oxc-parser は UTF-8 バイトオフセットを返す。
+ * この実装は JS 文字列 (UTF-16) のインデックスとして扱うため、
+ * CJK 等の多バイト文字が多い場合にオフセットがずれることがある。
+ * Phase 1 では精度より速度を優先し、この制限を受け入れる。
  */
-function offsetToLineCol(
-  source: string,
-  offset: number,
-): { line: number; column: number } {
-  let line = 1;
-  let col = 1;
-  for (let i = 0; i < offset && i < source.length; i++) {
-    if (source[i] === '\n') {
-      line++;
-      col = 1;
-    } else {
-      col++;
+class OffsetIndex {
+  /** 各改行文字の位置 (先頭が 0 行目、改行後が 1 行目...) */
+  private readonly lineStarts: number[];
+
+  constructor(source: string) {
+    this.lineStarts = [0];
+    for (let i = 0; i < source.length; i++) {
+      if (source[i] === '\n') {
+        this.lineStarts.push(i + 1);
+      }
     }
   }
-  return { line, column: col };
+
+  /** バイトオフセットを 1-indexed の { line, column } に変換する。 */
+  toLineCol(offset: number): { line: number; column: number } {
+    // Binary search for the last lineStart <= offset
+    let lo = 0;
+    let hi = this.lineStarts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (this.lineStarts[mid] <= offset) {
+        lo = mid;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    const line = lo + 1;
+    const column = offset - this.lineStarts[lo] + 1;
+    return { line, column };
+  }
 }
 
 /**
  * JSX 要素ツリーを再帰下降し、各要素の JsxStack を収集する。
  *
  * @param node - 現在の AST ノード
- * @param source - ソース文字列 (行番号計算に使用)
+ * @param offsetIndex - バイトオフセット → 行番号変換インデックス
  * @param filePath - ファイルパス (報告用)
  * @param parentBgStack - 親要素から継承した bg クラス候補のスタック
  * @param results - 収集結果を追記するリスト
  */
 function visitNode(
   node: AstNode,
-  source: string,
+  offsetIndex: OffsetIndex,
   filePath: string,
   parentBgStack: ClassCandidate[],
   results: JsxStack[],
@@ -323,7 +441,7 @@ function visitNode(
           if (child && typeof child === 'object' && 'type' in child) {
             visitNode(
               child as AstNode,
-              source,
+              offsetIndex,
               filePath,
               parentBgStack,
               results,
@@ -331,7 +449,13 @@ function visitNode(
           }
         }
       } else if (val && typeof val === 'object' && 'type' in val) {
-        visitNode(val as AstNode, source, filePath, parentBgStack, results);
+        visitNode(
+          val as AstNode,
+          offsetIndex,
+          filePath,
+          parentBgStack,
+          results,
+        );
       }
     }
     return;
@@ -382,7 +506,7 @@ function visitNode(
 
   // If this element has text candidates, record a JsxStack entry
   if (textCandidates.length > 0 && newBgStack.length > 0) {
-    const { line, column } = offsetToLineCol(source, opening.start);
+    const { line, column } = offsetIndex.toLineCol(opening.start);
     results.push({
       file: filePath,
       line,
@@ -396,7 +520,23 @@ function visitNode(
   // Recurse into children with the new bg stack
   for (const child of node.children) {
     if (child && typeof child === 'object' && 'type' in child) {
-      visitNode(child, source, filePath, newBgStack, results);
+      visitNode(child, offsetIndex, filePath, newBgStack, results);
+    }
+  }
+
+  // Recurse into JSX elements embedded in attribute values.
+  // 例: <Dialog trigger={<Button className="..." />}>
+  // attribute 内 JSX は論理的に別ツリーなので parentBgStack を引き継がない
+  // (属性値 JSX は DOM 上で別の場所にレンダリングされるため)。
+  for (const attr of opening.attributes) {
+    if (attr.type === 'JSXAttribute' && attr.value !== null) {
+      const value = attr.value;
+      if (value.type === 'JSXExpressionContainer') {
+        const expr = (value as AstNode & { expression: AstNode }).expression;
+        if (expr && isJsxElement(expr)) {
+          visitNode(expr, offsetIndex, filePath, [], results);
+        }
+      }
     }
   }
 }
@@ -428,7 +568,10 @@ export function collectJsxStacks(filePath: string, source: string): JsxStack[] {
   // required by AstNode. Cast through unknown to satisfy both type constraints.
   const program = result.program as unknown as AstNode;
 
-  visitNode(program, source, filePath, [], stacks);
+  // ファイル単位で改行インデックスを一度だけ構築し、二分探索で行番号計算する
+  const offsetIndex = new OffsetIndex(source);
+
+  visitNode(program, offsetIndex, filePath, [], stacks);
 
   return stacks;
 }

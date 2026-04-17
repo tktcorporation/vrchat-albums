@@ -59,12 +59,8 @@ function parseHslValue(value: string): Rgba | null {
   }
 
   // CSS vars store HSL as "H S% L%" or "H S% L% / A" without "hsl(" prefix
-  let parsed: ReturnType<typeof culori.parse>;
-  try {
-    parsed = culori.parse(`hsl(${trimmed})`);
-  } catch {
-    return null;
-  }
+  // culori.parse は無効入力に対して null/undefined を返す (throw しない)
+  const parsed = culori.parse(`hsl(${trimmed})`);
 
   if (!parsed) {
     return null;

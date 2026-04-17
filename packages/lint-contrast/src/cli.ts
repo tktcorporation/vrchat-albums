@@ -19,6 +19,7 @@ import { glob } from 'glob';
 import { classifyStack } from './classify.js';
 import { collectJsxStacks } from './collectJsxStacks.js';
 import { wcagContrastRatio } from './evaluateContrast.js';
+import { getBaseBackground } from './getBaseBackground.js';
 import { parseCssVars } from './parseCssVars.js';
 import type { ContrastIssue, JsxStack, Rgba, Theme } from './types.js';
 
@@ -39,19 +40,25 @@ interface CliOptions {
   format: 'text' | 'json';
   /** unknown を error に昇格するか */
   warnAsError: boolean;
+  /** 除外する glob パターンのリスト */
+  ignore: string[];
+  /** 組合せ爆発の上限 */
+  maxCombinations: number;
 }
 
 /**
  * process.argv を解析して CliOptions を返す。
  *
  * サポートオプション:
- *   --project <path>   対象プロジェクトのルート (default: cwd)
- *   --glob <pattern>   走査対象 glob (default: "src/**\/*.tsx")
- *   --css <path>       CSS 変数定義ファイル (default: "src/index.css")
- *   --threshold <n>    AA 閾値 (default: 4.5)
- *   --format <fmt>     出力形式: text|json (default: text)
- *   --warn-as-error    unknown を error に昇格
- *   --help             ヘルプ表示
+ *   --project <path>         対象プロジェクトのルート (default: cwd)
+ *   --glob <pattern>         走査対象 glob (default: "src/**\/*.tsx")
+ *   --css <path>             CSS 変数定義ファイル (default: "src/index.css")
+ *   --threshold <n>          AA 閾値 (default: 4.5)
+ *   --format <fmt>           出力形式: text|json (default: text)
+ *   --warn-as-error          unknown を error に昇格
+ *   --ignore <pattern>       除外 glob パターン (複数指定可)
+ *   --max-combinations <n>   組合せ爆発の上限 (default: 32)
+ *   --help                   ヘルプ表示
  */
 function parseArgs(argv: string[]): CliOptions | null {
   const args = argv.slice(2); // skip 'node' and script path
@@ -61,13 +68,15 @@ function parseArgs(argv: string[]): CliOptions | null {
 Usage: lint-contrast [options]
 
 Options:
-  --project <path>     対象プロジェクトのルート (default: cwd)
-  --glob <pattern>     走査対象 glob (default: "src/**/*.tsx")
-  --css <path>         CSS 変数定義ファイル (default: "src/index.css")
-  --threshold <n>      AA 閾値 (default: 4.5)
-  --format <fmt>       出力形式: text|json (default: text)
-  --warn-as-error      unknown を error に昇格
-  --help               ヘルプ表示
+  --project <path>         対象プロジェクトのルート (default: cwd)
+  --glob <pattern>         走査対象 glob (default: "src/**/*.tsx")
+  --css <path>             CSS 変数定義ファイル (default: "src/index.css")
+  --threshold <n>          AA 閾値 (default: 4.5)
+  --format <fmt>           出力形式: text|json (default: text)
+  --warn-as-error          unknown を error に昇格
+  --ignore <pattern>       除外 glob パターン (複数指定可)
+  --max-combinations <n>   組合せ爆発の上限 (default: 32)
+  --help                   ヘルプ表示
 `);
     return null;
   }
@@ -79,6 +88,10 @@ Options:
     threshold: 4.5,
     format: 'text',
     warnAsError: false,
+    // デフォルトは node_modules とテストファイルのみ除外。
+    // test-fixtures は意図的に含める (ドッグフーディング用)。
+    ignore: ['**/node_modules/**', '**/*.test.tsx', '**/*.spec.tsx'],
+    maxCombinations: 32,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -91,7 +104,7 @@ Options:
       opts.css = args[++i];
     } else if (arg === '--threshold' && args[i + 1]) {
       const n = parseFloat(args[++i]);
-      if (!isNaN(n)) {
+      if (!Number.isNaN(n)) {
         opts.threshold = n;
       }
     } else if (arg === '--format' && args[i + 1]) {
@@ -101,6 +114,13 @@ Options:
       }
     } else if (arg === '--warn-as-error') {
       opts.warnAsError = true;
+    } else if (arg === '--ignore' && args[i + 1]) {
+      opts.ignore.push(args[++i]);
+    } else if (arg === '--max-combinations' && args[i + 1]) {
+      const n = parseInt(args[++i], 10);
+      if (!Number.isNaN(n) && n > 0) {
+        opts.maxCombinations = n;
+      }
     }
   }
 
@@ -110,24 +130,6 @@ Options:
 // ---------------------------------------------------------------------------
 // コントラスト評価ロジック
 // ---------------------------------------------------------------------------
-
-/**
- * CSS 変数マップからベース背景色 (--background) を取得する。
- *
- * --background は最外層の下に仮定するベース色として使用する。
- * 未定義の場合は白 (light) または黒 (dark) を返す。
- */
-function getBaseBackground(
-  cssVars: Record<Theme, Record<string, Rgba>>,
-  theme: Theme,
-): Rgba {
-  return (
-    cssVars[theme]['--background'] ??
-    (theme === 'light'
-      ? { r: 1, g: 1, b: 1, a: 1 }
-      : { r: 0, g: 0, b: 0, a: 1 })
-  );
-}
 
 /**
  * 単一の JsxStack を評価してコントラスト違反を生成する。
@@ -140,7 +142,7 @@ function evaluateStack(
   cssVars: Record<Theme, Record<string, Rgba>>,
   opts: CliOptions,
 ): ContrastIssue[] {
-  const resolution = classifyStack(stack, cssVars);
+  const resolution = classifyStack(stack, cssVars, opts.maxCombinations);
   const issues: ContrastIssue[] = [];
 
   if (resolution.kind === 'skip') {
@@ -226,13 +228,17 @@ function reportText(issues: ContrastIssue[], projectRoot: string): void {
 /**
  * CLI エントリポイント。
  *
+ * exit code を戻り値で返す。bin/lint-contrast.ts 側で process.exit() する。
+ * これにより テスト等からも呼び出せる (process.exit() を直接呼ばない)。
+ *
  * @param argv - process.argv を渡す
+ * @returns exit code (0: 成功, 1: エラーあり)
  */
-export async function runCli(argv: string[]): Promise<void> {
+export async function runCli(argv: string[]): Promise<number> {
   const opts = parseArgs(argv);
   if (opts === null) {
     // --help が表示済み
-    process.exit(0);
+    return 0;
   }
 
   const projectRoot = path.resolve(opts.project);
@@ -242,32 +248,29 @@ export async function runCli(argv: string[]): Promise<void> {
   const cssPath = path.join(projectRoot, opts.css);
   const cssVars = parseCssVars(cssPath);
 
-  // 2. Build base backgrounds for use in getBaseBackground (available via closure)
-  // Attach to cssVars wrapper for use in evaluateStack
-  const cssVarsWithBase = cssVars;
-
-  // Also expose getBaseBackground for resolving base per theme
-  // (used internally in classifyStack via cssVars parameter)
-  // Make light/dark bases available for classifyStack via cssVars['--background']
-  for (const theme of ['light', 'dark'] as const) {
-    if (!cssVarsWithBase[theme]['--background']) {
-      cssVarsWithBase[theme]['--background'] = getBaseBackground(
-        cssVars,
-        theme,
-      );
-    }
+  // 2. --background を実効色に正規化する。
+  // alpha < 1 の場合は警告を出し不透明実効色に変換する (I5 対応)。
+  // cssVars を直接変異させる (clone 不要: parseCssVars は呼び出しごとに新オブジェクト)。
+  const alphaWarnCallback = (t: (typeof themes)[number], a: number): void => {
+    consola.warn(
+      `[contrast] --background in ${t} has alpha=${a.toFixed(3)} < 1. ` +
+        `Using composited value over ${t === 'light' ? 'white' : 'black'} as effective base.`,
+    );
+  };
+  const themes = ['light', 'dark'] as const;
+  for (const theme of themes) {
+    cssVars[theme]['--background'] = getBaseBackground(
+      cssVars,
+      theme,
+      alphaWarnCallback,
+    );
   }
 
   // 3. Find all TSX files
   const files = await glob([opts.glob], {
     cwd: projectRoot,
     absolute: true,
-    ignore: [
-      '**/node_modules/**',
-      '**/*.test.tsx',
-      '**/*.spec.tsx',
-      '**/test-fixtures/**',
-    ],
+    ignore: opts.ignore,
   });
 
   consola.info(`Found ${files.length} TSX files to check`);
@@ -280,7 +283,7 @@ export async function runCli(argv: string[]): Promise<void> {
     const stacks = collectJsxStacks(file, source);
 
     for (const stack of stacks) {
-      const issues = evaluateStack(stack, cssVarsWithBase, opts);
+      const issues = evaluateStack(stack, cssVars, opts);
       allIssues.push(...issues);
     }
   }
@@ -288,7 +291,7 @@ export async function runCli(argv: string[]): Promise<void> {
   // 5. Report results
   if (allIssues.length === 0) {
     consola.success('No contrast issues found.');
-    process.exit(0);
+    return 0;
   }
 
   const errors = allIssues.filter((i) => i.severity === 'error');
@@ -305,9 +308,5 @@ export async function runCli(argv: string[]): Promise<void> {
   }
 
   // Exit 1 only on errors; warnings are informational (Strategy B)
-  if (errors.length > 0) {
-    process.exit(1);
-  }
-
-  process.exit(0);
+  return errors.length > 0 ? 1 : 0;
 }

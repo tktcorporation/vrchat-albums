@@ -25,7 +25,8 @@ import type { Rgba } from './types';
 function over(src: Rgba, dst: Rgba): Rgba {
   const ao = src.a + dst.a * (1 - src.a);
   if (ao === 0) {
-    return { r: 0, g: 0, b: 0, a: 0 };
+    // 両方完全透明の場合: dst をそのまま返す (idempotent)
+    return dst;
   }
   return {
     r: (src.r * src.a + dst.r * dst.a * (1 - src.a)) / ao,

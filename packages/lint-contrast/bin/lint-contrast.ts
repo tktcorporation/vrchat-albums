@@ -13,7 +13,11 @@
 
 import { runCli } from '../src/cli.js';
 
-runCli(process.argv).catch((error: unknown) => {
-  console.error('lint-contrast failed:', error);
-  process.exit(1);
-});
+runCli(process.argv)
+  .then((exitCode) => {
+    process.exit(exitCode);
+  })
+  .catch((error: unknown) => {
+    console.error('lint-contrast failed:', error);
+    process.exit(1);
+  });

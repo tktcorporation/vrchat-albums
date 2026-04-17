@@ -13,6 +13,7 @@ import { match, P } from 'ts-pattern';
 
 import { compositeOver } from './composite.js';
 import { wcagContrastRatio } from './evaluateContrast.js';
+import { getBaseBackground } from './getBaseBackground.js';
 import { resolveClass } from './resolveTailwind.js';
 import type {
   ClassCandidate,
@@ -22,8 +23,11 @@ import type {
   Theme,
 } from './types.js';
 
-/** 組合せ数が爆発するときの上限。Rule 7 の閾値。 */
-const COMBINATION_LIMIT = 32;
+/**
+ * 組合せ数が爆発するときのデフォルト上限。Rule 6/7 の分岐閾値。
+ * CLI の --max-combinations オプションで上書き可能。
+ */
+const DEFAULT_COMBINATION_LIMIT = 32;
 
 /**
  * bgStack の各 ClassCandidate 配列の直積 × textCandidates を列挙する。
@@ -133,11 +137,13 @@ function resolveForTheme(
  *
  * @param stack - collectJsxStacks が生成した JsxStack
  * @param cssVars - parseCssVars が返した CSS 変数マップ (light/dark)
+ * @param combinationLimit - 組合せ爆発の上限 (default: DEFAULT_COMBINATION_LIMIT)
  * @returns Resolution
  */
 export function classifyStack(
   stack: JsxStack,
   cssVars: Record<Theme, Record<string, Rgba>>,
+  combinationLimit: number = DEFAULT_COMBINATION_LIMIT,
 ): Resolution {
   const { bgStack, textCandidates } = stack;
 
@@ -176,11 +182,14 @@ export function classifyStack(
         () => ({ kind: 'unknown' as const, reason: 'dynamic-text-branch' }),
       )
       // Rules 6 & 7: 静的候補 → 組合せ数チェック → resolvable or explosion
+      // `.otherwise()` を使用する理由: Rule 6/7 の分岐は `P.when()` 述語で実装されており、
+      // ts-pattern は述語ベースのパターンに対して exhaustive 証明ができない。
+      // そのため `.exhaustive()` ではなく `.otherwise()` でデフォルト分岐を処理する。
       .otherwise(() => {
         const count = countCombinations(bgStack, textCandidates);
 
         // Rule 7: 組合せ数爆発
-        if (count > COMBINATION_LIMIT) {
+        if (count > combinationLimit) {
           return {
             kind: 'unknown' as const,
             reason: 'combinatorial-explosion',
@@ -193,12 +202,8 @@ export function classifyStack(
         const worstByTheme: Partial<Record<Theme, { bg: Rgba; fg: Rgba }>> = {};
 
         for (const theme of themes) {
-          // --background をベースとして使用
-          const base: Rgba =
-            cssVars[theme]['--background'] ??
-            (theme === 'light'
-              ? { r: 1, g: 1, b: 1, a: 1 }
-              : { r: 0, g: 0, b: 0, a: 1 });
+          // --background をベースとして使用 (alpha < 1 の場合は実効色に変換済み)
+          const base: Rgba = getBaseBackground(cssVars, theme);
 
           const combinations = enumerateCombinations(bgStack, textCandidates);
           let worstRatio: number | null = null;
