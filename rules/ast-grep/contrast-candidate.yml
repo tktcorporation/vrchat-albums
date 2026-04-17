@@ -1,0 +1,24 @@
+id: contrast-candidate
+language: TypeScript
+severity: info
+message: |
+  この JSX 要素は className 属性に bg-* または text-* クラスを持ちます。
+  lint-contrast の pre-filter 候補として検出されました。
+  コントラスト検証には pnpm lint:contrast を実行してください。
+note: |
+  この rule は lint:contrast の pre-filter として機能します。
+  className 属性に bg-* / text-* を持つ JSX 要素を絞り込むことで、
+  oxc-parser の全ファイルスキャンを減らすことが目的です。
+
+  現在 (Phase 1) は oxc-parser が全 .tsx を走査するため、
+  この rule は pnpm lint:ast-grep の範疇に留まり、
+  lint-contrast.ts からは直接呼び出されません。
+
+  参照: issues/20260417-design-system-contrast-lint.md
+rule:
+  kind: string_fragment
+  regex: \b(bg|text)-[a-zA-Z]
+files:
+  - src/**/*.tsx
+ignores:
+  - src/v2/constants/**

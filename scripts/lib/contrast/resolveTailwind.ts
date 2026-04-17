@@ -1,0 +1,143 @@
+/**
+ * Tailwind クラス名を RGBA 色に解決するモジュール。
+ *
+ * 解決優先順位:
+ * 1. セマンティックトークン: "bg-card" → CSS 変数 "--card" を parseCssVars のマップから引く
+ *    (tailwind.config.js で hsl(var(--card)) と定義されているものが対象)
+ * 2. 既知の基本色: "bg-white" → rgb(1,1,1), "bg-black" → rgb(0,0,0)
+ * 3. 任意値: "bg-[#abcdef]", "bg-[hsl(0_0%_50%)]" → 直接パース
+ * 4. opacity modifier: "bg-white/80" → alpha 0.8 を付与
+ * 5. dark: プレフィックス → ダークテーマ時のみ適用 (ライトテーマでは null)
+ *
+ * 設計判断:
+ * tailwindcss v4 では resolveConfig が公開 API から削除されたため、
+ * CSS 変数名とクラス名サフィックスの対応を直接マッピングする。
+ * このプロジェクトでは hsl(var(--xxx)) 形式のセマンティックトークンのみ使用する (規約)。
+ * 対応関係: bg-{suffix} → CSS var "--{suffix}" (例: bg-card → --card)
+ */
+
+import * as culori from 'culori';
+
+import type { Rgba, Theme } from './types';
+
+/**
+ * culori でパース可能な色文字列を RGBA に変換する。
+ * 変換失敗の場合は null を返す。
+ */
+function culoriToRgba(colorStr: string): Rgba | null {
+  const parsed = culori.rgb(culori.parse(colorStr));
+  if (!parsed) {
+    return null;
+  }
+  return {
+    r: Math.max(0, Math.min(1, parsed.r ?? 0)),
+    g: Math.max(0, Math.min(1, parsed.g ?? 0)),
+    b: Math.max(0, Math.min(1, parsed.b ?? 0)),
+    a: Math.max(0, Math.min(1, parsed.alpha ?? 1)),
+  };
+}
+
+/**
+ * 任意値クラス "[#abcdef]" や "[hsl(0_0%_50%)]" を RGBA に変換する。
+ *
+ * Tailwind の任意値では "_" がスペースに変換される。
+ */
+function parseArbitraryValue(value: string): Rgba | null {
+  // Replace underscores with spaces (Tailwind arbitrary value convention)
+  const normalized = value.replaceAll('_', ' ');
+  return culoriToRgba(normalized);
+}
+
+/**
+ * Tailwind クラスを CSS 値に解決する。
+ *
+ * セマンティックトークン解決の仕組み:
+ * このプロジェクトの tailwind.config.js では、セマンティックカラーは
+ * すべて `hsl(var(--{suffix}))` 形式で定義されている。
+ * そのため、クラス名サフィックス = CSS 変数名の "--" 以降の部分 という
+ * 単純な対応関係が成立する。
+ *
+ * 例: bg-card → CSS var "--card", text-muted-foreground → "--muted-foreground"
+ *
+ * - セマンティックトークン (`bg-card`) → `--card` を cssVars[theme] から引く
+ * - 既知の基本色 (`bg-white`, `bg-black`) → culori で直接パース
+ * - 任意値 (`bg-[#abcdef]`, `bg-[hsl(0_0%_50%)]`) → 直接パース
+ * - opacity modifier (`bg-white/80`) → alpha 0.8 を付与
+ * - dark: プレフィックス → ダークテーマ時のみ適用
+ *
+ * 解決不能 (未定義変数、動的値) の場合は null。
+ *
+ * @param cls - Tailwind クラス名 (例: "bg-card", "text-muted-foreground", "bg-white/80")
+ * @param theme - 解決するテーマ ('light' | 'dark')
+ * @param cssVars - parseCssVars が返した CSS 変数マップ
+ * @returns 解決された RGBA 値、解決不能な場合は null
+ */
+export function resolveClass(
+  cls: string,
+  theme: Theme,
+  cssVars: Record<Theme, Record<string, Rgba>>,
+): Rgba | null {
+  let remaining = cls;
+
+  // Handle dark: prefix - only applies in dark theme
+  if (remaining.startsWith('dark:')) {
+    if (theme !== 'dark') {
+      return null;
+    } // not applicable in light theme
+    remaining = remaining.slice(5);
+  }
+
+  // Determine if this is a bg or text class
+  let prefix: 'bg' | 'text' | null = null;
+  if (remaining.startsWith('bg-')) {
+    prefix = 'bg';
+    remaining = remaining.slice(3);
+  } else if (remaining.startsWith('text-')) {
+    prefix = 'text';
+    remaining = remaining.slice(5);
+  }
+
+  if (!prefix) {
+    return null;
+  }
+
+  // Handle opacity modifier: "white/80" → alpha 0.8
+  let opacityOverride: number | null = null;
+  const slashIdx = remaining.indexOf('/');
+  if (slashIdx !== -1) {
+    const opacityStr = remaining.slice(slashIdx + 1);
+    remaining = remaining.slice(0, slashIdx);
+    const opacityNum = parseFloat(opacityStr);
+    if (!isNaN(opacityNum)) {
+      // Tailwind uses 0-100 for percentage or 0-1 for decimal
+      opacityOverride = opacityNum > 1 ? opacityNum / 100 : opacityNum;
+    }
+  }
+
+  let rgba: Rgba | null = null;
+
+  // Handle arbitrary values: "[#abcdef]" or "[hsl(0_0%_50%)]"
+  if (remaining.startsWith('[') && remaining.endsWith(']')) {
+    const innerValue = remaining.slice(1, -1);
+    rgba = parseArbitraryValue(innerValue);
+  } else {
+    // Strategy: suffix → CSS var name "--{suffix}" (semantic token convention)
+    // bg-card → --card, text-muted-foreground → --muted-foreground
+    const cssVarName = `--${remaining}`;
+    const fromCssVars = cssVars[theme][cssVarName];
+    // Fallback: try culori direct parse for known color names
+    // (e.g., "white", "black", "transparent", hex values)
+    rgba = fromCssVars ?? culoriToRgba(remaining);
+  }
+
+  if (rgba === null) {
+    return null;
+  }
+
+  // Apply opacity override if present
+  if (opacityOverride !== null) {
+    return { ...rgba, a: opacityOverride };
+  }
+
+  return rgba;
+}
