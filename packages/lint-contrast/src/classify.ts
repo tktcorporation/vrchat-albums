@@ -62,36 +62,54 @@ function isApplicableForTheme(cls: string, theme: Theme): boolean {
 const DEFAULT_COMBINATION_LIMIT = 32;
 
 /**
- * 2 つの branchId が「互換」かどうかを判定する。
+ * 2 つの branchId が「排他」(mutually exclusive) かどうかを判定する。
  *
- * - 片方が undefined (無条件) → 常に互換
- * - 両方が同じ文字列 → 互換
- * - それ以外 (異なる branchId 同士) → 非互換
+ * branchId のフォーマット: `cn@<offset>:<argIndex>:<suffix>`
+ * 例: "cn@100:0:c" (consequent), "cn@100:0:a" (alternate), "cn@100:0:rhs" (||右辺)
  *
- * 非互換な bg × text 組合せはランタイムで到達不能であり、評価から除外する。
- * これにより cn(cond ? 'bg-black text-white' : 'bg-white text-black') のような
- * 分岐で偽陽性/偽陰性が生じないようにする。
+ * 同じ cn() 呼び出し (= 同じ `cn@<offset>:<argIndex>` prefix) から来た候補は
+ * **排他** — ランタイムで同時に選ばれることがない。
+ * 異なる cn() 呼び出しの候補は**独立** — 同時に選ばれてよい。
  *
- * @param a - bg 候補の branchId (undefined = 無条件)
- * @param b - text 候補の branchId (undefined = 無条件)
+ * 旧実装の equality チェック (`a === b`) は、異なる cn() 呼び出しの分岐を
+ * 「非互換」と誤判定し、独立条件のネストで全組合せが除外されていた (G2 バグ)。
+ *
+ * @param a - 一方の branchId (undefined = 無条件)
+ * @param b - 他方の branchId (undefined = 無条件)
+ * @returns true なら「同じ cn() の別分岐 = 排他」→ 組合せ不可
  */
-function areBranchIdsCompatible(
+function areMutuallyExclusive(
   a: string | undefined,
   b: string | undefined,
 ): boolean {
+  // 片方でも undefined (無条件) なら排他でない
   if (a === undefined || b === undefined) {
-    // 片方が無条件 → 常に互換 (無条件は全分岐で適用)
-    return true;
+    return false;
   }
-  return a === b;
+  // 完全一致 (同じ分岐の同じ側) → 排他でない (同一分岐は組合せ可能)
+  if (a === b) {
+    return false;
+  }
+  // cn@<offset>:<argIndex>:<suffix> の suffix を除く prefix 部分が同じなら
+  // 同一 cn() 呼び出しの別分岐 = 排他
+  const aPrefix = a.split(':').slice(0, -1).join(':');
+  const bPrefix = b.split(':').slice(0, -1).join(':');
+  return aPrefix === bPrefix && aPrefix.length > 0;
 }
 
 /**
  * 選択された bg 候補リスト全体と text 候補の branchId が全て互換かどうかを判定する。
  *
  * 各層から選んだ bg 候補の branchId と text の branchId の組合せで、
- * 「非 undefined かつ互いに異なる branchId」が共存する場合は非互換と判定する。
- * → 到達不能な組合せを除外して偽陽性/偽陰性を防ぐ。
+ * 「同じ cn() の排他的な別分岐」が混在する場合は非互換と判定する。
+ * 異なる cn() 呼び出し由来の branchId は独立なので互換と見なす。
+ *
+ * 旧実装の問題 (G2):
+ * 異なる cn() 呼び出し ("cn@100:0:c" と "cn@200:0:c") を非互換と誤判定し、
+ * 独立条件のネストで全組合せが除外されていた。
+ *
+ * 修正後:
+ * 排他判定は「同じ cn@<offset>:<argIndex> prefix を持ち suffix だけ異なる」場合のみ。
  *
  * @param selectedBgs - 各層から選んだ bg 候補のリスト
  * @param textCandidate - text 候補
@@ -100,24 +118,21 @@ function isCombinationCompatible(
   selectedBgs: ClassCandidate[],
   textCandidate: ClassCandidate,
 ): boolean {
-  // 全ての bg branchId と text branchId が互いに互換かチェックする。
-  // undefined は任意と互換。非 undefined 同士は同値のみ互換。
+  // 全ての bg branchId と text branchId の間で排他チェック。
+  // areMutuallyExclusive が true = 同一 cn() の別分岐が混在 → 非互換 (到達不能な組合せ)。
   const textId = textCandidate.branchId;
   for (const bg of selectedBgs) {
-    if (!areBranchIdsCompatible(bg.branchId, textId)) {
+    if (areMutuallyExclusive(bg.branchId, textId)) {
       return false;
     }
   }
-  // さらに選択された bg 候補同士の branchId も互換か確認する。
-  // 異なる層の候補は異なる分岐系列に由来することがあるが、undefined は常に互換なので
-  // 「非 undefined かつ異なる」ケースのみ非互換として除外する。
+  // 選択された bg 候補同士の排他チェック。
+  // 異なる cn() 由来 (例: 親 cn と子 cn) は独立なので排他でない。
+  // 同一 cn() の consequent + alternate が混在する場合のみ非互換。
   for (let i = 0; i < selectedBgs.length; i++) {
     for (let j = i + 1; j < selectedBgs.length; j++) {
       if (
-        !areBranchIdsCompatible(
-          selectedBgs[i].branchId,
-          selectedBgs[j].branchId,
-        )
+        areMutuallyExclusive(selectedBgs[i].branchId, selectedBgs[j].branchId)
       ) {
         return false;
       }

@@ -795,6 +795,83 @@ describe('branchId filtering in enumerateCombinations', () => {
 });
 
 // ---------------------------------------------------------------------------
+// G2 修正 (PR #806 Codex G2): 独立した cn() 呼び出しからの branchId は互換
+// ---------------------------------------------------------------------------
+
+describe('G2: independent cn() calls have compatible branchIds (different call sites)', () => {
+  // 旧実装の問題: branchId equality チェック (a === b) で、
+  // 異なる cn() 呼び出し (cn@100:0:c vs cn@200:0:c) を非互換と誤判定し、
+  // 全組合せが除外されて unknown に落ちていた。
+  //
+  // 修正後: 排他判定は「同じ cn@<offset>:<argIndex> prefix を共有し suffix だけ異なる」場合のみ。
+  // 異なる offset を持つ branchId は独立 → 互換 → 組合せが生成される。
+
+  it('G2: parent cn@100 and child cn@200 with independent conditions — all 4 combinations are valid', () => {
+    // 親: cn@100:0:c = 'bg-black', cn@100:0:a = 'bg-white' (condA による分岐)
+    // 子: cn@200:0:c = 'bg-red/50', cn@200:0:a = 'bg-blue/50' (condB による独立分岐)
+    // 親と子は独立なので 2×2=4 組合せ全てが有効
+    // text: branchId=undefined (無条件) → 全 bg パスと互換
+    const stack = makeStack(
+      [
+        [
+          { classes: ['bg-black'], branchId: 'cn@100:0:c' },
+          { classes: ['bg-white'], branchId: 'cn@100:0:a' },
+        ], // 層1: 親の cn()
+        [
+          { classes: ['bg-card'], branchId: 'cn@200:0:c' },
+          { classes: ['bg-muted'], branchId: 'cn@200:0:a' },
+        ], // 層2: 子の cn() (独立条件)
+      ],
+      [{ classes: ['text-foreground'] }], // branchId=undefined → 全 bg パスと互換
+    );
+    const result = classifyStack(stack, cssVars);
+    // 4 組合せが全て評価されるので resolvable (全クラスが解決可能)
+    expect(result.kind).toBe('resolvable');
+  });
+
+  it('G2: same cn() call — consequent and alternate are mutually exclusive (2 combinations, not 4)', () => {
+    // 同一 cn@42:0 から来た consequent (cn@42:0:c) と alternate (cn@42:0:a) は排他。
+    // bgStack 1層に 2 alternatives, text 1層に 2 candidates (同じ cn)
+    // 有効組合せ: (cn@42:0:c, cn@42:0:c) と (cn@42:0:a, cn@42:0:a) のみ → 2 通り
+    const stack = makeStack(
+      [
+        [
+          { classes: ['bg-black'], branchId: 'cn@42:0:c' },
+          { classes: ['bg-white'], branchId: 'cn@42:0:a' },
+        ],
+      ],
+      [
+        { classes: ['text-white'], branchId: 'cn@42:0:c' },
+        { classes: ['text-black'], branchId: 'cn@42:0:a' },
+      ],
+    );
+    const result = classifyStack(stack, cssVars);
+    // 2 通りのみ (bg-black+text-white と bg-white+text-black) → 両方 AA クリア → resolvable
+    expect(result.kind).toBe('resolvable');
+  });
+
+  it('G2: parent bg (cn@100) + text (cn@200) from different cn() calls — compatible (not excluded)', () => {
+    // 異なる cn() 呼び出し由来の bg (cn@100:0:c) と text (cn@200:0:c) は独立 → 互換
+    // 旧実装ではこれが非互換扱いになり全組合せが除外されていた
+    const stack = makeStack(
+      [
+        [
+          { classes: ['bg-black'], branchId: 'cn@100:0:c' },
+          { classes: ['bg-white'], branchId: 'cn@100:0:a' },
+        ],
+      ],
+      [
+        { classes: ['text-foreground'], branchId: 'cn@200:0:c' },
+        { classes: ['text-muted-foreground'], branchId: 'cn@200:0:a' },
+      ],
+    );
+    const result = classifyStack(stack, cssVars);
+    // 独立条件 → 2×2=4 組合せが評価される → resolvable
+    expect(result.kind).toBe('resolvable');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // P1 修正 (PR #806 Codex P1): 階層 bgStack で排他的 bg 分岐を独立評価
 // ---------------------------------------------------------------------------
 
