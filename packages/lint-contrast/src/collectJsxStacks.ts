@@ -112,10 +112,22 @@ const NON_COLOR_BG_SUFFIXES = new Set([
   'left',
   'right',
   'center',
+  // 対角配置 (bg-right-top 等の複合サフィックスは後続の startsWith チェックで除外)
+  'right-top',
+  'right-bottom',
+  'left-top',
+  'left-bottom',
   // 背景固定
   'fixed',
   'local',
   'scroll',
+  // 繰り返し (bg-repeat, bg-repeat-x, bg-no-repeat 等)
+  'repeat',
+  'repeat-x',
+  'repeat-y',
+  'no-repeat',
+  'repeat-round',
+  'repeat-space',
   // クリップ・オリジン (text 等はサフィックスなので prefix チェック)
   'transparent',
   'current',
@@ -528,6 +540,11 @@ function visitNode(
   // 例: <Dialog trigger={<Button className="..." />}>
   // attribute 内 JSX は論理的に別ツリーなので parentBgStack を引き継がない
   // (属性値 JSX は DOM 上で別の場所にレンダリングされるため)。
+  //
+  // Phase 1 制限: 属性値内の直接 JSX 埋め込み (<Element />) のみ対応。
+  // ConditionalExpression ({cond ? <A /> : <B />}) や Fragment ({<><A /><B /></>})
+  // 経由の JSX は未対応 (expr.type !== 'JSXElement' のためスキップされる)。
+  // 将来の Phase で ConditionalExpression / Fragment の再帰走査を拡張可能。
   for (const attr of opening.attributes) {
     if (attr.type === 'JSXAttribute' && attr.value !== null) {
       const value = attr.value;

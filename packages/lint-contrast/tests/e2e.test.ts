@@ -212,6 +212,61 @@ describe('ng-low-contrast-dark.tsx', () => {
     // ライトモードは AA クリアすること
     expect(passes.some((p) => p.theme === 'light')).toBe(true);
   });
+
+  it('light mode ratio >= 6.0 (sufficient margin above AA threshold 4.5)', () => {
+    // --low-fg: 0 0% 35% vs --low-bg: 0 0% 100% → ratio ≈ 6.98
+    // Verify the margin is wide enough to prevent flaky failures.
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ng-low-contrast-dark.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ng-low-contrast-dark.tsx', source);
+
+    const lightRatios: number[] = [];
+    for (const stack of stacks) {
+      const resolution = classifyStack(stack, cssVars);
+      if (resolution.kind !== 'resolvable') {
+        continue;
+      }
+      const { bg, fg } = resolution.themes.light;
+      lightRatios.push(wcagContrastRatio(fg, bg));
+    }
+
+    expect(lightRatios.length).toBeGreaterThan(0);
+    // 全ライトモードスタックが 6.0 以上であること (AA 閾値 4.5 に対して +1.5 以上の余裕)
+    for (const r of lightRatios) {
+      expect(r).toBeGreaterThanOrEqual(6);
+    }
+  });
+
+  it('dark mode ratio < 3.0 (clearly fails AA threshold 4.5)', () => {
+    // --low-fg: 0 0% 40% vs --low-bg: 0 0% 15% → ratio ≈ 2.63
+    // Verify the dark mode ratio is far enough below AA to prevent flaky passes.
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ng-low-contrast-dark.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ng-low-contrast-dark.tsx', source);
+
+    const darkViolations: number[] = [];
+    for (const stack of stacks) {
+      const resolution = classifyStack(stack, cssVars);
+      if (resolution.kind !== 'resolvable') {
+        continue;
+      }
+      const { bg, fg } = resolution.themes.dark;
+      const r = wcagContrastRatio(fg, bg);
+      if (r < WCAG_AA_THRESHOLD) {
+        darkViolations.push(r);
+      }
+    }
+
+    expect(darkViolations.length).toBeGreaterThan(0);
+    // ダークモードの比率が 3.0 未満であること (flaky 防止の余裕)
+    for (const r of darkViolations) {
+      expect(r).toBeLessThan(3);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
