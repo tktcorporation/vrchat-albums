@@ -220,4 +220,48 @@ describe('resolveTailwind.resolveClass', () => {
     expect(result).not.toBeNull();
     expect(result!.a).toBeCloseTo(1, 3);
   });
+
+  // ---------------------------------------------------------------------------
+  // G1 修正 (PR #806 Codex): "!" important modifier を resolveClass が認識する
+  // collectJsxStacks の extractBase で "!" を剥がして color class 判定するが、
+  // ClassCandidate.classes には元形式 ("!text-foreground") のまま格納される。
+  // resolveClass が "!" を剥がさないと prefix check (bg-/text-) 不一致で null 返却していた。
+  // ---------------------------------------------------------------------------
+
+  it('G1: !text-foreground resolves in light mode (important modifier stripped)', () => {
+    // "!text-foreground" → "text-foreground" → "--foreground" (light) → 解決可能
+    const result = resolveClass('!text-foreground', 'light', cssVars);
+    expect(result).not.toBeNull();
+    // light --foreground: 0 0% 9% → 暗い灰色
+    expect(result!.r).toBeCloseTo(0.09, 2);
+  });
+
+  it('G1: !text-foreground resolves in dark mode (important modifier stripped)', () => {
+    // "!text-foreground" → "text-foreground" → "--foreground" (dark) → 解決可能
+    const result = resolveClass('!text-foreground', 'dark', cssVars);
+    expect(result).not.toBeNull();
+    // dark --foreground: 220 15% 85% → 明るい灰色
+    expect(result!.r).toBeCloseTo(0.8275, 2);
+  });
+
+  it('G1: !bg-card resolves in light mode (important on bg class)', () => {
+    const result = resolveClass('!bg-card', 'light', cssVars);
+    expect(result).not.toBeNull();
+    // light --card: 0 0% 100% → 白
+    expect(result!.r).toBeCloseTo(1, 2);
+  });
+
+  it('G1: dark:!bg-card resolves in dark mode (variant + important modifier)', () => {
+    // "dark:!bg-card" → dark: 剥がし → "!bg-card" → ! 剥がし → "bg-card" → dark --card
+    const result = resolveClass('dark:!bg-card', 'dark', cssVars);
+    expect(result).not.toBeNull();
+    // dark --card: 220 27% 12% / 0.7 → alpha ≈ 0.7
+    expect(result!.a).toBeCloseTo(0.7, 2);
+  });
+
+  it('G1: dark:!bg-card returns null in light mode (dark: prefix check applies first)', () => {
+    // dark: プレフィックスがあるので light モードでは null (theme mismatch)
+    const result = resolveClass('dark:!bg-card', 'light', cssVars);
+    expect(result).toBeNull();
+  });
 });

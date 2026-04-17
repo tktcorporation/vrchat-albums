@@ -87,6 +87,14 @@ export function resolveClass(
     remaining = remaining.slice(5);
   }
 
+  // Strip Tailwind important modifier "!" (e.g. "!text-foreground" → "text-foreground").
+  // collectJsxStacks の extractBase が "!" を剥がして color class 判定するが、
+  // ClassCandidate.classes には元形式 ("!text-foreground") のまま格納される。
+  // variant 剥がし (dark:) の直後に剥がすことで、"dark:!bg-card" にも対応する。
+  if (remaining.startsWith('!')) {
+    remaining = remaining.slice(1);
+  }
+
   // Determine if this is a bg or text class
   let prefix: 'bg' | 'text' | null = null;
   if (remaining.startsWith('bg-')) {
