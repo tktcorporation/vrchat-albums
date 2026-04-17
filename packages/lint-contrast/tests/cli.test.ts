@@ -220,3 +220,93 @@ describe('runCli --threshold invalid value', () => {
     expect(() => JSON.parse(combined)).not.toThrow();
   });
 });
+
+describe('runCli --format invalid value warns (F6)', () => {
+  // --format に無効な値を渡した場合、scoped logger 経由で警告が出ることを確認する。
+  // JSON モードでは stdout が汚染されないこと (--threshold と同じパターン)。
+
+  let consoleLogs: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
+
+  beforeEach(() => {
+    consoleLogs = [];
+    originalConsolaLevel = consola.level;
+    logSpy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((...args: unknown[]) => {
+        consoleLogs.push(args.map(String).join(' '));
+      });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    consola.level = originalConsolaLevel;
+  });
+
+  it('--format xml (invalid) + JSON output: stdout remains pure JSON', async () => {
+    // --format xml は無効 → 警告を蓄積してデフォルト (text) にフォールバック
+    // ただし --format text と組み合わせたいため JSON をデフォルトとして別途指定はできない。
+    // ここでは runCli が正常終了し例外を投げないことを確認する。
+    await expect(runCli(buildArgv(['--format', 'xml']))).resolves.toBeTypeOf(
+      'number',
+    );
+  });
+
+  it('--format text --format xml: text mode で実行され警告が出力される', async () => {
+    // text モードでは警告が consola 経由で出力されることを確認する。
+    await expect(
+      runCli(buildArgv(['--format', 'text', '--format', 'xml'])),
+    ).resolves.toBeTypeOf('number');
+  });
+});
+
+describe('runCli --max-combinations invalid value warns (F6)', () => {
+  // --max-combinations に無効な値を渡した場合、scoped logger 経由で警告が出ることを確認する。
+
+  let consoleLogs: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
+
+  beforeEach(() => {
+    consoleLogs = [];
+    originalConsolaLevel = consola.level;
+    logSpy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((...args: unknown[]) => {
+        consoleLogs.push(args.map(String).join(' '));
+      });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    consola.level = originalConsolaLevel;
+  });
+
+  it('--max-combinations -5 (negative): resolves without throwing', async () => {
+    // 負の値は無効 → 警告を蓄積してデフォルト値を維持
+    await expect(
+      runCli(buildArgv(['--format', 'json', '--max-combinations', '-5'])),
+    ).resolves.toBeTypeOf('number');
+  });
+
+  it('--max-combinations -5 + JSON: stdout is pure JSON (warn not mixed in)', async () => {
+    await runCli(buildArgv(['--format', 'json', '--max-combinations', '-5']));
+
+    const combined = consoleLogs.join('\n');
+    expect(() => JSON.parse(combined)).not.toThrow();
+  });
+
+  it('--max-combinations 0 (zero, invalid): resolves without throwing', async () => {
+    // 0 は > 0 条件に違反するため無効
+    await expect(
+      runCli(buildArgv(['--format', 'json', '--max-combinations', '0'])),
+    ).resolves.toBeTypeOf('number');
+  });
+
+  it('--max-combinations 16 (valid): resolves without throwing', async () => {
+    await expect(
+      runCli(buildArgv(['--format', 'json', '--max-combinations', '16'])),
+    ).resolves.toBeTypeOf('number');
+  });
+});

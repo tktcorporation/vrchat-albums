@@ -268,8 +268,8 @@ describe('Rule 7: combinations > 32 → unknown(combinatorial-explosion)', () =>
     }
     const stack = makeStack([], textCandidates);
     const result = classifyStack(stack, cssVars);
-    // 32 は combinationLimit (default: 32) 以下なので explosion ではない
-    expect(result.kind).not.toBe('unknown');
+    // 32 は combinationLimit (default: 32) 以下なので explosion ではない → resolvable
+    expect(result.kind).toBe('resolvable');
   });
 
   it('hierarchical bgStack: 2 layers × 2 alternatives × 1 text = 4 combinations (does not overflow limit)', () => {
@@ -492,6 +492,12 @@ describe('text-only stack (bgStack empty) resolves against implicit --background
     const result = classifyStack(stack, cssVars);
     // Rule 3 or Rule 5 のどちらかで unknown になる
     expect(result.kind).toBe('unknown');
+    if (result.kind === 'unknown') {
+      // dynamic 候補は dynamic-text-branch または dynamic-classname のいずれかで unknown
+      expect(['dynamic-text-branch', 'dynamic-classname']).toContain(
+        result.reason,
+      );
+    }
   });
 });
 
