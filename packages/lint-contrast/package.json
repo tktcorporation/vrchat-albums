@@ -1,6 +1,7 @@
 {
   "name": "@vrchat-albums/lint-contrast",
   "version": "0.1.0",
+  "private": true,
   "license": "MIT",
   "bin": {
     "lint-contrast": "./bin/lint-contrast.ts"
