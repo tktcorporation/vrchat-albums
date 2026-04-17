@@ -241,6 +241,13 @@ export async function runCli(argv: string[]): Promise<number> {
     return 0;
   }
 
+  // JSON モードでは stdout を pure JSON に保つため、
+  // consola の status ログ (start / info / success / warn) を無効化する。
+  // 下流ツール (jq 等) が consola のステータス行で JSON パース失敗するのを防ぐ。
+  if (opts.format === 'json') {
+    consola.level = -999;
+  }
+
   const projectRoot = path.resolve(opts.project);
   consola.start(`Running lint-contrast on ${projectRoot}...`);
 
