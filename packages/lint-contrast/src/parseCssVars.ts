@@ -113,7 +113,12 @@ export function parseCssVars(
   const root = postcss.parse(css);
 
   const light: Record<string, Rgba> = {};
-  const dark: Record<string, Rgba> = {};
+  // dark マップは light (= :root) の全変数を継承した上で、
+  // .dark セレクタ内の宣言で上書きする。
+  // CSS カスタムプロパティは宣言階層を通じて継承されるため、
+  // .dark 内で再定義されていない変数は :root の値が使われる。
+  // 先に light を走査してから dark を初期化するために 2 パス構成にする。
+  const darkOverrides: Record<string, Rgba> = {};
 
   root.walkRules((rule) => {
     // :root selector maps to light theme
@@ -122,9 +127,12 @@ export function parseCssVars(
     } else if (rule.selector.trim() === '.dark') {
       // .dark selector maps to dark theme
       // Also matches "@layer base { .dark { ... } }" nesting via walkRules
-      extractVarsFromRule(rule, dark);
+      extractVarsFromRule(rule, darkOverrides);
     }
   });
+
+  // :root の全変数を継承した上で、.dark 宣言で上書き
+  const dark: Record<string, Rgba> = { ...light, ...darkOverrides };
 
   return { light, dark };
 }

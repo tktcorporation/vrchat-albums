@@ -53,7 +53,9 @@ describe('parseCssVars', () => {
     expect(card.a).toBeCloseTo(0.7, 2);
   });
 
-  it('parses minimal CSS with only :root', () => {
+  it('parses minimal CSS with only :root; dark inherits all :root vars', () => {
+    // .dark セレクタがない場合、dark マップは :root (light) の全変数を継承する。
+    // CSS カスタムプロパティの継承挙動: .dark セレクタが存在しなくても :root 変数は参照可能。
     const css = `
       @layer base {
         :root {
@@ -67,7 +69,10 @@ describe('parseCssVars', () => {
 
     expect(vars.light['--background'].r).toBeCloseTo(1, 2);
     expect(vars.light['--foreground'].r).toBeCloseTo(0.09, 2);
-    expect(Object.keys(vars.dark)).toHaveLength(0);
+    // dark マップは light を継承するので、:root 変数が含まれる
+    expect(vars.dark['--background']).toBeDefined();
+    expect(vars.dark['--background'].r).toBeCloseTo(1, 2);
+    expect(vars.dark['--foreground']).toBeDefined();
   });
 
   it('handles :root and .dark in @layer base', () => {
@@ -86,6 +91,52 @@ describe('parseCssVars', () => {
 
     expect(vars.light['--card'].r).toBeCloseTo(1, 2);
     expect(vars.dark['--card'].a).toBeCloseTo(0.7, 2);
+  });
+
+  it('dark map inherits :root variables not redefined in .dark', () => {
+    // CSS カスタムプロパティは継承される。.dark で再定義されていない変数は :root の値を使う。
+    // 修正前: dark マップは .dark 内宣言のみ → :root 変数が未定義扱いになっていた
+    // 修正後: dark マップは { ...light } で初期化 → :root 変数も参照可能
+    const css = `
+      @layer base {
+        :root {
+          --foo: 0 0% 50%;
+          --bar: 0 0% 90%;
+        }
+        .dark {
+          --bar: 0 0% 10%;
+        }
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+
+    // --foo は .dark で未定義 → :root (light) から継承されるべき
+    expect(vars.dark['--foo']).toBeDefined();
+    expect(vars.dark['--foo'].r).toBeCloseTo(0.5, 2); // 50% L in HSL ≈ gray
+
+    // --bar は .dark で上書き → dark の値が使われるべき
+    expect(vars.dark['--bar']).toBeDefined();
+    expect(vars.dark['--bar'].r).toBeLessThan(0.2); // 10% L in HSL ≈ very dark
+  });
+
+  it('.dark definition overrides :root definition for the same variable', () => {
+    // .dark で --foo を再定義した場合、dark マップでは dark の値で上書きされる
+    const css = `
+      :root {
+        --foo: 0 0% 50%;
+      }
+      .dark {
+        --foo: 0 0% 90%;
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+
+    // light: :root の値 (50%L ≈ gray)
+    expect(vars.light['--foo'].r).toBeCloseTo(0.5, 2);
+    // dark: .dark の値 (90%L ≈ near white)
+    expect(vars.dark['--foo'].r).toBeGreaterThan(0.85);
   });
 
   it('skips non-HSL CSS properties', () => {
