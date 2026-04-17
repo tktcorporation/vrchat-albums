@@ -375,6 +375,56 @@ describe('ng-branch-coupling.tsx', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ng-alternative-bg-branches.tsx: cn(cond ? 'bg-black' : 'bg-white') + text-black
+// 排他的 bg 分岐で bg-black + text-black が AA 未満として検出される
+// ---------------------------------------------------------------------------
+
+describe('ng-alternative-bg-branches.tsx', () => {
+  it('detects at least one resolvable stack from the alternative bg fixture', () => {
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ng-alternative-bg-branches.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ng-alternative-bg-branches.tsx', source);
+    expect(stacks.length).toBeGreaterThan(0);
+  });
+
+  it('detects bg-black + text-black as AA violation in light mode', () => {
+    // 旧実装: bg-black と bg-white を同時合成して中間色 → bg-black + text-black を見落とす
+    // 新実装: 2 通りの独立組合せで評価 → bg-black + text-black (ratio≈1) が最悪ケースとして検出
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ng-alternative-bg-branches.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ng-alternative-bg-branches.tsx', source);
+
+    const violations: { theme: Theme; ratio: number }[] = [];
+    for (const stack of stacks) {
+      const resolution = classifyStack(stack, cssVars);
+      if (resolution.kind !== 'resolvable') {
+        continue;
+      }
+      for (const theme of ['light', 'dark'] as Theme[]) {
+        const { bg, fg } = resolution.themes[theme];
+        const ratio = wcagContrastRatio(fg, bg);
+        if (ratio < WCAG_AA_THRESHOLD) {
+          violations.push({ theme, ratio });
+        }
+      }
+    }
+
+    // bg-black + text-black の組合せが最悪ケースとして検出されること
+    // (ratio ≈ 1, AA 閾値 4.5 を大きく下回る)
+    expect(violations.length).toBeGreaterThan(0);
+    // ライトモードで違反が検出されること
+    expect(violations.some((v) => v.theme === 'light')).toBe(true);
+    // ratio が非常に低いこと (bg-black + text-black ≈ 1)
+    const lightViolation = violations.find((v) => v.theme === 'light');
+    expect(lightViolation?.ratio).toBeLessThan(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Integration: parseCssVars → resolveClass → compositeOver → evaluateContrast
 // ---------------------------------------------------------------------------
 
