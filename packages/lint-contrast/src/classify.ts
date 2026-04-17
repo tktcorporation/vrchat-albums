@@ -123,11 +123,20 @@ function resolveForTheme(
   cssVars: Record<Theme, Record<string, Rgba>>,
   base: Rgba,
 ): { bg: Rgba; fg: Rgba; ratio: number } | null {
-  // Resolve each bg class in sequence (Porter-Duff over)
-  // dark: バリアントなど、このテーマに非適用なクラスはスキップする。
-  // 適用クラスであるにも関わらず resolve に失敗した場合は unknown 昇格のため null を返す。
+  // Resolve each bg candidate using CSS cascade semantics:
+  // 同一 ClassCandidate 内では最後に出現した適用可能な bg クラスを採用する。
+  // (CSS では複数の background-color 宣言が並ぶと最後の宣言が有効になるため)
+  // 例: "bg-white dark:bg-black/50" を dark モードで評価すると dark:bg-black/50 のみ採用。
+  //
+  // 各 candidate から得た 1 色を bgRgbas に積み、外→内の順に compositeOver する
+  // (DOM 親子ネスト由来の合成は引き続き維持)。
+  //
+  // 適用クラスが resolve できない場合は unknown 昇格のため null を返す。
   const bgRgbas: Rgba[] = [];
   for (const candidate of bgCandidates) {
+    // fg と同じパターン: 全クラスを走査し、最後に出現した適用可能クラスを採用する
+    let candidateRgba: Rgba | null = null;
+    let hasApplicable = false;
     for (const cls of candidate.classes) {
       if (!isApplicableForTheme(cls, theme)) {
         // 非適用バリアント (例: light モードの dark:bg-*) → スキップ
@@ -138,7 +147,12 @@ function resolveForTheme(
         // 適用クラスの resolve 失敗 → unknown 昇格
         return null;
       }
-      bgRgbas.push(rgba);
+      // break せず全体を走査し、最後に出現した適用可能クラスを採用する
+      candidateRgba = rgba;
+      hasApplicable = true;
+    }
+    if (hasApplicable && candidateRgba !== null) {
+      bgRgbas.push(candidateRgba);
     }
   }
 

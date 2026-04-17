@@ -317,6 +317,66 @@ describe('dark: variant handling', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 指摘 1 修正検証 (PR #806): bg CSS cascade — 同一 candidate 内で最後勝ち
+// ---------------------------------------------------------------------------
+
+describe('bg CSS cascade: last applicable class within each candidate wins', () => {
+  // "bg-white dark:bg-background" を dark モードで評価
+  // → dark:bg-background のみ採用 (bg-white は常に適用可能だが後続の dark:bg-background が後勝ち)
+  it('dark:bg-* overrides preceding bg-* in dark mode (last applicable class wins)', () => {
+    // bg-white は常に適用、dark:bg-background は dark でのみ適用
+    // dark モードでは bg-white → dark:bg-background の順で後勝ち → dark:bg-background (濃紺)
+    // light モードでは bg-white のみ適用 (dark:bg-background はスキップ) → 白
+    const stack = makeStack(
+      [staticBg('bg-white', 'dark:bg-background')],
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // dark モード: dark:bg-background が後勝ち → mock CSS: 220 27% 8% (濃紺, r < 0.15)
+      expect(result.themes.dark.bg.r).toBeLessThan(0.15);
+      // light モード: bg-white のみ適用 → 白 (r ≈ 1)
+      expect(result.themes.light.bg.r).toBeGreaterThan(0.9);
+    }
+  });
+
+  it('bg-white bg-black (both light-applicable) → bg-black wins (last class), not blended', () => {
+    // 同一 candidate 内に複数の bg クラス (両方 light で適用可能)
+    // CSS cascade: 最後の background-color 宣言が有効 → bg-black が後勝ち
+    // 旧実装: 両方を compositeOver して不正な中間色になっていた
+    // 修正後: bg-black のみ採用 → 黒 (r ≈ 0)
+    const stack = makeStack(
+      [staticBg('bg-white', 'bg-black')],
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // bg-black が後勝ち → 黒 (r ≈ 0, g ≈ 0, b ≈ 0)
+      expect(result.themes.light.bg.r).toBeLessThan(0.1);
+      expect(result.themes.light.bg.g).toBeLessThan(0.1);
+      expect(result.themes.light.bg.b).toBeLessThan(0.1);
+      // dark モードも同様に bg-black が後勝ち
+      expect(result.themes.dark.bg.r).toBeLessThan(0.1);
+    }
+  });
+
+  it('same-element bg-background bg-card (both resolvable) → resolvable (last bg-card color used)', () => {
+    // mock CSS: light では --background = white (100%L), --card = white (100%L) — 同値
+    // 両方 resolveClass で解決できる → resolvable になる
+    const stack = makeStack(
+      [staticBg('bg-background', 'bg-card')],
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    // 両方ライト適用可能かつ同一候補内 → 最後のクラス (bg-card) が採用
+    // どちらも白なので両テーマで resolvable になるはず
+    expect(result.kind).toBe('resolvable');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 指摘 1 修正検証: text-only stack (bgStack 空) が --background ベースで解決可能
 // ---------------------------------------------------------------------------
 
