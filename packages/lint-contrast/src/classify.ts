@@ -159,6 +159,11 @@ function resolveForTheme(
   // Resolve fg: Tailwind の CSS cascade ルールに従い、最後に出現した適用可能なクラスを採用する。
   // "text-gray-900 dark:text-gray-100" を dark モードで評価すると dark:text-gray-100 が後勝ち。
   // 先に break していた旧実装では dark: オーバーライドが無視されていた。
+  //
+  // 適用可能だが resolveClass が null を返すクラス (未知の色定義等) がある場合、
+  // そのクラスが CSS cascade で後勝ちする可能性があるため全体を unknown 昇格させる。
+  // サイレントスキップすると "text-foreground unknown-class" で text-foreground が採用されてしまい、
+  // soundness を損なう (実ランタイムでは unknown-class が勝つ可能性がある)。
   let fgRgba: Rgba | null = null;
   for (const cls of textCandidate.classes) {
     if (!isApplicableForTheme(cls, theme)) {
@@ -166,10 +171,12 @@ function resolveForTheme(
       continue;
     }
     const resolved = resolveClass(cls, theme, cssVars);
-    if (resolved !== null) {
-      // break せず全体を走査し、最後に出現した適用可能クラスを採用する
-      fgRgba = resolved;
+    if (resolved === null) {
+      // 適用クラスの resolve 失敗 → unknown 昇格 (bg 側と同じポリシー)
+      return null;
     }
+    // break せず全体を走査し、最後に出現した適用可能クラスを採用する
+    fgRgba = resolved;
   }
   if (fgRgba === null) {
     return null;

@@ -522,3 +522,70 @@ describe('LogicalExpression dynamic left-side → unknown (Rule 5)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// PR #806 Codex 追加指摘 1: 適用可能だが resolve 不能な fg/bg クラスは unknown 昇格
+// ---------------------------------------------------------------------------
+
+describe('unresolvable applicable class → unknown (soundness)', () => {
+  // fg: 適用可能だが resolveClass が null を返すクラスがあると、
+  // そのクラスが CSS cascade で後勝ちする可能性があるため全体を unknown 昇格させる。
+  // 旧実装: 解決不能クラスをサイレントスキップして前の結果を維持 → soundness 違反
+  // 新実装: 解決不能クラス検出時に null を返し → unknown(dynamic-classname) に落ちる
+
+  it('fg: text-foreground followed by unresolvable class → unknown', () => {
+    // "text-foreground" は解決可能, "__unknown_color__" は resolveClass が null を返す想定
+    // CSS cascade 的には "__unknown_color__" が後勝ちするため結果が確定できない
+    // → resolveForTheme が null → unknown(dynamic-classname)
+    const stack = makeStack(
+      [staticBg('bg-background')],
+      // __unknown_color__ は resolveClass に未登録 → null を返す
+      [staticText('text-foreground', '__unknown_color__')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('unknown');
+    if (result.kind === 'unknown') {
+      expect(result.reason).toBe('dynamic-classname');
+    }
+  });
+
+  it('fg: unresolvable class before text-foreground → unknown (any applicable unresolvable triggers unknown)', () => {
+    // "__unknown_color__" が先で "text-foreground" が後: cascade では text-foreground が後勝ちだが、
+    // "__unknown_color__" は適用可能かつ resolve 不能 → 前後問わず全体を unknown 昇格させる
+    // (位置に関わらず適用可能な未知クラスは結果を不確定にする)
+    const stack = makeStack(
+      [staticBg('bg-background')],
+      [staticText('__unknown_color__', 'text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    // "__unknown_color__" が適用可能かつ resolve 不能 → unknown 昇格
+    expect(result.kind).toBe('unknown');
+  });
+
+  it('bg: bg-card followed by unresolvable class → unknown', () => {
+    // bg 側も同じポリシー: 適用可能かつ resolve 不能なクラスがあれば全体 null → unknown
+    const stack = makeStack(
+      [staticBg('bg-card', '__unknown_bg__')],
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('unknown');
+    if (result.kind === 'unknown') {
+      expect(result.reason).toBe('dynamic-classname');
+    }
+  });
+
+  it('non-applicable dark: unresolvable class does not cause unknown in light mode', () => {
+    // "dark:__unknown__" は light モードでは isApplicableForTheme = false → スキップ
+    // → light モードでは text-foreground のみ採用 → resolvable
+    const stack = makeStack(
+      [staticBg('bg-background')],
+      [staticText('text-foreground', 'dark:__unknown__')],
+    );
+    const result = classifyStack(stack, cssVars);
+    // dark:__unknown__ は light モードで非適用 → スキップ → text-foreground で resolvable
+    // dark モードでは dark:__unknown__ が適用可能かつ resolve 不能 → unknown 昇格
+    // 全体の result は両テーマを評価するため unknown になる
+    expect(result.kind).toBe('unknown');
+  });
+});
