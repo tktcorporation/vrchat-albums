@@ -138,15 +138,26 @@ Options:
       const fmt = args[++i];
       if (fmt === 'json' || fmt === 'text') {
         opts.format = fmt;
+      } else {
+        // --threshold と同じパターン: scoped logger 準備前に蓄積し、後で出力する。
+        warnings.push(
+          `Ignoring invalid value for --format: ${fmt} (valid: json, text)`,
+        );
       }
     } else if (arg === '--warn-as-error') {
       opts.warnAsError = true;
     } else if (arg === '--ignore' && args[i + 1]) {
       opts.ignore.push(args[++i]);
     } else if (arg === '--max-combinations' && args[i + 1]) {
-      const n = parseInt(args[++i], 10);
-      if (!Number.isNaN(n) && n > 0) {
+      const rawCombinations = args[++i];
+      const n = parseInt(rawCombinations, 10);
+      if (!Number.isNaN(n) && n > 0 && Number.isInteger(n)) {
         opts.maxCombinations = n;
+      } else {
+        // --threshold と同じパターン: scoped logger 準備前に蓄積し、後で出力する。
+        warnings.push(
+          `Ignoring invalid value for --max-combinations: ${rawCombinations} (must be a positive integer)`,
+        );
       }
     }
   }
@@ -289,19 +300,21 @@ export async function runCli(argv: string[]): Promise<number> {
   logger.start(`Running lint-contrast on ${projectRoot}...`);
 
   // 1. Load CSS variables
-  const cssPath = path.join(projectRoot, opts.css);
+  // path.resolve は絶対パス指定 (--css /abs/path/to/index.css) を正しく扱う。
+  // path.join では絶対パスが projectRoot に連結されてしまい壊れる (F2 修正)。
+  const cssPath = path.resolve(projectRoot, opts.css);
   const cssVars = parseCssVars(cssPath);
 
   // 2. --background を実効色に正規化する。
   // alpha < 1 の場合は警告を出し不透明実効色に変換する (I5 対応)。
   // cssVars を直接変異させる (clone 不要: parseCssVars は呼び出しごとに新オブジェクト)。
-  const alphaWarnCallback = (t: (typeof themes)[number], a: number): void => {
+  const themes: readonly Theme[] = ['light', 'dark'];
+  const alphaWarnCallback = (t: Theme, a: number): void => {
     logger.warn(
       `[contrast] --background in ${t} has alpha=${a.toFixed(3)} < 1. ` +
         `Using composited value over ${t === 'light' ? 'white' : 'black'} as effective base.`,
     );
   };
-  const themes = ['light', 'dark'] as const;
   for (const theme of themes) {
     cssVars[theme]['--background'] = getBaseBackground(
       cssVars,
