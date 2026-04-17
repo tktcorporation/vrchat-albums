@@ -182,13 +182,42 @@ describe('resolveTailwind.resolveClass', () => {
     expect(result!.a).toBeCloseTo(0.01, 3);
   });
 
-  it('C2: bracket path /[0.5] decimal via bracket — resolves alpha 0.5', () => {
+  it('C2: bracket path /50 — resolves alpha 0.5 (bracket decimal /[0.5] unsupported)', () => {
     // ブラケット内に decimal を書く場合: bg-[#ffffff]/[0.5] はこのパーサでは
     // afterBracket が "/[0.5]" になるため parseFloat("[0.5]") = NaN → opacityOverride なし
     // つまり元の alpha がそのまま使われる (バグではなく、この形式は非対応)
-    // このテストは /50 の正常系を確認する
+    // このテストは /50 (整数パーセント) の正常系を確認する
     const result = resolveClass('bg-[#ff0000]/50', 'light', cssVars);
     expect(result).not.toBeNull();
     expect(result!.a).toBeCloseTo(0.5, 2);
+  });
+
+  // F3: opacity clamp — 範囲外値 (>100 や <0) は [0,1] にクランプ
+  it('F3: normal path /200 → alpha clamped to 1.0', () => {
+    // 200% は範囲外 → 1.0 にクランプ (F3 修正)
+    const result = resolveClass('bg-[#ffffff]/200', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(1, 3);
+  });
+
+  it('F3: normal path /-50 → alpha clamped to 0.0', () => {
+    // -50% は負の値 → 0.0 にクランプ (F3 修正)
+    const result = resolveClass('bg-[#ffffff]/-50', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(0, 3);
+  });
+
+  it('F3: normal path /100.0 → alpha clamped to 1.0 (decimal 100%)', () => {
+    // /100.0 は decimal として解釈 → 100.0 → clamp → 1.0 (F3 修正)
+    const result = resolveClass('bg-[#ffffff]/100.0', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(1, 3);
+  });
+
+  it('F3: bracket path /200 → alpha clamped to 1.0', () => {
+    // ブラケットパスでも同様にクランプ (F3 修正)
+    const result = resolveClass('bg-[#ff0000]/200', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(1, 3);
   });
 });
