@@ -21,8 +21,12 @@ const projectRoot = process.env.INIT_CWD ?? process.cwd();
 // process.argv[2..] を追加引数として転送する
 const extraArgs = process.argv.slice(2);
 
+// Windows では pnpm.cmd を shell: false で呼ぶことで、
+// スペースを含むパス (e.g. INIT_CWD に空白) が shell に分割されるのを防ぐ (F4 修正)。
+// Unix 系は 'pnpm' を shell: false で直接起動する。
+const isWin = process.platform === 'win32';
 const result = spawnSync(
-  'pnpm',
+  isWin ? 'pnpm.cmd' : 'pnpm',
   [
     '--filter',
     '@vrchat-albums/lint-contrast',
@@ -35,8 +39,7 @@ const result = spawnSync(
   ],
   {
     stdio: 'inherit',
-    // Windows では shell: true が必要
-    shell: process.platform === 'win32',
+    shell: false,
   },
 );
 
