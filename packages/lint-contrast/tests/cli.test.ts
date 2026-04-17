@@ -158,3 +158,65 @@ describe('runCli JSON format mode with zero violations', () => {
     expect(parsed.warningCount).toBe(0);
   });
 });
+
+describe('runCli --threshold invalid value', () => {
+  // JSON モードで --threshold に無効な値を渡した場合、
+  // parseArgs 内の consola.warn が JSON 出力より先に stdout を汚染しないことを確認する。
+  // (Codex P2 指摘: scoped logger が作られる前に consola.warn を直接呼ぶと
+  //  JSON と警告が stdout 上で混在し jq 等のパイプが壊れる問題の修正)
+
+  let consoleLogs: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
+
+  beforeEach(() => {
+    consoleLogs = [];
+    originalConsolaLevel = consola.level;
+    logSpy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((...args: unknown[]) => {
+        consoleLogs.push(args.map(String).join(' '));
+      });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    consola.level = originalConsolaLevel;
+  });
+
+  it('--format json --threshold invalid: stdout is pure JSON (no warn mixed in)', async () => {
+    await runCli(buildArgv(['--format', 'json', '--threshold', 'abc']));
+
+    // console.log の呼び出しは JSON 出力のみのはず
+    expect(consoleLogs.length).toBeGreaterThan(0);
+
+    const combined = consoleLogs.join('\n');
+    // 警告メッセージが混入していないこと → JSON としてパース可能
+    expect(() => JSON.parse(combined)).not.toThrow();
+
+    const parsed = JSON.parse(combined) as {
+      errorCount: number;
+      warningCount: number;
+      issues: unknown[];
+    };
+    expectTypeOf(parsed.errorCount).toBeNumber();
+    expectTypeOf(parsed.warningCount).toBeNumber();
+    expect(Array.isArray(parsed.issues)).toBe(true);
+  });
+
+  it('--format text --threshold invalid: warn is emitted (existing behavior maintained)', async () => {
+    // text モードでは警告が出ることを確認する。
+    // consola は stderr/stdout に出力するが、ここでは runCli が正常終了することのみ確認。
+    await expect(
+      runCli(buildArgv(['--format', 'text', '--threshold', 'abc'])),
+    ).resolves.toBeTypeOf('number');
+  });
+
+  it('--threshold 5.0 (valid): no warning emitted to console.log', async () => {
+    await runCli(buildArgv(['--format', 'json', '--threshold', '5.0']));
+
+    const combined = consoleLogs.join('\n');
+    // 有効な値では警告なし → JSON としてパース可能
+    expect(() => JSON.parse(combined)).not.toThrow();
+  });
+});

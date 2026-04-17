@@ -47,7 +47,21 @@ interface CliOptions {
 }
 
 /**
- * process.argv を解析して CliOptions を返す。
+ * parseArgs の戻り値型。
+ *
+ * warnings は scoped logger 作成前に検出された警告メッセージのリスト。
+ * parseArgs が直接 consola.warn を呼ぶと、JSON モードでも scoped logger が
+ * まだ存在しないためグローバルな consola が stdout に出力してしまい
+ * `jq` 等のパイプが壊れる。そのため parseArgs は警告を蓄積して返し、
+ * runCli 側で scoped logger 経由で出力する。
+ */
+interface ParseArgsResult {
+  opts: CliOptions;
+  warnings: string[];
+}
+
+/**
+ * process.argv を解析して ParseArgsResult を返す。
  *
  * サポートオプション:
  *   --project <path>         対象プロジェクトのルート (default: cwd)
@@ -60,7 +74,7 @@ interface CliOptions {
  *   --max-combinations <n>   組合せ爆発の上限 (default: 32)
  *   --help                   ヘルプ表示
  */
-function parseArgs(argv: string[]): CliOptions | null {
+function parseArgs(argv: string[]): ParseArgsResult | null {
   const args = argv.slice(2); // skip 'node' and script path
 
   if (args.includes('--help') || args.includes('-h')) {
@@ -94,6 +108,11 @@ Options:
     maxCombinations: 32,
   };
 
+  // scoped logger 作成前に検出した警告を蓄積する。
+  // consola.warn を直接呼ぶと JSON モードでも stdout を汚染するため、
+  // runCli 側で scoped logger が確定してから出力する。
+  const warnings: string[] = [];
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--project' && args[i + 1]) {
@@ -106,9 +125,12 @@ Options:
       const rawThreshold = args[++i];
       const n = parseFloat(rawThreshold);
       if (Number.isNaN(n)) {
-        // 無効な数値は黙ってデフォルト維持するのではなく警告を出す。
-        // JSON モードでは scoped logger が抑制するため stdout を汚染しない。
-        consola.warn(`Ignoring invalid value for --threshold: ${rawThreshold}`);
+        // 無効な数値はデフォルトを維持し、警告を蓄積する。
+        // 直接 consola.warn を呼ばないのは、この時点では scoped logger が
+        // まだ作られておらず、JSON モードでも stdout に出力されてしまうため。
+        warnings.push(
+          `Ignoring invalid value for --threshold: ${rawThreshold}`,
+        );
       } else {
         opts.threshold = n;
       }
@@ -129,7 +151,7 @@ Options:
     }
   }
 
-  return opts;
+  return { opts, warnings };
 }
 
 // ---------------------------------------------------------------------------
@@ -240,11 +262,13 @@ function reportText(issues: ContrastIssue[], projectRoot: string): void {
  * @returns exit code (0: 成功, 1: エラーあり)
  */
 export async function runCli(argv: string[]): Promise<number> {
-  const opts = parseArgs(argv);
-  if (opts === null) {
+  const parsed = parseArgs(argv);
+  if (parsed === null) {
     // --help が表示済み
     return 0;
   }
+
+  const { opts, warnings: parseWarnings } = parsed;
 
   // JSON モードでは stdout を pure JSON に保つため、
   // consola の status ログ (start / info / success / warn) を無効化する。
@@ -253,6 +277,13 @@ export async function runCli(argv: string[]): Promise<number> {
   // 下流ツール (jq 等) が consola のステータス行で JSON パース失敗するのを防ぐ。
   const logger =
     opts.format === 'json' ? consola.create({ level: -999 }) : consola;
+
+  // parseArgs が蓄積した警告を scoped logger 経由で出力する。
+  // JSON モードでは level=-999 により抑制されるため stdout を汚染しない。
+  // text モードでは通常通り警告が表示される。
+  for (const w of parseWarnings) {
+    logger.warn(w);
+  }
 
   const projectRoot = path.resolve(opts.project);
   logger.start(`Running lint-contrast on ${projectRoot}...`);
