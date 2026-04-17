@@ -422,6 +422,11 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
   // これらは別途 branchLabel:'variant-pseudo' の候補として末尾に追加する。
   const variantPseudoCollected: string[] = [];
 
+  // AST ノードの start offset を branchId に含めることで、
+  // 異なる cn() 呼び出し間で同じ argIndex を持つ branchId が衝突しないようにする (F1 修正)。
+  // 例: 親の cn() と子の cn() で argIndex=0 が同じでも callSite が異なるため安全。
+  const callSite = call.start;
+
   // 引数インデックス (branchId の一部として使用)
   let argIndex = 0;
 
@@ -461,7 +466,9 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
       const branchLabel = `conditional(${logical.operator})`;
       // branchId: この LogicalExpression 引数に対して「右辺あり」パスを識別する。
       // 「右辺なし」パスには undefined を維持 (右辺が適用されないパスは無条件扱い)。
-      const activeBranchId = `cn:${argIndex}:rhs`;
+      // callSite (cn() 呼び出しの AST offset) を prefix に含めることで
+      // 異なる cn() 呼び出し間での branchId 衝突を防ぐ (F1 修正)。
+      const activeBranchId = `cn@${callSite}:${argIndex}:rhs`;
 
       if (logical.right.type === 'Literal') {
         const lit = logical.right as Literal;
@@ -527,7 +534,8 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
     // branchLabel: 'dynamic' として記録する。
     // これにより classify の Rule 4/5 が発火して unknown に落ちる (偽陰性を防ぐ)。
     //
-    // branchId: consequent は 'cn:<i>:c', alternate は 'cn:<i>:a' を付与する。
+    // branchId: consequent は 'cn@<callSite>:<i>:c', alternate は 'cn@<callSite>:<i>:a' を付与する。
+    // callSite は cn() 呼び出しの AST start offset で、異なる cn() 間での衝突を防ぐ (F1 修正)。
     // 同一 ConditionalExpression 内で bg と text が現れる場合、
     // 同じ branchId を持つ候補同士のみが classify で組合せ対象となる。
     if (arg.type === 'ConditionalExpression') {
@@ -544,8 +552,10 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
         for (let bi = 0; bi < branches.length; bi++) {
           const branch = branches[bi];
           const suffix = branchSuffixes[bi];
-          // この引数の branchId: 親の branchId と組み合わせてネストを表現する
-          const thisBranchId = `cn:${argIndex}:${suffix}`;
+          // この引数の branchId: 親の branchId と組み合わせてネストを表現する。
+          // callSite (cn() 呼び出しの AST offset) を prefix に含めることで
+          // 異なる cn() 呼び出し間での branchId 衝突を防ぐ (F1 修正)。
+          const thisBranchId = `cn@${callSite}:${argIndex}:${suffix}`;
           const newBranchId =
             acc.branchId === null || acc.branchId === undefined
               ? thisBranchId

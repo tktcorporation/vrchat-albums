@@ -684,7 +684,7 @@ describe('branchId: ConditionalExpression assigns matching branchId to bg and te
   });
 
   it('cn(dynamicVar || "text-foreground") — rhs branchId attached to literal candidate', () => {
-    // || 演算子の右辺リテラル候補には activeBranchId ('cn:0:rhs') が付与される。
+    // || 演算子の右辺リテラル候補には activeBranchId ('cn@<offset>:0:rhs') が付与される。
     // 「右辺なし」パス (左辺が truthy) は branchId=undefined のまま。
     const source = `
       declare const dynamicVar: string;
@@ -705,8 +705,53 @@ describe('branchId: ConditionalExpression assigns matching branchId to bg and te
       c.classes.includes('text-foreground'),
     );
     expect(literalCandidate).toBeDefined();
-    // 右辺 rhs パスは branchId='cn:0:rhs'
-    expect(literalCandidate!.branchId).toBe('cn:0:rhs');
+    // 右辺 rhs パスは branchId が付与されている。
+    // branchId は "cn@<offset>:0:rhs" 形式 (callSite prefix を含む)。
+    // 正確な offset は AST に依存するため、パターンで検証する (F1 修正後)。
+    expect(literalCandidate!.branchId).toBeDefined();
+    expect(literalCandidate!.branchId).toMatch(/^cn@\d+:0:rhs$/);
+  });
+
+  it('F1: two separate cn() calls at same argIndex produce distinct branchIds', () => {
+    // 親 div: cn(cond1 ? 'bg-a' : 'bg-b') — argIndex=0, suffix=c/a
+    // 子 p: cn(cond2 ? 'text-a' : 'text-b') — argIndex=0, suffix=c/a
+    // 修正前: 両方の branchId が 'cn:0:c' になり areBranchIdsCompatible が誤判定する
+    // 修正後: callSite prefix が異なるため 'cn@<n1>:0:c' != 'cn@<n2>:0:c' でユニーク
+    const source = `
+      declare const cond1: boolean;
+      declare const cond2: boolean;
+      export function Foo() {
+        return (
+          <div className={cn(cond1 ? 'bg-a' : 'bg-b')}>
+            <p className={cn(cond2 ? 'text-a' : 'text-b')}>hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+
+    // 親の bg 候補 (bgStack の先頭層)
+    const parentBgCandidates = pStack!.bgStack[0];
+    expect(parentBgCandidates.length).toBe(2);
+
+    // 子の text 候補
+    const textCandidates = pStack!.textCandidates.filter(
+      (c) => c.branchId !== undefined,
+    );
+    expect(textCandidates.length).toBeGreaterThanOrEqual(2);
+
+    // 親の branchId (cn@<parentOffset>:0:c/a) と子の branchId (cn@<childOffset>:0:c/a) が異なる
+    const parentBranchIds = parentBgCandidates.map((c) => c.branchId);
+    const textBranchIds = textCandidates.map((c) => c.branchId);
+
+    // 全ての (parent, text) ペアで branchId が異なる (namespace が分離されている)
+    for (const parentId of parentBranchIds) {
+      for (const textId of textBranchIds) {
+        expect(parentId).not.toBe(textId);
+      }
+    }
   });
 });
 

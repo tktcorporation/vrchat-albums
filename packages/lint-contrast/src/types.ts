@@ -40,11 +40,16 @@ export interface ClassCandidate {
    * - 文字列: 特定の分岐に属する候補。同じ branchId を持つ bg/text のみ組合せ対象
    *
    * 例: cn(cond ? 'bg-black text-white' : 'bg-white text-black')
-   *   bgCandidate { classes: ['bg-black'], branchId: 'cn:0:c' }  (consequent)
-   *   bgCandidate { classes: ['bg-white'], branchId: 'cn:0:a' }  (alternate)
-   *   textCandidate { classes: ['text-white'], branchId: 'cn:0:c' }
-   *   textCandidate { classes: ['text-black'], branchId: 'cn:0:a' }
+   *   bgCandidate { classes: ['bg-black'], branchId: 'cn@42:0:c' }  (consequent)
+   *   bgCandidate { classes: ['bg-white'], branchId: 'cn@42:0:a' }  (alternate)
+   *   textCandidate { classes: ['text-white'], branchId: 'cn@42:0:c' }
+   *   textCandidate { classes: ['text-black'], branchId: 'cn@42:0:a' }
    *   → 有効組合せ: (bg-black, text-white), (bg-white, text-black) のみ
+   *
+   * branchId の形式: "cn@<callSite>:<argIndex>:<suffix>"
+   * callSite は cn() 呼び出しの AST start offset。
+   * 異なる cn() 呼び出し間で同じ argIndex を持つ branchId が衝突しないよう
+   * callSite を prefix として含める (F1 修正)。
    */
   branchId?: string;
 }
@@ -73,8 +78,8 @@ export interface JsxStack {
    * ```
    * bgStack: [
    *   [{ classes: ['bg-red'], branchId: undefined }],          // 層1: 祖父の bg (無条件)
-   *   [{ classes: ['bg-black'], branchId: 'cn:0:c' },          // 層2: 親の bg (条件分岐)
-   *    { classes: ['bg-white'], branchId: 'cn:0:a' }],
+   *   [{ classes: ['bg-black'], branchId: 'cn@42:0:c' },        // 層2: 親の bg (条件分岐)
+   *    { classes: ['bg-white'], branchId: 'cn@42:0:a' }],
    * ]
    * ```
    */
