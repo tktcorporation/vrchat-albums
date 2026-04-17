@@ -240,6 +240,33 @@ function isColorClass(base: string): boolean {
 }
 
 /**
+ * バリアントプレフィックスと important 修飾子 (!) を剥がした実クラス base と
+ * バリアント情報を返す。
+ *
+ * Tailwind v3+ の important 修飾子 `!` は `!text-foreground`, `!bg-card`,
+ * `dark:!bg-muted` のようにバリアント剥がし後の先頭に残る。
+ * isColorClass は `!` なしの base で判定する必要があるため、ここで除去する。
+ *
+ * @internal stripVariantPrefixes の後処理として使用する
+ */
+function extractBase(cls: string): {
+  base: string;
+  hasDarkVariant: boolean;
+  hasNonDarkVariant: boolean;
+} {
+  const {
+    base: afterVariants,
+    hasDarkVariant,
+    hasNonDarkVariant,
+  } = stripVariantPrefixes(cls);
+  // Important modifier (!): Tailwind v3+ syntax — 先頭の `!` を除去して base を得る
+  const base = afterVariants.startsWith('!')
+    ? afterVariants.slice(1)
+    : afterVariants;
+  return { base, hasDarkVariant, hasNonDarkVariant };
+}
+
+/**
  * Tailwind クラス文字列から bg-* または text-* の「色」クラスのみを抽出する。
  *
  * スペース区切りのクラスリストから bg- または text- で始まるクラスを返すが、
@@ -251,6 +278,10 @@ function isColorClass(base: string): boolean {
  * - `dark:` 以外のバリアント (`sm:`, `hover:`, `focus:` 等) を持つ色クラスは
  *   `variant-pseudo` ラベル付きで別途戻り値に含まれる。
  *   コントラストをランタイムに依存せず静的解析できないため unknown に落とす。
+ *
+ * important 修飾子 (`!`) 対応:
+ * - `!text-foreground`, `!bg-card`, `dark:!bg-muted` のような important 修飾子は
+ *   バリアント剥がし後に `extractBase` で除去し、base で color class 判定を行う。
  *
  * @returns { classes, variantPseudoClasses }
  *   - `classes`: dark: あり/なしの色クラス (従来どおり)
@@ -269,8 +300,7 @@ function extractColorClasses(classStr: string): {
       continue;
     }
 
-    const { base, hasDarkVariant, hasNonDarkVariant } =
-      stripVariantPrefixes(trimmed);
+    const { base, hasDarkVariant, hasNonDarkVariant } = extractBase(trimmed);
 
     if (!isColorClass(base)) {
       continue;
@@ -726,14 +756,14 @@ class OffsetIndex {
  * @param node - 現在の AST ノード
  * @param offsetIndex - バイトオフセット → 行番号変換インデックス
  * @param filePath - ファイルパス (報告用)
- * @param parentBgStack - 親要素から継承した bg クラス候補のスタック
+ * @param parentBgStack - 親要素から継承した bg クラス候補の階層配列 (外→内)
  * @param results - 収集結果を追記するリスト
  */
 function visitNode(
   node: AstNode,
   offsetIndex: OffsetIndex,
   filePath: string,
-  parentBgStack: ClassCandidate[],
+  parentBgStack: ClassCandidate[][],
   results: JsxStack[],
 ): void {
   if (!isJsxElement(node)) {
@@ -778,14 +808,14 @@ function visitNode(
     // Separate bg and text candidates
     for (const candidate of allCandidates) {
       // variant-pseudo 候補 (sm:text-*, hover:bg-* 等) は base クラスで bg/text を判定する。
-      // 全体の classes が variant-pseudo クラスのみなので、stripVariantPrefixes で base を得る。
+      // 全体の classes が variant-pseudo クラスのみなので、extractBase で base を得る。
       if (candidate.branchLabel === 'variant-pseudo') {
         const hasBgClass = candidate.classes.some((c) => {
-          const { base } = stripVariantPrefixes(c);
+          const { base } = extractBase(c);
           return base.startsWith('bg-');
         });
         const hasTextClass = candidate.classes.some((c) => {
-          const { base } = stripVariantPrefixes(c);
+          const { base } = extractBase(c);
           return base.startsWith('text-');
         });
         if (hasBgClass) {
@@ -797,12 +827,17 @@ function visitNode(
         continue;
       }
 
-      const bgClasses = candidate.classes.filter(
-        (c) => c.startsWith('bg-') || c.startsWith('dark:bg-'),
-      );
-      const textClasses = candidate.classes.filter(
-        (c) => c.startsWith('text-') || c.startsWith('dark:text-'),
-      );
+      // important 修飾子 (!) 付きのクラスも bg-*/text-* として認識する。
+      // `!bg-card`, `dark:!bg-muted` → extractBase で `!` を除去して base で判定した上で
+      // 元の trimmed クラス文字列 (! 含む) を格納する。
+      const bgClasses = candidate.classes.filter((c) => {
+        const { base } = extractBase(c);
+        return base.startsWith('bg-');
+      });
+      const textClasses = candidate.classes.filter((c) => {
+        const { base } = extractBase(c);
+        return base.startsWith('text-');
+      });
 
       if (bgClasses.length > 0) {
         bgCandidates.push({ ...candidate, classes: bgClasses });
@@ -824,17 +859,16 @@ function visitNode(
 
   // Build the new bg stack for this element and its children.
   //
-  // CSS cascade セマンティクスの設計:
-  // - bgStack の各エントリは 1 つの DOM 層 (祖先要素) を表す。
-  // - 同一要素内の複数 bg クラス (例: cn('bg-black/50', 'bg-white/50')) は、
-  //   指摘 1 の修正により 1 つの ClassCandidate { classes: ['bg-black/50', 'bg-white/50'] }
-  //   に集約されている。classify 側の「最後勝ち」ロジックが同一 candidate 内で処理する。
-  // - bgStack.push の対象は「この要素自身の bgCandidates を子要素へ継承する」ためのもの。
-  //   親子ネスト由来の compositeOver は classify.ts が bgStack エントリ間で行う。
-  // - 同一要素内の複数 bg は最後勝ちのみ有効 (DOM ネスト由来の compositeOver は不要)。
-  const newBgStack =
+  // 階層配列設計:
+  // - bgStack の各エントリ (層) は 1 つの DOM 階層を表す。
+  // - この要素自身の bgCandidates を 1 つの「層」として push する。
+  //   → 同一要素内の排他分岐 (cn(cond ? 'bg-black' : 'bg-white')) は同じ層に入る。
+  //   → classify の enumerateCombinations が各層から 1 つずつ alternative を選ぶ直積を生成する。
+  // - 親子ネスト由来の compositeOver は classify.ts が各層間で行う。
+  // - bgCandidates が空 (この要素に bg 指定なし) なら親の bgStack をそのまま継承する。
+  const newBgStack: ClassCandidate[][] =
     bgCandidates.length > 0
-      ? [...parentBgStack, ...bgCandidates]
+      ? [...parentBgStack, bgCandidates] // この要素の候補群を 1 層として追加
       : parentBgStack;
 
   // If this element has text candidates, record a JsxStack entry.

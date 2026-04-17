@@ -59,8 +59,26 @@ export interface JsxStack {
   file: string;
   line: number;
   column: number;
-  /** 親ノードから辿った bg クラスのスタック (外→内) */
-  bgStack: ClassCandidate[];
+  /**
+   * 親ノードから辿った bg クラスの階層配列 (外→内)。
+   *
+   * 外層 (bgStack[i]) は DOM 階層の 1 層を表す。
+   * 内層 (bgStack[i][j]) はその層での alternative 候補群 (排他的選択肢) を表す。
+   *
+   * enumerateCombinations は各層から 1 つずつ候補を選ぶ直積で
+   * 具体的な合成スタックを生成する。これにより cn(cond ? 'bg-black' : 'bg-white') のような
+   * 排他分岐が「両方同時適用」ではなく「どちらか一方を選ぶ」として正しく評価される。
+   *
+   * 例:
+   * ```
+   * bgStack: [
+   *   [{ classes: ['bg-red'], branchId: undefined }],          // 層1: 祖父の bg (無条件)
+   *   [{ classes: ['bg-black'], branchId: 'cn:0:c' },          // 層2: 親の bg (条件分岐)
+   *    { classes: ['bg-white'], branchId: 'cn:0:a' }],
+   * ]
+   * ```
+   */
+  bgStack: ClassCandidate[][];
   /** この要素自身の text クラス候補 */
   textCandidates: ClassCandidate[];
   /** 報告時に表示する JSX タグ名 */

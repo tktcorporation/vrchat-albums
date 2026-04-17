@@ -87,66 +87,122 @@ function areBranchIdsCompatible(
 }
 
 /**
- * bgStack の各 ClassCandidate 配列の直積 × textCandidates を列挙する。
+ * 選択された bg 候補リスト全体と text 候補の branchId が全て互換かどうかを判定する。
  *
- * bgStack の各インデックスから1つずつ ClassCandidate を選び、
- * textCandidates からも1つ選んだ全組合せを返す。
+ * 各層から選んだ bg 候補の branchId と text の branchId の組合せで、
+ * 「非 undefined かつ互いに異なる branchId」が共存する場合は非互換と判定する。
+ * → 到達不能な組合せを除外して偽陽性/偽陰性を防ぐ。
  *
- * branchId が設定されている場合、非互換な bg × text 組合せ (到達不能な分岐の組合せ) を除外する。
- * これにより cn(cond ? 'bg-black text-white' : 'bg-white text-black') のような構造で
- * 実ランタイムで発生しない bg-white × text-white 等の組合せを評価しない。
+ * @param selectedBgs - 各層から選んだ bg 候補のリスト
+ * @param textCandidate - text 候補
+ */
+function isCombinationCompatible(
+  selectedBgs: ClassCandidate[],
+  textCandidate: ClassCandidate,
+): boolean {
+  // 全ての bg branchId と text branchId が互いに互換かチェックする。
+  // undefined は任意と互換。非 undefined 同士は同値のみ互換。
+  const textId = textCandidate.branchId;
+  for (const bg of selectedBgs) {
+    if (!areBranchIdsCompatible(bg.branchId, textId)) {
+      return false;
+    }
+  }
+  // さらに選択された bg 候補同士の branchId も互換か確認する。
+  // 異なる層の候補は異なる分岐系列に由来することがあるが、undefined は常に互換なので
+  // 「非 undefined かつ異なる」ケースのみ非互換として除外する。
+  for (let i = 0; i < selectedBgs.length; i++) {
+    for (let j = i + 1; j < selectedBgs.length; j++) {
+      if (
+        !areBranchIdsCompatible(
+          selectedBgs[i].branchId,
+          selectedBgs[j].branchId,
+        )
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * bgStack の各層から 1 つずつ alternative を選ぶ直積 × textCandidates を列挙する。
  *
- * @param bgStack - 背景候補のスタック (外→内の順)
+ * bgStack は階層配列 (ClassCandidate[][]):
+ * - 外層: DOM 階層 (祖先→自身の順)
+ * - 内層: その層での alternative 候補群 (排他的選択肢)
+ *
+ * 各層から 1 つ alternative を選ぶ直積で「具体的な合成スタック」を生成し、
+ * さらに textCandidates の各候補と組み合わせる。
+ *
+ * branchId 互換チェック: 選んだ全 bg 候補と text 候補の branchId が互換な組合せのみ返す。
+ * これにより cn(cond ? 'bg-black' : 'bg-white') の親 + text-black の子で
+ * 「bg-black + text-black」と「bg-white + text-black」が独立の組合せとして評価される。
+ *
+ * @param bgStack - 背景候補の階層配列 (外→内の順)
  * @param textCandidates - テキスト候補の配列
  * @returns 有効な組合せの配列。各要素は { bgCandidates, textCandidate }
  */
 function enumerateCombinations(
-  bgStack: ClassCandidate[],
+  bgStack: ClassCandidate[][],
   textCandidates: ClassCandidate[],
 ): { bgCandidates: ClassCandidate[]; textCandidate: ClassCandidate }[] {
+  // bgStack の各層から 1 つずつ alternative を選ぶ直積を生成する。
+  // 初期状態: 1 つの空パス [[]]
+  // 各層を順に処理し、その層の各 alternative を現在のパスに追加して展開する。
+  let bgPaths: ClassCandidate[][] = [[]];
+
+  for (const layer of bgStack) {
+    const nextPaths: ClassCandidate[][] = [];
+    for (const currentPath of bgPaths) {
+      for (const alt of layer) {
+        nextPaths.push([...currentPath, alt]);
+      }
+    }
+    bgPaths = nextPaths;
+  }
+
+  // bgStack が空 (祖先に bg 指定なし) の場合: bgPaths = [[]] (空パスが 1 つ)
+  // resolveForTheme が bgRgbas = [] → compositeOver([]) = base で処理する。
+  // (bgStack 空 = ページ背景という設計と一致する)
+
   const results: {
     bgCandidates: ClassCandidate[];
     textCandidate: ClassCandidate;
   }[] = [];
 
   for (const textCandidate of textCandidates) {
-    // branchId フィルタリング: bg 候補のうち textCandidate と branchId が互換なもののみを使用する。
-    // 非互換な bg 候補 (異なる branchId = 異なるランタイム分岐に属する) は除外する。
-    // 無条件の bg 候補 (branchId=undefined) は常に互換 → 親要素から継承した bg は全て含まれる。
-    const compatibleBgStack = bgStack.filter((bg) =>
-      areBranchIdsCompatible(bg.branchId, textCandidate.branchId),
-    );
-
-    // 全 bg 候補が除外された場合: この textCandidate に対して有効な bg が存在しない。
-    // これはネストした条件分岐等で起きうるが通常は発生しない。
-    // safety net として評価から除外するのではなく、空のまま push して
-    // resolveForTheme が bgRgbas = [] → compositeOver([]) = base で処理する。
-    // (bgStack 空 = ページ背景という設計と一致する)
-    results.push({ bgCandidates: compatibleBgStack, textCandidate });
+    for (const selectedBgs of bgPaths) {
+      // branchId 互換チェック: 選んだ bg 候補群と text 候補が全て互換か確認する。
+      // 非互換な組合せ (到達不能な分岐) は除外して偽陽性/偽陰性を防ぐ。
+      if (!isCombinationCompatible(selectedBgs, textCandidate)) {
+        continue;
+      }
+      results.push({ bgCandidates: selectedBgs, textCandidate });
+    }
   }
+
   return results;
 }
 
 /**
  * 組合せ数を計算する。
  *
- * bgStack の各要素は ClassCandidate を1つとして扱い、
- * textCandidates の数だけ組合せが生まれる。
- * 将来的に bgStack が 2D になった場合はここを変更する。
+ * bgStack の各層のサイズの直積 × textCandidates の数が組合せ数。
+ * 各層から 1 つずつ alternative を選び、全層の選択の直積が bg パス数となる。
+ *
+ * bgStack が空の場合 (親 bg 指定なし) でも textCandidates は全て評価対象になるため
+ * textCandidates.length を返す (0 を返すと combinatorial-explosion guard が bypass される)。
  */
 function countCombinations(
-  bgStack: ClassCandidate[],
+  bgStack: ClassCandidate[][],
   textCandidates: ClassCandidate[],
 ): number {
-  // Phase 1: bgStack は flat な候補リスト（各要素 = 1候補、選択肢ではない）。
-  // 実際の組合せ数は textCandidates の数だけ。bgStack は全要素を使って合成するので
-  // 「bgStack のどれか1つを選ぶ」というバリアントは存在しない。
-  // bgStack.length を因子に含めると組合せ数を過大計上し、combinatorial-explosion 誤検知が起きる。
-  //
-  // bgStack が空の場合 (親 bg 指定なし) でも textCandidates は全て評価対象になるため
-  // 0 ではなく textCandidates.length を返す。0 を返すと combinatorial-explosion guard が
-  // bypass されてしまう (count > combinationLimit が常に false になる)。
-  return textCandidates.length;
+  // 各層のサイズの積 = bg パスの総数
+  const bgPathCount = bgStack.reduce((acc, layer) => acc * layer.length, 1);
+  // bg パス数 × text 候補数 = 全組合せ数
+  return bgPathCount * textCandidates.length;
 }
 
 /**
@@ -251,6 +307,10 @@ export function classifyStack(
 ): Resolution {
   const { bgStack, textCandidates } = stack;
 
+  // bgStack (ClassCandidate[][]) を flat にして rules 3/4 の判定で使用する。
+  // flat は「全層の全 alternative 候補」を一覧にするためのもの。
+  const allBgCandidates = bgStack.flat();
+
   return (
     match({ bgStack, textCandidates })
       // Rule 1: bgStack 空 かつ textCandidates 空 → skip
@@ -267,17 +327,19 @@ export function classifyStack(
         reason: 'no-text',
       }))
       // Rule 3: 全候補 classes が空配列 (完全動的)
+      // bgStack の全層の全 alternative + textCandidates が全て classes:[] のとき
       .with(
-        P.when(({ bgStack: b, textCandidates: t }) =>
-          [...b, ...t].every((c) => c.classes.length === 0),
+        P.when(({ textCandidates: t }) =>
+          [...allBgCandidates, ...t].every((c) => c.classes.length === 0),
         ),
         () => ({ kind: 'unknown' as const, reason: 'dynamic-classname' }),
       )
       // Rule 4: bgStack に dynamic または variant-pseudo branchLabel
       // variant-pseudo: sm:, hover: 等のバリアント付きクラスはランタイム依存で静的解析不能
+      // bgStack の全層の全 alternative を走査して判定する
       .with(
-        P.when(({ bgStack: b }) =>
-          b.some(
+        P.when(() =>
+          allBgCandidates.some(
             (c) =>
               c.branchLabel === 'dynamic' || c.branchLabel === 'variant-pseudo',
           ),
