@@ -275,6 +275,9 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
     }
 
     // Conditional expression: cond ? 'bg-a' : 'bg-b'
+    // 健全性確保: 非リテラル分岐 (変数・式など) は silently drop せず
+    // { classes: [], branchLabel: 'dynamic' } として記録する。
+    // これにより classify の Rule 4/5 が発火して unknown に落ちる (偽陰性を防ぐ)。
     if (arg.type === 'ConditionalExpression') {
       const cond = arg as AstNode & {
         consequent: AstNode;
@@ -289,6 +292,9 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
               candidates.push({ classes, branchLabel: 'conditional(?)' });
             }
           }
+        } else {
+          // 非リテラル分岐 (Identifier, MemberExpression 等) は動的として記録する
+          candidates.push({ classes: [], branchLabel: 'dynamic' });
         }
       }
       continue;

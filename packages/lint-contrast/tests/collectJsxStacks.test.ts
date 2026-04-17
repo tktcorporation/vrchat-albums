@@ -135,4 +135,62 @@ describe('collectJsxStacks', () => {
     );
     expect(hasBgBranch).toBe(true);
   });
+
+  // ---------------------------------------------------------------------------
+  // 指摘 2: 三項演算子の非リテラル分岐が dynamic candidate として記録される
+  // ---------------------------------------------------------------------------
+
+  it('records both literal and dynamic candidates from ternary with non-literal branch', () => {
+    // 指摘 2 の修正: cn(cond ? dynamicVar : 'text-foreground') のような場合、
+    // 非リテラル分岐 (dynamicVar) を silently drop せず dynamic candidate として記録する。
+    // classify の Rule 5 が発火して unknown に落ちる = 偽陰性を防ぐ健全な挙動。
+    const source = `
+      declare const dynamicCls: string;
+      declare const cond: boolean;
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className={cn(cond ? dynamicCls : 'text-foreground')}>hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // リテラル分岐が候補として存在する
+    const hasLiteralCandidate = pStack!.textCandidates.some((c) =>
+      c.classes.includes('text-foreground'),
+    );
+    expect(hasLiteralCandidate).toBe(true);
+    // 非リテラル分岐が dynamic candidate として存在する
+    const hasDynamicCandidate = pStack!.textCandidates.some(
+      (c) => c.branchLabel === 'dynamic',
+    );
+    expect(hasDynamicCandidate).toBe(true);
+  });
+
+  it('records dynamic candidate for both non-literal ternary branches', () => {
+    // cn(cond ? dynA : dynB) のように両分岐が非リテラルの場合、
+    // 2つの dynamic candidate が記録される。
+    const source = `
+      declare const dynA: string;
+      declare const dynB: string;
+      declare const cond: boolean;
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className={cn(cond ? dynA : dynB)}>hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    const dynamicCandidates = pStack!.textCandidates.filter(
+      (c) => c.branchLabel === 'dynamic',
+    );
+    expect(dynamicCandidates.length).toBeGreaterThanOrEqual(2);
+  });
 });
