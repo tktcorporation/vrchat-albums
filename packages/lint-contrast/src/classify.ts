@@ -62,30 +62,67 @@ function isApplicableForTheme(cls: string, theme: Theme): boolean {
 const DEFAULT_COMBINATION_LIMIT = 32;
 
 /**
+ * 2 つの branchId が「互換」かどうかを判定する。
+ *
+ * - 片方が undefined (無条件) → 常に互換
+ * - 両方が同じ文字列 → 互換
+ * - それ以外 (異なる branchId 同士) → 非互換
+ *
+ * 非互換な bg × text 組合せはランタイムで到達不能であり、評価から除外する。
+ * これにより cn(cond ? 'bg-black text-white' : 'bg-white text-black') のような
+ * 分岐で偽陽性/偽陰性が生じないようにする。
+ *
+ * @param a - bg 候補の branchId (undefined = 無条件)
+ * @param b - text 候補の branchId (undefined = 無条件)
+ */
+function areBranchIdsCompatible(
+  a: string | undefined,
+  b: string | undefined,
+): boolean {
+  if (a === undefined || b === undefined) {
+    // 片方が無条件 → 常に互換 (無条件は全分岐で適用)
+    return true;
+  }
+  return a === b;
+}
+
+/**
  * bgStack の各 ClassCandidate 配列の直積 × textCandidates を列挙する。
  *
  * bgStack の各インデックスから1つずつ ClassCandidate を選び、
  * textCandidates からも1つ選んだ全組合せを返す。
  *
+ * branchId が設定されている場合、非互換な bg × text 組合せ (到達不能な分岐の組合せ) を除外する。
+ * これにより cn(cond ? 'bg-black text-white' : 'bg-white text-black') のような構造で
+ * 実ランタイムで発生しない bg-white × text-white 等の組合せを評価しない。
+ *
  * @param bgStack - 背景候補のスタック (外→内の順)
  * @param textCandidates - テキスト候補の配列
- * @returns 全組合せの配列。各要素は { bgCandidates, textCandidate }
+ * @returns 有効な組合せの配列。各要素は { bgCandidates, textCandidate }
  */
 function enumerateCombinations(
   bgStack: ClassCandidate[],
   textCandidates: ClassCandidate[],
 ): { bgCandidates: ClassCandidate[]; textCandidate: ClassCandidate }[] {
-  // Build cartesian product of bgStack selections
-  // Each bgStack element contributes exactly one ClassCandidate per combination
-  // (For Phase 1 we treat each element in bgStack as already being 1 candidate —
-  // the bgStack is a flat array not a 2D array of alternatives.)
-  // So the "product" is simply: pick one textCandidate, use all bgStack entries.
   const results: {
     bgCandidates: ClassCandidate[];
     textCandidate: ClassCandidate;
   }[] = [];
+
   for (const textCandidate of textCandidates) {
-    results.push({ bgCandidates: bgStack, textCandidate });
+    // branchId フィルタリング: bg 候補のうち textCandidate と branchId が互換なもののみを使用する。
+    // 非互換な bg 候補 (異なる branchId = 異なるランタイム分岐に属する) は除外する。
+    // 無条件の bg 候補 (branchId=undefined) は常に互換 → 親要素から継承した bg は全て含まれる。
+    const compatibleBgStack = bgStack.filter((bg) =>
+      areBranchIdsCompatible(bg.branchId, textCandidate.branchId),
+    );
+
+    // 全 bg 候補が除外された場合: この textCandidate に対して有効な bg が存在しない。
+    // これはネストした条件分岐等で起きうるが通常は発生しない。
+    // safety net として評価から除外するのではなく、空のまま push して
+    // resolveForTheme が bgRgbas = [] → compositeOver([]) = base で処理する。
+    // (bgStack 空 = ページ背景という設計と一致する)
+    results.push({ bgCandidates: compatibleBgStack, textCandidate });
   }
   return results;
 }
