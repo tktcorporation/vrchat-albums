@@ -17,6 +17,10 @@ note: |
   参照: issues/20260417-design-system-contrast-lint.md
 rule:
   kind: string_fragment
+  # bg-* / text-* クラスを持つ JSX 要素を検出する pre-filter。
+  # ast-grep は lookahead 非対応のため、非色クラス (text-sm 等) の除外は
+  # lint-contrast の isColorClass() / NON_COLOR_TEXT_SUFFIXES でより精密に行う。
+  # この rule は「候補がある可能性がある」ファイルを絞り込む用途にとどめる。
   regex: \b(bg|text)-[a-zA-Z]
 files:
   - src/**/*.tsx

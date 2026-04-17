@@ -209,18 +209,13 @@ function stripVariantPrefixes(cls: string): {
 function isColorClass(base: string): boolean {
   if (base.startsWith('text-')) {
     const suffix = base.slice(5);
+    // text-opacity-*, text-clip (text-overflow), text-decoration-* は色クラスではない。
+    // underline / overline / line-through / uppercase 等は text- prefix を持たない
+    // standalone Tailwind utility なので、このブランチに入ることはない (dead check 削除済み)。
     if (
       suffix.startsWith('opacity-') ||
       suffix.startsWith('clip') ||
-      suffix.startsWith('decoration-') ||
-      suffix.startsWith('underline') ||
-      suffix.startsWith('overline') ||
-      suffix.startsWith('line-through') ||
-      suffix.startsWith('no-underline') ||
-      suffix.startsWith('uppercase') ||
-      suffix.startsWith('lowercase') ||
-      suffix.startsWith('capitalize') ||
-      suffix.startsWith('normal-case')
+      suffix.startsWith('decoration-')
     ) {
       return false;
     }
@@ -373,6 +368,13 @@ function extractStaticClassString(valueNode: AstNode): string | null {
  * - cn(dynVar || 'b') → 2 候補 [{classes:['b']}, {classes:[], branchLabel:'dynamic'}]
  * - cn(dynVar && 'b') → 2 候補 [{classes:['b']}, {classes:[], branchLabel:'dynamic'}]
  */
+/**
+ * cn()/clsx() 展開時のアキュムレータ上限。
+ * 条件分岐が深くネストされた場合に 2^N 個の候補が生成されるのを防ぐ。
+ * 上限を超えた場合は残りの分岐を 'dynamic' の単一候補に集約する。
+ */
+const MAX_ACCUMULATORS = 64;
+
 function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
   const call = node as CallExpression;
 
@@ -438,6 +440,13 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
           }
           accumulators = [...accumulators, ...withBranch];
 
+          // アキュムレータ爆発ガード: 上限超過時は dynamic 単一候補に集約する。
+          // これ以上の展開を続けると 2^N 個の候補が生まれる可能性がある。
+          if (accumulators.length > MAX_ACCUMULATORS) {
+            accumulators = [{ classes: [], branchLabel: 'dynamic' }];
+            continue;
+          }
+
           // || / ?? 演算子かつ左辺が非リテラルの場合: 左辺が truthy/非null で勝つ
           // ランタイムケースを dynamic で記録する。
           // 例: cn(dynVar || 'text-fg') → dynVar が truthy なら dynVar の値が使われる
@@ -493,7 +502,11 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
           }
         }
       }
-      accumulators = newAccumulators;
+      // アキュムレータ爆発ガード: 上限超過時は dynamic 単一候補に集約する。
+      accumulators =
+        newAccumulators.length > MAX_ACCUMULATORS
+          ? [{ classes: [], branchLabel: 'dynamic' }]
+          : newAccumulators;
       continue;
     }
 
