@@ -230,4 +230,90 @@ describe('parseCssVars', () => {
     expect(vars.light['--background'].r).toBeCloseTo(1, 2); // white
     expect(vars.dark['--background'].r).toBeLessThan(0.1); // dark (8% L)
   });
+
+  // ---------------------------------------------------------------------------
+  // G3 修正 (PR #806 Codex): @media / @supports の祖先 at-rule を全て検査する。
+  // 修正前: rule.parent のみチェック → @media { @layer { :root { ... } } } が通過していた。
+  // 修正後: hasConditionalAncestor で全祖先を辿り、@media / @supports があれば skip。
+  // ---------------------------------------------------------------------------
+
+  it('G3: @media { :root { --x } } does not pollute light map (direct parent check)', () => {
+    // 既存 C5 テストと同等だが G3 文脈で明示
+    const css = `
+      :root {
+        --background: 0 0% 100%;
+      }
+      @media (max-width: 768px) {
+        :root {
+          --background: 220 27% 8%;
+        }
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+    // @media 内の :root は skip → light は無条件の :root の値 (white) を保持する
+    expect(vars.light['--background'].r).toBeCloseTo(1, 2);
+    // dark も混入しない (light を継承するだけ)
+    expect(vars.dark['--background'].r).toBeCloseTo(1, 2);
+  });
+
+  it('G3: @media { @layer base { :root { --x } } } — nested media+layer is skipped', () => {
+    // G3 の核心: rule.parent が @layer (構造的) でも、祖先に @media があれば skip すべき。
+    // 修正前: parent が @layer なので pass → 条件付きトークンが混入していた。
+    // 修正後: hasConditionalAncestor が @media 祖先を検出して skip。
+    const css = `
+      :root {
+        --background: 0 0% 100%;
+      }
+      @media (prefers-color-scheme: dark) {
+        @layer base {
+          :root {
+            --background: 220 27% 8%;
+          }
+        }
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+    // @media 内 @layer 内の :root は skip → light は white を保持
+    expect(vars.light['--background'].r).toBeCloseTo(1, 2);
+    // dark も white (条件付きトークンは混入しない)
+    expect(vars.dark['--background'].r).toBeCloseTo(1, 2);
+  });
+
+  it('G3: @layer base { :root { ... } } (no @media ancestor) — still processed correctly', () => {
+    // @layer のみの入れ子 (親祖先に @media / @supports なし) は引き続き処理される
+    const css = `
+      @layer base {
+        :root {
+          --x: 0 0% 50%;
+        }
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+    // @layer は構造的 at-rule → 処理される
+    expect(vars.light['--x']).toBeDefined();
+    expect(vars.light['--x'].r).toBeCloseTo(0.5, 2);
+  });
+
+  it('G3: @supports { :root { --x } } does not pollute light map', () => {
+    // @supports 内も skip する (G3 の修正対象)
+    const css = `
+      :root {
+        --background: 0 0% 100%;
+      }
+      @supports (color: hsl(0 0% 0%)) {
+        @layer base {
+          :root {
+            --background: 220 27% 8%;
+          }
+        }
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+    // @supports 内 @layer 内の :root は skip → white を保持
+    expect(vars.light['--background'].r).toBeCloseTo(1, 2);
+  });
 });

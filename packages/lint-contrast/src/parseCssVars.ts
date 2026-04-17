@@ -97,6 +97,36 @@ function extractVarsFromRule(
 }
 
 /**
+ * ルールの祖先 at-rule に @media または @supports が含まれるかを判定する。
+ *
+ * 現実装の問題 (G3 修正前):
+ * `rule.parent` のみチェックしていたため、
+ * `@media { @layer base { :root { ... } } }` のような構造では
+ * parent が @layer (構造的 at-rule) なので skip されず、
+ * 条件付きトークンが無条件とみなされて light/dark マップに混入していた。
+ *
+ * 修正後: 全祖先を遡って @media / @supports が 1 つでもあれば skip する。
+ *
+ * @param rule - 検査対象のルール
+ * @returns 条件付き at-rule 祖先が存在すれば true (skip すべき)
+ */
+function hasConditionalAncestor(rule: postcss.Rule): boolean {
+  // rule.parent の型は postcss.Container | postcss.Document | undefined だが、
+  // postcss.Node として扱い、型エラーを避けながら祖先チェーンを辿る。
+  let current: postcss.Node | undefined = rule.parent;
+  while (current) {
+    if (current.type === 'atrule') {
+      const name = (current as postcss.AtRule).name;
+      if (name === 'media' || name === 'supports') {
+        return true;
+      }
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
+/**
  * src/index.css をパースして :root (light) と .dark (dark) の
  * CSS 変数を RGBA マップに展開する。
  *
@@ -125,11 +155,12 @@ export function parseCssVars(
     // light/dark マップに無条件で混入させると誤ったコントラスト評価になる。
     // @layer や @root などの構造的 at-rule は通す (条件分岐ではないため)。
     // 将来 darkMode: 'media' を使う場合は別途設計が必要。
-    if (rule.parent?.type === 'atrule') {
-      const parentAtRule = rule.parent as postcss.AtRule;
-      if (parentAtRule.name === 'media' || parentAtRule.name === 'supports') {
-        return; // skip: 条件付き at-rule 内のルールは処理しない
-      }
+    //
+    // G3 修正: rule.parent の 1 段のみではなく全祖先を辿る。
+    // "@media { @layer base { :root { ... } } }" のような入れ子でも
+    // @media 祖先を検出して skip できるようにした。
+    if (hasConditionalAncestor(rule)) {
+      return; // skip: 条件付き at-rule 内のルールは処理しない
     }
 
     // :root selector maps to light theme
