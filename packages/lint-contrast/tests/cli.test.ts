@@ -107,3 +107,47 @@ describe('runCli text format mode', () => {
     );
   });
 });
+
+describe('runCli JSON format mode with zero violations', () => {
+  let consoleLogs: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consoleLogs = [];
+    logSpy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((...args: unknown[]) => {
+        consoleLogs.push(args.map(String).join(' '));
+      });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    consola.level = 3;
+  });
+
+  it('emits parseable JSON even when no issues found (ok-card-on-background.tsx only)', async () => {
+    // 指摘 3 の修正: 違反ゼロでも --format json 指定時に JSON ペイロードを出力する。
+    // 下流ツール (jq 等) が空出力で JSON パース失敗しないよう一貫した出力を提供する。
+    // ok-card-on-background.tsx のみを対象とするため --glob で絞り込む。
+    await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-card-on-background.tsx']),
+    );
+
+    // console.log が少なくとも 1 回呼ばれるはず (JSON 出力)
+    expect(consoleLogs.length).toBeGreaterThan(0);
+
+    const combined = consoleLogs.join('\n');
+    // parseable JSON であること
+    expect(() => JSON.parse(combined)).not.toThrow();
+
+    const parsed = JSON.parse(combined) as {
+      errorCount: number;
+      warningCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.issues).toEqual([]);
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.warningCount).toBe(0);
+  });
+});

@@ -296,13 +296,20 @@ export async function runCli(argv: string[]): Promise<number> {
   }
 
   // 5. Report results
-  if (allIssues.length === 0) {
-    consola.success('No contrast issues found.');
-    return 0;
-  }
-
   const errors = allIssues.filter((i) => i.severity === 'error');
   const warnings = allIssues.filter((i) => i.severity === 'warning');
+
+  if (allIssues.length === 0) {
+    // JSON モードでは違反ゼロの場合も parseable な JSON を出力する。
+    // 下流ツール (jq 等) は常に JSON ペイロードを期待するため、
+    // 空ケースのために特別扱いが必要にならないよう一貫した出力を提供する。
+    if (opts.format === 'json') {
+      reportJson(allIssues, projectRoot);
+    } else {
+      consola.success('No contrast issues found.');
+    }
+    return 0;
+  }
 
   consola.info(
     `Found ${errors.length} error(s) and ${warnings.length} warning(s):`,
