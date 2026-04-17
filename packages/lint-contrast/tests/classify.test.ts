@@ -409,3 +409,60 @@ describe('text-only stack (bgStack empty) resolves against implicit --background
     expect(result.kind).toBe('unknown');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 指摘 2 結合確認 (PR #806): 要素内 bg cascade vs 親子 compositeOver
+// ---------------------------------------------------------------------------
+
+describe('element-vs-ancestor bg cascade (Issue 2 validation)', () => {
+  // 親子ネスト: 親 bg-background + 子 bg-black/50 → compositeOver が適用される
+  // <div className="bg-background"><span className="text-white bg-black/50">
+  //   → 子の bgStack = [{ classes: ['bg-background'] }, { classes: ['bg-black/50'] }]
+  //   → compositeOver([white, black/50], base) = 中間のグレー
+  it('parent-child nesting: ancestor bg + alpha child bg are composited (separate bgStack entries)', () => {
+    // bgStack に 2 エントリ (親と子それぞれ独立した ClassCandidate) → compositeOver される
+    // 修正済み設計: 2 エントリが別候補として bgStack に積まれるため合成が発生する
+    // light モード: bg-background = white (r=1,g=1,b=1), bg-black/50 = black at 0.5
+    // compositeOver([white, black/50], white_base) = 0.5*0 + (1-0.5)*1 = 0.5 (グレー)
+    const stack = makeStack(
+      [
+        staticBg('bg-background'), // 親要素 (ancestor)
+        staticBg('bg-black/50'), // 子要素 (element itself, with alpha)
+      ],
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // compositeOver した結果: 白 (bg-background) の上に黒/50 → グレー (r ≈ 0.5)
+      // 純白 (r=1) でも純黒 (r=0) でもなく中間値
+      expect(result.themes.light.bg.r).toBeGreaterThan(0.3);
+      expect(result.themes.light.bg.r).toBeLessThan(0.7); // ≈ 0.5 (合成で中間色)
+    }
+  });
+
+  // 同一要素内: cn('bg-black/50', 'bg-white/50') → 最後勝ちで bg-white/50 のみ採用
+  // (compositeOver しない。CSS cascade: 後のクラスが background-color を上書き)
+  it('same-element cn(bg-black/50, bg-white/50) uses last-wins bg-white/50 only (no compositeOver)', () => {
+    // bgStack に 1 エントリ { classes: ['bg-black/50', 'bg-white/50'] }
+    // → resolveForTheme 内で最後の適用可能クラス bg-white/50 のみ採用 (bg-black/50 は上書き)
+    // → compositeOver([white/50], base) = 白系の薄い色
+    // ≠ compositeOver([black/50, white/50], base) = 黒+白の合成 (誤った旧動作)
+    const stack = makeStack(
+      [staticBg('bg-black/50', 'bg-white/50')], // 単一要素の className に両クラス
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // bg-white/50 のみ compositeOver(base) → 白寄りの色
+      // base = bg-background (light: white → r=1, g=1, b=1)
+      // compositeOver([{r:1,g:1,b:1,a:0.5}], {r:1,g:1,b:1,a:1}) = {r:1,g:1,b:1,a:1} (純白)
+      // bg-black/50 との compositeOver は起きないことを確認
+      // (bg-black/50 だけなら bg.r ≈ 0.5 になるが、bg-white/50 後勝ちなので bg.r ≈ 1)
+      expect(result.themes.light.bg.r).toBeGreaterThan(0.9);
+      expect(result.themes.light.bg.g).toBeGreaterThan(0.9);
+      expect(result.themes.light.bg.b).toBeGreaterThan(0.9);
+    }
+  });
+});
