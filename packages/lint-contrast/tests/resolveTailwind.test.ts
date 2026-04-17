@@ -89,4 +89,45 @@ describe('resolveTailwind.resolveClass', () => {
     expect(result!.g).toBeCloseTo(0.45, 2);
     expect(result!.b).toBeCloseTo(0.45, 2);
   });
+
+  // ---------------------------------------------------------------------------
+  // 指摘 3 修正 (PR #806): ブラケット任意値の "/" が opacity split で壊れる問題
+  // ---------------------------------------------------------------------------
+
+  it('resolves bg-[hsl(220_15%_85%/0.5)] — bracket arbitrary value with inner slash', () => {
+    // 修正前: "/" で先に split → "[hsl(220_15%_85%" を color として解釈しようとして null
+    // 修正後: ブラケット内の "/" は無視、hsl(220 15% 85% / 0.5) として culori でパース
+    // hsl(220 15% 85% / 0.5): lightness 85% ≈ 0.85, alpha 0.5
+    const result = resolveClass('bg-[hsl(220_15%_85%/0.5)]', 'light', cssVars);
+    expect(result).not.toBeNull();
+    // lightness 85% → r, g, b が 0.8 付近
+    expect(result!.r).toBeGreaterThan(0.75);
+    expect(result!.g).toBeGreaterThan(0.75);
+    expect(result!.b).toBeGreaterThan(0.75);
+    // alpha = 0.5 (culori がパースした値)
+    expect(result!.a).toBeCloseTo(0.5, 2);
+  });
+
+  it('resolves bg-[hsl(220_15%_85%/0.5)]/80 — bracket arbitrary value with external opacity override', () => {
+    // ブラケット内 alpha は無視し、ブラケット外の "/80" が alpha を 0.8 に上書きする
+    const result = resolveClass(
+      'bg-[hsl(220_15%_85%/0.5)]/80',
+      'light',
+      cssVars,
+    );
+    expect(result).not.toBeNull();
+    // 色は hsl(220 15% 85%) 相当
+    expect(result!.r).toBeGreaterThan(0.75);
+    // alpha は外側の /80 → 0.8 (ブラケット内の 0.5 は上書きされる)
+    expect(result!.a).toBeCloseTo(0.8, 2);
+  });
+
+  it('resolves bg-[#abcdef]/50 — bracket hex value with external opacity', () => {
+    // ブラケット内は純粋な hex、外側の "/50" が opacity を 0.5 に設定する
+    const result = resolveClass('bg-[#abcdef]/50', 'light', cssVars);
+    expect(result).not.toBeNull();
+    // #abcdef: r=171/255≈0.671, g=205/255≈0.804, b=239/255≈0.937
+    expect(result!.r).toBeCloseTo(0.671, 1);
+    expect(result!.a).toBeCloseTo(0.5, 2);
+  });
 });

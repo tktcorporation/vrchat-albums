@@ -101,27 +101,57 @@ export function resolveClass(
     return null;
   }
 
-  // Handle opacity modifier: "white/80" → alpha 0.8
+  // Handle opacity modifier and arbitrary values.
+  //
+  // 処理順序が重要 — 任意値クラス (例: bg-[hsl(220_15%_85%/0.5)]) は
+  // ブラケット内に "/" を含む場合がある。先に "/" で split すると
+  // "[hsl(220_15%_85%" と "0.5)]" に分断されて任意値パースが失敗する。
+  // そのため **ブラケット任意値を先に検出** し、ブラケット外の "/" のみを
+  // opacity modifier として解釈する。
+  //
+  // サポートするパターン:
+  //   bg-[hsl(220_15%_85%/0.5)]      → ブラケット内の "/" は色値の一部
+  //   bg-[hsl(220_15%_85%/0.5)]/80   → ブラケット外の "/80" が opacity override
+  //   bg-[#abcdef]/50                 → ブラケット外の "/50" が opacity override
+  //   bg-white/80                     → 通常の opacity modifier (ブラケットなし)
+
   let opacityOverride: number | null = null;
-  const slashIdx = remaining.indexOf('/');
-  if (slashIdx !== -1) {
-    const opacityStr = remaining.slice(slashIdx + 1);
-    remaining = remaining.slice(0, slashIdx);
-    const opacityNum = parseFloat(opacityStr);
-    if (!Number.isNaN(opacityNum)) {
-      // Tailwind uses 0-100 for percentage or 0-1 for decimal.
-      // "bg-white/80" → 80/100 = 0.8; "bg-white/0.5" → 0.5 (直接使用)
-      opacityOverride = opacityNum > 1 ? opacityNum / 100 : opacityNum;
+  let rgba: Rgba | null = null;
+
+  if (remaining.startsWith('[')) {
+    // ブラケット任意値: "[value]" または "[value]/opacity"
+    // remaining = "[value]" か "[value]/nn" の形式 (prefix "bg-"/"text-" は既に削除済み)
+    const bracketEnd = remaining.lastIndexOf(']');
+    if (bracketEnd !== -1) {
+      const innerValue = remaining.slice(1, bracketEnd);
+      const afterBracket = remaining.slice(bracketEnd + 1); // "]" より後 (空文字 or "/nn")
+      if (afterBracket.startsWith('/')) {
+        const opacityStr = afterBracket.slice(1);
+        const opacityNum = parseFloat(opacityStr);
+        if (!Number.isNaN(opacityNum)) {
+          // Tailwind uses 0-100 for percentage or 0-1 for decimal.
+          opacityOverride = opacityNum > 1 ? opacityNum / 100 : opacityNum;
+        }
+      }
+      rgba = parseArbitraryValue(innerValue);
+    }
+  } else {
+    // 通常のクラス: opacity modifier は "/" で split して取り出す
+    // ブラケット任意値ではないので "/" はここでのみ出現する
+    const slashIdx = remaining.indexOf('/');
+    if (slashIdx !== -1) {
+      const opacityStr = remaining.slice(slashIdx + 1);
+      remaining = remaining.slice(0, slashIdx);
+      const opacityNum = parseFloat(opacityStr);
+      if (!Number.isNaN(opacityNum)) {
+        // Tailwind uses 0-100 for percentage or 0-1 for decimal.
+        // "bg-white/80" → 80/100 = 0.8; "bg-white/0.5" → 0.5 (直接使用)
+        opacityOverride = opacityNum > 1 ? opacityNum / 100 : opacityNum;
+      }
     }
   }
 
-  let rgba: Rgba | null = null;
-
-  // Handle arbitrary values: "[#abcdef]" or "[hsl(0_0%_50%)]"
-  if (remaining.startsWith('[') && remaining.endsWith(']')) {
-    const innerValue = remaining.slice(1, -1);
-    rgba = parseArbitraryValue(innerValue);
-  } else {
+  if (rgba === null) {
     // Strategy: suffix → CSS var name "--{suffix}" (semantic token convention)
     // bg-card → --card, text-muted-foreground → --muted-foreground
     const cssVarName = `--${remaining}`;
