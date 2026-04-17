@@ -163,6 +163,58 @@ describe('ng-alpha-composite.tsx', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ng-low-contrast-dark.tsx: ダークモードで低コントラスト → error
+// ---------------------------------------------------------------------------
+
+describe('ng-low-contrast-dark.tsx', () => {
+  it('produces at least one resolvable stack', () => {
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ng-low-contrast-dark.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ng-low-contrast-dark.tsx', source);
+
+    const resolvable = stacks
+      .map((s) => classifyStack(s, cssVars))
+      .filter((r) => r.kind === 'resolvable');
+
+    expect(resolvable.length).toBeGreaterThan(0);
+  });
+
+  it('passes AA in light mode but fails in dark mode', () => {
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ng-low-contrast-dark.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ng-low-contrast-dark.tsx', source);
+
+    const violations: { theme: Theme; ratio: number }[] = [];
+    const passes: { theme: Theme; ratio: number }[] = [];
+
+    for (const stack of stacks) {
+      const resolution = classifyStack(stack, cssVars);
+      if (resolution.kind !== 'resolvable') {
+        continue;
+      }
+      for (const theme of ['light', 'dark'] as Theme[]) {
+        const { bg, fg } = resolution.themes[theme];
+        const ratio = wcagContrastRatio(fg, bg);
+        if (ratio < WCAG_AA_THRESHOLD) {
+          violations.push({ theme, ratio });
+        } else {
+          passes.push({ theme, ratio });
+        }
+      }
+    }
+
+    // ダークモードで違反が発生すること
+    expect(violations.some((v) => v.theme === 'dark')).toBe(true);
+    // ライトモードは AA クリアすること
+    expect(passes.some((p) => p.theme === 'light')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Integration: parseCssVars → resolveClass → compositeOver → evaluateContrast
 // ---------------------------------------------------------------------------
 
