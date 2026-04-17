@@ -69,29 +69,126 @@ lint-contrast.ts     ── file:line:col 形式でレポート出力
                        ── exit 1 on error (resolvable かつ AA 未満), exit 0 on warn-only
 ```
 
-## ファイル配置
+## ファイル配置 — 独立パッケージ (pnpm workspace)
+
+既存の `pnpm-workspace.yaml` に `packages/*` が含まれているため、`packages/lint-contrast/` として独立パッケージを切り出す。これにより:
+
+- vrchat-albums 本体とは**依存関係が分離**される (本体の package.json は汚染しない)
+- 将来他のリポジトリへ `@vrchat-albums/lint-contrast` として持ち出せる
+- 独自の `package.json` / `tsconfig.json` を持ち、単独でビルド・テスト可能
+- 既存の `packages/exif-native` と同じ命名規約 (`@vrchat-albums/*`)
 
 ```text
-scripts/
-├─ lint-contrast.ts                 # エントリ (pnpm lint:contrast で実行)
-└─ lib/contrast/
-   ├─ types.ts                      # 共有型定義
-   ├─ parseCssVars.ts               # CSS 変数パーサ (postcss + culori)
-   ├─ resolveTailwind.ts            # Tailwind クラス → CSS 値解決
-   ├─ collectJsxStacks.ts           # oxc-parser で JSX スタック抽出
-   ├─ composite.ts                  # Porter-Duff アルファ合成
-   ├─ evaluateContrast.ts           # WCAG 2 コントラスト計算
-   └─ classify.ts                   # unknown/skip/resolvable 分類 (Strategy B 契約)
-
-rules/ast-grep/
-└─ contrast-candidate.yml           # className 属性を含む JSX の pre-filter
-
-scripts/test-fixtures/contrast/     # 期待値付きフィクスチャ
-├─ ok-card-on-background.tsx
-├─ ng-low-contrast-dark.tsx
-├─ ng-alpha-composite.tsx
-└─ warn-dynamic-class.tsx
+packages/lint-contrast/
+├─ package.json                      # @vrchat-albums/lint-contrast
+├─ tsconfig.json                     # パッケージ単独ビルド用
+├─ README.md                         # CLI/ライブラリ両方の使い方
+├─ vitest.config.ts                  # 独自テスト設定
+├─ bin/
+│  └─ lint-contrast.ts               # CLI エントリ (shebang + argv パース)
+├─ src/
+│  ├─ index.ts                       # ライブラリ API の re-export
+│  ├─ types.ts                       # 共有型定義
+│  ├─ parseCssVars.ts                # CSS 変数パーサ (postcss + culori)
+│  ├─ resolveTailwind.ts             # Tailwind クラス → CSS 値解決
+│  ├─ collectJsxStacks.ts            # oxc-parser で JSX スタック抽出
+│  ├─ composite.ts                   # Porter-Duff アルファ合成
+│  ├─ evaluateContrast.ts            # WCAG 2 コントラスト計算
+│  ├─ classify.ts                    # Strategy B 分類
+│  └─ cli.ts                         # CLI ロジック (bin から呼ばれる)
+├─ tests/
+│  ├─ parseCssVars.test.ts
+│  ├─ resolveTailwind.test.ts
+│  ├─ composite.test.ts
+│  ├─ evaluateContrast.test.ts
+│  ├─ classify.test.ts
+│  ├─ collectJsxStacks.test.ts
+│  └─ e2e.test.ts                    # フィクスチャに対する end-to-end
+└─ test-fixtures/
+   ├─ ok-card-on-background.tsx
+   ├─ ng-low-contrast-dark.tsx
+   ├─ ng-alpha-composite.tsx
+   ├─ warn-dynamic-class.tsx
+   ├─ skip-no-colors.tsx
+   └─ mock-index.css                 # テスト用 CSS 変数定義
 ```
+
+### `packages/lint-contrast/package.json`
+
+```json
+{
+  "name": "@vrchat-albums/lint-contrast",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "lint-contrast": "./bin/lint-contrast.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint-contrast": "tsx bin/lint-contrast.ts",
+    "test": "vitest run",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "consola": "...",
+    "culori": "...",
+    "glob": "...",
+    "oxc-parser": "...",
+    "pathe": "...",
+    "postcss": "...",
+    "tailwindcss": "...",
+    "ts-pattern": "..."
+  },
+  "devDependencies": {
+    "@types/culori": "...",
+    "@vitest/coverage-v8": "...",
+    "tsx": "...",
+    "typescript": "...",
+    "vitest": "..."
+  }
+}
+```
+
+### ルート側からの呼び出し
+
+ルート `package.json` には**薄い委譲スクリプト**のみ追加:
+
+```json
+{
+  "scripts": {
+    "lint:contrast": "pnpm --filter @vrchat-albums/lint-contrast run lint-contrast -- --project ."
+  }
+}
+```
+
+ルート本体の `dependencies` / `devDependencies` には `oxc-parser` / `culori` / `postcss` を**追加しない**。全てパッケージ側に閉じ込める。
+
+### CLI 仕様 (`bin/lint-contrast.ts`)
+
+```text
+Usage: lint-contrast [options]
+
+Options:
+  --project <path>     対象プロジェクトのルート (default: cwd)
+  --glob <pattern>     走査対象 glob (default: "src/**/*.tsx")
+  --css <path>         CSS 変数定義ファイル (default: "src/index.css")
+  --tailwind <path>    Tailwind config (default: "tailwind.config.js")
+  --threshold <n>      AA 閾値 (default: 4.5)
+  --format <fmt>       出力形式: text|json (default: text)
+  --warn-as-error      unknown を error に昇格
+  --help               ヘルプ表示
+```
+
+### rules/ast-grep は本体側に残す
+
+```text
+rules/ast-grep/
+└─ contrast-candidate.yml            # className 属性を持つ JSX の pre-filter
+```
+
+これは pre-filter 目的で本体 lint パイプに組み込むため本体側に配置。パッケージ側からは `--glob` で対象ファイルを直接指定する形を基本とする。
 
 ## モジュール仕様
 
@@ -328,40 +425,61 @@ export function classifyStack(stack: JsxStack): Resolution;
 
 `warning` は CI で fail させない。`error` のみ `exit 1`。
 
-## 依存追加
+## 依存管理 (独立パッケージ)
 
-- `oxc-parser` (devDep): JSX/TSX AST パーサ
-- `culori` (devDep): HSL/HSLA → RGBA 色空間変換
-- `postcss` (devDep): CSS 変数抽出
+**ルート本体の依存は汚染しない。全て `packages/lint-contrast/package.json` に閉じる。**
 
-`tailwindcss` と `glob` と `pathe` は既存。
+### `packages/lint-contrast/` に追加する依存
+
+| パッケージ      | 種別   | 用途                         |
+| --------------- | ------ | ---------------------------- |
+| `oxc-parser`    | dep    | JSX/TSX AST パーサ           |
+| `culori`        | dep    | HSL/HSLA → RGBA 色空間変換   |
+| `postcss`       | dep    | CSS 変数抽出                 |
+| `tailwindcss`   | dep    | `resolveConfig` でクラス解決 |
+| `ts-pattern`    | dep    | 分岐網羅チェック (ADR-004)   |
+| `glob`          | dep    | 対象ファイル列挙             |
+| `pathe`         | dep    | パス正規化                   |
+| `consola`       | dep    | ログ出力                     |
+| `@types/culori` | devDep | 型定義                       |
+| `vitest`        | devDep | テストランナー               |
+| `tsx`           | devDep | TypeScript 実行              |
+| `typescript`    | devDep | 型チェック                   |
+
+### ルート `package.json` に追加するもの
+
+```json
+{
+  "scripts": {
+    "lint:contrast": "pnpm --filter @vrchat-albums/lint-contrast run lint-contrast -- --project ."
+  }
+}
+```
+
+**dependencies / devDependencies には何も追加しない**。`pnpm install` 実行時に workspace 解決で自動的に `packages/lint-contrast` 側の依存がインストールされる。
 
 ## 統合
 
-### `package.json` scripts
+### 呼び出し方法
 
-```json
-"lint:contrast": "tsx scripts/lint-contrast.ts"
-```
+本体リポジトリからは `pnpm lint:contrast` で起動。パッケージ単独開発時は `pnpm --filter @vrchat-albums/lint-contrast test` 等で作業。
 
-### `scripts/lint-custom.ts` の tasks 配列に追加
+### `scripts/lint-custom.ts` には追加しない (Phase 2)
 
-```typescript
-{ name: 'contrast', script: 'scripts/lint-contrast.ts' },
-```
+Phase 1 では `lint-custom.ts` の tasks 配列に入れず、単独実行のみサポート。統合は Phase 2 で別途検討。
 
-### CI
+### CI (Phase 2)
 
-既存 `.github/workflows/lint-test-cross.yml` で `pnpm lint` が `lint:custom` を呼ぶ想定なら、自動的に CI で走る。明示的に `pnpm lint:contrast` ステップを足す必要があれば別途追加。
+`.github/workflows/lint-test-cross.yml` にパッケージ単位のビルド・テストジョブを追加する想定。Phase 1 では CI ゲートにしない。
 
-### PostToolUse フック
+### PostToolUse フック (Phase 2)
 
-`.claude/hooks/post-edit-lint.sh` で `.tsx` 編集時に `lint:contrast --file <path>` を走らせる (引数対応は Phase 2)。
+`.claude/hooks/post-edit-lint.sh` で `.tsx` 編集時に `pnpm lint:contrast --glob <path>` を走らせる対応は Phase 2。
 
 ## テスト戦略
 
-`scripts/test-fixtures/contrast/` に期待出力付きフィクスチャを置き、
-`scripts/lint-contrast.test.ts` で Vitest により以下を検証:
+`packages/lint-contrast/test-fixtures/` に期待出力付きフィクスチャを置き、
+`packages/lint-contrast/tests/` 配下の Vitest により以下を検証:
 
 | フィクスチャ                | 期待 severity | 期待検出理由                                       |
 | --------------------------- | ------------- | -------------------------------------------------- |
