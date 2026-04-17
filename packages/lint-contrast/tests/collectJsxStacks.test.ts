@@ -193,4 +193,97 @@ describe('collectJsxStacks', () => {
     );
     expect(dynamicCandidates.length).toBeGreaterThanOrEqual(2);
   });
+
+  // ---------------------------------------------------------------------------
+  // 指摘 1 修正 (PR #806): 無条件 cn 引数を連結して 1 候補に集約
+  // ---------------------------------------------------------------------------
+
+  it('merges unconditional cn literal args into a single ClassCandidate', () => {
+    // cn('text-foreground', 'text-muted-foreground') のような無条件リテラルは
+    // CSS 的に両方が同一要素に同時適用される (cascade 最後勝ち = text-muted-foreground)。
+    // 修正前: 2 つの独立 ClassCandidate として分岐扱い → text-foreground 側が到達不能として偽陽性
+    // 修正後: 1 つの ClassCandidate { classes: ['text-foreground', 'text-muted-foreground'] }
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className={cn('text-foreground', 'text-muted-foreground')}>hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // 1 候補に連結されているはず (2 候補に分かれていてはいけない)
+    expect(pStack!.textCandidates).toHaveLength(1);
+    expect(pStack!.textCandidates[0].classes).toContain('text-foreground');
+    expect(pStack!.textCandidates[0].classes).toContain(
+      'text-muted-foreground',
+    );
+    // 無条件引数なので branchLabel は undefined
+    expect(pStack!.textCandidates[0].branchLabel).toBeUndefined();
+  });
+
+  it('generates 2 candidates for cn with unconditional base + conditional branch', () => {
+    // cn('a', cond && 'b', 'c') の期待動作:
+    // - 「b なし」パス: classes = ['a', 'c'] (unconditional のみ)
+    // - 「b あり」パス: classes = ['a', 'b', 'c']
+    // つまり 2 候補となる。
+    const source = `
+      declare const cond: boolean;
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className={cn('text-foreground', cond && 'text-muted-foreground', 'text-card-foreground')}>hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // 2 候補が生成される
+    expect(pStack!.textCandidates).toHaveLength(2);
+    // 両候補が text-foreground と text-card-foreground を含む (unconditional base)
+    for (const candidate of pStack!.textCandidates) {
+      expect(candidate.classes).toContain('text-foreground');
+      expect(candidate.classes).toContain('text-card-foreground');
+    }
+    // どちらかの候補が text-muted-foreground を含む (conditional branch)
+    const hasConditionalClass = pStack!.textCandidates.some((c) =>
+      c.classes.includes('text-muted-foreground'),
+    );
+    expect(hasConditionalClass).toBe(true);
+    // もう一方は text-muted-foreground を含まない
+    const withoutConditional = pStack!.textCandidates.some(
+      (c) => !c.classes.includes('text-muted-foreground'),
+    );
+    expect(withoutConditional).toBe(true);
+  });
+
+  it('single element with cn(bg-black/50, bg-white/50) produces one bgStack entry', () => {
+    // 同一要素内の複数 bg クラスは単一 ClassCandidate に連結される。
+    // CSS cascade 的には bg-white/50 が後勝ち (同一要素なので compositeOver しない)。
+    // 修正前: 2 候補 → bgStack に 2 エントリ → 親子合成として誤って compositeOver される可能性
+    // 修正後: 1 候補 { classes: ['bg-black/50', 'bg-white/50'] } → classify 側の最後勝ちロジック
+    const source = `
+      export function Foo() {
+        return (
+          <div className={cn('bg-black/50', 'bg-white/50')}>
+            <p className="text-foreground">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // 子要素 p の bgStack に div の bg が継承される
+    // div の bgCandidates は 1 候補のはず (2 候補に分かれていてはいけない)
+    // bgStack[0] が単一 ClassCandidate { classes: ['bg-black/50', 'bg-white/50'] }
+    expect(pStack!.bgStack).toHaveLength(1);
+    expect(pStack!.bgStack[0].classes).toContain('bg-black/50');
+    expect(pStack!.bgStack[0].classes).toContain('bg-white/50');
+  });
 });

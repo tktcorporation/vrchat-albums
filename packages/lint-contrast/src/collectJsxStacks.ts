@@ -233,78 +233,129 @@ function extractStaticClassString(valueNode: AstNode): string | null {
 /**
  * cn()/clsx() 呼び出しから ClassCandidate 配列を抽出する試み。
  *
- * 各引数を独立した ClassCandidate として扱う (最大限の保守的展開)。
- * 動的引数 (変数参照、関数呼び出し等) は branchLabel: 'dynamic' で記録する。
- * 引数が論理式 (&&, ||) の場合は右辺を候補として展開する。
+ * CSS cascade セマンティクスに基づいた引数解析:
+ * - **無条件引数 (文字列リテラル)** は同一要素に同時適用されるため、
+ *   1 つの ClassCandidate の classes 配列に連結する。
+ *   (cascade 最後勝ちは classify 側の「最後勝ち」ロジックで処理される)
+ * - **条件付き引数** (cond && 'literal', cond ? 'a' : 'b') のみが
+ *   実行時分岐を表すため、それぞれ独立した候補として展開する。
+ * - 動的引数 (変数参照、関数呼び出し等) は branchLabel: 'dynamic' で記録する。
+ *
+ * 実装: 候補アキュムレータの集合を持ち、各引数で状態遷移する。
+ * - 初期状態: accumulator = [{ classes: [], branchLabel: undefined }] (単一の空候補)
+ * - 無条件リテラル: 全アキュムレータの classes に追加 (分岐なし)
+ * - cond && 'b': 各アキュムレータを複製し、一方に 'b' を追加
+ *   (「b なし」と「b あり」の 2 分岐)
+ * - cond ? 'b' : 'c': 各アキュムレータを複製し、一方に 'b', 他方に 'c' を追加
+ *   (「b」と「c」の 2 分岐)
+ * - 動的: 全アキュムレータを dynamic に変換 (その後の処理を安全側に倒す)
+ *
+ * 例:
+ * - cn('a', 'b', 'c') → 1 候補 {classes: ['a', 'b', 'c']}
+ * - cn('a', cond && 'b') → 2 候補 [{classes:['a']}, {classes:['a','b']}]
+ * - cn('a', cond ? 'b' : 'c') → 2 候補 [{classes:['a','b']}, {classes:['a','c']}]
+ * - cn('a', cond && 'b', 'c') → 2 候補 [{classes:['a','c']}, {classes:['a','b','c']}]
  */
 function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
   const call = node as CallExpression;
-  const candidates: ClassCandidate[] = [];
+
+  // 候補アキュムレータの集合。各エントリが1つの実行時パスを表す。
+  // branchLabel は最初の分岐発生時に付与される。
+  let accumulators: {
+    classes: string[];
+    branchLabel: string | undefined;
+  }[] = [{ classes: [], branchLabel: undefined }];
 
   for (const arg of call.arguments) {
-    // Static string literal argument
+    // Static string literal argument: 全アキュムレータに追加 (分岐なし)
     if (arg.type === 'Literal') {
       const lit = arg as Literal;
       if (typeof lit.value === 'string') {
         const classes = extractColorClasses(lit.value);
-        if (classes.length > 0) {
-          candidates.push({ classes, branchLabel: undefined });
+        for (const acc of accumulators) {
+          acc.classes = [...acc.classes, ...classes];
         }
       }
       continue;
     }
 
-    // Logical expression: cond && 'bg-red' → extract 'bg-red' as conditional branch
+    // Logical expression: cond && 'bg-red'
+    // 「b なし」パスと「b あり」パスの 2 分岐に展開する。
     if (arg.type === 'LogicalExpression') {
       const logical = arg as AstNode & { right: AstNode; operator: string };
+      const branchLabel = `conditional(${logical.operator})`;
+
       if (logical.right.type === 'Literal') {
         const lit = logical.right as Literal;
         if (typeof lit.value === 'string') {
-          const classes = extractColorClasses(lit.value);
-          if (classes.length > 0) {
-            candidates.push({
-              classes,
-              branchLabel: `conditional(${logical.operator})`,
-            });
+          const addedClasses = extractColorClasses(lit.value);
+          // 「条件なし」パス (既存アキュムレータに branchLabel を付与)
+          // 「条件あり」パス (既存アキュムレータを複製して addedClasses を追加)
+          const withBranch = accumulators.map((acc) => ({
+            classes: [...acc.classes, ...addedClasses],
+            branchLabel: acc.branchLabel ?? branchLabel,
+          }));
+          // branchLabel なしパスにも branchLabel を付与して分岐の存在を示す
+          for (const acc of accumulators) {
+            acc.branchLabel = acc.branchLabel ?? branchLabel;
           }
+          accumulators = [...accumulators, ...withBranch];
         }
       } else {
-        candidates.push({ classes: [], branchLabel: 'dynamic' });
+        // 非リテラル右辺: 全アキュムレータを dynamic に変換
+        for (const acc of accumulators) {
+          acc.branchLabel = 'dynamic';
+        }
       }
       continue;
     }
 
     // Conditional expression: cond ? 'bg-a' : 'bg-b'
     // 健全性確保: 非リテラル分岐 (変数・式など) は silently drop せず
-    // { classes: [], branchLabel: 'dynamic' } として記録する。
+    // branchLabel: 'dynamic' として記録する。
     // これにより classify の Rule 4/5 が発火して unknown に落ちる (偽陰性を防ぐ)。
     if (arg.type === 'ConditionalExpression') {
       const cond = arg as AstNode & {
         consequent: AstNode;
         alternate: AstNode;
       };
-      for (const branch of [cond.consequent, cond.alternate]) {
-        if (branch.type === 'Literal') {
-          const lit = branch as Literal;
-          if (typeof lit.value === 'string') {
-            const classes = extractColorClasses(lit.value);
-            if (classes.length > 0) {
-              candidates.push({ classes, branchLabel: 'conditional(?)' });
+
+      const newAccumulators: typeof accumulators = [];
+      for (const acc of accumulators) {
+        for (const branch of [cond.consequent, cond.alternate]) {
+          if (branch.type === 'Literal') {
+            const lit = branch as Literal;
+            if (typeof lit.value === 'string') {
+              const classes = extractColorClasses(lit.value);
+              newAccumulators.push({
+                classes: [...acc.classes, ...classes],
+                branchLabel: acc.branchLabel ?? 'conditional(?)',
+              });
             }
+          } else {
+            // 非リテラル分岐 (Identifier, MemberExpression 等) は動的として記録する
+            newAccumulators.push({
+              classes: [...acc.classes],
+              branchLabel: 'dynamic',
+            });
           }
-        } else {
-          // 非リテラル分岐 (Identifier, MemberExpression 等) は動的として記録する
-          candidates.push({ classes: [], branchLabel: 'dynamic' });
         }
       }
+      accumulators = newAccumulators;
       continue;
     }
 
-    // Any other dynamic expression
-    candidates.push({ classes: [], branchLabel: 'dynamic' });
+    // Any other dynamic expression: 全アキュムレータを dynamic に変換
+    for (const acc of accumulators) {
+      acc.branchLabel = 'dynamic';
+    }
   }
 
-  return candidates;
+  // アキュムレータから ClassCandidate 配列に変換。
+  // classes が空で branchLabel も undefined の候補 (引数なし cn()) は除外する。
+  return accumulators
+    .filter((acc) => acc.classes.length > 0 || acc.branchLabel !== undefined)
+    .map((acc) => ({ classes: acc.classes, branchLabel: acc.branchLabel }));
 }
 
 /**
@@ -516,7 +567,16 @@ function visitNode(
     }
   }
 
-  // Build the new bg stack for this element and its children
+  // Build the new bg stack for this element and its children.
+  //
+  // CSS cascade セマンティクスの設計:
+  // - bgStack の各エントリは 1 つの DOM 層 (祖先要素) を表す。
+  // - 同一要素内の複数 bg クラス (例: cn('bg-black/50', 'bg-white/50')) は、
+  //   指摘 1 の修正により 1 つの ClassCandidate { classes: ['bg-black/50', 'bg-white/50'] }
+  //   に集約されている。classify 側の「最後勝ち」ロジックが同一 candidate 内で処理する。
+  // - bgStack.push の対象は「この要素自身の bgCandidates を子要素へ継承する」ためのもの。
+  //   親子ネスト由来の compositeOver は classify.ts が bgStack エントリ間で行う。
+  // - 同一要素内の複数 bg は最後勝ちのみ有効 (DOM ネスト由来の compositeOver は不要)。
   const newBgStack =
     bgCandidates.length > 0
       ? [...parentBgStack, ...bgCandidates]
