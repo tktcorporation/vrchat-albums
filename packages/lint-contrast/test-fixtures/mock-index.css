@@ -1,0 +1,34 @@
+/**
+ * テスト用 CSS 変数定義。
+ *
+ * 本番の src/index.css を模倣したミニマルな CSS ファイル。
+ * parseCssVars のテストや classify.ts の単体テストで使用する。
+ *
+ * 値の意味:
+ *   --background:        ライトは白 (0 0% 100%), ダークは濃紺 (220 27% 8%)
+ *   --foreground:        ライトは濃灰 (0 0% 9%), ダークは明灰 (220 15% 85%)
+ *   --card:              ライトは白 (0 0% 100%), ダークは半透明濃紺 (220 27% 12% / 0.7)
+ *   --muted-foreground:  ライトは中灰 (0 0% 45%), ダークは薄灰 (220 10% 60%)
+ */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --border: 0 0% 89%;
+  }
+
+  .dark {
+    --background: 220 27% 8%;
+    --foreground: 220 15% 85%;
+    --card: 220 27% 12% / 0.7;
+    --card-foreground: 220 15% 85%;
+    --muted: 220 27% 12% / 0.4;
+    --muted-foreground: 220 10% 60%;
+    --border: 220 15% 20%;
+  }
+}
