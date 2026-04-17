@@ -51,7 +51,7 @@
     "sync-landing-images": "bash scripts/sync-landing-images.sh",
     "lint": "run-p lint:oxlint lint:fmt-check lint:type-check lint:actionlint lint:ast-grep lint:custom",
     "lint:custom": "tsx scripts/lint-custom.ts",
-    "lint:contrast": "pnpm --filter @vrchat-albums/lint-contrast run lint-contrast -- --project $INIT_CWD",
+    "lint:contrast": "node scripts/run-lint-contrast.mjs",
     "lint:valueobjects": "tsx scripts/lint-valueobjects.ts",
     "lint:effect": "tsx scripts/lint-effect.ts",
     "lint:node-types": "tsx scripts/lint-node-types.ts",
