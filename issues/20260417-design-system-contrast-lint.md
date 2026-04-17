@@ -195,7 +195,7 @@ rules/ast-grep/
 ### `types.ts`
 
 ```typescript
-export type Rgba = { r: number; g: number; b: number; a: number }; // 0-255, alpha 0-1
+export type Rgba = { r: number; g: number; b: number; a: number }; // r/g/b/a: 0-1 (sRGB normalized)
 export type Theme = 'light' | 'dark';
 
 export type ClassCandidate = {
@@ -249,7 +249,7 @@ export function parseCssVars(
 ```
 
 - 入力: `src/index.css` の絶対パス
-- 出力: `{ light: { '--background': {r:255,g:255,b:255,a:1}, ... }, dark: { ... } }`
+- 出力: `{ light: { '--background': {r:1,g:1,b:1,a:1}, ... }, dark: { ... } }`
 - アルファ付き HSL (`0 0% 100% / 0.9`) を正しくパース
 
 ### `resolveTailwind.ts`

@@ -20,12 +20,12 @@ import type { Rgba } from './types';
  *   out.a   = src.a + dst.a * (1 - src.a)
  *   out.rgb = (src.rgb * src.a + dst.rgb * dst.a * (1 - src.a)) / out.a
  *
- * out.a が 0 の場合 (両方完全透明) は黒透明を返す。
+ * out.a が 0 の場合 (両方完全透明) は dst をそのまま返す (idempotent)。
  */
 function over(src: Rgba, dst: Rgba): Rgba {
   const ao = src.a + dst.a * (1 - src.a);
   if (ao === 0) {
-    // 両方完全透明の場合: dst をそのまま返す (idempotent)
+    // 両方完全透明の場合: 合成結果は意味を持たないため dst をそのまま返す (idempotent)
     return dst;
   }
   return {

@@ -38,7 +38,7 @@ lint-contrast --project . --warn-as-error
 
 ### CLI オプション
 
-```
+```text
 Options:
   --project <path>           対象プロジェクトのルート (default: cwd)
   --glob <pattern>           走査対象 glob (default: "src/**/*.tsx")
