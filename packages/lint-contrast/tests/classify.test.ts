@@ -217,6 +217,35 @@ describe('Rule 7: combinations > 32 → unknown(combinatorial-explosion)', () =>
       expect(result.reason).toBe('combinatorial-explosion');
     }
   });
+
+  // C3 修正 (PR #806 CodeRabbit): bgStack 空 + textCandidates 33 件でも
+  // combinatorial-explosion が発火すること。
+  // 修正前: countCombinations が bgStack.length === 0 のとき 0 を返していたため guard が bypass された。
+  // 修正後: bgStack 空でも textCandidates.length を返すため正しく explosion 検知できる。
+  it('C3: bgStack empty + 33 textCandidates → unknown(combinatorial-explosion)', () => {
+    const textCandidates: ClassCandidate[] = [];
+    for (let i = 0; i < 33; i++) {
+      textCandidates.push(staticText('text-foreground'));
+    }
+    // bgStack = [] (空), textCandidates = 33 → 33 組合せ > 32 → explosion
+    const stack = makeStack([], textCandidates);
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('unknown');
+    if (result.kind === 'unknown') {
+      expect(result.reason).toBe('combinatorial-explosion');
+    }
+  });
+
+  it('C3: bgStack empty + 32 textCandidates → NOT explosion (exactly at limit)', () => {
+    const textCandidates: ClassCandidate[] = [];
+    for (let i = 0; i < 32; i++) {
+      textCandidates.push(staticText('text-foreground'));
+    }
+    const stack = makeStack([], textCandidates);
+    const result = classifyStack(stack, cssVars);
+    // 32 は combinationLimit (default: 32) 以下なので explosion ではない
+    expect(result.kind).not.toBe('unknown');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -536,7 +565,7 @@ describe('unresolvable applicable class → unknown (soundness)', () => {
   it('fg: text-foreground followed by unresolvable class → unknown', () => {
     // "text-foreground" は解決可能, "__unknown_color__" は resolveClass が null を返す想定
     // CSS cascade 的には "__unknown_color__" が後勝ちするため結果が確定できない
-    // → resolveForTheme が null → unknown(dynamic-classname)
+    // → resolveForTheme が null → unknown(unresolved-class) [C8 修正: dynamic-classname から変更]
     const stack = makeStack(
       [staticBg('bg-background')],
       // __unknown_color__ は resolveClass に未登録 → null を返す
@@ -545,7 +574,7 @@ describe('unresolvable applicable class → unknown (soundness)', () => {
     const result = classifyStack(stack, cssVars);
     expect(result.kind).toBe('unknown');
     if (result.kind === 'unknown') {
-      expect(result.reason).toBe('dynamic-classname');
+      expect(result.reason).toBe('unresolved-class');
     }
   });
 
@@ -564,6 +593,7 @@ describe('unresolvable applicable class → unknown (soundness)', () => {
 
   it('bg: bg-card followed by unresolvable class → unknown', () => {
     // bg 側も同じポリシー: 適用可能かつ resolve 不能なクラスがあれば全体 null → unknown
+    // C8 修正: reason は 'unresolved-class' (static class だが color resolve 失敗)
     const stack = makeStack(
       [staticBg('bg-card', '__unknown_bg__')],
       [staticText('text-foreground')],
@@ -571,7 +601,7 @@ describe('unresolvable applicable class → unknown (soundness)', () => {
     const result = classifyStack(stack, cssVars);
     expect(result.kind).toBe('unknown');
     if (result.kind === 'unknown') {
-      expect(result.reason).toBe('dynamic-classname');
+      expect(result.reason).toBe('unresolved-class');
     }
   });
 

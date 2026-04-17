@@ -5,11 +5,11 @@
  * HSL → RGBA 変換を検証する。
  */
 
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import { parseCssVars } from '../src/parseCssVars.js';
 
@@ -18,12 +18,22 @@ const MOCK_CSS = path.resolve(
   '../test-fixtures/mock-index.css',
 );
 
+// C15 修正 (PR #806 CodeRabbit): createTempCss で作成した temp dir を afterAll でクリーンアップ
+const tempDirs: string[] = [];
+
 function createTempCss(content: string): string {
   const dir = mkdtempSync(path.join(tmpdir(), 'lint-contrast-'));
+  tempDirs.push(dir);
   const cssPath = path.join(dir, 'index.css');
   writeFileSync(cssPath, content, 'utf8');
   return cssPath;
 }
+
+afterAll(() => {
+  for (const dir of tempDirs) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 describe('parseCssVars', () => {
   it('parses :root and .dark CSS variables from mock-index.css', () => {
@@ -153,5 +163,71 @@ describe('parseCssVars', () => {
     expect(vars.light['--background']).toBeDefined();
     expect(vars.light['--shadow']).toBeUndefined();
     expect(vars.light['--spacing']).toBeUndefined();
+  });
+
+  // C5 修正 (PR #806 CodeRabbit): @media / @supports 内のルールを light/dark マップに混入させない。
+  // darkMode: 'media' パターン (@media prefers-color-scheme: dark { :root { ... } }) が
+  // light マップに誤って混入するのを防ぐ。
+  it('C5: @media { :root { --x } } does not pollute light map', () => {
+    // darkMode: 'media' スタイルの CSS: @media prefers-color-scheme: dark 内の :root
+    // これは light テーマ変数として扱うべきではない
+    const css = `
+      :root {
+        --background: 0 0% 100%;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: 220 27% 8%;
+        }
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+
+    // @media 内の :root は skip されるため、light の --background は :root の値のまま
+    expect(vars.light['--background']).toBeDefined();
+    expect(vars.light['--background'].r).toBeCloseTo(1, 2); // white (0 0% 100%)
+
+    // @media 内なので dark マップにも混入しない (dark は light を継承するだけ)
+    // 220 27% 8% の dark 値が dark['--background'] に入っていないこと
+    // (もし入っていれば r < 0.1 になるはず)
+    expect(vars.dark['--background'].r).toBeCloseTo(1, 2); // still white
+  });
+
+  it('C5: @supports { :root { --x } } does not pollute light map', () => {
+    const css = `
+      :root {
+        --background: 0 0% 100%;
+      }
+      @supports (color: hsl(0 0% 0%)) {
+        :root {
+          --background: 220 27% 8%;
+        }
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+
+    // @supports 内は skip されるため、light の --background は :root の値のまま
+    expect(vars.light['--background'].r).toBeCloseTo(1, 2);
+  });
+
+  it('C5: @layer base { :root { ... } } still processes correctly (structural at-rule)', () => {
+    // @layer は条件分岐ではなく構造的 at-rule なので通す
+    const css = `
+      @layer base {
+        :root {
+          --background: 0 0% 100%;
+        }
+        .dark {
+          --background: 220 27% 8%;
+        }
+      }
+    `;
+    const cssPath = createTempCss(css);
+    const vars = parseCssVars(cssPath);
+
+    expect(vars.light['--background'].r).toBeCloseTo(1, 2); // white
+    expect(vars.dark['--background'].r).toBeLessThan(0.1); // dark (8% L)
   });
 });

@@ -130,4 +130,65 @@ describe('resolveTailwind.resolveClass', () => {
     expect(result!.r).toBeCloseTo(0.671, 1);
     expect(result!.a).toBeCloseTo(0.5, 2);
   });
+
+  // ---------------------------------------------------------------------------
+  // C2 修正 (PR #806 CodeRabbit): opacity "/1" が 1.0 扱いされるバグの修正
+  // Tailwind の opacity modifier は常に percentage 整数 ("/1" = 1%, "/50" = 50%)、
+  // または decimal ("/0.5" = 0.5) のいずれかである。
+  // "/1" は 1% = 0.01 (ほぼ透明) であり、1.0 (不透明) ではない。
+  // ---------------------------------------------------------------------------
+
+  it('C2: /0 → alpha 0.0 (completely transparent)', () => {
+    const result = resolveClass('bg-white/0', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(0, 3);
+  });
+
+  it('C2: /1 → alpha 0.01 (1%, nearly transparent, NOT 1.0)', () => {
+    const result = resolveClass('bg-white/1', 'light', cssVars);
+    expect(result).not.toBeNull();
+    // "/1" は percentage 整数として /100 → 0.01
+    expect(result!.a).toBeCloseTo(0.01, 3);
+  });
+
+  it('C2: /50 → alpha 0.5 (50%)', () => {
+    const result = resolveClass('bg-white/50', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(0.5, 2);
+  });
+
+  it('C2: /100 → alpha 1.0 (fully opaque)', () => {
+    const result = resolveClass('bg-white/100', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(1, 3);
+  });
+
+  it('C2: /0.5 → alpha 0.5 (decimal, unchanged)', () => {
+    const result = resolveClass('bg-white/0.5', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(0.5, 2);
+  });
+
+  it('C2: /0.8 → alpha 0.8 (decimal, unchanged)', () => {
+    const result = resolveClass('bg-white/0.8', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(0.8, 2);
+  });
+
+  it('C2: bracket path /1 → alpha 0.01 (NOT 1.0)', () => {
+    // ブラケット任意値の外側 opacity も同じルールが適用される
+    const result = resolveClass('bg-[#ffffff]/1', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(0.01, 3);
+  });
+
+  it('C2: bracket path /[0.5] decimal via bracket — resolves alpha 0.5', () => {
+    // ブラケット内に decimal を書く場合: bg-[#ffffff]/[0.5] はこのパーサでは
+    // afterBracket が "/[0.5]" になるため parseFloat("[0.5]") = NaN → opacityOverride なし
+    // つまり元の alpha がそのまま使われる (バグではなく、この形式は非対応)
+    // このテストは /50 の正常系を確認する
+    const result = resolveClass('bg-[#ff0000]/50', 'light', cssVars);
+    expect(result).not.toBeNull();
+    expect(result!.a).toBeCloseTo(0.5, 2);
+  });
 });

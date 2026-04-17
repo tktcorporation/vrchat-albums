@@ -49,9 +49,12 @@ function buildArgv(extra: string[] = []): string[] {
 describe('runCli JSON format mode', () => {
   let consoleLogs: string[] = [];
   let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
 
   beforeEach(() => {
     consoleLogs = [];
+    // テスト開始時の consola.level をスナップショットしておく (C14 修正)
+    originalConsolaLevel = consola.level;
     // reportJson は console.log で JSON を出力するため、それをキャプチャする
     logSpy = vi
       .spyOn(console, 'log')
@@ -62,8 +65,8 @@ describe('runCli JSON format mode', () => {
 
   afterEach(() => {
     logSpy.mockRestore();
-    // consola.level をデフォルトに戻す (テスト間の副作用を防ぐ)
-    consola.level = 3;
+    // consola.level をテスト開始時の値に戻す (ハードコード 3 ではなくスナップショットを使用)
+    consola.level = originalConsolaLevel;
   });
 
   it('outputs pure JSON via console.log (no consola status lines mixed in)', async () => {
@@ -111,9 +114,12 @@ describe('runCli text format mode', () => {
 describe('runCli JSON format mode with zero violations', () => {
   let consoleLogs: string[] = [];
   let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
 
   beforeEach(() => {
     consoleLogs = [];
+    // テスト開始時の consola.level をスナップショット (C14 修正)
+    originalConsolaLevel = consola.level;
     logSpy = vi
       .spyOn(console, 'log')
       .mockImplementation((...args: unknown[]) => {
@@ -123,7 +129,8 @@ describe('runCli JSON format mode with zero violations', () => {
 
   afterEach(() => {
     logSpy.mockRestore();
-    consola.level = 3;
+    // ハードコード 3 ではなくスナップショットを使用 (C14 修正)
+    consola.level = originalConsolaLevel;
   });
 
   it('emits parseable JSON even when no issues found (ok-card-on-background.tsx only)', async () => {
