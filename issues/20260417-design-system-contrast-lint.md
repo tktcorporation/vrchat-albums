@@ -50,7 +50,7 @@ collectJsxStacks.ts  ── 親→子の bg スタック配列を構築
     │     [{ file, loc, bgStack: ['bg-card', 'bg-white/80'], text: 'text-foreground' }, ...]
     │
     ▼
-classify.ts          ── 各候補を { resolvable | unknown | skip } に分類 ★
+classify.ts          ── 各候補を { resolvable | unknown | skip } に分類
     │
     ▼
 resolveTailwind.ts   ── "bg-card" → "var(--card)" (resolveConfig 経由)
@@ -81,7 +81,7 @@ scripts/
    ├─ collectJsxStacks.ts           # oxc-parser で JSX スタック抽出
    ├─ composite.ts                  # Porter-Duff アルファ合成
    ├─ evaluateContrast.ts           # WCAG 2 コントラスト計算
-   └─ classify.ts                   # ★ unknown/skip/resolvable 分類 (ユーザー実装)
+   └─ classify.ts                   # unknown/skip/resolvable 分類 (Strategy B 契約)
 
 rules/ast-grep/
 └─ contrast-candidate.yml           # className 属性を含む JSX の pre-filter
@@ -146,7 +146,9 @@ export type ContrastIssue = {
  * HSL 記法 ("0 0% 100%" や "0 0% 100% / 0.9") に対応。
  * culori の parseHsl で HSLA に変換し、sRGB 変換して RGBA を返す。
  */
-export function parseCssVars(cssPath: string): Record<Theme, Record<string, Rgba>>;
+export function parseCssVars(
+  cssPath: string,
+): Record<Theme, Record<string, Rgba>>;
 ```
 
 - 入力: `src/index.css` の絶対パス
@@ -217,23 +219,54 @@ export function compositeOver(stack: Rgba[], base: Rgba): Rgba;
 export function wcagContrastRatio(fg: Rgba, bg: Rgba): number;
 ```
 
-### `classify.ts` ★ ユーザー実装箇所
+### `classify.ts`
 
 ```typescript
 /**
- * JsxStack の ClassCandidate 群を見て、この要素を lint 評価対象にするか判定する。
- *
- * Strategy B (Warn-on-unknown) の核心:
- * - resolvable: 全候補が静的に解決できる → コントラスト計算してエラーチェック
- * - unknown: 一部解決不能 → warning を出すだけでエラーにしない
- * - skip: 明らかに静的解析対象外 → 何も出さない
- *
- * ここで各判定の境界線を決める。例えば cn(cond && 'bg-red', 'bg-blue') を
- * 「両方評価する (resolvable)」扱いにするか「unknown」扱いにするかは
- * 設計判断 (ノイズと検出力のバランス)。
+ * JsxStack を Strategy B 契約に従って分類する。
+ * 詳細ルールは下記「Classification Rules (決定版)」参照。
+ * ts-pattern の match().with().exhaustive() で実装すること。
  */
 export function classifyStack(stack: JsxStack): Resolution;
 ```
+
+#### Classification Rules (決定版)
+
+| #   | 入力条件                                                         | Resolution                                      | 理由                                   |
+| --- | ---------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------- |
+| 1   | `bgStack` が空 かつ `textCandidates` が空                        | `skip` (`reason: 'no-color-classes'`)           | 検査対象外                             |
+| 2   | `textCandidates` が空 (bg のみ)                                  | `skip` (`reason: 'no-text'`)                    | コントラストは文字色があって意味を持つ |
+| 3   | 全 `ClassCandidate.classes` が空配列 (完全動的)                  | `unknown` (`reason: 'dynamic-classname'`)       | warn で気付きを残す                    |
+| 4   | `bgStack` に `branchLabel === 'dynamic'` を含む候補がある        | `unknown` (`reason: 'dynamic-bg-branch'`)       | 静的解決不能な分岐が混在               |
+| 5   | `textCandidates` に `branchLabel === 'dynamic'` を含む候補がある | `unknown` (`reason: 'dynamic-text-branch'`)     | 同上                                   |
+| 6   | 全候補が静的かつ解決可能、組合せ数 ≤ 32                          | `resolvable` (worst case ペアを theme 別に返す) | 検査対象                               |
+| 7   | 組合せ数 > 32                                                    | `unknown` (`reason: 'combinatorial-explosion'`) | 列挙爆発の保険                         |
+
+**worst case ペアの算出 (ルール 6)**:
+
+- `bgStack` の各要素候補配列の直積 × `textCandidates` の候補配列を列挙
+- 各組合せで light/dark 両モードの `(bg: Rgba, fg: Rgba)` を計算
+- `Resolution.themes[theme]` には **コントラスト比が最低となる組合せの bg/fg ペア** を格納 (theme ごとに独立)
+
+**`branchLabel` を立てる基準** (`collectJsxStacks.ts` 側の責務):
+
+| 由来                                                                                            | `branchLabel`                                                 |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `className="bg-card text-foreground"` (リテラル)                                                | `undefined` (static)                                          |
+| `className={cn('a', cond && 'b')}` — 全引数が文字列リテラル or `cond && 'literal'` パターン     | 各分岐を候補展開、`branchLabel: 'cn:N'`                       |
+| `className={cn(dynamicVar, 'a')}` — 非リテラル識別子を含む                                      | `branchLabel: 'dynamic'`                                      |
+| `className={clsx(...)}`                                                                         | cn と同等扱い                                                 |
+| `className={someVar}` / `className={styles.foo}` — 識別子単独                                   | `branchLabel: 'dynamic'`                                      |
+| `className={cva(...)({ variant: 'primary' })}` — cva 定義が同一ファイル、variant キーがリテラル | variant 展開、`branchLabel: 'cva:variant-name'`               |
+| `className={cva(...)({ variant })}` — variant 非リテラル                                        | `branchLabel: 'dynamic'`                                      |
+| cva 定義が別ファイルから import                                                                 | `branchLabel: 'dynamic'` (Phase 1 では cross-file 解析しない) |
+| `style={{ background: ... }}` のみ                                                              | `ClassCandidate` 非生成 → ルール 1 で skip                    |
+
+**暗黙のベース背景**:
+
+- `bgStack` が空で `textCandidates` のみ存在する要素は、CSS 変数 `--background` を暗黙のベースに使う
+- Phase 1 の仮定: 「bg 未指定のルート領域は `bg-background` 相当」
+- body が別色のケースは既知の限界に追加
 
 ### `lint-contrast.ts` (エントリ)
 
@@ -251,6 +284,7 @@ export function classifyStack(stack: JsxStack): Resolution;
 ## データフロー例
 
 入力 JSX:
+
 ```tsx
 <div className="bg-card">
   <p className="text-muted-foreground">hello</p>
@@ -258,30 +292,39 @@ export function classifyStack(stack: JsxStack): Resolution;
 ```
 
 `src/index.css`:
+
 ```css
-:root { --card: 0 0% 100%; --muted-foreground: 0 0% 45%; }
-.dark { --card: 220 15% 12%; --muted-foreground: 220 10% 60%; }
+:root {
+  --card: 0 0% 100%;
+  --muted-foreground: 0 0% 45%;
+}
+.dark {
+  --card: 220 15% 12%;
+  --muted-foreground: 220 10% 60%;
+}
 ```
 
 処理結果 (light テーマ):
+
 - bg = `rgba(255,255,255,1)`
 - fg = `rgba(115,115,115,1)`
 - ratio = 3.94 → **AA 未満 (< 4.5)** → error
 
 処理結果 (dark テーマ):
+
 - bg = `rgba(27,30,38,1)`
 - fg = `rgba(141,147,155,1)`
 - ratio = 5.02 → OK
 
 ## Strategy B (Warn-on-unknown) 契約
 
-| ケース | Resolution | severity |
-|---|---|---|
-| 全候補が静的解決でき、AA 未満 | `resolvable` | `error` |
-| 全候補が静的解決でき、AA 以上 | `resolvable` | (報告なし) |
-| 一部候補のみ解決不能 | `unknown` | `warning` |
-| 全候補が動的 (`style={{}}`, 完全動的 className) | `skip` | (報告なし) |
-| className に bg/text が1つもない | `skip` | (報告なし) |
+| ケース                                          | Resolution   | severity   |
+| ----------------------------------------------- | ------------ | ---------- |
+| 全候補が静的解決でき、AA 未満                   | `resolvable` | `error`    |
+| 全候補が静的解決でき、AA 以上                   | `resolvable` | (報告なし) |
+| 一部候補のみ解決不能                            | `unknown`    | `warning`  |
+| 全候補が動的 (`style={{}}`, 完全動的 className) | `skip`       | (報告なし) |
+| className に bg/text が1つもない                | `skip`       | (報告なし) |
 
 `warning` は CI で fail させない。`error` のみ `exit 1`。
 
@@ -320,13 +363,13 @@ export function classifyStack(stack: JsxStack): Resolution;
 `scripts/test-fixtures/contrast/` に期待出力付きフィクスチャを置き、
 `scripts/lint-contrast.test.ts` で Vitest により以下を検証:
 
-| フィクスチャ | 期待 severity | 期待検出理由 |
-|---|---|---|
-| `ok-card-on-background.tsx` | (なし) | `bg-card` × `text-foreground` で両モード AA クリア |
-| `ng-low-contrast-dark.tsx` | error | ダークでコントラスト比 < 4.5 |
-| `ng-alpha-composite.tsx` | error | `bg-white/30` の合成後、fg との比が不足 |
-| `warn-dynamic-class.tsx` | warning | `cn(dynamicVar)` で解決不能 |
-| `skip-no-colors.tsx` | (なし) | bg/text クラスを含まない |
+| フィクスチャ                | 期待 severity | 期待検出理由                                       |
+| --------------------------- | ------------- | -------------------------------------------------- |
+| `ok-card-on-background.tsx` | (なし)        | `bg-card` × `text-foreground` で両モード AA クリア |
+| `ng-low-contrast-dark.tsx`  | error         | ダークでコントラスト比 < 4.5                       |
+| `ng-alpha-composite.tsx`    | error         | `bg-white/30` の合成後、fg との比が不足            |
+| `warn-dynamic-class.tsx`    | warning       | `cn(dynamicVar)` で解決不能                        |
+| `skip-no-colors.tsx`        | (なし)        | bg/text クラスを含まない                           |
 
 ## 段階的ロールアウト
 
@@ -337,13 +380,13 @@ export function classifyStack(stack: JsxStack): Resolution;
 
 ## 既知の限界
 
-| 限界 | 対応方針 |
-|---|---|
-| z-index / position 由来の重なり | 対象外。ビジュアルリグレッション (Playwright + axe) で補完 |
-| React Portal | 対象外。Storybook addon-a11y 等で補完 |
-| 動的背景画像 (VRChat 写真) | 対象外。ランタイム OCR/ルミナンス分析は別スクリプト |
-| cva variant 網羅 | Phase 3 で cva 定義パーサを追加 |
-| `@apply` 利用箇所 | CSS 側で bg/text が合成されている場合は PostCSS 側で解析必要。Phase 3 |
+| 限界                            | 対応方針                                                              |
+| ------------------------------- | --------------------------------------------------------------------- |
+| z-index / position 由来の重なり | 対象外。ビジュアルリグレッション (Playwright + axe) で補完            |
+| React Portal                    | 対象外。Storybook addon-a11y 等で補完                                 |
+| 動的背景画像 (VRChat 写真)      | 対象外。ランタイム OCR/ルミナンス分析は別スクリプト                   |
+| cva variant 網羅                | Phase 3 で cva 定義パーサを追加                                       |
+| `@apply` 利用箇所               | CSS 側で bg/text が合成されている場合は PostCSS 側で解析必要。Phase 3 |
 
 ## 優先度
 
