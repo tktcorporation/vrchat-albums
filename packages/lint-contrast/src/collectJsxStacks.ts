@@ -516,8 +516,11 @@ function visitNode(
       ? [...parentBgStack, ...bgCandidates]
       : parentBgStack;
 
-  // If this element has text candidates, record a JsxStack entry
-  if (textCandidates.length > 0 && newBgStack.length > 0) {
+  // If this element has text candidates, record a JsxStack entry.
+  // bgStack が空 (祖先に bg 指定なし) の場合も記録する。
+  // classify.ts Rule 6 が bgStack 空時に暗黙の --background をベースとして使うため、
+  // ページデフォルト背景に描画される一般テキストのコントラスト検証が可能になる。
+  if (textCandidates.length > 0) {
     const { line, column } = offsetIndex.toLineCol(opening.start);
     results.push({
       file: filePath,

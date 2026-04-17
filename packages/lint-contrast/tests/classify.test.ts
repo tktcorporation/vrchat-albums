@@ -315,3 +315,37 @@ describe('dark: variant handling', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// 指摘 1 修正検証: text-only stack (bgStack 空) が --background ベースで解決可能
+// ---------------------------------------------------------------------------
+
+describe('text-only stack (bgStack empty) resolves against implicit --background', () => {
+  // bgStack が空の場合、classify は暗黙の --background をベースとして使用する。
+  // collectJsxStacks の修正により、祖先に bg 指定のない要素も JsxStack に記録されるため、
+  // ページデフォルト背景に描画される一般テキストのコントラスト検証が可能になる。
+
+  it('text-only stack with text-foreground is resolvable (uses --background as base)', () => {
+    // bgStack 空 → Rule 6 の otherwise ブランチが実行される。
+    // countCombinations([], [...]) === 0 ≤ 32 なので resolvable へ進む。
+    // resolveForTheme は bgRgbas = [] で compositeOver([], base) = base を使用する。
+    const stack = makeStack([], [staticText('text-foreground')]);
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // bg は --background そのもの (合成なし)
+      expect(result.themes.light.bg).toBeDefined();
+      expect(result.themes.dark.bg).toBeDefined();
+      expect(result.themes.light.fg).toBeDefined();
+      expect(result.themes.dark.fg).toBeDefined();
+    }
+  });
+
+  it('text-only stack with dynamic textCandidates → unknown(dynamic-text-branch)', () => {
+    // bgStack 空 + dynamic text → Rule 5 が発火して unknown になる
+    const stack = makeStack([], [dynamicCandidate()]);
+    const result = classifyStack(stack, cssVars);
+    // Rule 3 or Rule 5 のどちらかで unknown になる
+    expect(result.kind).toBe('unknown');
+  });
+});

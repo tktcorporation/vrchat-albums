@@ -35,14 +35,22 @@ describe('collectJsxStacks', () => {
     ).toBe(true);
   });
 
-  it('returns empty array when no text+bg nesting exists', () => {
+  it('records text-only element (no ancestor bg) with empty bgStack', () => {
+    // 指摘 1 の修正: bgStack が空でも textCandidates があれば JsxStack を生成する。
+    // classify.ts Rule 6 が bgStack 空時に暗黙の --background をベースとして使うため、
+    // ページデフォルト背景に対するコントラスト検証が可能になる (偽陰性を防ぐ)。
     const source = `
       export function Foo() {
         return <p className="text-foreground">hello</p>;
       }
     `;
     const stacks = collectJsxStacks('test.tsx', source);
-    expect(stacks).toHaveLength(0);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.bgStack).toHaveLength(0);
+    expect(
+      pStack!.textCandidates.some((c) => c.classes.includes('text-foreground')),
+    ).toBe(true);
   });
 
   it('detects dynamic class as branchLabel: dynamic', () => {
