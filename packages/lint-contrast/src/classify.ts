@@ -228,15 +228,24 @@ export function classifyStack(
         ),
         () => ({ kind: 'unknown' as const, reason: 'dynamic-classname' }),
       )
-      // Rule 4: bgStack に dynamic branchLabel
+      // Rule 4: bgStack に dynamic または variant-pseudo branchLabel
+      // variant-pseudo: sm:, hover: 等のバリアント付きクラスはランタイム依存で静的解析不能
       .with(
-        P.when(({ bgStack: b }) => b.some((c) => c.branchLabel === 'dynamic')),
+        P.when(({ bgStack: b }) =>
+          b.some(
+            (c) =>
+              c.branchLabel === 'dynamic' || c.branchLabel === 'variant-pseudo',
+          ),
+        ),
         () => ({ kind: 'unknown' as const, reason: 'dynamic-bg-branch' }),
       )
-      // Rule 5: textCandidates に dynamic branchLabel
+      // Rule 5: textCandidates に dynamic または variant-pseudo branchLabel
       .with(
         P.when(({ textCandidates: t }) =>
-          t.some((c) => c.branchLabel === 'dynamic'),
+          t.some(
+            (c) =>
+              c.branchLabel === 'dynamic' || c.branchLabel === 'variant-pseudo',
+          ),
         ),
         () => ({ kind: 'unknown' as const, reason: 'dynamic-text-branch' }),
       )

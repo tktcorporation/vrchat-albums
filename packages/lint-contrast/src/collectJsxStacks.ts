@@ -135,56 +135,141 @@ const NON_COLOR_BG_SUFFIXES = new Set([
 ]);
 
 /**
+ * Tailwind バリアントプレフィックス (`dark:`, `sm:`, `hover:`, `aria-[...]:` 等) を
+ * 全て剥がし、残りの実クラスとバリアント情報を返す。
+ *
+ * 戻り値:
+ * - `base`: プレフィックスを除いた実クラス (例: "text-foreground")
+ * - `hasDarkVariant`: `dark:` プレフィックスが含まれていたか
+ * - `hasNonDarkVariant`: `dark:` 以外のバリアントプレフィックスが含まれていたか
+ *   (例: `sm:`, `hover:`, `focus:`, `md:dark:` の `md:` 部分)
+ *
+ * Tailwind のバリアントプレフィックスはコロン区切りで複数連続できる
+ * (例: `dark:md:text-foreground`, `group-hover:text-card`)。
+ * `/^([a-zA-Z][a-zA-Z0-9_-]*(\[[^\]]*\])?:)+/` でバリアント部分全体をマッチして剥がす。
+ */
+function stripVariantPrefixes(cls: string): {
+  base: string;
+  hasDarkVariant: boolean;
+  hasNonDarkVariant: boolean;
+} {
+  // バリアントプレフィックスの正規表現: コロン終端の識別子 (任意個)
+  // aria-[label]:, data-[state=open]: のような arbitrary variant にも対応
+  const variantPrefixRe = /^([a-zA-Z][a-zA-Z0-9_-]*(\[[^\]]*\])?:)+/;
+
+  const matched = variantPrefixRe.exec(cls);
+  if (matched === null) {
+    return { base: cls, hasDarkVariant: false, hasNonDarkVariant: false };
+  }
+
+  const prefixStr = matched[0]; // e.g. "dark:" / "sm:" / "hover:dark:" / "dark:md:"
+  const base = cls.slice(prefixStr.length);
+
+  // コロン区切りで各バリアントを分解して dark: の有無を判定
+  // "hover:dark:" → ["hover", "dark"]
+  const variants = prefixStr.slice(0, -1).split(':');
+  const hasDarkVariant = variants.includes('dark');
+  const hasNonDarkVariant = variants.some((v) => v !== 'dark');
+
+  return { base, hasDarkVariant, hasNonDarkVariant };
+}
+
+/**
+ * 単一 Tailwind クラスが「色」クラスかどうかを、プレフィックスを除いた base で判定する。
+ *
+ * @returns 色クラスなら true
+ */
+function isColorClass(base: string): boolean {
+  if (base.startsWith('text-')) {
+    const suffix = base.slice(5);
+    if (
+      suffix.startsWith('opacity-') ||
+      suffix.startsWith('clip') ||
+      suffix.startsWith('decoration-') ||
+      suffix.startsWith('underline') ||
+      suffix.startsWith('overline') ||
+      suffix.startsWith('line-through') ||
+      suffix.startsWith('no-underline') ||
+      suffix.startsWith('uppercase') ||
+      suffix.startsWith('lowercase') ||
+      suffix.startsWith('capitalize') ||
+      suffix.startsWith('normal-case')
+    ) {
+      return false;
+    }
+    return !NON_COLOR_TEXT_SUFFIXES.has(suffix);
+  }
+
+  if (base.startsWith('bg-')) {
+    const suffix = base.slice(3);
+    if (
+      suffix.startsWith('gradient-') ||
+      suffix.startsWith('clip-') ||
+      suffix.startsWith('origin-') ||
+      suffix.startsWith('blend-') ||
+      suffix.startsWith('opacity-')
+    ) {
+      return false;
+    }
+    return !NON_COLOR_BG_SUFFIXES.has(suffix);
+  }
+
+  return false;
+}
+
+/**
  * Tailwind クラス文字列から bg-* または text-* の「色」クラスのみを抽出する。
  *
  * スペース区切りのクラスリストから bg- または text- で始まるクラスを返すが、
  * フォントサイズ・整列・配置など色以外のユーティリティは除外する。
  * `NON_COLOR_TEXT_SUFFIXES` / `NON_COLOR_BG_SUFFIXES` が除外リスト。
+ *
+ * バリアント処理:
+ * - `dark:` は extractColorClasses の戻り値にそのまま含まれる (classify 側で処理)
+ * - `dark:` 以外のバリアント (`sm:`, `hover:`, `focus:` 等) を持つ色クラスは
+ *   `variant-pseudo` ラベル付きで別途戻り値に含まれる。
+ *   コントラストをランタイムに依存せず静的解析できないため unknown に落とす。
+ *
+ * @returns { classes, variantPseudoClasses }
+ *   - `classes`: dark: あり/なしの色クラス (従来どおり)
+ *   - `variantPseudoClasses`: dark: 以外のバリアント付きの色クラス
  */
-function extractColorClasses(classStr: string): string[] {
-  return classStr.split(/\s+/).filter((cls) => {
-    const trimmed = cls.trim();
-    // dark: プレフィックスを除いた実クラスで判定
-    const base = trimmed.startsWith('dark:') ? trimmed.slice(5) : trimmed;
+function extractColorClasses(classStr: string): {
+  classes: string[];
+  variantPseudoClasses: string[];
+} {
+  const classes: string[] = [];
+  const variantPseudoClasses: string[] = [];
 
-    if (base.startsWith('text-')) {
-      const suffix = base.slice(5);
-      // bg-clip-text, bg-gradient-to-* 等: 複合プレフィックスを持つ非色クラス
-      if (
-        suffix.startsWith('opacity-') ||
-        suffix.startsWith('clip') ||
-        suffix.startsWith('decoration-') ||
-        suffix.startsWith('underline') ||
-        suffix.startsWith('overline') ||
-        suffix.startsWith('line-through') ||
-        suffix.startsWith('no-underline') ||
-        suffix.startsWith('uppercase') ||
-        suffix.startsWith('lowercase') ||
-        suffix.startsWith('capitalize') ||
-        suffix.startsWith('normal-case')
-      ) {
-        return false;
-      }
-      return !NON_COLOR_TEXT_SUFFIXES.has(suffix);
+  for (const rawCls of classStr.split(/\s+/)) {
+    const trimmed = rawCls.trim();
+    if (!trimmed) {
+      continue;
     }
 
-    if (base.startsWith('bg-')) {
-      const suffix = base.slice(3);
-      // bg-gradient-to-*, bg-clip-*, bg-origin-*, bg-blend-* は非色
-      if (
-        suffix.startsWith('gradient-') ||
-        suffix.startsWith('clip-') ||
-        suffix.startsWith('origin-') ||
-        suffix.startsWith('blend-') ||
-        suffix.startsWith('opacity-')
-      ) {
-        return false;
-      }
-      return !NON_COLOR_BG_SUFFIXES.has(suffix);
+    const { base, hasDarkVariant, hasNonDarkVariant } =
+      stripVariantPrefixes(trimmed);
+
+    if (!isColorClass(base)) {
+      continue;
     }
 
-    return false;
-  });
+    if (hasNonDarkVariant) {
+      // dark: 以外のバリアント付き → variant-pseudo として記録
+      // dark: も同時に持つ複合バリアント (md:dark:text-*) も variant-pseudo 扱い
+      variantPseudoClasses.push(trimmed);
+    } else {
+      // dark: のみ or バリアントなし → 従来どおり classes に追加
+      // (dark: プレフィックスは classify の isApplicableForTheme で処理)
+      classes.push(trimmed);
+    }
+
+    // hasDarkVariant は classes/variantPseudoClasses への振り分けで使用済み。
+    // classify 側が cls.startsWith('dark:') で判定するため元の trimmed を格納している。
+    void hasDarkVariant;
+  }
+
+  return { classes, variantPseudoClasses };
 }
 
 /**
@@ -240,12 +325,15 @@ function extractStaticClassString(valueNode: AstNode): string | null {
  * - **条件付き引数** (cond && 'literal', cond ? 'a' : 'b') のみが
  *   実行時分岐を表すため、それぞれ独立した候補として展開する。
  * - 動的引数 (変数参照、関数呼び出し等) は branchLabel: 'dynamic' で記録する。
+ * - variant-pseudo クラス (sm:, hover: 等) は branchLabel: 'variant-pseudo' の
+ *   追加候補として記録する (静的解析不能のため unknown に落とす)。
  *
  * 実装: 候補アキュムレータの集合を持ち、各引数で状態遷移する。
  * - 初期状態: accumulator = [{ classes: [], branchLabel: undefined }] (単一の空候補)
  * - 無条件リテラル: 全アキュムレータの classes に追加 (分岐なし)
  * - cond && 'b': 各アキュムレータを複製し、一方に 'b' を追加
  *   (「b なし」と「b あり」の 2 分岐)
+ *   さらに左辺が非リテラルなら dynamic 候補も追加する
  * - cond ? 'b' : 'c': 各アキュムレータを複製し、一方に 'b', 他方に 'c' を追加
  *   (「b」と「c」の 2 分岐)
  * - 動的: 全アキュムレータを dynamic に変換 (その後の処理を安全側に倒す)
@@ -255,6 +343,8 @@ function extractStaticClassString(valueNode: AstNode): string | null {
  * - cn('a', cond && 'b') → 2 候補 [{classes:['a']}, {classes:['a','b']}]
  * - cn('a', cond ? 'b' : 'c') → 2 候補 [{classes:['a','b']}, {classes:['a','c']}]
  * - cn('a', cond && 'b', 'c') → 2 候補 [{classes:['a','c']}, {classes:['a','b','c']}]
+ * - cn(dynVar || 'b') → 2 候補 [{classes:['b']}, {classes:[], branchLabel:'dynamic'}]
+ * - cn(dynVar && 'b') → 2 候補 [{classes:['b']}, {classes:[], branchLabel:'dynamic'}]
  */
 function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
   const call = node as CallExpression;
@@ -266,40 +356,72 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
     branchLabel: string | undefined;
   }[] = [{ classes: [], branchLabel: undefined }];
 
+  // variant-pseudo クラス (sm:, hover: 等) のクラス文字列を収集する。
+  // これらは別途 branchLabel:'variant-pseudo' の候補として末尾に追加する。
+  const variantPseudoCollected: string[] = [];
+
   for (const arg of call.arguments) {
     // Static string literal argument: 全アキュムレータに追加 (分岐なし)
     if (arg.type === 'Literal') {
       const lit = arg as Literal;
       if (typeof lit.value === 'string') {
-        const classes = extractColorClasses(lit.value);
+        const { classes, variantPseudoClasses } = extractColorClasses(
+          lit.value,
+        );
         for (const acc of accumulators) {
           acc.classes = [...acc.classes, ...classes];
         }
+        variantPseudoCollected.push(...variantPseudoClasses);
       }
       continue;
     }
 
-    // Logical expression: cond && 'bg-red'
-    // 「b なし」パスと「b あり」パスの 2 分岐に展開する。
+    // Logical expression: cond && 'bg-red' / dynVar || 'text-foreground' / a ?? 'b'
+    //
+    // 健全性設計:
+    // - 右辺がリテラルの場合:「右辺なし」と「右辺あり」の 2 分岐に展開する。
+    // - 左辺が非リテラルの場合 (動的変数 etc.): 左辺が truthy で勝つケースを
+    //   branchLabel:'dynamic' の追加候補として記録する。
+    //   例: cn(dynVar || 'text-foreground')
+    //   → [{classes:['text-foreground'], branchLabel:'conditional(||)'},
+    //      {classes:[], branchLabel:'dynamic'}]
+    //   これにより classify Rule 5 が発火して unknown に落ちる (偽陰性を防ぐ)。
     if (arg.type === 'LogicalExpression') {
-      const logical = arg as AstNode & { right: AstNode; operator: string };
+      const logical = arg as AstNode & {
+        left: AstNode;
+        right: AstNode;
+        operator: string;
+      };
       const branchLabel = `conditional(${logical.operator})`;
 
       if (logical.right.type === 'Literal') {
         const lit = logical.right as Literal;
         if (typeof lit.value === 'string') {
-          const addedClasses = extractColorClasses(lit.value);
-          // 「条件なし」パス (既存アキュムレータに branchLabel を付与)
-          // 「条件あり」パス (既存アキュムレータを複製して addedClasses を追加)
+          const { classes: addedClasses, variantPseudoClasses } =
+            extractColorClasses(lit.value);
+          variantPseudoCollected.push(...variantPseudoClasses);
+          // 「右辺適用」パス (既存アキュムレータを複製して addedClasses を追加)
           const withBranch = accumulators.map((acc) => ({
             classes: [...acc.classes, ...addedClasses],
             branchLabel: acc.branchLabel ?? branchLabel,
           }));
-          // branchLabel なしパスにも branchLabel を付与して分岐の存在を示す
+          // 「右辺なし」パスにも branchLabel を付与して分岐の存在を示す
           for (const acc of accumulators) {
             acc.branchLabel = acc.branchLabel ?? branchLabel;
           }
           accumulators = [...accumulators, ...withBranch];
+
+          // || / ?? 演算子かつ左辺が非リテラルの場合: 左辺が truthy/非null で勝つ
+          // ランタイムケースを dynamic で記録する。
+          // 例: cn(dynVar || 'text-fg') → dynVar が truthy なら dynVar の値が使われる
+          // && は left が boolean 条件として使われるため対象外
+          // (cn(cond && 'cls') の cond は boolean で左辺値がクラスとして使われない)
+          if (
+            (logical.operator === '||' || logical.operator === '??') &&
+            logical.left.type !== 'Literal'
+          ) {
+            accumulators.push({ classes: [], branchLabel: 'dynamic' });
+          }
         }
       } else {
         // 非リテラル右辺: 全アキュムレータを dynamic に変換
@@ -326,7 +448,10 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
           if (branch.type === 'Literal') {
             const lit = branch as Literal;
             if (typeof lit.value === 'string') {
-              const classes = extractColorClasses(lit.value);
+              const { classes, variantPseudoClasses } = extractColorClasses(
+                lit.value,
+              );
+              variantPseudoCollected.push(...variantPseudoClasses);
               newAccumulators.push({
                 classes: [...acc.classes, ...classes],
                 branchLabel: acc.branchLabel ?? 'conditional(?)',
@@ -353,9 +478,20 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
 
   // アキュムレータから ClassCandidate 配列に変換。
   // classes が空で branchLabel も undefined の候補 (引数なし cn()) は除外する。
-  return accumulators
+  const result = accumulators
     .filter((acc) => acc.classes.length > 0 || acc.branchLabel !== undefined)
     .map((acc) => ({ classes: acc.classes, branchLabel: acc.branchLabel }));
+
+  // variant-pseudo クラスがあれば追加候補として記録する。
+  // ランタイム条件依存のため静的解析不能 → classify Rule 4/5 で unknown に落ちる。
+  if (variantPseudoCollected.length > 0) {
+    result.push({
+      classes: variantPseudoCollected,
+      branchLabel: 'variant-pseudo',
+    });
+  }
+
+  return result;
 }
 
 /**
@@ -364,14 +500,24 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
  * 静的文字列 → classes にクラスを格納した単一 ClassCandidate
  * cn()/clsx() 呼び出し → 各引数を展開した複数 ClassCandidate
  * それ以外の動的式 → branchLabel: 'dynamic' の単一 ClassCandidate
+ *
+ * variant-pseudo クラス (sm:, hover: 等) が存在する場合は
+ * branchLabel: 'variant-pseudo' の候補を追加する。
  */
 function extractClassCandidates(valueNode: AstNode): ClassCandidate[] {
   // Static string
   const staticStr = extractStaticClassString(valueNode);
   if (staticStr !== null) {
-    const classes = extractColorClasses(staticStr);
-    // Return even if empty - caller can filter
-    return [{ classes }];
+    const { classes, variantPseudoClasses } = extractColorClasses(staticStr);
+    const result: ClassCandidate[] = [{ classes }];
+    // variant-pseudo クラスが存在すれば追加候補として記録する
+    if (variantPseudoClasses.length > 0) {
+      result.push({
+        classes: variantPseudoClasses,
+        branchLabel: 'variant-pseudo',
+      });
+    }
+    return result;
   }
 
   // JSXExpressionContainer with a call expression (cn/clsx)
@@ -542,6 +688,26 @@ function visitNode(
 
     // Separate bg and text candidates
     for (const candidate of allCandidates) {
+      // variant-pseudo 候補 (sm:text-*, hover:bg-* 等) は base クラスで bg/text を判定する。
+      // 全体の classes が variant-pseudo クラスのみなので、stripVariantPrefixes で base を得る。
+      if (candidate.branchLabel === 'variant-pseudo') {
+        const hasBgClass = candidate.classes.some((c) => {
+          const { base } = stripVariantPrefixes(c);
+          return base.startsWith('bg-');
+        });
+        const hasTextClass = candidate.classes.some((c) => {
+          const { base } = stripVariantPrefixes(c);
+          return base.startsWith('text-');
+        });
+        if (hasBgClass) {
+          bgCandidates.push({ classes: [], branchLabel: 'variant-pseudo' });
+        }
+        if (hasTextClass) {
+          textCandidates.push({ classes: [], branchLabel: 'variant-pseudo' });
+        }
+        continue;
+      }
+
       const bgClasses = candidate.classes.filter(
         (c) => c.startsWith('bg-') || c.startsWith('dark:bg-'),
       );
@@ -556,7 +722,7 @@ function visitNode(
         textCandidates.push({ ...candidate, classes: textClasses });
       }
 
-      // Dynamic branch with no classes - propagate as dynamic
+      // Dynamic/variant-pseudo branch with no classes - propagate as signal
       if (
         candidate.branchLabel === 'dynamic' &&
         candidate.classes.length === 0
