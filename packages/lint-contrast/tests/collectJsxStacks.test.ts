@@ -580,6 +580,127 @@ describe('C12: accumulator explosion guard in extractCandidatesFromCnCall', () =
 });
 
 // ---------------------------------------------------------------------------
+// branchId 付与: ConditionalExpression / LogicalExpression で bg/text ペア結合
+// ---------------------------------------------------------------------------
+
+describe('branchId: ConditionalExpression assigns matching branchId to bg and text', () => {
+  it('cn(cond ? "bg-black text-white" : "bg-white text-black") produces 2 bg + 2 text candidates with paired branchIds', () => {
+    // 分岐1 (consequent): bg-black + text-white → 同じ branchId 'cn:0:c'
+    // 分岐2 (alternate):  bg-white + text-black → 同じ branchId 'cn:0:a'
+    // classify でこのペアのみ評価することで偽陽性 (bg-black + text-black 等) を防ぐ
+    const source = `
+      declare const cond: boolean;
+      export function Foo() {
+        return (
+          <div className={cn(cond ? 'bg-black text-white' : 'bg-white text-black')}>
+            Hello
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const divStack = stacks.find((s) => s.elementName === 'div');
+    expect(divStack).toBeDefined();
+
+    // bgStack: 2 候補 (consequent, alternate)
+    expect(divStack!.bgStack).toHaveLength(2);
+    const bgConsequent = divStack!.bgStack.find((c) =>
+      c.classes.includes('bg-black'),
+    );
+    const bgAlternate = divStack!.bgStack.find((c) =>
+      c.classes.includes('bg-white'),
+    );
+    expect(bgConsequent).toBeDefined();
+    expect(bgAlternate).toBeDefined();
+    // consequent と alternate で異なる branchId が付与されている
+    expect(bgConsequent!.branchId).toBeDefined();
+    expect(bgAlternate!.branchId).toBeDefined();
+    expect(bgConsequent!.branchId).not.toBe(bgAlternate!.branchId);
+
+    // textCandidates: 2 候補 (consequent, alternate)
+    expect(divStack!.textCandidates).toHaveLength(2);
+    const textConsequent = divStack!.textCandidates.find((c) =>
+      c.classes.includes('text-white'),
+    );
+    const textAlternate = divStack!.textCandidates.find((c) =>
+      c.classes.includes('text-black'),
+    );
+    expect(textConsequent).toBeDefined();
+    expect(textAlternate).toBeDefined();
+
+    // bg と text の branchId が対応している (consequent 同士、alternate 同士)
+    expect(bgConsequent!.branchId).toBe(textConsequent!.branchId);
+    expect(bgAlternate!.branchId).toBe(textAlternate!.branchId);
+  });
+
+  it('cn("bg-base", cond ? "bg-a text-a" : "bg-b text-b") — bg-base is merged into each branch with branch branchId', () => {
+    // 無条件引数 'bg-base' は全パスで適用されるが、
+    // ConditionalExpression 展開後は各分岐の accumulator に組み込まれて branchId を持つ。
+    // 最終的に bgStack に 2 候補 (consequent + alternate) が生成され、
+    // 各候補に bg-background が含まれている。
+    const source = `
+      declare const cond: boolean;
+      export function Foo() {
+        return (
+          <div className={cn('bg-background', cond ? 'bg-card text-card-foreground' : 'bg-muted text-muted-foreground')}>
+            Hello
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const divStack = stacks.find((s) => s.elementName === 'div');
+    expect(divStack).toBeDefined();
+
+    // bgStack: 2 候補 (consequent と alternate の各パスに bg-background が含まれる)
+    expect(divStack!.bgStack).toHaveLength(2);
+
+    // 両候補に bg-background が含まれている (各分岐で無条件部分が適用される)
+    for (const bgCandidate of divStack!.bgStack) {
+      expect(bgCandidate.classes).toContain('bg-background');
+    }
+
+    // bg 候補は異なる branchId を持つ (consequent と alternate)
+    const bgBranchIds = divStack!.bgStack.map((c) => c.branchId);
+    expect(bgBranchIds[0]).not.toBe(bgBranchIds[1]);
+    expect(bgBranchIds[0]).toBeDefined();
+    expect(bgBranchIds[1]).toBeDefined();
+
+    // textCandidates の条件分岐候補も branchId が付与されている
+    const textConditional = divStack!.textCandidates.filter(
+      (c) => c.branchId !== undefined,
+    );
+    expect(textConditional.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('cn(dynamicVar || "text-foreground") — rhs branchId attached to literal candidate', () => {
+    // || 演算子の右辺リテラル候補には activeBranchId ('cn:0:rhs') が付与される。
+    // 「右辺なし」パス (左辺が truthy) は branchId=undefined のまま。
+    const source = `
+      declare const dynamicVar: string;
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className={cn(dynamicVar || 'text-foreground')}>hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+
+    // リテラル候補 (右辺適用パス) に branchId が付与されている
+    const literalCandidate = pStack!.textCandidates.find((c) =>
+      c.classes.includes('text-foreground'),
+    );
+    expect(literalCandidate).toBeDefined();
+    // 右辺 rhs パスは branchId='cn:0:rhs'
+    expect(literalCandidate!.branchId).toBe('cn:0:rhs');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // C16 修正 (PR #806 CodeRabbit): OR 条件 split
 // ---------------------------------------------------------------------------
 

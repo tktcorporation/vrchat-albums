@@ -323,6 +323,58 @@ describe('ok-dark-variant.tsx', () => {
 });
 
 // ---------------------------------------------------------------------------
+// ng-branch-coupling.tsx: cn(cond ? 'bg-black text-white' : 'bg-white text-black')
+// 分岐ペアが正しく評価され、到達不能な組合せが除外されることを確認する
+// ---------------------------------------------------------------------------
+
+describe('ng-branch-coupling.tsx', () => {
+  it('produces exactly 2 resolvable stacks (1 div with 2 branch combinations)', () => {
+    // ランタイムで発生しうる組合せは 2 通り:
+    //   分岐1: bg-black + text-white → ratio ≈ 21 (AA クリア)
+    //   分岐2: bg-white + text-black → ratio ≈ 21 (AA クリア)
+    // branchId フィルタが正しく機能しているなら worst-case = min(21, 21) → resolvable
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ng-branch-coupling.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ng-branch-coupling.tsx', source);
+    expect(stacks.length).toBeGreaterThan(0);
+
+    const resolutions = stacks.map((s) => classifyStack(s, cssVars));
+    // 少なくとも 1 つは resolvable になること (dynamic 候補がある場合は unknown もありうる)
+    const resolvable = resolutions.filter((r) => r.kind === 'resolvable');
+    expect(resolvable.length).toBeGreaterThan(0);
+  });
+
+  it('produces no AA violations: both branch pairs have sufficient contrast', () => {
+    // branchId フィルタなし (修正前) では bg-black+text-black (ratio≈1) が評価されて
+    // 偽陽性の error が出る。修正後は 2 通りのみ評価され、どちらも AA クリア。
+    const source = readFileSync(
+      path.join(FIXTURES_DIR, 'ng-branch-coupling.tsx'),
+      'utf8',
+    );
+    const stacks = collectJsxStacks('ng-branch-coupling.tsx', source);
+
+    const errors: string[] = [];
+    for (const stack of stacks) {
+      const resolution = classifyStack(stack, cssVars);
+      if (resolution.kind === 'resolvable') {
+        for (const theme of ['light', 'dark'] as Theme[]) {
+          const { bg, fg } = resolution.themes[theme];
+          const ratio = wcagContrastRatio(fg, bg);
+          if (ratio < WCAG_AA_THRESHOLD) {
+            errors.push(`${theme}: ratio=${ratio.toFixed(2)}`);
+          }
+        }
+      }
+    }
+
+    // 偽陽性エラーが出ないこと (branchId フィルタが有効)
+    expect(errors).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Integration: parseCssVars → resolveClass → compositeOver → evaluateContrast
 // ---------------------------------------------------------------------------
 

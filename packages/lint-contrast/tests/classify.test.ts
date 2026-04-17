@@ -619,3 +619,111 @@ describe('unresolvable applicable class → unknown (soundness)', () => {
     expect(result.kind).toBe('unknown');
   });
 });
+
+// ---------------------------------------------------------------------------
+// branchId 互換性フィルタ: cn(cond ? 'bg-black text-white' : 'bg-white text-black')
+// ---------------------------------------------------------------------------
+
+describe('branchId filtering in enumerateCombinations', () => {
+  // areBranchIdsCompatible の動作確認 (enumerateCombinations 経由で間接テスト)
+
+  it('same branchId on bg and text → compatible → resolvable (both branches AA)', () => {
+    // cn(cond ? 'bg-black text-white' : 'bg-white text-black')
+    // bg: [{ classes: ['bg-black'], branchId: 'cn:0:c' }, { classes: ['bg-white'], branchId: 'cn:0:a' }]
+    // text: [{ classes: ['text-white'], branchId: 'cn:0:c' }, { classes: ['text-black'], branchId: 'cn:0:a' }]
+    // 互換組合せ: (bg-black, text-white), (bg-white, text-black) のみ → 両方 AA → resolvable
+    const stack = makeStack(
+      [
+        { classes: ['bg-black'], branchId: 'cn:0:c' },
+        { classes: ['bg-white'], branchId: 'cn:0:a' },
+      ],
+      [
+        { classes: ['text-white'], branchId: 'cn:0:c' },
+        { classes: ['text-black'], branchId: 'cn:0:a' },
+      ],
+    );
+    const result = classifyStack(stack, cssVars);
+    // 両分岐が AA クリア (black on white ≈ 21, white on black ≈ 21)
+    // branchId フィルタなし (旧実装) では bg-black+text-black (ratio≈1) で error になる
+    expect(result.kind).toBe('resolvable');
+  });
+
+  it('different branchId → incompatible combination excluded (4→2 combinations)', () => {
+    // branchId が異なる組合せ (bg-black×text-black, bg-white×text-white) は除外される。
+    // 除外されなければ ratio≈1 で unresolved や low-contrast になるが、
+    // 正しく除外されれば 2 通りのみ評価され resolvable (AA クリア) になる。
+    const stack = makeStack(
+      [
+        { classes: ['bg-black'], branchId: 'cn:0:c' },
+        { classes: ['bg-white'], branchId: 'cn:0:a' },
+      ],
+      [
+        { classes: ['text-white'], branchId: 'cn:0:c' },
+        { classes: ['text-black'], branchId: 'cn:0:a' },
+      ],
+    );
+    const result = classifyStack(stack, cssVars);
+    // bg-black+text-black / bg-white+text-white は除外されるため、
+    // worst-case は black on white (ratio≈21) → AA クリア → resolvable
+    expect(result.kind).toBe('resolvable');
+    if (result.kind === 'resolvable') {
+      // light: bg-black + text-white or bg-white + text-black → ratio≈21
+      const lightBg = result.themes.light.bg;
+      const lightFg = result.themes.light.fg;
+      // bg-black (r≈0) + text-white (r≈1) の場合: ratio=21 (非常に高いコントラスト)
+      // bg-white (r≈1) + text-black (r≈0) の場合: ratio=21 (同様)
+      // worst-case はどちらでも ratio>21 になる → bg か fg が極端な値
+      const isBlackOrWhite = (v: number) => v < 0.1 || v > 0.9;
+      expect(isBlackOrWhite(lightBg.r)).toBe(true);
+      expect(isBlackOrWhite(lightFg.r)).toBe(true);
+    }
+  });
+
+  it('branchId=undefined (unconditional) is compatible with all branchIds', () => {
+    // 無条件の bg 候補 (branchId=undefined) は全ての text 候補と互換
+    // cn('bg-background', cond ? 'text-foreground' : 'text-muted-foreground')
+    // bg: { classes: ['bg-background'], branchId: undefined } (無条件)
+    // text: [{ classes: ['text-foreground'], branchId: 'cn:1:c' },
+    //        { classes: ['text-muted-foreground'], branchId: 'cn:1:a' }]
+    // 両方の text 候補と bg が組合せ対象になる (無条件 bg は全分岐で適用)
+    const stack = makeStack(
+      [{ classes: ['bg-background'] }], // branchId=undefined
+      [
+        { classes: ['text-foreground'], branchId: 'cn:1:c' },
+        { classes: ['text-muted-foreground'], branchId: 'cn:1:a' },
+      ],
+    );
+    const result = classifyStack(stack, cssVars);
+    // bg-background は両 text 候補と互換 → 2 通りが評価される → resolvable
+    expect(result.kind).toBe('resolvable');
+  });
+
+  it('mixed: parent bg (branchId=undefined) + current bg (branchId set) filtered correctly', () => {
+    // 親要素 bg-background (branchId=undefined) + 現要素 cn(cond ? 'bg-card' : 'bg-muted')
+    // bgStack: [
+    //   { classes: ['bg-background'], branchId: undefined }, ← 親 (常に互換)
+    //   { classes: ['bg-card'],       branchId: 'cn:0:c' },
+    //   { classes: ['bg-muted'],      branchId: 'cn:0:a' },
+    // ]
+    // textCandidates: [
+    //   { classes: ['text-foreground'], branchId: 'cn:0:c' },
+    //   { classes: ['text-muted-foreground'], branchId: 'cn:0:a' },
+    // ]
+    // text 'cn:0:c' と互換な bg: undefined(親) + 'cn:0:c'(bg-card) → bgStack=[bg-background, bg-card]
+    // text 'cn:0:a' と互換な bg: undefined(親) + 'cn:0:a'(bg-muted) → bgStack=[bg-background, bg-muted]
+    const stack = makeStack(
+      [
+        { classes: ['bg-background'], branchId: undefined },
+        { classes: ['bg-card'], branchId: 'cn:0:c' },
+        { classes: ['bg-muted'], branchId: 'cn:0:a' },
+      ],
+      [
+        { classes: ['text-foreground'], branchId: 'cn:0:c' },
+        { classes: ['text-muted-foreground'], branchId: 'cn:0:a' },
+      ],
+    );
+    const result = classifyStack(stack, cssVars);
+    // 全組合せが resolvable なクラスで構成される → resolvable
+    expect(result.kind).toBe('resolvable');
+  });
+});
