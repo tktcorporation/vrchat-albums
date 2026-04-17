@@ -40,13 +40,15 @@ lint-contrast --project . --warn-as-error
 
 ```
 Options:
-  --project <path>     対象プロジェクトのルート (default: cwd)
-  --glob <pattern>     走査対象 glob (default: "src/**/*.tsx")
-  --css <path>         CSS 変数定義ファイル (default: "src/index.css")
-  --threshold <n>      AA 閾値 (default: 4.5)
-  --format <fmt>       出力形式: text|json (default: text)
-  --warn-as-error      unknown を error に昇格
-  --help               ヘルプ表示
+  --project <path>           対象プロジェクトのルート (default: cwd)
+  --glob <pattern>           走査対象 glob (default: "src/**/*.tsx")
+  --css <path>               CSS 変数定義ファイル (default: "src/index.css")
+  --threshold <n>            AA 閾値 (default: 4.5)
+  --format <fmt>             出力形式: text|json (default: text)
+  --warn-as-error            unknown を error に昇格
+  --ignore <pattern>         除外パターンを追加 (複数指定可能)。デフォルト除外: "**/node_modules/**", "**/*.test.tsx", "**/*.spec.tsx"
+  --max-combinations <n>     worst case 算出時の組合せ数上限。これを超えると unknown 扱い (default: 32)
+  --help                     ヘルプ表示
 ```
 
 ### 終了コード
