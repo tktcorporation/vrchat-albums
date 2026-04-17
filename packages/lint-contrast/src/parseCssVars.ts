@@ -121,6 +121,17 @@ export function parseCssVars(
   const darkOverrides: Record<string, Rgba> = {};
 
   root.walkRules((rule) => {
+    // @media / @supports 内のルールは条件付き定義であり、
+    // light/dark マップに無条件で混入させると誤ったコントラスト評価になる。
+    // @layer や @root などの構造的 at-rule は通す (条件分岐ではないため)。
+    // 将来 darkMode: 'media' を使う場合は別途設計が必要。
+    if (rule.parent?.type === 'atrule') {
+      const parentAtRule = rule.parent as postcss.AtRule;
+      if (parentAtRule.name === 'media' || parentAtRule.name === 'supports') {
+        return; // skip: 条件付き at-rule 内のルールは処理しない
+      }
+    }
+
     // :root selector maps to light theme
     if (rule.selector.trim() === ':root') {
       extractVarsFromRule(rule, light);

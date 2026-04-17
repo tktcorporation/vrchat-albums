@@ -105,9 +105,10 @@ function countCombinations(
   // 実際の組合せ数は textCandidates の数だけ。bgStack は全要素を使って合成するので
   // 「bgStack のどれか1つを選ぶ」というバリアントは存在しない。
   // bgStack.length を因子に含めると組合せ数を過大計上し、combinatorial-explosion 誤検知が起きる。
-  if (bgStack.length === 0) {
-    return 0;
-  }
+  //
+  // bgStack が空の場合 (親 bg 指定なし) でも textCandidates は全て評価対象になるため
+  // 0 ではなく textCandidates.length を返す。0 を返すと combinatorial-explosion guard が
+  // bypass されてしまう (count > combinationLimit が常に false になる)。
   return textCandidates.length;
 }
 
@@ -198,7 +199,7 @@ function resolveForTheme(
  * 3. 全候補が classes: [] (完全動的) → unknown('dynamic-classname')
  * 4. bgStack に dynamic branchLabel → unknown('dynamic-bg-branch')
  * 5. textCandidates に dynamic branchLabel → unknown('dynamic-text-branch')
- * 6. 全候補静的 かつ 組合せ ≤ 32 → resolvable (worst-case ペア)
+ * 6. 全候補静的 かつ 組合せ ≤ 32 → resolvable (worst-case ペア)、色解決失敗なら unknown('unresolved-class')
  * 7. 組合せ > 32 → unknown('combinatorial-explosion')
  *
  * @param stack - collectJsxStacks が生成した JsxStack
@@ -294,7 +295,9 @@ export function classifyStack(
             );
             if (resolved === null) {
               // Any unresolvable combination → unknown
-              return { kind: 'unknown' as const, reason: 'dynamic-classname' };
+              // 'unresolved-class' を使用して Rule 3 の 'dynamic-classname' と区別する。
+              // Rule 3: 全候補が classes:[] (完全動的) / ここ: 静的クラスだが色解決に失敗した
+              return { kind: 'unknown' as const, reason: 'unresolved-class' };
             }
             if (worstRatio === null || resolved.ratio < worstRatio) {
               worstRatio = resolved.ratio;
@@ -309,7 +312,7 @@ export function classifyStack(
 
         // Ensure both themes resolved (if not, return unknown)
         if (!worstByTheme.light || !worstByTheme.dark) {
-          return { kind: 'unknown' as const, reason: 'dynamic-classname' };
+          return { kind: 'unknown' as const, reason: 'unresolved-class' };
         }
 
         return {

@@ -129,8 +129,12 @@ export function resolveClass(
         const opacityStr = afterBracket.slice(1);
         const opacityNum = parseFloat(opacityStr);
         if (!Number.isNaN(opacityNum)) {
-          // Tailwind uses 0-100 for percentage or 0-1 for decimal.
-          opacityOverride = opacityNum > 1 ? opacityNum / 100 : opacityNum;
+          // Tailwind opacity: 小数点を含む場合 (e.g. "/0.5") は decimal として使用し、
+          // 整数表記 (e.g. "/1", "/50", "/100") は percentage として /100 する。
+          // "/1" は 1% = 0.01 (ほぼ透明) であり、1.0 (不透明) ではない。
+          opacityOverride = opacityStr.includes('.')
+            ? opacityNum
+            : opacityNum / 100;
         }
       }
       rgba = parseArbitraryValue(innerValue);
@@ -144,9 +148,12 @@ export function resolveClass(
       remaining = remaining.slice(0, slashIdx);
       const opacityNum = parseFloat(opacityStr);
       if (!Number.isNaN(opacityNum)) {
-        // Tailwind uses 0-100 for percentage or 0-1 for decimal.
-        // "bg-white/80" → 80/100 = 0.8; "bg-white/0.5" → 0.5 (直接使用)
-        opacityOverride = opacityNum > 1 ? opacityNum / 100 : opacityNum;
+        // Tailwind opacity: 小数点を含む場合 (e.g. "/0.5") は decimal として使用し、
+        // 整数表記 (e.g. "/1", "/80", "/100") は percentage として /100 する。
+        // "/1" は 1% = 0.01 (ほぼ透明) であり、1.0 (不透明) ではない。
+        opacityOverride = opacityStr.includes('.')
+          ? opacityNum
+          : opacityNum / 100;
       }
     }
   }
