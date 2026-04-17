@@ -103,8 +103,13 @@ Options:
     } else if (arg === '--css' && args[i + 1]) {
       opts.css = args[++i];
     } else if (arg === '--threshold' && args[i + 1]) {
-      const n = parseFloat(args[++i]);
-      if (!Number.isNaN(n)) {
+      const rawThreshold = args[++i];
+      const n = parseFloat(rawThreshold);
+      if (Number.isNaN(n)) {
+        // 無効な数値は黙ってデフォルト維持するのではなく警告を出す。
+        // JSON モードでは scoped logger が抑制するため stdout を汚染しない。
+        consola.warn(`Ignoring invalid value for --threshold: ${rawThreshold}`);
+      } else {
         opts.threshold = n;
       }
     } else if (arg === '--format' && args[i + 1]) {
@@ -243,13 +248,14 @@ export async function runCli(argv: string[]): Promise<number> {
 
   // JSON モードでは stdout を pure JSON に保つため、
   // consola の status ログ (start / info / success / warn) を無効化する。
+  // グローバルな consola.level を変更すると他のモジュールに副作用が生じるため、
+  // scoped logger (consola.create) を使用してグローバル状態を汚染しない。
   // 下流ツール (jq 等) が consola のステータス行で JSON パース失敗するのを防ぐ。
-  if (opts.format === 'json') {
-    consola.level = -999;
-  }
+  const logger =
+    opts.format === 'json' ? consola.create({ level: -999 }) : consola;
 
   const projectRoot = path.resolve(opts.project);
-  consola.start(`Running lint-contrast on ${projectRoot}...`);
+  logger.start(`Running lint-contrast on ${projectRoot}...`);
 
   // 1. Load CSS variables
   const cssPath = path.join(projectRoot, opts.css);
@@ -259,7 +265,7 @@ export async function runCli(argv: string[]): Promise<number> {
   // alpha < 1 の場合は警告を出し不透明実効色に変換する (I5 対応)。
   // cssVars を直接変異させる (clone 不要: parseCssVars は呼び出しごとに新オブジェクト)。
   const alphaWarnCallback = (t: (typeof themes)[number], a: number): void => {
-    consola.warn(
+    logger.warn(
       `[contrast] --background in ${t} has alpha=${a.toFixed(3)} < 1. ` +
         `Using composited value over ${t === 'light' ? 'white' : 'black'} as effective base.`,
     );
@@ -280,7 +286,7 @@ export async function runCli(argv: string[]): Promise<number> {
     ignore: opts.ignore,
   });
 
-  consola.info(`Found ${files.length} TSX files to check`);
+  logger.info(`Found ${files.length} TSX files to check`);
 
   const allIssues: ContrastIssue[] = [];
 
@@ -306,12 +312,12 @@ export async function runCli(argv: string[]): Promise<number> {
     if (opts.format === 'json') {
       reportJson(allIssues, projectRoot);
     } else {
-      consola.success('No contrast issues found.');
+      logger.success('No contrast issues found.');
     }
     return 0;
   }
 
-  consola.info(
+  logger.info(
     `Found ${errors.length} error(s) and ${warnings.length} warning(s):`,
   );
 
