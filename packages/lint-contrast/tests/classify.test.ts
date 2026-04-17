@@ -466,3 +466,59 @@ describe('element-vs-ancestor bg cascade (Issue 2 validation)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// 指摘 1 修正 (PR #806 Codex): variant-pseudo textCandidates → unknown
+// ---------------------------------------------------------------------------
+
+describe('variant-pseudo branchLabel → unknown (Rule 5)', () => {
+  it('variant-pseudo in textCandidates falls through to unknown(dynamic-text-branch)', () => {
+    // sm:text-foreground のみ持つ textCandidates は variant-pseudo → Rule 5 で unknown
+    // classify 側は branchLabel === 'variant-pseudo' を dynamic と同等に扱う
+    const stack = makeStack(
+      [staticBg('bg-background')],
+      [{ classes: [], branchLabel: 'variant-pseudo' }],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('unknown');
+    if (result.kind === 'unknown') {
+      expect(result.reason).toBe('dynamic-text-branch');
+    }
+  });
+
+  it('variant-pseudo in bgStack falls through to unknown(dynamic-bg-branch)', () => {
+    // hover:bg-card → variant-pseudo bgStack → Rule 4 で unknown
+    const stack = makeStack(
+      [{ classes: [], branchLabel: 'variant-pseudo' }],
+      [staticText('text-foreground')],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('unknown');
+    if (result.kind === 'unknown') {
+      expect(result.reason).toBe('dynamic-bg-branch');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 指摘 2 修正 (PR #806 Codex): dynamicVar || 'literal' → unknown
+// ---------------------------------------------------------------------------
+
+describe('LogicalExpression dynamic left-side → unknown (Rule 5)', () => {
+  it('cn(dynamicVar || "text-foreground") → unknown(dynamic-text-branch)', () => {
+    // dynamicVar が truthy のとき dynamicVar 自身が使われる可能性がある
+    // → dynamic 候補が textCandidates に存在 → Rule 5 で unknown
+    const stack = makeStack(
+      [staticBg('bg-background')],
+      [
+        { classes: ['text-foreground'], branchLabel: 'conditional(||)' },
+        { classes: [], branchLabel: 'dynamic' },
+      ],
+    );
+    const result = classifyStack(stack, cssVars);
+    expect(result.kind).toBe('unknown');
+    if (result.kind === 'unknown') {
+      expect(result.reason).toBe('dynamic-text-branch');
+    }
+  });
+});

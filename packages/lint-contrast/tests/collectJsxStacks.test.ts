@@ -262,6 +262,140 @@ describe('collectJsxStacks', () => {
     expect(withoutConditional).toBe(true);
   });
 
+  // ---------------------------------------------------------------------------
+  // 指摘 1 (PR #806): 非 dark: バリアント付きクラスが variant-pseudo として記録される
+  // ---------------------------------------------------------------------------
+
+  it('sm:text-foreground produces variant-pseudo textCandidate', () => {
+    // sm:text-foreground はレスポンシブバリアント付き → 静的解析不能
+    // → branchLabel: 'variant-pseudo' の候補が textCandidates に記録される
+    // → classify Rule 5 が発火して unknown に落ちる (偽陰性を防ぐ)
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className="sm:text-foreground">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    const hasVariantPseudo = pStack!.textCandidates.some(
+      (c) => c.branchLabel === 'variant-pseudo',
+    );
+    expect(hasVariantPseudo).toBe(true);
+  });
+
+  it('hover:bg-card produces variant-pseudo bgCandidate', () => {
+    // hover:bg-card は疑似クラスバリアント付き → 静的解析不能
+    // → branchLabel: 'variant-pseudo' の候補が bgCandidates (bgStack) に記録される
+    const source = `
+      export function Foo() {
+        return (
+          <div className="hover:bg-card">
+            <p className="text-foreground">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    const hasVariantPseudo = pStack!.bgStack.some(
+      (c) => c.branchLabel === 'variant-pseudo',
+    );
+    expect(hasVariantPseudo).toBe(true);
+  });
+
+  it('md:text-foreground dark:md:text-accent — md: is variant-pseudo, dark:md: is also variant-pseudo', () => {
+    // md:text-foreground → hasNonDarkVariant → variant-pseudo
+    // dark:md:text-accent → 複合バリアント (dark + md) → md が non-dark → variant-pseudo
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className="md:text-foreground dark:md:text-accent">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // 両方とも variant-pseudo として記録されるので候補が存在する
+    const variantPseudoCandidates = pStack!.textCandidates.filter(
+      (c) => c.branchLabel === 'variant-pseudo',
+    );
+    expect(variantPseudoCandidates.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // 指摘 2 (PR #806): LogicalExpression の動的左辺が dynamic 候補として記録される
+  // ---------------------------------------------------------------------------
+
+  it('cn(dynamicVar || "text-foreground") produces literal + dynamic candidates', () => {
+    // dynamicVar が truthy なとき dynamicVar 自身の値が使われる (ランタイム依存)
+    // → リテラル側 ({classes:['text-foreground']}) + dynamic 側 ({classes:[], branchLabel:'dynamic'})
+    // → classify Rule 5 で unknown に落ちる (偽陰性を防ぐ)
+    const source = `
+      declare const dynamicVar: string;
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className={cn(dynamicVar || 'text-foreground')}>hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // リテラル側が候補として存在する
+    const hasLiteralCandidate = pStack!.textCandidates.some((c) =>
+      c.classes.includes('text-foreground'),
+    );
+    expect(hasLiteralCandidate).toBe(true);
+    // 動的側が候補として存在する (dynamicVar が truthy で勝つケース)
+    const hasDynamicCandidate = pStack!.textCandidates.some(
+      (c) => c.branchLabel === 'dynamic',
+    );
+    expect(hasDynamicCandidate).toBe(true);
+    // 合計 2 候補以上
+    expect(pStack!.textCandidates.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('cn(dynamicVar && "text-foreground") has literal text candidate (no extra dynamic)', () => {
+    // cond && 'class' パターン: cond は boolean 条件として使われる
+    // → リテラル候補が textCandidates に記録される
+    // && の左辺はクラス文字列ではなく boolean 条件として扱うので dynamic は追加しない
+    // (|| / ?? と異なり && の左辺値はクラスとして使われない)
+    const source = `
+      declare const dynamicVar: boolean;
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className={cn(dynamicVar && 'text-foreground')}>hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // リテラル側が候補として存在する
+    const hasLiteralCandidate = pStack!.textCandidates.some((c) =>
+      c.classes.includes('text-foreground'),
+    );
+    expect(hasLiteralCandidate).toBe(true);
+    // && 演算子の左辺は boolean 条件なので dynamic 候補は追加されない
+    const hasDynamicCandidate = pStack!.textCandidates.some(
+      (c) => c.branchLabel === 'dynamic',
+    );
+    expect(hasDynamicCandidate).toBe(false);
+  });
+
   it('single element with cn(bg-black/50, bg-white/50) produces one bgStack entry', () => {
     // 同一要素内の複数 bg クラスは単一 ClassCandidate に連結される。
     // CSS cascade 的には bg-white/50 が後勝ち (同一要素なので compositeOver しない)。
