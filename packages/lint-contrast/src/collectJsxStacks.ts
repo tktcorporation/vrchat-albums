@@ -135,8 +135,8 @@ const NON_COLOR_BG_SUFFIXES = new Set([
 ]);
 
 /**
- * Tailwind バリアントプレフィックス (`dark:`, `sm:`, `hover:`, `aria-[...]:` 等) を
- * 全て剥がし、残りの実クラスとバリアント情報を返す。
+ * Tailwind バリアントプレフィックス (`dark:`, `sm:`, `hover:`, `aria-[...]:`,
+ * `[&>*]:`, `[@media(...)]:` 等) を全て剥がし、残りの実クラスとバリアント情報を返す。
  *
  * 戻り値:
  * - `base`: プレフィックスを除いた実クラス (例: "text-foreground")
@@ -145,33 +145,60 @@ const NON_COLOR_BG_SUFFIXES = new Set([
  *   (例: `sm:`, `hover:`, `focus:`, `md:dark:` の `md:` 部分)
  *
  * Tailwind のバリアントプレフィックスはコロン区切りで複数連続できる
- * (例: `dark:md:text-foreground`, `group-hover:text-card`)。
- * `/^([a-zA-Z][a-zA-Z0-9_-]*(\[[^\]]*\])?:)+/` でバリアント部分全体をマッチして剥がす。
+ * (例: `dark:md:text-foreground`, `[&>*]:dark:text-accent`, `sm:[&>*]:text-foreground`)。
+ *
+ * 旧実装はアルファベット始まりのバリアントのみ対応していた。
+ * 新実装: ループで 1 バリアントずつ消費し、ブラケット始まり `[...]:` も認識する。
+ * - アルファベット始まり: `[a-zA-Z][\w-]*(?:\[[^\]]*\])?:`
+ * - ブラケット始まり: `\[[^\]]+\]:`
  */
+// 単一バリアントにマッチする正規表現 (チェイン対応のためループで使用)
+// アルファベット始まり (例: "dark:", "sm:", "hover:", "aria-[label]:")
+const ALPHA_VARIANT_RE = /^[a-zA-Z][\w-]*(?:\[[^\]]*\])?:/;
+// ブラケット始まり任意バリアント (例: "[&>*]:", "[@media(prefers-contrast:high)]:")
+const BRACKET_VARIANT_RE = /^\[[^\]]+\]:/;
+
 function stripVariantPrefixes(cls: string): {
   base: string;
   hasDarkVariant: boolean;
   hasNonDarkVariant: boolean;
 } {
-  // バリアントプレフィックスの正規表現: コロン終端の識別子 (任意個)
-  // aria-[label]:, data-[state=open]: のような arbitrary variant にも対応
-  const variantPrefixRe = /^([a-zA-Z][a-zA-Z0-9_-]*(\[[^\]]*\])?:)+/;
+  let remaining = cls;
+  let hasDarkVariant = false;
+  let hasNonDarkVariant = false;
 
-  const matched = variantPrefixRe.exec(cls);
-  if (matched === null) {
-    return { base: cls, hasDarkVariant: false, hasNonDarkVariant: false };
+  // 1 バリアントずつ消費するループ。アルファベット始まりとブラケット始まりの両方を認識する。
+  // チェイン例: "sm:[&>*]:text-foreground" → "sm:" → "[&>*]:" → "text-foreground"
+  while (remaining.length > 0) {
+    const alphaMatch = ALPHA_VARIANT_RE.exec(remaining);
+
+    if (alphaMatch) {
+      // アルファベット始まりバリアント: dark: の有無を判定
+      const variantToken = alphaMatch[0].slice(0, -1); // trailing ':' を除去
+      // "dark" 部分のみ抽出 (例: "aria-[label]" → "aria-[label]", "dark" → "dark")
+      const variantName = variantToken.replace(/\[[^\]]*\]$/, '');
+      if (variantName === 'dark') {
+        hasDarkVariant = true;
+      } else {
+        hasNonDarkVariant = true;
+      }
+      remaining = remaining.slice(alphaMatch[0].length);
+      continue;
+    }
+
+    const bracketMatch = BRACKET_VARIANT_RE.exec(remaining);
+    if (bracketMatch) {
+      // ブラケット始まり任意バリアント: dark: ではないので hasNonDarkVariant
+      hasNonDarkVariant = true;
+      remaining = remaining.slice(bracketMatch[0].length);
+      continue;
+    }
+
+    // バリアントではない → 実クラス部分 (例: "text-foreground")
+    break;
   }
 
-  const prefixStr = matched[0]; // e.g. "dark:" / "sm:" / "hover:dark:" / "dark:md:"
-  const base = cls.slice(prefixStr.length);
-
-  // コロン区切りで各バリアントを分解して dark: の有無を判定
-  // "hover:dark:" → ["hover", "dark"]
-  const variants = prefixStr.slice(0, -1).split(':');
-  const hasDarkVariant = variants.includes('dark');
-  const hasNonDarkVariant = variants.some((v) => v !== 'dark');
-
-  return { base, hasDarkVariant, hasNonDarkVariant };
+  return { base: remaining, hasDarkVariant, hasNonDarkVariant };
 }
 
 /**

@@ -421,3 +421,99 @@ describe('collectJsxStacks', () => {
     expect(pStack!.bgStack[0].classes).toContain('bg-white/50');
   });
 });
+
+// ---------------------------------------------------------------------------
+// PR #806 Codex 追加指摘 2: ブラケット始まり任意バリアント [&>*]: の認識
+// ---------------------------------------------------------------------------
+
+describe('bracket arbitrary variant prefix stripping', () => {
+  // [&>*]:text-foreground のような Tailwind arbitrary variant はブラケット始まり。
+  // 旧実装の regex はアルファベット始まりのみ対応していたため、これらは
+  // isColorClass 判定に "[&>*]:text-foreground" がそのまま渡り false → drop → 偽陰性。
+  // 新実装: ループで [...]： も認識し、base = "text-foreground" として color class 判定する。
+  // ブラケット任意バリアントは dark: でないので hasNonDarkVariant = true → variant-pseudo 候補。
+
+  it('[&>*]:text-foreground produces variant-pseudo textCandidate', () => {
+    // ブラケット始まり任意バリアント: [&>*]: を剥がして text-foreground が isColorClass
+    // → hasNonDarkVariant = true → variant-pseudo branchLabel が付与される
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className="[&>*]:text-foreground">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    const hasVariantPseudo = pStack!.textCandidates.some(
+      (c) => c.branchLabel === 'variant-pseudo',
+    );
+    expect(hasVariantPseudo).toBe(true);
+  });
+
+  it('[@media(prefers-contrast:high)]:bg-card produces variant-pseudo bgCandidate', () => {
+    // @media 任意バリアント: [@media(prefers-contrast:high)]: を剥がして bg-card が isColorClass
+    // → hasNonDarkVariant = true → variant-pseudo
+    const source = `
+      export function Foo() {
+        return (
+          <div className="[@media(prefers-contrast:high)]:bg-card">
+            <p className="text-foreground">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    const hasVariantPseudo = pStack!.bgStack.some(
+      (c) => c.branchLabel === 'variant-pseudo',
+    );
+    expect(hasVariantPseudo).toBe(true);
+  });
+
+  it('sm:[&>*]:text-foreground (alpha chain) strips all prefixes and produces variant-pseudo', () => {
+    // チェイン: "sm:" (alpha) + "[&>*]:" (bracket) → base = "text-foreground"
+    // hasNonDarkVariant = true → variant-pseudo
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className="sm:[&>*]:text-foreground">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    const hasVariantPseudo = pStack!.textCandidates.some(
+      (c) => c.branchLabel === 'variant-pseudo',
+    );
+    expect(hasVariantPseudo).toBe(true);
+  });
+
+  it('[&>*]:dark:text-accent (bracket + dark chain) produces variant-pseudo (hasNonDarkVariant wins)', () => {
+    // "[&>*]:" (bracket, non-dark) + "dark:" → hasNonDarkVariant = true → variant-pseudo
+    // (dark: が含まれていても non-dark バリアントが存在するため variant-pseudo 扱い)
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-background">
+            <p className="[&>*]:dark:text-accent">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    const hasVariantPseudo = pStack!.textCandidates.some(
+      (c) => c.branchLabel === 'variant-pseudo',
+    );
+    expect(hasVariantPseudo).toBe(true);
+  });
+});
