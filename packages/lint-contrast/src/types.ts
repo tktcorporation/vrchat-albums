@@ -29,6 +29,24 @@ export interface ClassCandidate {
   classes: string[];
   /** 分岐条件 (cn/clsx の短絡評価など) のサマリ。報告時の説明用 */
   branchLabel?: string;
+  /**
+   * 分岐識別子。同じ branchId を持つ bg/text 候補は「同じ runtime 分岐」に属する。
+   *
+   * classify の組合せ列挙で、異なる branchId 同士の bg × text 組合せは除外される。
+   * これにより cn(cond ? 'bg-black text-white' : 'bg-white text-black') のような
+   * 条件分岐で bg と text のペア結合が保たれ、到達不能な組合せ (偽陽性/偽陰性) を防ぐ。
+   *
+   * - undefined: 「無条件」。全ての branchId と互換 (常に適用される)
+   * - 文字列: 特定の分岐に属する候補。同じ branchId を持つ bg/text のみ組合せ対象
+   *
+   * 例: cn(cond ? 'bg-black text-white' : 'bg-white text-black')
+   *   bgCandidate { classes: ['bg-black'], branchId: 'cn:0:c' }  (consequent)
+   *   bgCandidate { classes: ['bg-white'], branchId: 'cn:0:a' }  (alternate)
+   *   textCandidate { classes: ['text-white'], branchId: 'cn:0:c' }
+   *   textCandidate { classes: ['text-black'], branchId: 'cn:0:a' }
+   *   → 有効組合せ: (bg-black, text-white), (bg-white, text-black) のみ
+   */
+  branchId?: string;
 }
 
 /**

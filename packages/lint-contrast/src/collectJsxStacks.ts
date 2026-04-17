@@ -380,14 +380,20 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
 
   // 候補アキュムレータの集合。各エントリが1つの実行時パスを表す。
   // branchLabel は最初の分岐発生時に付与される。
+  // branchId は ConditionalExpression / LogicalExpression 引数ごとに割り当てられる機械可読な識別子。
+  // 同じ branchId を持つ bg 候補と text 候補のみが classify で組合せ対象となる。
   let accumulators: {
     classes: string[];
     branchLabel: string | undefined;
-  }[] = [{ classes: [], branchLabel: undefined }];
+    branchId: string | undefined;
+  }[] = [{ classes: [], branchLabel: undefined, branchId: undefined }];
 
   // variant-pseudo クラス (sm:, hover: 等) のクラス文字列を収集する。
   // これらは別途 branchLabel:'variant-pseudo' の候補として末尾に追加する。
   const variantPseudoCollected: string[] = [];
+
+  // 引数インデックス (branchId の一部として使用)
+  let argIndex = 0;
 
   for (const arg of call.arguments) {
     // Static string literal argument: 全アキュムレータに追加 (分岐なし)
@@ -402,6 +408,7 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
         }
         variantPseudoCollected.push(...variantPseudoClasses);
       }
+      argIndex++;
       continue;
     }
 
@@ -422,6 +429,9 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
         operator: string;
       };
       const branchLabel = `conditional(${logical.operator})`;
+      // branchId: この LogicalExpression 引数に対して「右辺あり」パスを識別する。
+      // 「右辺なし」パスには undefined を維持 (右辺が適用されないパスは無条件扱い)。
+      const activeBranchId = `cn:${argIndex}:rhs`;
 
       if (logical.right.type === 'Literal') {
         const lit = logical.right as Literal;
@@ -430,11 +440,17 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
             extractColorClasses(lit.value);
           variantPseudoCollected.push(...variantPseudoClasses);
           // 「右辺適用」パス (既存アキュムレータを複製して addedClasses を追加)
+          // branchId を activeBranchId に設定して「右辺あり」パスを識別する。
           const withBranch = accumulators.map((acc) => ({
             classes: [...acc.classes, ...addedClasses],
             branchLabel: acc.branchLabel ?? branchLabel,
+            branchId:
+              acc.branchId === null || acc.branchId === undefined
+                ? activeBranchId
+                : `${acc.branchId}|${activeBranchId}`,
           }));
-          // 「右辺なし」パスにも branchLabel を付与して分岐の存在を示す
+          // 「右辺なし」パスにも branchLabel を付与して分岐の存在を示す。
+          // branchId は変えない (右辺が適用されないパスは無条件扱い = undefined のまま)。
           for (const acc of accumulators) {
             acc.branchLabel = acc.branchLabel ?? branchLabel;
           }
@@ -443,7 +459,10 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
           // アキュムレータ爆発ガード: 上限超過時は dynamic 単一候補に集約する。
           // これ以上の展開を続けると 2^N 個の候補が生まれる可能性がある。
           if (accumulators.length > MAX_ACCUMULATORS) {
-            accumulators = [{ classes: [], branchLabel: 'dynamic' }];
+            accumulators = [
+              { classes: [], branchLabel: 'dynamic', branchId: undefined },
+            ];
+            argIndex++;
             continue;
           }
 
@@ -456,7 +475,11 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
             (logical.operator === '||' || logical.operator === '??') &&
             logical.left.type !== 'Literal'
           ) {
-            accumulators.push({ classes: [], branchLabel: 'dynamic' });
+            accumulators.push({
+              classes: [],
+              branchLabel: 'dynamic',
+              branchId: undefined,
+            });
           }
         }
       } else {
@@ -465,6 +488,7 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
           acc.branchLabel = 'dynamic';
         }
       }
+      argIndex++;
       continue;
     }
 
@@ -472,15 +496,31 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
     // 健全性確保: 非リテラル分岐 (変数・式など) は silently drop せず
     // branchLabel: 'dynamic' として記録する。
     // これにより classify の Rule 4/5 が発火して unknown に落ちる (偽陰性を防ぐ)。
+    //
+    // branchId: consequent は 'cn:<i>:c', alternate は 'cn:<i>:a' を付与する。
+    // 同一 ConditionalExpression 内で bg と text が現れる場合、
+    // 同じ branchId を持つ候補同士のみが classify で組合せ対象となる。
     if (arg.type === 'ConditionalExpression') {
-      const cond = arg as AstNode & {
+      const condExpr = arg as AstNode & {
         consequent: AstNode;
         alternate: AstNode;
       };
 
       const newAccumulators: typeof accumulators = [];
+      const branchSuffixes = ['c', 'a'] as const; // consequent, alternate
+      const branches = [condExpr.consequent, condExpr.alternate];
+
       for (const acc of accumulators) {
-        for (const branch of [cond.consequent, cond.alternate]) {
+        for (let bi = 0; bi < branches.length; bi++) {
+          const branch = branches[bi];
+          const suffix = branchSuffixes[bi];
+          // この引数の branchId: 親の branchId と組み合わせてネストを表現する
+          const thisBranchId = `cn:${argIndex}:${suffix}`;
+          const newBranchId =
+            acc.branchId === null || acc.branchId === undefined
+              ? thisBranchId
+              : `${acc.branchId}|${thisBranchId}`;
+
           if (branch.type === 'Literal') {
             const lit = branch as Literal;
             if (typeof lit.value === 'string') {
@@ -491,6 +531,7 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
               newAccumulators.push({
                 classes: [...acc.classes, ...classes],
                 branchLabel: acc.branchLabel ?? 'conditional(?)',
+                branchId: newBranchId,
               });
             }
           } else {
@@ -498,6 +539,7 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
             newAccumulators.push({
               classes: [...acc.classes],
               branchLabel: 'dynamic',
+              branchId: newBranchId,
             });
           }
         }
@@ -505,8 +547,9 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
       // アキュムレータ爆発ガード: 上限超過時は dynamic 単一候補に集約する。
       accumulators =
         newAccumulators.length > MAX_ACCUMULATORS
-          ? [{ classes: [], branchLabel: 'dynamic' }]
+          ? [{ classes: [], branchLabel: 'dynamic', branchId: undefined }]
           : newAccumulators;
+      argIndex++;
       continue;
     }
 
@@ -514,13 +557,18 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
     for (const acc of accumulators) {
       acc.branchLabel = 'dynamic';
     }
+    argIndex++;
   }
 
   // アキュムレータから ClassCandidate 配列に変換。
   // classes が空で branchLabel も undefined の候補 (引数なし cn()) は除外する。
   const result = accumulators
     .filter((acc) => acc.classes.length > 0 || acc.branchLabel !== undefined)
-    .map((acc) => ({ classes: acc.classes, branchLabel: acc.branchLabel }));
+    .map((acc) => ({
+      classes: acc.classes,
+      branchLabel: acc.branchLabel,
+      branchId: acc.branchId,
+    }));
 
   // variant-pseudo クラスがあれば追加候補として記録する。
   // ランタイム条件依存のため静的解析不能 → classify Rule 4/5 で unknown に落ちる。
@@ -528,6 +576,7 @@ function extractCandidatesFromCnCall(node: AstNode): ClassCandidate[] {
     result.push({
       classes: variantPseudoCollected,
       branchLabel: 'variant-pseudo',
+      branchId: undefined,
     });
   }
 
