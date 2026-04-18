@@ -361,12 +361,9 @@ const Contents = memo(() => {
           {match(errorDisplayType)
             .with('setup', () => (
               <div className="w-full max-w-2xl mx-auto p-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
                   初期セットアップ
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  VRChatのログと写真のフォルダを設定してください。
-                </p>
                 <PathSettings showRefreshAll={false} />
                 <div className="mt-6 text-right">
                   <button
