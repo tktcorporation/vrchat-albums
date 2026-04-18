@@ -361,47 +361,10 @@ const Contents = memo(() => {
           {match(errorDisplayType)
             .with('setup', () => (
               <div className="w-full max-w-2xl mx-auto p-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
                   初期セットアップ
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  VRChatのログフォルダと写真フォルダを設定して、アプリケーションを使用する準備をしましょう。
-                </p>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
-                          <span className="text-primary">1</span>
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          フォルダを設定
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          以下の設定画面からVRChatのログフォルダと写真フォルダを選択してください。
-                        </p>
-                      </div>
-                    </div>
-                    <PathSettings showRefreshAll={false} />
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center">
-                          <span className="text-primary">2</span>
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          設定を確認
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          フォルダを設定したら、下のボタンをクリックして設定を確認します。
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <PathSettings showRefreshAll={false} />
                 <div className="mt-6 text-right">
                   <button
                     type="button"
