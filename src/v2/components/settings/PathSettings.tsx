@@ -200,7 +200,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
   return (
     <SettingsSection
       title="パス設定"
-      description="VRChat のログファイルと写真フォルダを指定します"
+      description={t('settings.paths.description')}
     >
       {/* 写真ディレクトリ */}
       <SettingsPathInput
@@ -269,7 +269,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
         <div className={cn('pt-6', SPACING.stack.default)}>
           <div className={SPACING.stack.tight}>
             <span className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}>
-              インデックスの再構築
+              {t('settings.paths.refreshIndexLabel')}
             </span>
             <p
               className={cn(

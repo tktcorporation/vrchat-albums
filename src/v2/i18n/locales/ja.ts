@@ -91,11 +91,16 @@ const ja: Translations = {
       removeExtraDirectory: '追加の写真フォルダを削除',
       validate: '確認',
       validating: '確認中...',
+      description: 'VRChat のログファイルと写真フォルダを指定します',
+      refreshIndexLabel: 'インデックスの再構築',
       logFormat: {
         title: 'ログファイルの形式',
         description:
           'ログファイルは以下の形式のJSONファイルである必要があります：',
       },
+    },
+    dataImport: {
+      historyDescription: '過去のインポートを取り消して元の状態へ戻せます',
     },
     info: {
       title: 'アプリ情報',

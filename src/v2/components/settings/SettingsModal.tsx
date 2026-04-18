@@ -121,21 +121,28 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
         <div className="flex-1 flex h-[calc(88vh-96px)] min-h-0">
           <div className="flex-none w-52 pl-6 pr-2 pb-8">
             <nav className="flex flex-col gap-0.5" aria-label="Tabs">
-              {tabs.map(({ id, label, icon: Icon }) => (
-                <button
-                  type="button"
-                  key={id}
-                  onClick={() => setActiveTab(id)}
-                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                    activeTab === id
-                      ? 'bg-foreground/5 text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]'
-                  }`}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                  <span className="truncate">{label}</span>
-                </button>
-              ))}
+              {tabs.map(({ id, label, icon: Icon }) => {
+                const isActive = activeTab === id;
+                return (
+                  <button
+                    type="button"
+                    key={id}
+                    onClick={() => setActiveTab(id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                      isActive
+                        ? 'bg-foreground/[0.08] text-foreground font-medium'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]'
+                    }`}
+                  >
+                    <Icon
+                      className="h-4 w-4 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">{label}</span>
+                  </button>
+                );
+              })}
             </nav>
           </div>
 

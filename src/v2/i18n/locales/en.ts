@@ -85,11 +85,16 @@ const en: Translations = {
       removeExtraDirectory: 'Remove Extra Photo Folder',
       validate: 'Validate Paths',
       validating: 'Validating...',
+      description: 'Specify the VRChat log file and photo folders',
+      refreshIndexLabel: 'Rebuild Index',
       logFormat: {
         title: 'Log File Format',
         description:
           'The log file must be a JSON file with the following format:',
       },
+    },
+    dataImport: {
+      historyDescription: 'Undo a past import and restore the previous state',
     },
     info: {
       title: 'App Info',

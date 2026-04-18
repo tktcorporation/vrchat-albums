@@ -22,6 +22,7 @@ import {
   TYPOGRAPHY,
 } from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
+import { useI18n } from '../../i18n/store';
 import { SettingsInfoBox, SettingsSection } from './common';
 
 // Note: ImportHistoryItem interface is used for documentation purposes
@@ -51,6 +52,7 @@ const getFilenameFromPath = (filePath: string): string => {
  * SettingsModal内のデータインポートタブから利用される
  */
 const DataImport = memo(() => {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -328,7 +330,7 @@ const DataImport = memo(() => {
               インポート履歴・ロールバック
             </h4>
             <p className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.secondary)}>
-              過去のインポートを取り消して元の状態へ戻せます
+              {t('settings.dataImport.historyDescription')}
             </p>
           </div>
           <Button

@@ -117,10 +117,15 @@ export interface Translations {
       removeExtraDirectory: string;
       validate: string;
       validating: string;
+      description: string;
+      refreshIndexLabel: string;
       logFormat: {
         title: string;
         description: string;
       };
+    };
+    dataImport: {
+      historyDescription: string;
     };
     info: {
       title: string;
