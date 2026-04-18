@@ -44,13 +44,13 @@ const SettingsItem = memo<SettingsItemProps>(
     return (
       <div
         className={cn(
-          'flex items-center justify-between',
+          'flex items-start justify-between gap-6',
           disabled && 'opacity-50',
           className,
         )}
       >
         {/* ラベルと説明 */}
-        <div className="flex-1 min-w-0 mr-4">
+        <div className="flex-1 min-w-0 space-y-1">
           <div
             className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}
             id={`settings-item-${label.replaceAll(/\s+/g, '-').toLowerCase()}`}
@@ -58,14 +58,20 @@ const SettingsItem = memo<SettingsItemProps>(
             {label}
           </div>
           {description && (
-            <div className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.secondary)}>
+            <div
+              className={cn(
+                TYPOGRAPHY.body.small,
+                TEXT_COLOR.secondary,
+                'leading-relaxed',
+              )}
+            >
               {description}
             </div>
           )}
         </div>
 
         {/* 操作要素 */}
-        <div className="flex-shrink-0">{children}</div>
+        <div className="flex-shrink-0 pt-0.5">{children}</div>
       </div>
     );
   },

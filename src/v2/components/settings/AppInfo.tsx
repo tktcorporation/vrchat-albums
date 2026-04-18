@@ -1,11 +1,5 @@
 import { Effect } from 'effect';
-import {
-  ArrowUpRight,
-  CheckCircle,
-  Download,
-  Info,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowUpRight, CheckCircle, Download, RefreshCw } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useState } from 'react';
 
@@ -18,7 +12,6 @@ import {
   ICON_SIZE,
   SPACING,
   STATUS_COLOR,
-  SURFACE_COLOR,
   TEXT_COLOR,
   TYPOGRAPHY,
 } from '../../constants/ui';
@@ -139,50 +132,51 @@ const AppInfo = memo(() => {
   };
 
   return (
-    <SettingsSection icon={Info} title={t('settings.info.title')}>
-      <div
-        className={`${SURFACE_COLOR.muted} rounded-lg ${SPACING.padding.card} ${SPACING.stack.tight}`}
-      >
-        <div className="flex justify-between">
-          <span className={TEXT_COLOR.secondary}>
-            {t('settings.info.version')}
-          </span>
-          <button
-            type="button"
-            className={`font-mono ${TEXT_COLOR.primary} cursor-pointer appearance-none border-none bg-transparent p-0`}
-            onClick={handleVersionClick}
-            onKeyDown={handleKeyDown}
-          >
-            {appVersion}
-          </button>
-        </div>
-        <div className="flex justify-between">
-          <span className={TEXT_COLOR.secondary}>
-            {t('settings.info.name')}
-          </span>
-          <span className={`font-mono ${TEXT_COLOR.primary}`}>
-            {packageJson.name}
-          </span>
+    <SettingsSection title={t('settings.info.title')}>
+      {/* key-value 行: カードをやめ、divide-y で控えめに区切る */}
+      <dl className="divide-y divide-border/30">
+        <div className="flex items-center justify-between py-3">
+          <dt className={TEXT_COLOR.secondary}>{t('settings.info.version')}</dt>
+          <dd>
+            <button
+              type="button"
+              className={`font-mono ${TEXT_COLOR.primary} cursor-pointer appearance-none border-none bg-transparent p-0`}
+              onClick={handleVersionClick}
+              onKeyDown={handleKeyDown}
+            >
+              {appVersion}
+            </button>
+          </dd>
         </div>
 
-        {/* アップデートセクション */}
-        <div className="flex flex-col gap-2 mt-4">
+        <div className="flex items-center justify-between py-3">
+          <dt className={TEXT_COLOR.secondary}>{t('settings.info.name')}</dt>
+          <dd className={`font-mono ${TEXT_COLOR.primary}`}>
+            {packageJson.name}
+          </dd>
+        </div>
+
+        <div className={cn('py-3', SPACING.stack.tight)}>
           <div className="flex items-center justify-between">
-            <span className={TEXT_COLOR.secondary}>
+            <dt className={TEXT_COLOR.secondary}>
               {t('settings.info.update.checkForUpdates')}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCheckForUpdates}
-              disabled={updateState.status === 'checking'}
-            >
-              {updateState.status === 'checking' ? (
-                <RefreshCw className={cn(ICON_SIZE.sm.class, 'animate-spin')} />
-              ) : (
-                <RefreshCw className={ICON_SIZE.sm.class} />
-              )}
-            </Button>
+            </dt>
+            <dd>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCheckForUpdates}
+                disabled={updateState.status === 'checking'}
+              >
+                {updateState.status === 'checking' ? (
+                  <RefreshCw
+                    className={cn(ICON_SIZE.sm.class, 'animate-spin')}
+                  />
+                ) : (
+                  <RefreshCw className={ICON_SIZE.sm.class} />
+                )}
+              </Button>
+            </dd>
           </div>
 
           {/* アップデートステータス表示 */}
@@ -204,26 +198,24 @@ const AppInfo = memo(() => {
             </div>
           )}
           {updateState.status === 'available' && (
-            <div className="flex flex-col gap-2">
-              <div
-                className={cn(
-                  'flex items-center gap-1.5',
-                  TYPOGRAPHY.caption.default,
-                  STATUS_COLOR.info.text,
+            <div
+              className={cn(
+                'flex items-center gap-1.5',
+                TYPOGRAPHY.caption.default,
+                STATUS_COLOR.info.text,
+              )}
+            >
+              <Download className={ICON_SIZE.xs.class} />
+              <span>
+                {t('settings.info.update.available').replace(
+                  '{version}',
+                  updateState.version,
                 )}
-              >
-                <Download className={ICON_SIZE.xs.class} />
-                <span>
-                  {t('settings.info.update.available').replace(
-                    '{version}',
-                    updateState.version,
-                  )}
-                </span>
-              </div>
+              </span>
             </div>
           )}
           {updateState.status === 'downloaded' && (
-            <div className="flex flex-col gap-2">
+            <div className={SPACING.stack.tight}>
               <div
                 className={cn(
                   'flex items-center gap-1.5',
@@ -256,16 +248,16 @@ const AppInfo = memo(() => {
           )}
         </div>
 
-        <div className="flex justify-between mt-4">
-          <span className={TEXT_COLOR.secondary}>
-            {t('settings.info.openLog')}
-          </span>
-          <Button variant="outline" size="sm" onClick={handleOpenLog}>
-            <span className="sr-only">{t('settings.info.openLog')}</span>
-            <ArrowUpRight className={ICON_SIZE.sm.class} />
-          </Button>
+        <div className="flex items-center justify-between py-3">
+          <dt className={TEXT_COLOR.secondary}>{t('settings.info.openLog')}</dt>
+          <dd>
+            <Button variant="ghost" size="sm" onClick={handleOpenLog}>
+              <span className="sr-only">{t('settings.info.openLog')}</span>
+              <ArrowUpRight className={ICON_SIZE.sm.class} />
+            </Button>
+          </dd>
         </div>
-      </div>
+      </dl>
 
       <SqliteConsole
         isOpen={showSqlConsole}

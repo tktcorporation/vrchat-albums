@@ -6,7 +6,13 @@ import { cn } from '../../../../components/lib/utils';
 import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../../constants/ui';
 
 interface SettingsSectionProps {
-  /** セクションアイコン */
+  /**
+   * セクションアイコン（非推奨）
+   *
+   * 余白で区切るデザインに統一するため、セクションヘッダーではアイコンを表示しない。
+   * 互換性のため型として残しているが、渡されても描画しない。
+   * @deprecated タブナビゲーションのアイコンと冗長。渡しても無視される。
+   */
   icon?: LucideIcon;
   /** セクションタイトル */
   title: string;
@@ -41,25 +47,16 @@ interface SettingsSectionProps {
  * </SettingsSection>
  */
 const SettingsSection = memo<SettingsSectionProps>(
-  ({ icon: Icon, title, description, children, className }) => {
+  ({ title, description, children, className }) => {
     return (
       <section className={cn(SPACING.stack.loose, className)}>
-        {/* ヘッダー */}
+        {/* ヘッダー: アイコンに頼らず、タイポグラフィと余白だけで階層を表現する */}
         <div className={SPACING.stack.tight}>
-          <h3
-            className={cn(
-              'flex items-center',
-              TYPOGRAPHY.heading.secondary,
-              TEXT_COLOR.primary,
-            )}
-          >
-            {Icon && (
-              <Icon className="h-5 w-5 mr-2 text-primary" aria-hidden="true" />
-            )}
+          <h3 className={cn(TYPOGRAPHY.heading.primary, TEXT_COLOR.primary)}>
             {title}
           </h3>
           {description && (
-            <p className={cn(TYPOGRAPHY.body.default, TEXT_COLOR.secondary)}>
+            <p className={cn(TYPOGRAPHY.body.secondary, TEXT_COLOR.secondary)}>
               {description}
             </p>
           )}

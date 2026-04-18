@@ -145,163 +145,152 @@ const DataExport = memo(() => {
 
   return (
     <SettingsSection
-      icon={Download}
       title="ログデータエクスポート"
       description="データベースからlogStore形式でログデータをエクスポートします"
     >
-      <div className={SPACING.stack.relaxed}>
-        {/* 期間設定 */}
-        <div className={SPACING.stack.default}>
-          <Label
-            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
-          >
-            エクスポート期間
-          </Label>
+      {/* 期間設定 */}
+      <div className={SPACING.stack.default}>
+        <Label
+          className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
+        >
+          エクスポート期間
+        </Label>
 
-          {/* プリセット選択 - ThemeSelectorパターン */}
-          <div className="grid grid-cols-3 gap-3">
-            {periodPresets.map(({ value, label, icon: Icon }) => (
-              <button
-                type="button"
-                key={value}
-                onClick={() => handlePresetSelect(value)}
-                className={cn(
-                  'flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors',
-                  selectedPreset === value
-                    ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                    : 'border-border hover:border-primary/50',
-                )}
-              >
-                <Icon
-                  className={cn(
-                    'h-5 w-5',
-                    selectedPreset === value
-                      ? 'text-primary'
-                      : TEXT_COLOR.muted,
-                  )}
-                />
-                <span
-                  className={cn(
-                    TYPOGRAPHY.body.emphasis,
-                    selectedPreset === value
-                      ? 'text-primary'
-                      : TEXT_COLOR.secondary,
-                  )}
-                >
-                  {label}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* カスタム期間入力 - カスタム選択時のみ表示 */}
-          {selectedPreset === 'custom' && (
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div>
-                <Label
-                  htmlFor="startDate"
-                  className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
-                >
-                  開始日
-                </Label>
-                <div className="relative">
-                  <Calendar
-                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
-                  />
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label
-                  htmlFor="endDate"
-                  className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
-                >
-                  終了日
-                </Label>
-                <div className="relative">
-                  <Calendar
-                    className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
-                  />
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 出力パス設定 */}
-        <div className={SPACING.stack.tight}>
-          <Label
-            htmlFor="outputPath"
-            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
-          >
-            出力先ディレクトリ（オプション）
-          </Label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <FolderOpen
-                className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
-              />
-              <Input
-                id="outputPath"
-                type="text"
-                value={outputPath}
-                onChange={(e) => setOutputPath(e.target.value)}
-                placeholder="デフォルトはダウンロードフォルダ内のlogStoreディレクトリ"
-                className="pl-10"
-              />
-            </div>
-            <Button
+        {/* プリセット選択 */}
+        <div className="grid grid-cols-3 gap-2">
+          {periodPresets.map(({ value, label, icon: Icon }) => (
+            <button
               type="button"
-              variant="outline"
-              onClick={() => void selectOutputDir()}
-              className="flex-shrink-0"
+              key={value}
+              onClick={() => handlePresetSelect(value)}
+              aria-pressed={selectedPreset === value}
+              className={cn(
+                'flex items-center justify-center gap-2 px-3 py-3 rounded-md transition-colors',
+                selectedPreset === value
+                  ? 'bg-foreground/[0.06] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]',
+              )}
             >
-              参照
-            </Button>
-          </div>
-          <p className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
-            出力先を変更しない場合、ダウンロードフォルダ内のlogStoreディレクトリに出力されます
-          </p>
+              <Icon
+                className={cn(
+                  'h-4 w-4',
+                  selectedPreset === value
+                    ? 'text-foreground'
+                    : TEXT_COLOR.muted,
+                )}
+                aria-hidden="true"
+              />
+              <span className={TYPOGRAPHY.body.emphasis}>{label}</span>
+            </button>
+          ))}
         </div>
 
-        {/* エクスポートボタン */}
-        <div className="pt-4">
+        {/* カスタム期間入力 */}
+        {selectedPreset === 'custom' && (
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className={SPACING.stack.tight}>
+              <Label
+                htmlFor="startDate"
+                className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
+              >
+                開始日
+              </Label>
+              <div className="relative">
+                <Calendar
+                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
+                />
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className={SPACING.stack.tight}>
+              <Label
+                htmlFor="endDate"
+                className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
+              >
+                終了日
+              </Label>
+              <div className="relative">
+                <Calendar
+                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
+                />
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 出力パス設定 */}
+      <div className={SPACING.stack.tight}>
+        <Label
+          htmlFor="outputPath"
+          className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
+        >
+          出力先ディレクトリ（オプション）
+        </Label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <FolderOpen
+              className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
+            />
+            <Input
+              id="outputPath"
+              type="text"
+              value={outputPath}
+              onChange={(e) => setOutputPath(e.target.value)}
+              placeholder="デフォルトはダウンロードフォルダ内のlogStoreディレクトリ"
+              className="pl-10"
+            />
+          </div>
           <Button
-            onClick={handleExport}
-            disabled={
-              isExporting ||
-              (selectedPreset === 'custom' && (!startDate || !endDate))
-            }
-            className="w-full"
+            type="button"
+            variant="ghost"
+            onClick={() => void selectOutputDir()}
+            className="flex-shrink-0"
           >
-            <Download className="h-4 w-4 mr-2" />
-            {isExporting ? 'エクスポート中...' : 'エクスポート開始'}
+            参照
           </Button>
         </div>
-
-        {/* 説明 */}
-        <SettingsInfoBox title="エクスポート形式について" variant="info">
-          <ul className={`${TYPOGRAPHY.body.small} space-y-1`}>
-            <li>• データベースからlogStore形式でエクスポートします</li>
-            <li>• 月別にファイルが分割されます（例: logStore-2023-10.txt）</li>
-            <li>• ワールド参加、プレイヤー参加/退出ログが含まれます</li>
-            <li>• 時系列順でソートされた形式で出力されます</li>
-          </ul>
-        </SettingsInfoBox>
+        <p className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
+          出力先を変更しない場合、ダウンロードフォルダ内のlogStoreディレクトリに出力されます
+        </p>
       </div>
+
+      {/* エクスポートボタン: 全幅ではなく、自然な幅のプライマリアクションに */}
+      <div className="flex">
+        <Button
+          onClick={handleExport}
+          disabled={
+            isExporting ||
+            (selectedPreset === 'custom' && (!startDate || !endDate))
+          }
+        >
+          <Download className="h-4 w-4 mr-2" />
+          {isExporting ? 'エクスポート中...' : 'エクスポート開始'}
+        </Button>
+      </div>
+
+      {/* 説明 */}
+      <SettingsInfoBox title="エクスポート形式について" variant="info">
+        <ul className="space-y-1">
+          <li>・データベースからlogStore形式でエクスポートします</li>
+          <li>・月別にファイルが分割されます（例: logStore-2023-10.txt）</li>
+          <li>・ワールド参加、プレイヤー参加/退出ログが含まれます</li>
+          <li>・時系列順でソートされた形式で出力されます</li>
+        </ul>
+      </SettingsInfoBox>
     </SettingsSection>
   );
 });

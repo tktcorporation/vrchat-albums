@@ -96,11 +96,7 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
       id: 'info',
       label: t('settings.tabs.info'),
       icon: SettingsIcon,
-      component: () => (
-        <div className="space-y-8">
-          <AppInfo />
-        </div>
-      ),
+      component: AppInfo,
     },
     {
       id: 'license',
@@ -115,35 +111,35 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="h-[90vh] w-[800px] max-w-[800px] p-0 glass-panel">
-        <DialogHeader className="px-6 py-4 border-b border-border/40 backdrop-blur-sm">
-          <DialogTitle className="text-xl font-semibold">
+      <DialogContent className="h-[88vh] w-[880px] max-w-[880px] p-0 glass-panel">
+        <DialogHeader className="px-10 pt-8 pb-6">
+          <DialogTitle className="text-2xl font-semibold tracking-tight">
             {t('common.settings')}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 flex h-[calc(90vh-80px)]">
-          <div className="flex-none w-48 border-r border-border/30">
-            <nav className="flex flex-col p-2" aria-label="Tabs">
+        <div className="flex-1 flex h-[calc(88vh-96px)] min-h-0">
+          <div className="flex-none w-52 pl-6 pr-2 pb-8">
+            <nav className="flex flex-col gap-0.5" aria-label="Tabs">
               {tabs.map(({ id, label, icon: Icon }) => (
                 <button
                   type="button"
                   key={id}
                   onClick={() => setActiveTab(id)}
-                  className={`relative py-3 px-4 flex items-center text-sm font-medium transition-all duration-200 rounded-lg m-1 ${
+                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
                     activeTab === id
-                      ? 'text-primary bg-primary/8 shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                      ? 'bg-foreground/5 text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]'
                   }`}
                 >
-                  <Icon className="h-4 w-4 mr-3 flex-shrink-0" />
+                  <Icon className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                   <span className="truncate">{label}</span>
                 </button>
               ))}
             </nav>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 bg-background/30 backdrop-blur-sm">
+          <div className="flex-1 overflow-y-auto px-10 pb-12">
             <ActiveComponent />
           </div>
         </div>

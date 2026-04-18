@@ -4,20 +4,23 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 
 import { cn } from '../../../../components/lib/utils';
-import { SPACING, STATUS_COLOR, TYPOGRAPHY } from '../../../constants/ui';
+import { STATUS_COLOR, TEXT_COLOR, TYPOGRAPHY } from '../../../constants/ui';
 
 /**
  * InfoBoxのバリアント定義
+ *
+ * 大きな背景カードをやめ、左アクセントバーのみでバリアントを区別する。
+ * 設定画面全体の「余白で語る」方針に合わせて、情報の重要度はアクセント色だけで表現する。
  */
-const infoBoxVariants = cva('rounded-lg', {
+const infoBoxVariants = cva('border-l-2 pl-4 py-1', {
   variants: {
     variant: {
       /** 一般的な情報・ヒント */
-      info: 'bg-primary/10 dark:bg-primary/20',
+      info: 'border-primary/40',
       /** 注意事項 */
-      warning: STATUS_COLOR.warning.bg,
+      warning: STATUS_COLOR.warning.border,
       /** 成功・完了 */
-      success: STATUS_COLOR.success.bg,
+      success: STATUS_COLOR.success.border,
     },
   },
   defaultVariants: {
@@ -55,9 +58,10 @@ const getVariantIcon = (variant: InfoBoxVariantProps['variant']) => {
 };
 
 /**
- * バリアントに対応するテキストカラーを取得
+ * バリアントに対応するアイコン色を取得
+ * アイコンのみバリアントカラー、本文は通常カラーに保つ。
  */
-const getTextColorClass = (variant: InfoBoxVariantProps['variant']) => {
+const getIconColorClass = (variant: InfoBoxVariantProps['variant']) => {
   switch (variant) {
     case 'warning':
       return STATUS_COLOR.warning.text;
@@ -66,7 +70,7 @@ const getTextColorClass = (variant: InfoBoxVariantProps['variant']) => {
     case 'info':
     case undefined:
     case null:
-      return 'text-primary';
+      return 'text-primary/80';
   }
 };
 
@@ -91,30 +95,34 @@ const getTextColorClass = (variant: InfoBoxVariantProps['variant']) => {
 const SettingsInfoBox = memo<SettingsInfoBoxProps>(
   ({ title, variant = 'info', children, hideIcon, className }) => {
     const Icon = getVariantIcon(variant);
-    const textColor = getTextColorClass(variant);
+    const iconColor = getIconColorClass(variant);
 
     return (
-      <div
-        className={cn(
-          infoBoxVariants({ variant }),
-          SPACING.padding.card,
-          className,
-        )}
-      >
+      <div className={cn(infoBoxVariants({ variant }), className)}>
         {title && (
           <h4
             className={cn(
-              'flex items-center',
+              'flex items-center mb-2',
               TYPOGRAPHY.body.emphasis,
-              textColor,
-              'mb-2',
+              TEXT_COLOR.primary,
             )}
           >
-            {!hideIcon && <Icon className="h-4 w-4 mr-2" aria-hidden="true" />}
+            {!hideIcon && (
+              <Icon
+                className={cn('h-4 w-4 mr-2 flex-shrink-0', iconColor)}
+                aria-hidden="true"
+              />
+            )}
             {title}
           </h4>
         )}
-        <div className={cn(TYPOGRAPHY.body.small, `${textColor}/80`)}>
+        <div
+          className={cn(
+            TYPOGRAPHY.body.small,
+            TEXT_COLOR.secondary,
+            'leading-relaxed',
+          )}
+        >
           {children}
         </div>
       </div>
