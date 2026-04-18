@@ -142,6 +142,33 @@ const screenshot = async (page: Page, title: string, suffix: string) => {
   }
 };
 
+/**
+ * 設定モーダルを開いてパス設定タブのスクショを撮り、モーダルを閉じる。
+ * JA ロケール前提 (AppHeader の aria-label が t('common.settings') で "設定")。
+ * モーダル内スコープ ([role="dialog"]) でセレクタを限定することで、
+ * セットアップ画面の同名セレクタとの誤マッチを防ぐ。
+ */
+const captureSettingsPaths = async (page: Page, title: string) => {
+  const settingsButton = await page.waitForSelector('[aria-label="設定"]', {
+    timeout: 5000,
+  });
+  await settingsButton.click();
+  // Radix Dialog のフェードイン完了とパス設定要素の表示を待つ
+  const dialogPhotoInput =
+    '[role="dialog"] [aria-label="input-写真ディレクトリ"]';
+  await page.waitForSelector(dialogPhotoInput, {
+    timeout: 5000,
+    state: 'visible',
+  });
+  await screenshot(page, title, 'settings-paths');
+  // 後続の操作に副作用を残さないためモーダルを確実に閉じる
+  await page.keyboard.press('Escape');
+  await page.waitForSelector(dialogPhotoInput, {
+    state: 'hidden',
+    timeout: 5000,
+  });
+};
+
 const TIMEOUT = 60000; // Increased timeout to 60 seconds
 
 test.setTimeout(TIMEOUT);
@@ -235,6 +262,7 @@ test('各画面でスクショ', async () => {
     if (hasMainContent) {
       console.log('Main screen already loaded, skipping setup');
       await screenshot(page, title, 'main-already-loaded');
+      await captureSettingsPaths(page, title);
       // Exit app.
       await electronApp.close();
       return;
@@ -324,6 +352,9 @@ test('各画面でスクショ', async () => {
     // 最後の状態をスクショ
     await page.waitForTimeout(500);
     await screenshot(page, title, 'finalized');
+
+    // 設定モーダルを開いてパス設定画面をスクショ
+    await captureSettingsPaths(page, title);
   } catch (error) {
     console.log('Failed to wait for main content, checking page status...');
 
@@ -359,6 +390,7 @@ test('各画面でスクショ', async () => {
     'setup',
     'logs-loaded',
     'finalized',
+    'settings-paths',
   ];
 
   for (const name of requiredScreenshots) {
