@@ -37,14 +37,18 @@ interface SettingsFieldProps {
  */
 const SettingsField = memo<SettingsFieldProps>(
   ({ label, htmlFor, description, children, error, className }) => {
+    const labelClassName = cn(TYPOGRAPHY.body.default, TEXT_COLOR.secondary);
+    // htmlFor が無い場合は <label> を出すと orphan label になりアクセシビリティ
+    // 違反 (axe-core, スクリーンリーダー) となるため、<span> にフォールバックする
     return (
       <div className={cn('flex flex-col gap-3', className)}>
-        <label
-          htmlFor={htmlFor}
-          className={cn(TYPOGRAPHY.body.default, TEXT_COLOR.secondary)}
-        >
-          {label}
-        </label>
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className={labelClassName}>
+            {label}
+          </label>
+        ) : (
+          <span className={labelClassName}>{label}</span>
+        )}
 
         {children}
 
