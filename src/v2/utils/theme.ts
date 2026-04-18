@@ -1,12 +1,4 @@
-import type { ComponentType } from 'react';
-
 export type Theme = 'system' | 'dark' | 'light';
-
-export interface ThemeOption {
-  value: Theme;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-}
 
 /**
  * OS のカラースキーム設定を取得するユーティリティ。
