@@ -113,7 +113,7 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="h-[88vh] w-[880px] max-w-[880px] p-0 glass-panel">
+      <DialogContent className="h-[88vh] w-[min(55rem,100svw-2rem)] p-0 glass-panel">
         <DialogHeader className="px-10 pt-8 pb-6">
           <DialogTitle className="text-2xl font-semibold tracking-tight">
             {t('common.settings')}
