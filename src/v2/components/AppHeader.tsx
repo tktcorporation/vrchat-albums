@@ -150,6 +150,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 size="sm"
                 onClick={onOpenSettings}
                 className="h-7 w-7 p-0"
+                aria-label={t('common.settings')}
+                title={t('common.settings')}
               >
                 <Settings className={ICON_SIZE.sm.class} />
               </Button>

@@ -142,6 +142,32 @@ const screenshot = async (page: Page, title: string, suffix: string) => {
   }
 };
 
+/**
+ * 設定モーダルを開いてパス設定タブのスクショを撮り、モーダルを閉じる。
+ * AppHeader の設定ボタン (aria-label="設定") をクリックして、
+ * モーダル初期表示タブ (パス設定) を撮影する。
+ */
+const captureSettingsPaths = async (page: Page, title: string) => {
+  try {
+    const settingsButton = await page.waitForSelector('[aria-label="設定"]', {
+      timeout: 5000,
+    });
+    await settingsButton.click();
+    // モーダルが完全にレンダリングされるのを待つ (パス設定セクションの要素を検出)
+    await page.waitForSelector('[aria-label="input-写真ディレクトリ"]', {
+      timeout: 5000,
+    });
+    await page.waitForTimeout(500);
+    await screenshot(page, title, 'settings-paths');
+    // モーダルを閉じる
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+  } catch (error) {
+    console.error('Failed to capture settings paths screenshot:', error);
+    throw error;
+  }
+};
+
 const TIMEOUT = 60000; // Increased timeout to 60 seconds
 
 test.setTimeout(TIMEOUT);
@@ -235,6 +261,7 @@ test('各画面でスクショ', async () => {
     if (hasMainContent) {
       console.log('Main screen already loaded, skipping setup');
       await screenshot(page, title, 'main-already-loaded');
+      await captureSettingsPaths(page, title);
       // Exit app.
       await electronApp.close();
       return;
@@ -324,6 +351,9 @@ test('各画面でスクショ', async () => {
     // 最後の状態をスクショ
     await page.waitForTimeout(500);
     await screenshot(page, title, 'finalized');
+
+    // 設定モーダルを開いてパス設定画面をスクショ
+    await captureSettingsPaths(page, title);
   } catch (error) {
     console.log('Failed to wait for main content, checking page status...');
 
@@ -359,6 +389,7 @@ test('各画面でスクショ', async () => {
     'setup',
     'logs-loaded',
     'finalized',
+    'settings-paths',
   ];
 
   for (const name of requiredScreenshots) {
