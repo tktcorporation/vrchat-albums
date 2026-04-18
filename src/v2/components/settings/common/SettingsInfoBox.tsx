@@ -1,5 +1,4 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { AlertTriangle, Info, Lightbulb } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { memo } from 'react';
 
@@ -7,10 +6,10 @@ import { cn } from '../../../../components/lib/utils';
 import { STATUS_COLOR, TEXT_COLOR, TYPOGRAPHY } from '../../../constants/ui';
 
 /**
- * InfoBoxのバリアント定義
+ * InfoBox のバリアント定義。
  *
- * 大きな背景カードをやめ、左アクセントバーのみでバリアントを区別する。
- * 設定画面全体の「余白で語る」方針に合わせて、情報の重要度はアクセント色だけで表現する。
+ * 「余白で語る」方針に合わせ、装飾的アイコンは置かず左アクセントバーだけで
+ * 情報の重要度を示す。バリアントは左 border の色のみに反映される。
  */
 const infoBoxVariants = cva('border-l-2 pl-4 py-1', {
   variants: {
@@ -35,56 +34,19 @@ interface SettingsInfoBoxProps extends InfoBoxVariantProps {
   title?: string;
   /** コンテンツ */
   children: ReactNode;
-  /** アイコンを非表示にする */
-  hideIcon?: boolean;
   /** 追加のクラス名 */
   className?: string;
 }
 
 /**
- * バリアントに対応するアイコンを取得
- */
-const getVariantIcon = (variant: InfoBoxVariantProps['variant']) => {
-  switch (variant) {
-    case 'warning':
-      return AlertTriangle;
-    case 'success':
-      return Lightbulb;
-    case 'info':
-    case undefined:
-    case null:
-      return Info;
-  }
-};
-
-/**
- * バリアントに対応するアイコン色を取得
- * アイコンのみバリアントカラー、本文は通常カラーに保つ。
- */
-const getIconColorClass = (variant: InfoBoxVariantProps['variant']) => {
-  switch (variant) {
-    case 'warning':
-      return STATUS_COLOR.warning.text;
-    case 'success':
-      return STATUS_COLOR.success.text;
-    case 'info':
-    case undefined:
-    case null:
-      return 'text-primary/80';
-  }
-};
-
-/**
- * 設定画面用の情報ボックスコンポーネント
+ * 設定画面用の情報ボックス。
  *
- * ヒント、注意事項、成功メッセージなどを表示する。
+ * 左アクセントバーとタイポグラフィのみで情報階層を表現する。
+ * タイトルは emphasis、本文は secondary muted。
  *
  * @example
  * <SettingsInfoBox title="インポート機能について">
- *   <ul>
- *     <li>• logStoreファイルを統合します</li>
- *     <li>• 重複データは除外されます</li>
- *   </ul>
+ *   <ul>...</ul>
  * </SettingsInfoBox>
  *
  * @example
@@ -93,26 +55,13 @@ const getIconColorClass = (variant: InfoBoxVariantProps['variant']) => {
  * </SettingsInfoBox>
  */
 const SettingsInfoBox = memo<SettingsInfoBoxProps>(
-  ({ title, variant = 'info', children, hideIcon, className }) => {
-    const Icon = getVariantIcon(variant);
-    const iconColor = getIconColorClass(variant);
-
+  ({ title, variant = 'info', children, className }) => {
     return (
       <div className={cn(infoBoxVariants({ variant }), className)}>
         {title && (
           <h4
-            className={cn(
-              'flex items-center mb-2',
-              TYPOGRAPHY.body.emphasis,
-              TEXT_COLOR.primary,
-            )}
+            className={cn('mb-2', TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}
           >
-            {!hideIcon && (
-              <Icon
-                className={cn('h-4 w-4 mr-2 flex-shrink-0', iconColor)}
-                aria-hidden="true"
-              />
-            )}
             {title}
           </h4>
         )}

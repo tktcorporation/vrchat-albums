@@ -1,10 +1,3 @@
-import {
-  Calendar,
-  CalendarRange,
-  Download,
-  FolderOpen,
-  Infinity as InfinityIcon,
-} from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 
 import { cn } from '@/components/lib/utils';
@@ -143,9 +136,9 @@ const DataExport = memo(() => {
   };
 
   const periodPresets = [
-    { value: 'all' as const, label: '全期間', icon: InfinityIcon },
-    { value: 'recent3months' as const, label: '過去3ヶ月', icon: Calendar },
-    { value: 'custom' as const, label: 'カスタム期間', icon: CalendarRange },
+    { value: 'all' as const, label: '全期間' },
+    { value: 'recent3months' as const, label: '過去3ヶ月' },
+    { value: 'custom' as const, label: 'カスタム期間' },
   ];
 
   return (
@@ -163,28 +156,19 @@ const DataExport = memo(() => {
 
         {/* プリセット選択 */}
         <div className="grid grid-cols-3 gap-2">
-          {periodPresets.map(({ value, label, icon: Icon }) => (
+          {periodPresets.map(({ value, label }) => (
             <button
               type="button"
               key={value}
               onClick={() => handlePresetSelect(value)}
               aria-pressed={selectedPreset === value}
               className={cn(
-                'flex items-center justify-center gap-2 px-3 py-3 rounded-md transition-colors',
+                'flex items-center justify-center px-3 py-3 rounded-md transition-colors',
                 selectedPreset === value
                   ? OPTION_BUTTON.selected
                   : OPTION_BUTTON.default,
               )}
             >
-              <Icon
-                className={cn(
-                  'h-4 w-4',
-                  selectedPreset === value
-                    ? 'text-foreground'
-                    : TEXT_COLOR.muted,
-                )}
-                aria-hidden="true"
-              />
               <span className={TYPOGRAPHY.body.emphasis}>{label}</span>
             </button>
           ))}
@@ -200,18 +184,12 @@ const DataExport = memo(() => {
               >
                 開始日
               </Label>
-              <div className="relative">
-                <Calendar
-                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
-                />
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
             </div>
             <div className={SPACING.stack.tight}>
               <Label
@@ -220,18 +198,12 @@ const DataExport = memo(() => {
               >
                 終了日
               </Label>
-              <div className="relative">
-                <Calendar
-                  className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
-                />
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              <Input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
             </div>
           </div>
         )}
@@ -246,19 +218,14 @@ const DataExport = memo(() => {
           出力先ディレクトリ（オプション）
         </Label>
         <div className="flex gap-2">
-          <div className="relative flex-1">
-            <FolderOpen
-              className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${TEXT_COLOR.muted}`}
-            />
-            <Input
-              id="outputPath"
-              type="text"
-              value={outputPath}
-              onChange={(e) => setOutputPath(e.target.value)}
-              placeholder="デフォルトはダウンロードフォルダ内のlogStoreディレクトリ"
-              className="pl-10"
-            />
-          </div>
+          <Input
+            id="outputPath"
+            type="text"
+            value={outputPath}
+            onChange={(e) => setOutputPath(e.target.value)}
+            placeholder="デフォルトはダウンロードフォルダ内のlogStoreディレクトリ"
+            className="flex-1"
+          />
           <Button
             type="button"
             variant="ghost"
@@ -273,7 +240,7 @@ const DataExport = memo(() => {
         </p>
       </div>
 
-      {/* エクスポートボタン: 全幅ではなく、自然な幅のプライマリアクションに */}
+      {/* エクスポート: ラベルのみの自然な幅のプライマリアクション */}
       <div className="flex">
         <Button
           onClick={handleExport}
@@ -282,7 +249,6 @@ const DataExport = memo(() => {
             (selectedPreset === 'custom' && (!startDate || !endDate))
           }
         >
-          <Download className="h-4 w-4 mr-2" />
           {isExporting ? 'エクスポート中...' : 'エクスポート開始'}
         </Button>
       </div>

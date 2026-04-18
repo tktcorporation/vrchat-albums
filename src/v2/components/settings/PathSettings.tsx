@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, Trash } from 'lucide-react';
+import { RefreshCw, Trash } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 import { match } from 'ts-pattern';
 
@@ -244,7 +244,6 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
             size="sm"
             className="w-full justify-start text-muted-foreground hover:text-foreground"
           >
-            <Plus className="h-4 w-4 mr-2" />
             フォルダを追加
           </Button>
         </div>
@@ -268,7 +267,9 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
       {showRefreshAll && (
         <div className={cn('pt-6', SPACING.stack.default)}>
           <div className={SPACING.stack.tight}>
-            <span className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}>
+            <span
+              className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.secondary)}
+            >
               {t('settings.paths.refreshIndexLabel')}
             </span>
             <p

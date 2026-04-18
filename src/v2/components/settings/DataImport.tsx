@@ -1,12 +1,4 @@
 import { format } from 'date-fns';
-import {
-  AlertTriangle,
-  Clock,
-  FileText,
-  FolderOpen,
-  RotateCcw,
-  Upload,
-} from 'lucide-react';
 import type React from 'react';
 import { memo, useState } from 'react';
 
@@ -229,16 +221,16 @@ const DataImport = memo(() => {
 
         {/* ドロップエリア: 機能的に borderが必須なので dashed を維持 */}
         <div
-          className={`border border-dashed rounded-md p-8 text-center transition-colors ${
-            isDragOver ? 'border-primary/60 bg-primary/5' : 'border-border/60'
-          }`}
+          className={cn(
+            'border border-dashed rounded-md px-6 py-10 text-center transition-colors',
+            isDragOver ? 'border-primary/60 bg-primary/5' : 'border-border/60',
+          )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <Upload className={`h-6 w-6 mx-auto mb-3 ${TEXT_COLOR.muted}`} />
           <p
-            className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary} mb-4`}
+            className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.secondary, 'mb-4')}
           >
             logStoreファイルやディレクトリをドラッグ&amp;ドロップするか、下のボタンで選択してください
           </p>
@@ -249,7 +241,6 @@ const DataImport = memo(() => {
               onClick={() => void selectFiles()}
               size="sm"
             >
-              <FileText className="h-4 w-4 mr-2" />
               ファイル選択
             </Button>
             <Button
@@ -258,7 +249,6 @@ const DataImport = memo(() => {
               onClick={() => void selectDirectory()}
               size="sm"
             >
-              <FolderOpen className="h-4 w-4 mr-2" />
               ディレクトリ選択
             </Button>
           </div>
@@ -297,13 +287,12 @@ const DataImport = memo(() => {
         )}
       </div>
 
-      {/* インポートボタン: 全幅ではなく自然なアクションボタンに */}
+      {/* インポート: ラベルのみの自然な幅のプライマリアクション */}
       <div className="flex">
         <Button
           onClick={handleImport}
           disabled={isImporting || selectedPaths.length === 0}
         >
-          <Upload className="h-4 w-4 mr-2" />
           {isImporting ? 'インポート中...' : 'インポート開始'}
         </Button>
       </div>
@@ -339,7 +328,6 @@ const DataImport = memo(() => {
             onClick={() => void refetchHistory()}
             disabled={isLoadingHistory}
           >
-            <RotateCcw className="h-4 w-4 mr-2" />
             更新
           </Button>
         </div>
@@ -392,8 +380,7 @@ const DataImport = memo(() => {
                         )}
                       >
                         <div className="flex items-center gap-4 flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
+                          <span>
                             バックアップ:{' '}
                             {format(
                               new Date(backup.backupTimestamp),
@@ -430,7 +417,6 @@ const DataImport = memo(() => {
                         disabled={isRollingBack}
                         className="text-destructive hover:text-destructive flex-shrink-0"
                       >
-                        <AlertTriangle className="h-4 w-4 mr-1" />
                         この時点に戻す
                       </Button>
                     )}

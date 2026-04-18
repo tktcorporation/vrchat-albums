@@ -1,13 +1,3 @@
-import {
-  Download,
-  FileText,
-  FolderOpen,
-  Globe2,
-  Settings as SettingsIcon,
-  Sun,
-  Upload,
-} from 'lucide-react';
-import type React from 'react';
 import { memo, useState } from 'react';
 
 import { cn } from '../../../components/lib/utils';
@@ -45,13 +35,15 @@ type SettingsTab =
 interface TabConfig {
   id: SettingsTab;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
   component: React.ComponentType;
 }
 
 /**
  * 各種設定タブをまとめたモーダルダイアログ。
  * AppHeader から開かれ、パス設定やテーマ設定などを切り替えて表示する。
+ *
+ * 「余白で語る」設計方針: タブは文字のみで構成し、装飾的なアイコンは置かない。
+ * 選択状態は背景トーンと font-medium で表現する。
  */
 const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
   const { t } = useI18n();
@@ -61,49 +53,41 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
     {
       id: 'paths',
       label: t('settings.tabs.dataSource'),
-      icon: FolderOpen,
       component: () => <PathSettings showRefreshAll />,
     },
     {
       id: 'system',
       label: t('settings.tabs.system'),
-      icon: SettingsIcon,
       component: SystemSettings,
     },
     {
       id: 'theme',
       label: t('settings.tabs.theme'),
-      icon: Sun,
       component: ThemeSelector,
     },
     {
       id: 'language',
       label: 'Language / 言語',
-      icon: Globe2,
       component: LanguageSelector,
     },
     {
       id: 'export',
       label: 'データエクスポート',
-      icon: Download,
       component: DataExport,
     },
     {
       id: 'import',
       label: 'データインポート',
-      icon: Upload,
       component: DataImport,
     },
     {
       id: 'info',
       label: t('settings.tabs.info'),
-      icon: SettingsIcon,
       component: AppInfo,
     },
     {
       id: 'license',
       label: t('settings.tabs.license'),
-      icon: FileText,
       component: LicenseInfo,
     },
   ];
@@ -121,9 +105,9 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
         </DialogHeader>
 
         <div className="flex-1 flex h-[calc(88vh-96px)] min-h-0">
-          <div className="flex-none w-52 pl-6 pr-2 pb-8">
+          <div className="flex-none w-44 pl-6 pr-2 pb-8">
             <nav className="flex flex-col gap-0.5" aria-label="Tabs">
-              {tabs.map(({ id, label, icon: Icon }) => {
+              {tabs.map(({ id, label }) => {
                 const isActive = activeTab === id;
                 return (
                   <button
@@ -132,16 +116,12 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
                     onClick={() => setActiveTab(id)}
                     aria-current={isActive ? 'page' : undefined}
                     className={cn(
-                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                      'rounded-md px-3 py-2 text-left text-sm transition-colors',
                       isActive
                         ? OPTION_BUTTON.selectedStrong
                         : OPTION_BUTTON.default,
                     )}
                   >
-                    <Icon
-                      className="h-4 w-4 flex-shrink-0"
-                      aria-hidden="true"
-                    />
                     <span className="truncate">{label}</span>
                   </button>
                 );
