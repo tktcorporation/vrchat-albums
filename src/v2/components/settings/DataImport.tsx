@@ -8,6 +8,7 @@ import { trpcClient, trpcReact } from '@/trpc';
 import { Button } from '../../../components/ui/button';
 import { Label } from '../../../components/ui/label';
 import {
+  BORDER,
   SPACING,
   STATUS_BADGE,
   TEXT_COLOR,
@@ -342,7 +343,7 @@ const DataImport = memo(() => {
           }
           if (importHistory && importHistory.length > 0) {
             return (
-              <ul className="divide-y divide-border/30">
+              <ul className={BORDER.listDivide}>
                 {importHistory.map((backup) => (
                   <li
                     key={backup.id}

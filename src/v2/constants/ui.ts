@@ -307,6 +307,8 @@ export const BORDER = {
   dividerX: 'border-t border-border/30',
   /** 垂直方向のディバイダー */
   dividerY: 'border-l border-border/30',
+  /** 縦積みリスト用の子要素間ディバイダー（`divide-y` + subtle border） */
+  listDivide: 'divide-y divide-border/30',
 } as const;
 
 export type BorderKey = keyof typeof BORDER;

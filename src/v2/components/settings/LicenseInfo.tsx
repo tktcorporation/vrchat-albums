@@ -2,7 +2,7 @@ import { memo } from 'react';
 
 import licenseJsonFile from '@/assets/licenses.json';
 
-import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
+import { BORDER, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import { SettingsSection } from './common';
 
@@ -36,7 +36,7 @@ const LicenseInfo = memo(() => {
 
   return (
     <SettingsSection title={t('settings.info.licenses.title')}>
-      <ul className="divide-y divide-border/30">
+      <ul className={BORDER.listDivide}>
         {libraries.map((lib) => (
           <li key={lib.path} className="py-4 space-y-1">
             <div className="flex items-center justify-between gap-4">

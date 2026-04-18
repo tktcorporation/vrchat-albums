@@ -9,6 +9,7 @@ import { trpcClient, trpcReact } from '@/trpc';
 import packageJson from '../../../../package.json';
 import { Button } from '../../../components/ui/button';
 import {
+  BORDER,
   ICON_SIZE,
   SPACING,
   STATUS_COLOR,
@@ -133,8 +134,8 @@ const AppInfo = memo(() => {
 
   return (
     <SettingsSection title={t('settings.info.title')}>
-      {/* key-value 行: カードをやめ、divide-y で控えめに区切る */}
-      <dl className="divide-y divide-border/30">
+      {/* key-value 行: カードをやめ、subtle divider で控えめに区切る */}
+      <dl className={BORDER.listDivide}>
         <div className="flex items-center justify-between py-3">
           <dt className={TEXT_COLOR.secondary}>{t('settings.info.version')}</dt>
           <dd>
@@ -156,70 +157,36 @@ const AppInfo = memo(() => {
           </dd>
         </div>
 
-        <div className={cn('py-3', SPACING.stack.tight)}>
-          <div className="flex items-center justify-between">
-            <dt className={TEXT_COLOR.secondary}>
-              {t('settings.info.update.checkForUpdates')}
-            </dt>
-            <dd>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCheckForUpdates}
-                disabled={updateState.status === 'checking'}
-                aria-label={t('settings.info.update.checkForUpdates')}
-              >
-                <span className="sr-only">
-                  {t('settings.info.update.checkForUpdates')}
-                </span>
-                {updateState.status === 'checking' ? (
-                  <RefreshCw
-                    className={cn(ICON_SIZE.sm.class, 'animate-spin')}
-                  />
-                ) : (
-                  <RefreshCw className={ICON_SIZE.sm.class} />
-                )}
-              </Button>
-            </dd>
-          </div>
-
-          {/* アップデートステータス表示 */}
-          {updateState.status === 'checking' && (
-            <p className={TYPOGRAPHY.caption.default}>
-              {t('settings.info.update.checking')}
-            </p>
-          )}
-          {updateState.status === 'up-to-date' && (
-            <div
-              className={cn(
-                'flex items-center gap-1.5',
-                TYPOGRAPHY.caption.default,
-                STATUS_COLOR.success.text,
-              )}
+        {/* dt/dd を直下に保ち <dl> の semantic 構造を維持する */}
+        <div className="flex items-start justify-between py-3">
+          <dt className={TEXT_COLOR.secondary}>
+            {t('settings.info.update.checkForUpdates')}
+          </dt>
+          <dd className={cn('flex flex-col items-end', SPACING.stack.tight)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCheckForUpdates}
+              disabled={updateState.status === 'checking'}
+              aria-label={t('settings.info.update.checkForUpdates')}
             >
-              <CheckCircle className={ICON_SIZE.xs.class} />
-              <span>{t('settings.info.update.upToDate')}</span>
-            </div>
-          )}
-          {updateState.status === 'available' && (
-            <div
-              className={cn(
-                'flex items-center gap-1.5',
-                TYPOGRAPHY.caption.default,
-                STATUS_COLOR.info.text,
-              )}
-            >
-              <Download className={ICON_SIZE.xs.class} />
-              <span>
-                {t('settings.info.update.available').replace(
-                  '{version}',
-                  updateState.version,
-                )}
+              <span className="sr-only">
+                {t('settings.info.update.checkForUpdates')}
               </span>
-            </div>
-          )}
-          {updateState.status === 'downloaded' && (
-            <div className={SPACING.stack.tight}>
+              {updateState.status === 'checking' ? (
+                <RefreshCw className={cn(ICON_SIZE.sm.class, 'animate-spin')} />
+              ) : (
+                <RefreshCw className={ICON_SIZE.sm.class} />
+              )}
+            </Button>
+
+            {/* アップデートステータス表示 */}
+            {updateState.status === 'checking' && (
+              <p className={TYPOGRAPHY.caption.default}>
+                {t('settings.info.update.checking')}
+              </p>
+            )}
+            {updateState.status === 'up-to-date' && (
               <div
                 className={cn(
                   'flex items-center gap-1.5',
@@ -228,28 +195,61 @@ const AppInfo = memo(() => {
                 )}
               >
                 <CheckCircle className={ICON_SIZE.xs.class} />
-                <span>{t('settings.info.update.downloaded')}</span>
+                <span>{t('settings.info.update.upToDate')}</span>
               </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => quitAndInstall()}
-                disabled={isInstalling}
+            )}
+            {updateState.status === 'available' && (
+              <div
+                className={cn(
+                  'flex items-center gap-1.5',
+                  TYPOGRAPHY.caption.default,
+                  STATUS_COLOR.info.text,
+                )}
               >
-                {t('settings.info.update.installAndRestart')}
-              </Button>
-            </div>
-          )}
-          {updateState.status === 'error' && (
-            <p
-              className={cn(
-                TYPOGRAPHY.caption.default,
-                STATUS_COLOR.error.text,
-              )}
-            >
-              {t('settings.info.update.checkFailed')}
-            </p>
-          )}
+                <Download className={ICON_SIZE.xs.class} />
+                <span>
+                  {t('settings.info.update.available').replace(
+                    '{version}',
+                    updateState.version,
+                  )}
+                </span>
+              </div>
+            )}
+            {updateState.status === 'downloaded' && (
+              <div
+                className={cn('flex flex-col items-end', SPACING.stack.tight)}
+              >
+                <div
+                  className={cn(
+                    'flex items-center gap-1.5',
+                    TYPOGRAPHY.caption.default,
+                    STATUS_COLOR.success.text,
+                  )}
+                >
+                  <CheckCircle className={ICON_SIZE.xs.class} />
+                  <span>{t('settings.info.update.downloaded')}</span>
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => quitAndInstall()}
+                  disabled={isInstalling}
+                >
+                  {t('settings.info.update.installAndRestart')}
+                </Button>
+              </div>
+            )}
+            {updateState.status === 'error' && (
+              <p
+                className={cn(
+                  TYPOGRAPHY.caption.default,
+                  STATUS_COLOR.error.text,
+                )}
+              >
+                {t('settings.info.update.checkFailed')}
+              </p>
+            )}
+          </dd>
         </div>
 
         <div className="flex items-center justify-between py-3">
