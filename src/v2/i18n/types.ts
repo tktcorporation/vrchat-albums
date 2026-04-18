@@ -113,7 +113,9 @@ export interface Translations {
       photoDirectory: string;
       logFile: string;
       browse: string;
+      extraDirectoriesLabel: string;
       addExtraDirectory: string;
+      addExtraDirectoryButton: string;
       removeExtraDirectory: string;
       validate: string;
       validating: string;
