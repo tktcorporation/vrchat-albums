@@ -1,6 +1,6 @@
 import { FolderOpen, Save } from 'lucide-react';
 import type { ChangeEvent } from 'react';
-import { memo } from 'react';
+import { memo, useId } from 'react';
 
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
@@ -61,7 +61,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
       onChange(event.target.value);
     };
 
-    const inputId = `path-input-${label.replaceAll(/\s+/g, '-').toLowerCase()}`;
+    const inputId = useId();
 
     return (
       <SettingsField

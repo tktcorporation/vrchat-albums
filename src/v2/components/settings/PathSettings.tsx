@@ -219,7 +219,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
         />
 
         {/* 追加フォルダ */}
-        <SettingsField label="追加で読み込ませる写真フォルダ">
+        <SettingsField label={t('settings.paths.extraDirectoriesLabel')}>
           <div className="flex flex-col gap-2">
             {extraDirs.map((dir: string, index: number) => (
               <div key={`extra-dir-${dir}`} className="flex gap-2">
@@ -243,7 +243,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
               size="sm"
               className="w-full justify-start text-muted-foreground hover:text-foreground"
             >
-              フォルダを追加
+              {t('settings.paths.addExtraDirectoryButton')}
             </Button>
           </div>
         </SettingsField>

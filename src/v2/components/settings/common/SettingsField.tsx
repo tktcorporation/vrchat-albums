@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { memo } from 'react';
 
 import { cn } from '../../../../components/lib/utils';
+import { TEXT_COLOR, TYPOGRAPHY } from '../../../constants/ui';
 
 interface SettingsFieldProps {
   /** フィールドラベル */
@@ -24,6 +25,10 @@ interface SettingsFieldProps {
  * gap-3 (12px) でラベルと入力の距離を近づけ、関係性を視覚的に結びつける。
  * フィールド同士の間隔は呼び出し側で制御（space-y-10 等）。
  *
+ * ラベルは `body.default` で控えめに。`SettingsItem` (トグル/セレクト) が
+ * `body.emphasis` を使うのに対し、テキスト入力フィールドではラベル自体より
+ * 入力値の可読性を優先するため非強調とする。
+ *
  * @example
  * <SettingsField label="ログファイル" htmlFor="log-input" error={logError}>
  *   <Input id="log-input" />
@@ -33,19 +38,32 @@ const SettingsField = memo<SettingsFieldProps>(
   ({ label, htmlFor, description, children, error, className }) => {
     return (
       <div className={cn('flex flex-col gap-3', className)}>
-        <label htmlFor={htmlFor} className="text-sm text-muted-foreground">
+        <label
+          htmlFor={htmlFor}
+          className={cn(TYPOGRAPHY.body.default, TEXT_COLOR.secondary)}
+        >
           {label}
         </label>
 
         {children}
 
         {description && (
-          <p className="text-sm text-muted-foreground/70 leading-relaxed">
+          <p
+            className={cn(
+              TYPOGRAPHY.body.small,
+              TEXT_COLOR.secondary,
+              'leading-relaxed',
+            )}
+          >
             {description}
           </p>
         )}
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <p className={cn(TYPOGRAPHY.body.default, 'text-destructive')}>
+            {error}
+          </p>
+        )}
       </div>
     );
   },
