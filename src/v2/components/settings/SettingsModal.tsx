@@ -10,12 +10,14 @@ import {
 import type React from 'react';
 import { memo, useState } from 'react';
 
+import { cn } from '../../../components/lib/utils';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '../../../components/ui/dialog';
+import { OPTION_BUTTON } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import LanguageSelector from '../LanguageSelector';
 import AppInfo from './AppInfo';
@@ -129,11 +131,12 @@ const SettingsModal = memo(({ onClose }: SettingsModalProps) => {
                     key={id}
                     onClick={() => setActiveTab(id)}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                    className={cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
                       isActive
-                        ? 'bg-foreground/[0.08] text-foreground font-medium'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]'
-                    }`}
+                        ? OPTION_BUTTON.selectedStrong
+                        : OPTION_BUTTON.default,
+                    )}
                   >
                     <Icon
                       className="h-4 w-4 flex-shrink-0"

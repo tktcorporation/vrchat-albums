@@ -2,7 +2,7 @@ import { memo } from 'react';
 
 import { cn } from '@/components/lib/utils';
 
-import { TYPOGRAPHY } from '../constants/ui';
+import { OPTION_BUTTON, TYPOGRAPHY } from '../constants/ui';
 import { useI18n } from '../i18n/store';
 import type { Language } from '../i18n/types';
 import { SettingsSection } from './settings/common';
@@ -31,8 +31,8 @@ const LanguageSelector = memo(() => {
             className={cn(
               'flex items-center justify-center px-3 py-4 rounded-md transition-colors',
               language === value
-                ? 'bg-foreground/[0.06] text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]',
+                ? OPTION_BUTTON.selected
+                : OPTION_BUTTON.default,
             )}
           >
             <span className={TYPOGRAPHY.body.emphasis}>{label}</span>

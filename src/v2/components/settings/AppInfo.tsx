@@ -167,7 +167,11 @@ const AppInfo = memo(() => {
                 size="sm"
                 onClick={handleCheckForUpdates}
                 disabled={updateState.status === 'checking'}
+                aria-label={t('settings.info.update.checkForUpdates')}
               >
+                <span className="sr-only">
+                  {t('settings.info.update.checkForUpdates')}
+                </span>
                 {updateState.status === 'checking' ? (
                   <RefreshCw
                     className={cn(ICON_SIZE.sm.class, 'animate-spin')}

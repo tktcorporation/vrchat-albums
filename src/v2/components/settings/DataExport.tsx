@@ -13,7 +13,12 @@ import { trpcClient, trpcReact } from '@/trpc';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { Label } from '../../../components/ui/label';
-import { SPACING, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
+import {
+  OPTION_BUTTON,
+  SPACING,
+  TEXT_COLOR,
+  TYPOGRAPHY,
+} from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
 import { SettingsInfoBox, SettingsSection } from './common';
 
@@ -167,8 +172,8 @@ const DataExport = memo(() => {
               className={cn(
                 'flex items-center justify-center gap-2 px-3 py-3 rounded-md transition-colors',
                 selectedPreset === value
-                  ? 'bg-foreground/[0.06] text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]',
+                  ? OPTION_BUTTON.selected
+                  : OPTION_BUTTON.default,
               )}
             >
               <Icon

@@ -3,7 +3,7 @@ import { memo } from 'react';
 
 import { cn } from '@/components/lib/utils';
 
-import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
+import { OPTION_BUTTON, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useTheme } from '../../hooks/useTheme';
 import { useI18n } from '../../i18n/store';
 import type { ThemeOption } from '../../utils/theme';
@@ -34,9 +34,7 @@ const ThemeSelector = memo(() => {
             aria-pressed={theme === value}
             className={cn(
               'flex flex-col items-center justify-center gap-2 px-3 py-5 rounded-md transition-colors',
-              theme === value
-                ? 'bg-foreground/[0.06] text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]',
+              theme === value ? OPTION_BUTTON.selected : OPTION_BUTTON.default,
             )}
           >
             <Icon
