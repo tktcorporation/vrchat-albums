@@ -25,9 +25,10 @@ interface SettingsFieldProps {
  * gap-3 (12px) でラベルと入力の距離を近づけ、関係性を視覚的に結びつける。
  * フィールド同士の間隔は呼び出し側で制御（space-y-10 等）。
  *
- * ラベルは `body.default` で控えめに。`SettingsItem` (トグル/セレクト) が
- * `body.emphasis` を使うのに対し、テキスト入力フィールドではラベル自体より
- * 入力値の可読性を優先するため非強調とする。
+ * ラベルは `body.default` + `TEXT_COLOR.secondary` で控えめに。`SettingsItem`
+ * (トグル/セレクト) はラベルを `body.emphasis` + `TEXT_COLOR.primary` で主役化
+ * するのに対し、テキスト入力フィールドでは入力値自体が主役なので、ラベルは
+ * weight とカラーの両方で背景化する。
  *
  * @example
  * <SettingsField label="ログファイル" htmlFor="log-input" error={logError}>

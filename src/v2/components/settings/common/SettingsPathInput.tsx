@@ -2,8 +2,10 @@ import { FolderOpen, Save } from 'lucide-react';
 import type { ChangeEvent } from 'react';
 import { memo, useId } from 'react';
 
+import { cn } from '../../../../components/lib/utils';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
+import { TEXT_COLOR } from '../../../constants/ui';
 import { SettingsField } from './SettingsField';
 
 interface SettingsPathInputProps {
@@ -101,7 +103,7 @@ const SettingsPathInput = memo<SettingsPathInputProps>(
               size="sm"
               onClick={onBrowse}
               disabled={disabled ?? readOnly}
-              className="text-muted-foreground/60 hover:text-foreground"
+              className={cn(TEXT_COLOR.muted, 'hover:text-foreground')}
             >
               <FolderOpen className="h-4 w-4" />
             </Button>
