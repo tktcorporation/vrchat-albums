@@ -367,9 +367,7 @@ const Contents = memo(() => {
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
                   VRChatのログと写真のフォルダを設定してください。
                 </p>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                  <PathSettings showRefreshAll={false} />
-                </div>
+                <PathSettings showRefreshAll={false} />
                 <div className="mt-6 text-right">
                   <button
                     type="button"
