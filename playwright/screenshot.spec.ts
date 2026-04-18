@@ -144,28 +144,29 @@ const screenshot = async (page: Page, title: string, suffix: string) => {
 
 /**
  * 設定モーダルを開いてパス設定タブのスクショを撮り、モーダルを閉じる。
- * AppHeader の設定ボタン (aria-label="設定") をクリックして、
- * モーダル初期表示タブ (パス設定) を撮影する。
+ * JA ロケール前提 (AppHeader の aria-label が t('common.settings') で "設定")。
+ * モーダル内スコープ ([role="dialog"]) でセレクタを限定することで、
+ * セットアップ画面の同名セレクタとの誤マッチを防ぐ。
  */
 const captureSettingsPaths = async (page: Page, title: string) => {
-  try {
-    const settingsButton = await page.waitForSelector('[aria-label="設定"]', {
-      timeout: 5000,
-    });
-    await settingsButton.click();
-    // モーダルが完全にレンダリングされるのを待つ (パス設定セクションの要素を検出)
-    await page.waitForSelector('[aria-label="input-写真ディレクトリ"]', {
-      timeout: 5000,
-    });
-    await page.waitForTimeout(500);
-    await screenshot(page, title, 'settings-paths');
-    // モーダルを閉じる
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(500);
-  } catch (error) {
-    console.error('Failed to capture settings paths screenshot:', error);
-    throw error;
-  }
+  const settingsButton = await page.waitForSelector('[aria-label="設定"]', {
+    timeout: 5000,
+  });
+  await settingsButton.click();
+  // Radix Dialog のフェードイン完了とパス設定要素の表示を待つ
+  const dialogPhotoInput =
+    '[role="dialog"] [aria-label="input-写真ディレクトリ"]';
+  await page.waitForSelector(dialogPhotoInput, {
+    timeout: 5000,
+    state: 'visible',
+  });
+  await screenshot(page, title, 'settings-paths');
+  // 後続の操作に副作用を残さないためモーダルを確実に閉じる
+  await page.keyboard.press('Escape');
+  await page.waitForSelector(dialogPhotoInput, {
+    state: 'hidden',
+    timeout: 5000,
+  });
 };
 
 const TIMEOUT = 60000; // Increased timeout to 60 seconds
