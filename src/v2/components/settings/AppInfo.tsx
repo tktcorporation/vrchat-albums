@@ -1,11 +1,5 @@
 import { Effect } from 'effect';
-import {
-  ArrowUpRight,
-  CheckCircle,
-  Download,
-  Info,
-  RefreshCw,
-} from 'lucide-react';
+import { ArrowUpRight, CheckCircle, Download, RefreshCw } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useState } from 'react';
 
@@ -15,10 +9,10 @@ import { trpcClient, trpcReact } from '@/trpc';
 import packageJson from '../../../../package.json';
 import { Button } from '../../../components/ui/button';
 import {
+  BORDER,
   ICON_SIZE,
   SPACING,
   STATUS_COLOR,
-  SURFACE_COLOR,
   TEXT_COLOR,
   TYPOGRAPHY,
 } from '../../constants/ui';
@@ -139,72 +133,72 @@ const AppInfo = memo(() => {
   };
 
   return (
-    <SettingsSection icon={Info} title={t('settings.info.title')}>
-      <div
-        className={`${SURFACE_COLOR.muted} rounded-lg ${SPACING.padding.card} ${SPACING.stack.tight}`}
-      >
-        <div className="flex justify-between">
-          <span className={TEXT_COLOR.secondary}>
-            {t('settings.info.version')}
-          </span>
-          <button
-            type="button"
-            className={`font-mono ${TEXT_COLOR.primary} cursor-pointer appearance-none border-none bg-transparent p-0`}
-            onClick={handleVersionClick}
-            onKeyDown={handleKeyDown}
-          >
-            {appVersion}
-          </button>
-        </div>
-        <div className="flex justify-between">
-          <span className={TEXT_COLOR.secondary}>
-            {t('settings.info.name')}
-          </span>
-          <span className={`font-mono ${TEXT_COLOR.primary}`}>
-            {packageJson.name}
-          </span>
+    <SettingsSection title={t('settings.info.title')}>
+      {/* key-value 行: カードをやめ、subtle divider で控えめに区切る */}
+      <dl className={BORDER.listDivide}>
+        <div className="flex items-center justify-between py-3">
+          <dt className={TEXT_COLOR.secondary}>{t('settings.info.version')}</dt>
+          <dd>
+            <button
+              type="button"
+              className={`font-mono ${TEXT_COLOR.primary} cursor-pointer appearance-none border-none bg-transparent p-0`}
+              onClick={handleVersionClick}
+              onKeyDown={handleKeyDown}
+            >
+              {appVersion}
+            </button>
+          </dd>
         </div>
 
-        {/* アップデートセクション */}
-        <div className="flex flex-col gap-2 mt-4">
-          <div className="flex items-center justify-between">
-            <span className={TEXT_COLOR.secondary}>
-              {t('settings.info.update.checkForUpdates')}
-            </span>
+        <div className="flex items-center justify-between py-3">
+          <dt className={TEXT_COLOR.secondary}>{t('settings.info.name')}</dt>
+          <dd className={`font-mono ${TEXT_COLOR.primary}`}>
+            {packageJson.name}
+          </dd>
+        </div>
+
+        {/* dt/dd を直下に保ち <dl> の semantic 構造を維持する */}
+        <div className="flex items-start justify-between py-3">
+          <dt className={TEXT_COLOR.secondary}>
+            {t('settings.info.update.checkForUpdates')}
+          </dt>
+          <dd className={cn('flex flex-col items-end', SPACING.stack.tight)}>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={handleCheckForUpdates}
               disabled={updateState.status === 'checking'}
+              aria-label={t('settings.info.update.checkForUpdates')}
             >
+              <span className="sr-only">
+                {t('settings.info.update.checkForUpdates')}
+              </span>
               {updateState.status === 'checking' ? (
                 <RefreshCw className={cn(ICON_SIZE.sm.class, 'animate-spin')} />
               ) : (
                 <RefreshCw className={ICON_SIZE.sm.class} />
               )}
             </Button>
-          </div>
 
-          {/* アップデートステータス表示 */}
-          {updateState.status === 'checking' && (
-            <p className={TYPOGRAPHY.caption.default}>
-              {t('settings.info.update.checking')}
-            </p>
-          )}
-          {updateState.status === 'up-to-date' && (
-            <div
-              className={cn(
-                'flex items-center gap-1.5',
-                TYPOGRAPHY.caption.default,
-                STATUS_COLOR.success.text,
-              )}
-            >
-              <CheckCircle className={ICON_SIZE.xs.class} />
-              <span>{t('settings.info.update.upToDate')}</span>
-            </div>
-          )}
-          {updateState.status === 'available' && (
-            <div className="flex flex-col gap-2">
+            {/* アップデートステータス表示 */}
+            {updateState.status === 'checking' && (
+              <p className={TYPOGRAPHY.caption.default}>
+                {t('settings.info.update.checking')}
+              </p>
+            )}
+            {updateState.status === 'up-to-date' && (
+              <div
+                className={cn(
+                  'flex items-center gap-1.5',
+                  TYPOGRAPHY.caption.default,
+                  STATUS_COLOR.success.text,
+                )}
+              >
+                <CheckCircle className={ICON_SIZE.xs.class} />
+                <span>{t('settings.info.update.upToDate')}</span>
+              </div>
+            )}
+            {updateState.status === 'available' && (
               <div
                 className={cn(
                   'flex items-center gap-1.5',
@@ -220,52 +214,54 @@ const AppInfo = memo(() => {
                   )}
                 </span>
               </div>
-            </div>
-          )}
-          {updateState.status === 'downloaded' && (
-            <div className="flex flex-col gap-2">
+            )}
+            {updateState.status === 'downloaded' && (
               <div
+                className={cn('flex flex-col items-end', SPACING.stack.tight)}
+              >
+                <div
+                  className={cn(
+                    'flex items-center gap-1.5',
+                    TYPOGRAPHY.caption.default,
+                    STATUS_COLOR.success.text,
+                  )}
+                >
+                  <CheckCircle className={ICON_SIZE.xs.class} />
+                  <span>{t('settings.info.update.downloaded')}</span>
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => quitAndInstall()}
+                  disabled={isInstalling}
+                >
+                  {t('settings.info.update.installAndRestart')}
+                </Button>
+              </div>
+            )}
+            {updateState.status === 'error' && (
+              <p
                 className={cn(
-                  'flex items-center gap-1.5',
                   TYPOGRAPHY.caption.default,
-                  STATUS_COLOR.success.text,
+                  STATUS_COLOR.error.text,
                 )}
               >
-                <CheckCircle className={ICON_SIZE.xs.class} />
-                <span>{t('settings.info.update.downloaded')}</span>
-              </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => quitAndInstall()}
-                disabled={isInstalling}
-              >
-                {t('settings.info.update.installAndRestart')}
-              </Button>
-            </div>
-          )}
-          {updateState.status === 'error' && (
-            <p
-              className={cn(
-                TYPOGRAPHY.caption.default,
-                STATUS_COLOR.error.text,
-              )}
-            >
-              {t('settings.info.update.checkFailed')}
-            </p>
-          )}
+                {t('settings.info.update.checkFailed')}
+              </p>
+            )}
+          </dd>
         </div>
 
-        <div className="flex justify-between mt-4">
-          <span className={TEXT_COLOR.secondary}>
-            {t('settings.info.openLog')}
-          </span>
-          <Button variant="outline" size="sm" onClick={handleOpenLog}>
-            <span className="sr-only">{t('settings.info.openLog')}</span>
-            <ArrowUpRight className={ICON_SIZE.sm.class} />
-          </Button>
+        <div className="flex items-center justify-between py-3">
+          <dt className={TEXT_COLOR.secondary}>{t('settings.info.openLog')}</dt>
+          <dd>
+            <Button variant="ghost" size="sm" onClick={handleOpenLog}>
+              <span className="sr-only">{t('settings.info.openLog')}</span>
+              <ArrowUpRight className={ICON_SIZE.sm.class} />
+            </Button>
+          </dd>
         </div>
-      </div>
+      </dl>
 
       <SqliteConsole
         isOpen={showSqlConsole}

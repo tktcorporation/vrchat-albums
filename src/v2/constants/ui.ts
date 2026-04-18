@@ -307,6 +307,8 @@ export const BORDER = {
   dividerX: 'border-t border-border/30',
   /** 垂直方向のディバイダー */
   dividerY: 'border-l border-border/30',
+  /** 縦積みリスト用の子要素間ディバイダー（`divide-y` + subtle border） */
+  listDivide: 'divide-y divide-border/30',
 } as const;
 
 export type BorderKey = keyof typeof BORDER;
@@ -336,3 +338,28 @@ export const STATUS_BADGE = {
 } as const;
 
 export type StatusBadgeKey = keyof typeof STATUS_BADGE;
+
+// =============================================================================
+// インタラクティブ要素（タブ・選択ボタン等）
+// =============================================================================
+
+/**
+ * 「余白で語る」設計におけるトーンベースの選択 UI スタイル。
+ *
+ * `bg-foreground/[0.0X]` 系の透過レイヤーで選択状態を表現するパターンを集約。
+ * SettingsModal のサイドバータブや Theme/Language/期間プリセット等、
+ * 設定画面全体で同じ選択スタイルを共有するために定義する。
+ *
+ * primary 色のアクセントは情報量過多になるため、foreground 色のトーン差で控えめに表現する。
+ */
+export const OPTION_BUTTON = {
+  /** 選択中の状態 */
+  selected: 'bg-foreground/[0.06] text-foreground',
+  /** 選択中の状態（強め: サイドバータブ等で使用） */
+  selectedStrong: 'bg-foreground/[0.08] text-foreground font-medium',
+  /** 非選択の状態（hover で軽く反応） */
+  default:
+    'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.03]',
+} as const;
+
+export type OptionButtonKey = keyof typeof OPTION_BUTTON;

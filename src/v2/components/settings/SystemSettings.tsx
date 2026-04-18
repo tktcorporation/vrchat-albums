@@ -1,9 +1,9 @@
-import { Settings } from 'lucide-react';
 import { memo } from 'react';
 
 import { Switch } from '@/components/ui/switch';
 import { trpcReact } from '@/trpc';
 
+import { SPACING } from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
 import { useI18n } from '../../i18n/store';
 import { SettingsItem, SettingsSection } from './common';
@@ -77,8 +77,8 @@ const SystemSettings = memo(() => {
     );
 
   return (
-    <SettingsSection icon={Settings} title={t('settings.system.title')}>
-      <div className="space-y-4">
+    <SettingsSection title={t('settings.system.title')}>
+      <div className={SPACING.stack.relaxed}>
         <SettingsItem
           label={t('settings.system.startupLaunch')}
           description={t('settings.system.startupDescription')}

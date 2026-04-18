@@ -1,9 +1,8 @@
-import { Globe2 } from 'lucide-react';
 import { memo } from 'react';
 
 import { cn } from '@/components/lib/utils';
 
-import { TEXT_COLOR, TYPOGRAPHY } from '../constants/ui';
+import { OPTION_BUTTON, TYPOGRAPHY } from '../constants/ui';
 import { useI18n } from '../i18n/store';
 import type { Language } from '../i18n/types';
 import { SettingsSection } from './settings/common';
@@ -21,28 +20,22 @@ const LanguageSelector = memo(() => {
   const { language, setLanguage } = useI18n();
 
   return (
-    <SettingsSection icon={Globe2} title="Language / 言語">
-      <div className="grid grid-cols-2 gap-3">
+    <SettingsSection title="Language / 言語">
+      <div className="grid grid-cols-2 gap-2">
         {languages.map(({ value, label }) => (
           <button
             key={value}
             type="button"
             onClick={() => setLanguage(value)}
+            aria-pressed={language === value}
             className={cn(
-              'flex items-center justify-center p-3 rounded-lg border-2 transition-colors',
+              'flex items-center justify-center px-3 py-4 rounded-md transition-colors',
               language === value
-                ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                : 'border-border hover:border-primary/50',
+                ? OPTION_BUTTON.selected
+                : OPTION_BUTTON.default,
             )}
           >
-            <span
-              className={cn(
-                TYPOGRAPHY.body.emphasis,
-                language === value ? 'text-primary' : TEXT_COLOR.secondary,
-              )}
-            >
-              {label}
-            </span>
+            <span className={TYPOGRAPHY.body.emphasis}>{label}</span>
           </button>
         ))}
       </div>

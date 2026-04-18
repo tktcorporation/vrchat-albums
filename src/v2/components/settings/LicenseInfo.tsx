@@ -1,9 +1,8 @@
-import { Book } from 'lucide-react';
 import { memo } from 'react';
 
 import licenseJsonFile from '@/assets/licenses.json';
 
-import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
+import { BORDER, TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import { useI18n } from '../../i18n/store';
 import { SettingsSection } from './common';
 
@@ -36,38 +35,40 @@ const LicenseInfo = memo(() => {
   }));
 
   return (
-    <SettingsSection icon={Book} title={t('settings.info.licenses.title')}>
-      <div className="divide-y divide-border">
+    <SettingsSection title={t('settings.info.licenses.title')}>
+      <ul className={BORDER.listDivide}>
         {libraries.map((lib) => (
-          <div key={lib.path} className="py-3">
-            <div className="flex items-center justify-between mb-1">
+          <li key={lib.path} className="py-4 space-y-1">
+            <div className="flex items-center justify-between gap-4">
               <span
-                className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.primary}`}
+                className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.primary} truncate`}
               >
                 {lib.name}
               </span>
-              <span className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
+              <span
+                className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted} flex-shrink-0`}
+              >
                 {lib.licenses}
               </span>
             </div>
             {lib.repository && (
               <div
-                className={`flex items-center justify-between ${TYPOGRAPHY.body.small}`}
+                className={`flex items-center justify-between gap-4 ${TYPOGRAPHY.body.small}`}
               >
                 <span className={TEXT_COLOR.secondary}>Repository</span>
                 <a
                   href={lib.repository}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:text-primary/80"
+                  className="text-primary hover:text-primary/80 truncate"
                 >
                   {lib.repository}
                 </a>
               </div>
             )}
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </SettingsSection>
   );
 });

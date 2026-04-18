@@ -1,27 +1,21 @@
 import { format } from 'date-fns';
-import {
-  AlertTriangle,
-  Clock,
-  FileText,
-  FolderOpen,
-  RotateCcw,
-  Upload,
-} from 'lucide-react';
 import type React from 'react';
 import { memo, useState } from 'react';
 
+import { cn } from '@/components/lib/utils';
 import { trpcClient, trpcReact } from '@/trpc';
 
 import { Button } from '../../../components/ui/button';
 import { Label } from '../../../components/ui/label';
 import {
+  BORDER,
   SPACING,
   STATUS_BADGE,
-  SURFACE_COLOR,
   TEXT_COLOR,
   TYPOGRAPHY,
 } from '../../constants/ui';
 import { useToast } from '../../hooks/use-toast';
+import { useI18n } from '../../i18n/store';
 import { SettingsInfoBox, SettingsSection } from './common';
 
 // Note: ImportHistoryItem interface is used for documentation purposes
@@ -51,6 +45,7 @@ const getFilenameFromPath = (filePath: string): string => {
  * SettingsModal内のデータインポートタブから利用される
  */
 const DataImport = memo(() => {
+  const { t } = useI18n();
   const { toast } = useToast();
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -214,136 +209,126 @@ const DataImport = memo(() => {
 
   return (
     <SettingsSection
-      icon={Upload}
       title="ログデータインポート"
       description="エクスポートされたlogStoreファイルを既存のデータに統合します"
     >
-      <div className={SPACING.stack.relaxed}>
-        {/* ファイル選択・ドロップエリア */}
-        <div className={SPACING.stack.default}>
-          <Label
-            className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
-          >
-            インポートファイル
-          </Label>
+      {/* ファイル選択・ドロップエリア */}
+      <div className={SPACING.stack.default}>
+        <Label
+          className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.secondary}`}
+        >
+          インポートファイル
+        </Label>
 
-          {/* ドロップエリア */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-              isDragOver
-                ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                : 'border-border'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <Upload className={`h-8 w-8 mx-auto mb-2 ${TEXT_COLOR.muted}`} />
-            <p
-              className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary} mb-3`}
-            >
-              logStoreファイルやディレクトリをドラッグ&amp;ドロップするか、下のボタンで選択してください
-            </p>
-            <div className="flex gap-2 justify-center">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void selectFiles()}
-                size="sm"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                ファイル選択
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void selectDirectory()}
-                size="sm"
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                ディレクトリ選択
-              </Button>
-            </div>
-          </div>
-
-          {/* 選択されたパス一覧 */}
-          {selectedPaths.length > 0 && (
-            <div className={SPACING.stack.tight}>
-              <Label
-                className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
-              >
-                選択されたアイテム ({selectedPaths.length}個)
-              </Label>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {selectedPaths.map((pathItem) => (
-                  <div
-                    key={pathItem}
-                    className={`${TYPOGRAPHY.body.small} ${STATUS_BADGE.primary} p-2 rounded`}
-                  >
-                    {getFilenameFromPath(pathItem)}
-                    <div className={`${TEXT_COLOR.muted} truncate`}>
-                      {pathItem}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedPaths([])}
-                className="text-xs"
-              >
-                選択をクリア
-              </Button>
-            </div>
+        {/* ドロップエリア: 機能的に borderが必須なので dashed を維持 */}
+        <div
+          className={cn(
+            'border border-dashed rounded-md px-6 py-10 text-center transition-colors',
+            isDragOver ? 'border-primary/60 bg-primary/5' : 'border-border/60',
           )}
-        </div>
-
-        {/* インポートボタン */}
-        <div className="pt-4">
-          <Button
-            onClick={handleImport}
-            disabled={isImporting || selectedPaths.length === 0}
-            className="w-full"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <p
+            className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.secondary, 'mb-4')}
           >
-            <Upload className="h-4 w-4 mr-2" />
-            {isImporting ? 'インポート中...' : 'インポート開始'}
-          </Button>
+            logStoreファイルやディレクトリをドラッグ&amp;ドロップするか、下のボタンで選択してください
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => void selectFiles()}
+              size="sm"
+            >
+              ファイル選択
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => void selectDirectory()}
+              size="sm"
+            >
+              ディレクトリ選択
+            </Button>
+          </div>
         </div>
 
-        {/* 説明 */}
-        <SettingsInfoBox title="インポート機能について" variant="info">
-          <ul className={`${TYPOGRAPHY.body.small} space-y-1`}>
-            <li>
-              • logStoreファイルまたはディレクトリを既存データに統合します
-            </li>
-            <li>
-              • ディレクトリ指定の場合、再帰的にlogStoreファイルを検索します
-            </li>
-            <li>• インポート前に自動的にバックアップが作成されます</li>
-            <li>• 重複データは自動的に除外されます</li>
-            <li>• インポート後、データベースが自動的に更新されます</li>
-            <li>• ロールバック機能で元の状態に戻すことができます</li>
-          </ul>
-        </SettingsInfoBox>
+        {/* 選択されたパス一覧: border や背景色ではなく、インデントと muted テキストで区別する */}
+        {selectedPaths.length > 0 && (
+          <div className={SPACING.stack.tight}>
+            <Label
+              className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.secondary}`}
+            >
+              選択されたアイテム ({selectedPaths.length}個)
+            </Label>
+            <ul className="max-h-32 overflow-y-auto space-y-1 pl-1">
+              {selectedPaths.map((pathItem) => (
+                <li key={pathItem} className={TYPOGRAPHY.body.small}>
+                  <div className={TEXT_COLOR.primary}>
+                    {getFilenameFromPath(pathItem)}
+                  </div>
+                  <div className={`${TEXT_COLOR.muted} truncate`}>
+                    {pathItem}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedPaths([])}
+              className="text-xs self-start"
+            >
+              選択をクリア
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* インポート履歴・ロールバック */}
-      <div className="border-t border-border pt-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4
-            className={`${TYPOGRAPHY.heading.tertiary} ${TEXT_COLOR.primary}`}
-          >
-            インポート履歴・ロールバック
-          </h4>
+      {/* インポート: ラベルのみの自然な幅のプライマリアクション */}
+      <div className="flex">
+        <Button
+          onClick={handleImport}
+          disabled={isImporting || selectedPaths.length === 0}
+        >
+          {isImporting ? 'インポート中...' : 'インポート開始'}
+        </Button>
+      </div>
+
+      {/* 説明 */}
+      <SettingsInfoBox title="インポート機能について" variant="info">
+        <ul className="space-y-1">
+          <li>・logStoreファイルまたはディレクトリを既存データに統合します</li>
+          <li>
+            ・ディレクトリ指定の場合、再帰的にlogStoreファイルを検索します
+          </li>
+          <li>・インポート前に自動的にバックアップが作成されます</li>
+          <li>・重複データは自動的に除外されます</li>
+          <li>・インポート後、データベースが自動的に更新されます</li>
+          <li>・ロールバック機能で元の状態に戻すことができます</li>
+        </ul>
+      </SettingsInfoBox>
+
+      {/* インポート履歴・ロールバック: border ではなく大きな余白で区切る */}
+      <div className={cn('pt-4', SPACING.stack.relaxed)}>
+        <div className="flex items-center justify-between">
+          <div className={SPACING.stack.tight}>
+            <h4 className={cn(TYPOGRAPHY.heading.tertiary, TEXT_COLOR.primary)}>
+              インポート履歴・ロールバック
+            </h4>
+            <p className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.secondary)}>
+              {t('settings.dataImport.historyDescription')}
+            </p>
+          </div>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => void refetchHistory()}
             disabled={isLoadingHistory}
           >
-            <RotateCcw className="h-4 w-4 mr-2" />
             更新
           </Button>
         </div>
@@ -351,34 +336,37 @@ const DataImport = memo(() => {
         {(() => {
           if (isLoadingHistory) {
             return (
-              <div className="text-center py-4">
-                <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
-                  履歴を読み込み中...
-                </div>
+              <div className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.muted)}>
+                履歴を読み込み中...
               </div>
             );
           }
           if (importHistory && importHistory.length > 0) {
             return (
-              <div className={SPACING.stack.default}>
+              <ul className={BORDER.listDivide}>
                 {importHistory.map((backup) => (
-                  <div
+                  <li
                     key={backup.id}
-                    className={`flex items-center justify-between p-4 border border-border rounded-lg ${SURFACE_COLOR.muted}`}
+                    className="flex items-start justify-between gap-4 py-4"
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <div
-                          className={`${TYPOGRAPHY.body.emphasis} ${TEXT_COLOR.primary}`}
+                    <div className={cn('flex-1 min-w-0', SPACING.stack.tight)}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={cn(
+                            TYPOGRAPHY.body.emphasis,
+                            TEXT_COLOR.primary,
+                            'truncate',
+                          )}
                         >
                           {backup.exportFolderPath}
-                        </div>
+                        </span>
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          className={cn(
+                            'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium',
                             backup.status === 'completed'
                               ? STATUS_BADGE.success
-                              : STATUS_BADGE.muted
-                          }`}
+                              : STATUS_BADGE.muted,
+                          )}
                         >
                           {backup.status === 'completed'
                             ? '適用済み'
@@ -386,33 +374,34 @@ const DataImport = memo(() => {
                         </span>
                       </div>
                       <div
-                        className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted} space-y-0.5`}
+                        className={cn(
+                          TYPOGRAPHY.body.small,
+                          TEXT_COLOR.muted,
+                          'space-y-0.5',
+                        )}
                       >
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-1">
-                            <Clock className="h-3 w-3" />
-                            <span>
-                              バックアップ:{' '}
-                              {format(
-                                new Date(backup.backupTimestamp),
-                                'yyyy/MM/dd HH:mm:ss',
-                              )}
-                            </span>
-                          </div>
-                          <div>
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <span>
+                            バックアップ:{' '}
+                            {format(
+                              new Date(backup.backupTimestamp),
+                              'yyyy/MM/dd HH:mm:ss',
+                            )}
+                          </span>
+                          <span>
                             インポート:{' '}
                             {format(
                               new Date(backup.importTimestamp),
                               'yyyy/MM/dd HH:mm:ss',
                             )}
-                          </div>
+                          </span>
                         </div>
                         <div>
-                          {backup.totalLogLines.toLocaleString()}行 •{' '}
+                          {backup.totalLogLines.toLocaleString()}行 /{' '}
                           {backup.exportedFiles.length}ファイル
                         </div>
                         {backup.sourceFiles.length > 0 && (
-                          <div className="text-primary">
+                          <div className="text-primary/80 truncate">
                             インポート元:{' '}
                             {backup.sourceFiles
                               .map((f) => getFilenameFromPath(f))
@@ -421,30 +410,25 @@ const DataImport = memo(() => {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      {backup.status === 'completed' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRollback(backup.id)}
-                          disabled={isRollingBack}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <AlertTriangle className="h-4 w-4 mr-1" />
-                          この時点に戻す
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+                    {backup.status === 'completed' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRollback(backup.id)}
+                        disabled={isRollingBack}
+                        className="text-destructive hover:text-destructive flex-shrink-0"
+                      >
+                        この時点に戻す
+                      </Button>
+                    )}
+                  </li>
                 ))}
-              </div>
+              </ul>
             );
           }
           return (
-            <div className="text-center py-8">
-              <div className={`${TYPOGRAPHY.body.small} ${TEXT_COLOR.muted}`}>
-                インポート履歴がありません
-              </div>
+            <div className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.muted)}>
+              インポート履歴がありません
             </div>
           );
         })()}

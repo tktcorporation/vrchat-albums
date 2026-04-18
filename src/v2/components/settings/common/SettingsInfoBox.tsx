@@ -1,23 +1,25 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { AlertTriangle, Info, Lightbulb } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { memo } from 'react';
 
 import { cn } from '../../../../components/lib/utils';
-import { SPACING, STATUS_COLOR, TYPOGRAPHY } from '../../../constants/ui';
+import { STATUS_COLOR, TEXT_COLOR, TYPOGRAPHY } from '../../../constants/ui';
 
 /**
- * InfoBoxのバリアント定義
+ * InfoBox のバリアント定義。
+ *
+ * 「余白で語る」方針に合わせ、装飾的アイコンは置かず左アクセントバーだけで
+ * 情報の重要度を示す。バリアントは左 border の色のみに反映される。
  */
-const infoBoxVariants = cva('rounded-lg', {
+const infoBoxVariants = cva('border-l-2 pl-4 py-1', {
   variants: {
     variant: {
       /** 一般的な情報・ヒント */
-      info: 'bg-primary/10 dark:bg-primary/20',
+      info: 'border-primary/40',
       /** 注意事項 */
-      warning: STATUS_COLOR.warning.bg,
+      warning: STATUS_COLOR.warning.border,
       /** 成功・完了 */
-      success: STATUS_COLOR.success.bg,
+      success: STATUS_COLOR.success.border,
     },
   },
   defaultVariants: {
@@ -32,55 +34,19 @@ interface SettingsInfoBoxProps extends InfoBoxVariantProps {
   title?: string;
   /** コンテンツ */
   children: ReactNode;
-  /** アイコンを非表示にする */
-  hideIcon?: boolean;
   /** 追加のクラス名 */
   className?: string;
 }
 
 /**
- * バリアントに対応するアイコンを取得
- */
-const getVariantIcon = (variant: InfoBoxVariantProps['variant']) => {
-  switch (variant) {
-    case 'warning':
-      return AlertTriangle;
-    case 'success':
-      return Lightbulb;
-    case 'info':
-    case undefined:
-    case null:
-      return Info;
-  }
-};
-
-/**
- * バリアントに対応するテキストカラーを取得
- */
-const getTextColorClass = (variant: InfoBoxVariantProps['variant']) => {
-  switch (variant) {
-    case 'warning':
-      return STATUS_COLOR.warning.text;
-    case 'success':
-      return STATUS_COLOR.success.text;
-    case 'info':
-    case undefined:
-    case null:
-      return 'text-primary';
-  }
-};
-
-/**
- * 設定画面用の情報ボックスコンポーネント
+ * 設定画面用の情報ボックス。
  *
- * ヒント、注意事項、成功メッセージなどを表示する。
+ * 左アクセントバーとタイポグラフィのみで情報階層を表現する。
+ * タイトルは emphasis、本文は secondary muted。
  *
  * @example
  * <SettingsInfoBox title="インポート機能について">
- *   <ul>
- *     <li>• logStoreファイルを統合します</li>
- *     <li>• 重複データは除外されます</li>
- *   </ul>
+ *   <ul>...</ul>
  * </SettingsInfoBox>
  *
  * @example
@@ -89,32 +55,23 @@ const getTextColorClass = (variant: InfoBoxVariantProps['variant']) => {
  * </SettingsInfoBox>
  */
 const SettingsInfoBox = memo<SettingsInfoBoxProps>(
-  ({ title, variant = 'info', children, hideIcon, className }) => {
-    const Icon = getVariantIcon(variant);
-    const textColor = getTextColorClass(variant);
-
+  ({ title, variant = 'info', children, className }) => {
     return (
-      <div
-        className={cn(
-          infoBoxVariants({ variant }),
-          SPACING.padding.card,
-          className,
-        )}
-      >
+      <div className={cn(infoBoxVariants({ variant }), className)}>
         {title && (
           <h4
-            className={cn(
-              'flex items-center',
-              TYPOGRAPHY.body.emphasis,
-              textColor,
-              'mb-2',
-            )}
+            className={cn('mb-2', TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}
           >
-            {!hideIcon && <Icon className="h-4 w-4 mr-2" aria-hidden="true" />}
             {title}
           </h4>
         )}
-        <div className={cn(TYPOGRAPHY.body.small, `${textColor}/80`)}>
+        <div
+          className={cn(
+            TYPOGRAPHY.body.small,
+            TEXT_COLOR.secondary,
+            'leading-relaxed',
+          )}
+        >
           {children}
         </div>
       </div>
