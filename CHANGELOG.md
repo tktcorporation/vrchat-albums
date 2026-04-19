@@ -1,5 +1,97 @@
 # Changelog
 
+## 0.30.1
+
+### Patch Changes
+
+- [#790](https://github.com/tktcorporation/vrchat-albums/pull/790) [`d7db9bd`](https://github.com/tktcorporation/vrchat-albums/commit/d7db9bdc00d12726123b3e2b0a93d337fc85be3c) Thanks [@tktcorporation](https://github.com/tktcorporation)! - perf: XMP メタデータ抽出を部分読み込み + バッチ一発呼びで高速化
+
+  従来はファイル全体を `fs::read` で読み込み、1 ファイルずつ N-API 経由で呼んでいたが、
+  Rust 側で部分読み込み（JPEG: APP1 マーカースキャン、PNG: iTXt チャンクヘッダー走査）+
+  Rayon 全コア並列のバッチ関数に切り替え。
+
+  - 新規: `packages/exif-native/src/xmp/streaming_reader.rs` (Rust テスト 10 件含む)
+  - 変更: `read_vrc_xmp` / `read_vrc_xmp_batch` を部分読み込み版に置き換え
+  - 変更: `service.ts` を `readXmpTagsBatch` 一発呼びに簡略化
+  - 削除: `parsePhotoMetadataBatch` のループ処理（Rust バッチで不要に）
+
+- [#811](https://github.com/tktcorporation/vrchat-albums/pull/811) [`1d867be`](https://github.com/tktcorporation/vrchat-albums/commit/1d867beb84eca9fa9c81e95cf147425b6a2ca267) Thanks [@tktcorporation](https://github.com/tktcorporation)! - feat(lint-contrast): 非テキスト UI コンポーネントとグラデ背景の擬陽性を自動で吸収
+
+  `@vrchat-albums/lint-contrast` に以下を追加:
+
+  - **WCAG 1.4.11 non-text contrast**: `<svg>` / `<circle>` などの SVG primitives と `lucide-react` からインポートしたアイコンコンポーネントは 3:1 基準で評価
+  - **グラデーション背景の skip**: `bg-gradient-*` / `bg-linear-*` / `bg-radial-*` / `bg-conic-*` を持つ要素とその配下は単色解釈できないため skip
+  - **inline disable directive**: `{/* lint-contrast-disable-next-line */}` / `// lint-contrast-disable` で個別抑制も可能（通常はルール側で解決する escape hatch）
+
+  これにより MigrationDialog / App / PhotoCard 等の装飾アイコンやグラデ上の白文字がコード側に抑制コメントを書かずに擬陽性扱いされなくなる。ユーザー向けの機能変更はなし (内部 lint ツールのみ)。
+
+- [#806](https://github.com/tktcorporation/vrchat-albums/pull/806) [`281fa08`](https://github.com/tktcorporation/vrchat-albums/commit/281fa0834153caf783dc847bf405f83591e6d077) Thanks [@tktcorporation](https://github.com/tktcorporation)! - build: デザインシステム・コントラスト静的検証ツール `@vrchat-albums/lint-contrast` を packages/ 配下に独立パッケージとして追加
+
+  新規の内部開発ツール。`pnpm lint:contrast` でライト/ダーク両モードの WCAG AA コントラストを JSX AST 走査により静的検証する。ユーザー向けの機能変更はなく、本体パッケージの devDependencies 整理 (`oxc-parser` / `culori` 等を新パッケージ側へ移動) とルート scripts への委譲コマンド追加のみ。
+
+- [#791](https://github.com/tktcorporation/vrchat-albums/pull/791) [`625325f`](https://github.com/tktcorporation/vrchat-albums/commit/625325f9c476d3e24814e491b7bd7ee6a0fdf12f) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix: syncRDBClient のマイグレーションスキップが機能していなかったバグを修正
+
+  match() の結果を await していなかったため、同一バージョンでの再起動時も
+  毎回 7 テーブルの ALTER TABLE スキーマ比較が実行されていた。
+
+- [#811](https://github.com/tktcorporation/vrchat-albums/pull/811) [`1d867be`](https://github.com/tktcorporation/vrchat-albums/commit/1d867beb84eca9fa9c81e95cf147425b6a2ca267) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix(ui): ライトモードの色トークンを WCAG AA に適合するよう調整
+
+  `--destructive` / `--info` / `--success` / `--warning` / `--muted-foreground` の light mode L 値を下げ、`text-*` / `bg-*` 両用途でコントラスト比 4.5:1 以上を満たすように変更。`--primary` はビビッドオレンジ (52% L) を維持し、`--primary-foreground` を黒 (0% L) に変更することで `bg-primary + text-primary-foreground` ペアの AA を担保。アイコン用途の `text-primary` (App.tsx の progress circle、MigrationDialog のアクセントアイコン) は `text-accent-foreground` (やや濃いめのオレンジ) に置換し非テキスト 3:1 基準をクリア。併せて ErrorBoundary / SearchOverlay / SqliteConsole / MigrationDialog の `text-*/opacity` 付き文言と `text-warning` 本文を、セマンティックトークンの本来の役割に合わせて書き直し。
+
+- [#795](https://github.com/tktcorporation/vrchat-albums/pull/795) [`5f89df7`](https://github.com/tktcorporation/vrchat-albums/commit/5f89df7a525d0f9ae0d9a4846a5163b5846a5188) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix: Rust バッチ関数を AsyncTask 化してローディング中の UI フリーズを解消
+
+  readVrcXmpBatch と readImageDimensionsBatch が同期的な N-API 呼び出しだったため、
+  Rayon 並列処理中にメインスレッドがブロックされ UI がフリーズしていた問題を修正。
+
+  - napi-rs の AsyncTask で libuv スレッドプール上で処理を実行し、メインスレッドを非ブロック化
+  - XMP ストリーミングリーダーに BufReader(64KB) を追加して syscall 数を大幅削減
+
+- [#794](https://github.com/tktcorporation/vrchat-albums/pull/794) [`e843bfc`](https://github.com/tktcorporation/vrchat-albums/commit/e843bfc2af1f3ae2ad93478c5a5c15bf7c3d9e0b) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix: 初期化前に PhotoGallery が表示される問題を修正
+
+  - Contents コンポーネントが idle 状態で PhotoGallery をレンダリングし、
+    DB 未作成の段階でクエリが発火する問題を修正
+  - tRPC subscription 未接続時に初期化が永久に開始されない問題を
+    3 秒タイムアウトフォールバックで修正
+
+- [#801](https://github.com/tktcorporation/vrchat-albums/pull/801) [`8c66060`](https://github.com/tktcorporation/vrchat-albums/commit/8c660603cb6d655cc3989dc152fab7a12e15198e) Thanks [@tktcorporation](https://github.com/tktcorporation)! - perf: フルロード時の DB バッチ書き込みを高速化（findAll 除去・PRAGMA 最適化・進捗バー対応）
+
+- [#802](https://github.com/tktcorporation/vrchat-albums/pull/802) [`f13184b`](https://github.com/tktcorporation/vrchat-albums/commit/f13184b721cbd5fa612238d255f11b5e2aeb3976) Thanks [@tktcorporation](https://github.com/tktcorporation)! - FULL ロード時のパフォーマンス改善: ワールド名検索の O(n^2)解消と DB バッチ挿入のトランザクション化
+
+- [#800](https://github.com/tktcorporation/vrchat-albums/pull/800) [`285722c`](https://github.com/tktcorporation/vrchat-albums/commit/285722ca23fae371a9b80c34dce5d322b1d4ae39) Thanks [@tktcorporation](https://github.com/tktcorporation)! - perf: PNG XMP 抽出で IDAT 到達時に走査を打ち切り、フルロードを高速化
+
+  VRChat 写真 (16MB, ~1975 IDAT チャンク) のメタデータ抽出で IDAT 以降を
+  全走査していた問題を修正。IDAT 到達で打ち切ることで膨大な I/O を回避。
+
+- [#808](https://github.com/tktcorporation/vrchat-albums/pull/808) [`77000b4`](https://github.com/tktcorporation/vrchat-albums/commit/77000b42a5625239bab7fb713b4e3e11d849ba03) Thanks [@tktcorporation](https://github.com/tktcorporation)! - refactor(ui): 設定画面を「余白で語る」デザインにリデザイン
+
+  区切り線・背景色・アイコン装飾・カード枠を大幅に削減し、タイポグラフィと余白だけで階層を表現する設計に統一。サイドバーの罫線、セクションヘッダーのアイコン、`bg-muted` カードラッパー、`border-t` セパレーターを撤去し、Theme/Language/期間プリセットの `border-2` 選択 UI をフラットなトーン差で表現。機能変更なし。
+
+- [#812](https://github.com/tktcorporation/vrchat-albums/pull/812) [`bd4927b`](https://github.com/tktcorporation/vrchat-albums/commit/bd4927b255c97ed722a3652c27c67224f1cf6ba3) Thanks [@tktcorporation](https://github.com/tktcorporation)! - refactor(electron): Effect TS の重複ボイラープレートを SSOT 化
+
+  各 tRPC コントローラーで重複していた `Effect.mapError(e => UserFacingError.withStructuredInfo({...}))`
+  パターンを `electron/lib/errorMapping.ts` の `toUserFacing` / `mapByTag` /
+  プリセットマッパー (`mapToFileOperationError` / `mapToOpenPathError` / `mapToUnknownError`)
+  に集約。Electron 環境検出パターンも `withElectronApp(fallback, fn)` に統一。
+
+  ユーザー向け挙動の変更はなし。エラーメッセージの内容と表示タイミングは旧コードと等価。
+
+  - 新規: `electron/lib/errorMapping.ts`, `errorMapping.test.ts`
+  - 追加: `electron/lib/electronModules.ts` に `withElectronApp` ヘルパー
+  - 削除: `electron/lib/dbHelper.ts` の未使用コメントアウト 150 行と未使用エラー型
+  - ast-grep ルール 3 本追加/更新で将来の再発を防止
+
+- [#809](https://github.com/tktcorporation/vrchat-albums/pull/809) [`a4556e7`](https://github.com/tktcorporation/vrchat-albums/commit/a4556e7fe1c28bda1260b8d0c95b35ccef370b69) Thanks [@tktcorporation](https://github.com/tktcorporation)! - refactor(ui): 設定画面の input 余白と枠を整えた
+
+  - Input の過度な装飾 (border + shadow + backdrop-blur) を撤廃し、`bg-muted/40` のフラットな窪み表現に
+  - SettingsField を新設して label→input→error を gap-3 で統一、label と input の距離を 16px→12px に圧縮
+  - パス設定セクションのフィールド間余白を 24px→40px に広げ、視覚的階層を明確化
+
+- [#810](https://github.com/tktcorporation/vrchat-albums/pull/810) [`9220432`](https://github.com/tktcorporation/vrchat-albums/commit/922043237cdc7620c4d3c7baf576929232c842da) Thanks [@tktcorporation](https://github.com/tktcorporation)! - refactor(ui): 初期セットアップ画面の冗長な案内とステップ番号を削除
+
+  - ステップ 1「フォルダを設定」・ステップ 2「設定を確認」の番号付き UI を削除し、見出し+`PathSettings`+続けるボタンのフラット構成に
+  - 外側の「VRChat のログと写真のフォルダを設定してください。」を削除（`PathSettings` 内部の「パス設定」セクション説明と重複していたため）
+  - `PathSettings` を囲っていたカードラッパーを削除し、`SettingsSection` の見出し・余白に一本化
+
 ## 0.30.0
 
 ### Minor Changes
