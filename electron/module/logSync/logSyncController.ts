@@ -1,13 +1,13 @@
 import { Effect } from 'effect';
-import { match } from 'ts-pattern';
 import z from 'zod';
 
 import { runEffect } from '../../lib/effectTRPC';
 import {
-  ERROR_CATEGORIES,
-  ERROR_CODES,
-  UserFacingError,
-} from '../../lib/errors';
+  mapByTag,
+  mapToUnknownError,
+  toUserFacing,
+} from '../../lib/errorMapping';
+import { ERROR_CATEGORIES, ERROR_CODES } from '../../lib/errors';
 import { procedure, router as trpcRouter } from '../../trpc';
 import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from './service';
 
@@ -17,40 +17,28 @@ const logSyncModeSchema = z.enum([
 ]);
 
 /**
- * ログ同期エラーを UserFacingError に変換するヘルパー
- * VRChatLogFileError, VRChatLogError, LogInfoError, LogInfoServiceError を統一的に処理
+ * ログ同期エラーを UserFacingError に変換するヘルパー。
+ *
+ * VRChatLogFileError, VRChatLogError, LogInfoError, LogInfoServiceError を
+ * `_tag` で分岐し、未知の tag は「ログ同期中にエラー」として扱う。
  */
-const mapSyncErrorToUserFacing = (e: { message: string; _tag?: string }) =>
-  match(e._tag)
-    .with('LogFileDirNotFound', () =>
-      UserFacingError.withStructuredInfo({
-        code: ERROR_CODES.VRCHAT_DIRECTORY_SETUP_REQUIRED,
-        category: ERROR_CATEGORIES.SETUP_REQUIRED,
-        message: e.message,
-        userMessage:
-          'VRChatのログディレクトリが見つかりません。VRChatがインストールされているか確認してください。',
-        cause: e instanceof Error ? e : new Error(e.message),
-      }),
-    )
-    .with('LogFilesNotFound', () =>
-      UserFacingError.withStructuredInfo({
-        code: ERROR_CODES.FILE_NOT_FOUND,
-        category: ERROR_CATEGORIES.FILE_NOT_FOUND,
-        message: e.message,
-        userMessage:
-          'VRChatのログファイルが見つかりません。VRChatを一度起動してから再度お試しください。',
-        cause: e instanceof Error ? e : new Error(e.message),
-      }),
-    )
-    .otherwise(() =>
-      UserFacingError.withStructuredInfo({
-        code: ERROR_CODES.UNKNOWN,
-        category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-        message: e.message,
-        userMessage: 'ログ同期中にエラーが発生しました。',
-        cause: e instanceof Error ? e : new Error(e.message),
-      }),
-    );
+const mapSyncErrorToUserFacing = mapByTag<{ _tag?: string; message: string }>(
+  {
+    LogFileDirNotFound: toUserFacing({
+      code: ERROR_CODES.VRCHAT_DIRECTORY_SETUP_REQUIRED,
+      category: ERROR_CATEGORIES.SETUP_REQUIRED,
+      userMessage:
+        'VRChatのログディレクトリが見つかりません。VRChatがインストールされているか確認してください。',
+    }),
+    LogFilesNotFound: toUserFacing({
+      code: ERROR_CODES.FILE_NOT_FOUND,
+      category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+      userMessage:
+        'VRChatのログファイルが見つかりません。VRChatを一度起動してから再度お試しください。',
+    }),
+  },
+  mapToUnknownError('ログ同期中にエラーが発生しました。'),
+);
 
 /**
  * ログ同期のためのtRPCルーター

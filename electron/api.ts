@@ -3,6 +3,7 @@ import z from 'zod';
 
 import { initializeMainSentry } from './index';
 import { runEffect, runEffectExit } from './lib/effectTRPC';
+import { mapToFileOperationError } from './lib/errorMapping';
 import { ERROR_CATEGORIES, ERROR_CODES, UserFacingError } from './lib/errors';
 import { logger } from './lib/logger';
 import { backgroundSettingsRouter } from './module/backgroundSettings/controller/backgroundSettingsController';
@@ -180,49 +181,25 @@ export const router = trpcRouter({
     }),
   openPathOnExplorer: procedure.input(z.string()).mutation(async (ctx) => {
     await runEffect(
-      service.openPathOnExplorer(ctx.input).pipe(
-        Effect.mapError((e) =>
-          UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.UNKNOWN,
-            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-            message: String(e),
-            userMessage: 'ファイル操作中にエラーが発生しました。',
-            cause: e instanceof Error ? e : new Error(String(e)),
-          }),
-        ),
-      ),
+      service
+        .openPathOnExplorer(ctx.input)
+        .pipe(Effect.mapError(mapToFileOperationError)),
     );
     return true;
   }),
   openElectronLogOnExplorer: procedure.mutation(async () => {
     await runEffect(
-      service.openElectronLogOnExplorer().pipe(
-        Effect.mapError((e) =>
-          UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.UNKNOWN,
-            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-            message: String(e),
-            userMessage: 'ファイル操作中にエラーが発生しました。',
-            cause: e instanceof Error ? e : new Error(String(e)),
-          }),
-        ),
-      ),
+      service
+        .openElectronLogOnExplorer()
+        .pipe(Effect.mapError(mapToFileOperationError)),
     );
     return true;
   }),
   openDirOnExplorer: procedure.input(z.string()).mutation(async (ctx) => {
     await runEffect(
-      service.openDirOnExplorer(ctx.input).pipe(
-        Effect.mapError((e) =>
-          UserFacingError.withStructuredInfo({
-            code: ERROR_CODES.UNKNOWN,
-            category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-            message: String(e),
-            userMessage: 'ファイル操作中にエラーが発生しました。',
-            cause: e instanceof Error ? e : new Error(String(e)),
-          }),
-        ),
-      ),
+      service
+        .openDirOnExplorer(ctx.input)
+        .pipe(Effect.mapError(mapToFileOperationError)),
     );
     return true;
   }),
@@ -234,15 +211,9 @@ export const router = trpcRouter({
             // キャンセルは silent（ユーザーの意図的な操作）
             return Effect.void;
           }
-          return Effect.fail(
-            UserFacingError.withStructuredInfo({
-              code: ERROR_CODES.UNKNOWN,
-              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-              message: String(e),
-              userMessage: 'ファイル操作中にエラーが発生しました。',
-              cause: e instanceof Error ? e : new Error(String(e)),
-            }),
-          );
+          // 元のエラーオブジェクトをそのまま mapToFileOperationError に渡し、
+          // toUserFacing 側で `cause` として元の Error/スタックトレースを保持する
+          return Effect.fail(mapToFileOperationError(e));
         }),
       ),
     );

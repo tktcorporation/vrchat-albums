@@ -2,16 +2,22 @@ import { Cause, Effect, Exit, Option } from 'effect';
 import z from 'zod';
 
 import { runEffect } from '../../lib/effectTRPC';
-import {
-  ERROR_CATEGORIES,
-  ERROR_CODES,
-  UserFacingError,
-} from '../../lib/errors';
+import { toUserFacing } from '../../lib/errorMapping';
+import { ERROR_CATEGORIES, ERROR_CODES } from '../../lib/errors';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
 import * as utilsService from './../electronUtil/service';
 import * as vrchatPhotoService from './../vrchatPhoto/vrchatPhoto.service';
 import { VRChatPhotoDirPathSchema } from './valueObjects';
+
+/**
+ * 写真ファイルが見つからないエラー → UserFacingError 変換。
+ */
+const mapPhotoNotFoundError = toUserFacing({
+  code: ERROR_CODES.FILE_NOT_FOUND,
+  category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+  userMessage: '写真ファイルが見つかりません。',
+});
 
 /**
  * index 済みの写真ファイルのpath一覧を取得する
@@ -119,17 +125,9 @@ export const vrchatPhotoRouter = () =>
       .input(z.object({ photoPath: z.string(), width: z.number().optional() }))
       .mutation(async (ctx) => {
         return runEffect(
-          vrchatPhotoService.getVRChatPhotoItemData(ctx.input).pipe(
-            Effect.mapError((e) =>
-              UserFacingError.withStructuredInfo({
-                code: ERROR_CODES.FILE_NOT_FOUND,
-                category: ERROR_CATEGORIES.FILE_NOT_FOUND,
-                message: `Photo file operation error: ${String(e)}`,
-                userMessage: '写真ファイルが見つかりません。',
-                cause: new Error(String(e)),
-              }),
-            ),
-          ),
+          vrchatPhotoService
+            .getVRChatPhotoItemData(ctx.input)
+            .pipe(Effect.mapError(mapPhotoNotFoundError)),
         );
       }),
     getVRChatPhotoItemData: procedure.input(z.string()).query(async (ctx) => {

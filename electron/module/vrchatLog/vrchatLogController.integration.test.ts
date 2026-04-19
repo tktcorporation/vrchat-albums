@@ -205,9 +205,11 @@ vi.mock('./backupService/backupService', async (importOriginal) => {
 });
 
 // ロールバックサービスのモック
-vi.mock('./backupService/rollbackService', async () => {
+vi.mock('./backupService/rollbackService', async (importOriginal) => {
+  const original = await importOriginal();
   const { Effect } = await import('effect');
   return {
+    ...(original as object),
     rollbackService: {
       rollbackToBackup: vi.fn((backup: ImportBackupMetadata) => {
         console.log('[Mock] rollbackToBackup called for backup:', backup.id);

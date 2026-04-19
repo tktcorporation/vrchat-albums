@@ -4,6 +4,7 @@ import { match, P } from 'ts-pattern';
 
 import { reloadMainWindow } from '../../electronUtil';
 import { runEffect } from '../../lib/effectTRPC';
+import { toUserFacing } from '../../lib/errorMapping';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -21,45 +22,39 @@ import { procedure, router as trpcRouter } from './../../trpc';
 import type { UpdateError } from './errors';
 import * as settingService from './service';
 
+const mapUpdateErrorAsNetwork = toUserFacing<UpdateError>({
+  category: ERROR_CATEGORIES.NETWORK_ERROR,
+  userMessage: (e) => `アップデートに失敗しました: ${e.message}`,
+});
+
 /**
- * UpdateError → UserFacingError 変換ヘルパー（ネットワークエラーカテゴリ）
+ * UpdateError → UserFacingError 変換ヘルパー（ネットワークエラーカテゴリ）。
+ *
+ * E チャネルに `UpdateError | UserFacingError` が混在するケースのため、
+ * UserFacingError は素通し、UpdateError のみネットワークエラーとして変換する。
  */
 const mapUpdateError = (e: UpdateError | UserFacingError): UserFacingError => {
   if (e instanceof UserFacingError) {
     return e;
   }
-  return UserFacingError.withStructuredInfo({
-    code: ERROR_CODES.UNKNOWN,
-    category: ERROR_CATEGORIES.NETWORK_ERROR,
-    message: e.message,
-    userMessage: `アップデートに失敗しました: ${e.message}`,
-    cause: e,
-  });
+  return mapUpdateErrorAsNetwork(e);
 };
 
 /**
- * UpdateError → UserFacingError 変換ヘルパー（汎用カテゴリ）
+ * UpdateError → UserFacingError 変換ヘルパー（汎用カテゴリ）。
  */
-const mapUpdateErrorGeneric = (e: UpdateError): UserFacingError =>
-  UserFacingError.withStructuredInfo({
-    code: ERROR_CODES.UNKNOWN,
-    category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-    message: e.message,
-    userMessage: `アップデートに失敗しました: ${e.message}`,
-    cause: e,
-  });
+const mapUpdateErrorGeneric = toUserFacing<UpdateError>({
+  userMessage: (e) => `アップデートに失敗しました: ${e.message}`,
+});
 
 /**
- * OpenPathFailed → UserFacingError 変換ヘルパー
+ * OpenPathFailed → UserFacingError 変換ヘルパー（ログフォルダ専用メッセージ）。
  */
-const mapOpenPathErrorForSettings = (e: OpenPathFailed): UserFacingError =>
-  UserFacingError.withStructuredInfo({
-    code: ERROR_CODES.FILE_NOT_FOUND,
-    category: ERROR_CATEGORIES.FILE_NOT_FOUND,
-    message: e.message,
-    userMessage: `ログフォルダを開けませんでした: ${e.message}`,
-    cause: e,
-  });
+const mapOpenPathErrorForSettings = toUserFacing<OpenPathFailed>({
+  code: ERROR_CODES.FILE_NOT_FOUND,
+  category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+  userMessage: (e) => `ログフォルダを開けませんでした: ${e.message}`,
+});
 
 // 初期化処理の重複実行を防ぐためのフラグ
 let isInitializing = false;

@@ -3,9 +3,9 @@ import * as fs from 'node:fs';
 import { Transformer } from '@napi-rs/image';
 import { Resvg } from '@resvg/resvg-js';
 import { Effect } from 'effect';
-import type Electron from 'electron';
 import * as path from 'pathe';
 
+import { withElectronApp } from '../../lib/electronModules';
 import type { ImageGenerationError } from './errors';
 import {
   FontLoadFailed,
@@ -25,28 +25,23 @@ let fontFilePaths: string[] = [];
  * フォント解決の優先順位:
  * 1. Electron パッケージ済み: process.resourcesPath/fonts/
  * 2. 開発環境: electron/resources/fonts/ (__dirname からの相対パス)
- * 3. テスト環境: 同じ相対パスで解決（Electron require が失敗するため catch で処理）
+ * 3. テスト環境: 同じ相対パスで解決（withElectronApp の fallback 経由）
  */
 const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
   if (fontsLoaded) {
     return Effect.succeed(fontFilePaths);
   }
 
-  const fontsDir = (() => {
-    // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
-    try {
-      const { app } = require('electron') as typeof Electron;
-      return path.join(
+  const fontsDir = withElectronApp(
+    path.join(__dirname, '../../resources/fonts'),
+    (app) =>
+      path.join(
         app.isPackaged
           ? process.resourcesPath
           : path.join(__dirname, '../../resources'),
         'fonts',
-      );
-    } catch {
-      // テスト環境または非 Electron コンテキスト
-      return path.join(__dirname, '../../resources/fonts');
-    }
-  })();
+      ),
+  );
 
   /**
    * ロード対象のフォントファイル名。
