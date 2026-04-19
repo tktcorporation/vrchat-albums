@@ -35,11 +35,12 @@
     --card: 0 0% 100%;
     --card-foreground: 0 0% 9%;
 
-    /* 52% だと白背景で ~2.4:1 と AA 未達になり bg-primary + primary-foreground (白)
-       の組合せも含めて視認性が低下する。L=35% に下げてブランドオレンジを保ちつつ
-       WCAG AA (4.5:1) を全ての text-primary / bg-primary 用途でクリアする。 */
-    --primary: 32 95% 35%;
-    --primary-foreground: 0 0% 100%;
+    /* ブランドオレンジを保つため L=52% に維持。bg-primary 上の text の AA は
+       primary-foreground を黒 (0 0% 0%) にすることで担保する (Option A 方針)。
+       text-primary としてアイコンに使う場合は、各使用箇所で text-foreground 等に
+       置換するか、色情報以外で意味を伝える設計にする。 */
+    --primary: 32 95% 52%;
+    --primary-foreground: 0 0% 0%;
 
     --secondary-muted: 0 0% 96%;
     --secondary: 0 0% 96%;
@@ -53,9 +54,9 @@
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    /* --ring は --primary のアルファ薄色を意図。primary の L 変更 (52%→35%) に追随させ、
-       フォーカスリングとボタン塗りの色相が乖離しないよう同じ値を維持する。 */
-    --ring: 32 95% 35% / 0.3;
+    /* --ring は --primary のアルファ薄色を意図。primary と同じ値を維持して
+       フォーカスリングとボタン塗りの色相が乖離しないようにする。 */
+    --ring: 32 95% 52% / 0.3;
 
     --radius: 0.75rem;
 

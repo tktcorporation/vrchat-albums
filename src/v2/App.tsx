@@ -484,7 +484,7 @@ const Contents = memo(() => {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3"
-                    className="text-primary transition-all duration-300"
+                    className="text-accent-foreground transition-all duration-300"
                     strokeDasharray="226"
                     strokeDashoffset={226 - (226 * progressPercent) / 100}
                     strokeLinecap="round"

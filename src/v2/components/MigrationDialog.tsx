@@ -106,10 +106,10 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
                 {t('migration.labels.oldApp')}
               </span>
             </div>
-            <ArrowRight className="h-6 w-6 text-primary" />
+            <ArrowRight className="h-6 w-6 text-accent-foreground" />
             <div className="flex flex-col items-center gap-2">
               <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center">
-                <FolderOpen className="h-8 w-8 text-primary" />
+                <FolderOpen className="h-8 w-8 text-accent-foreground" />
               </div>
               <span className="text-xs text-muted-foreground">
                 {t('migration.labels.newApp')}
@@ -120,7 +120,7 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
           {/* 移行内容 */}
           <div className="bg-muted/50 rounded-lg p-4 space-y-3">
             <div className="flex items-start gap-3">
-              <Database className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+              <Database className="h-5 w-5 text-accent-foreground flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-foreground">
                   {t('migration.labels.dataToMigrate')}
