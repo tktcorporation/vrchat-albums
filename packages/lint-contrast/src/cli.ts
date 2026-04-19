@@ -181,55 +181,77 @@ Options:
 const DIRECTIVE_DISABLE = /lint-contrast-disable\b(?!-next-line)/;
 
 /**
- * 複数行 JSX/ブロックコメントの終端を検出する正規表現。
- *
- * `*\/` または `*\/}` が行末までのいずれかの位置で終わるパターン。
- * 本文が英字で始まる中継行を誤ってコメントでないと判定しないよう、
- * ブロックコメントは行単位の開閉状態で追跡する。
- */
-const BLOCK_COMMENT_END_PATTERN = /\*\/\}?\s*$/;
-
-/**
  * 各行が「コメント/空白のみで構成されているか」を表すフラグ配列を計算する。
  *
- * `isDisabledByDirective` から呼ばれる前処理。複数行の JSX コメント
- * (`{/* ... *\/}`) やブロックコメント (`/* ... *\/`) の中継行（英字で
- * 始まる本文のみの行）も正しくコメントと判定するため、行ベースで開閉状態を追跡する。
+ * `isDisabledByDirective` から呼ばれる前処理。行を 1 文字ずつ走査して
+ * コメント入れ子状態を追跡し、最終的に「非空白・非コメント」の文字が
+ * 現れなかった行のみ flags[i] = true とする。
  *
- * 文字列リテラル中に `/*` を含むといった病的ケースは扱わない。
- * JSX コメントの実用パターンをカバーすれば十分という判断。
+ * 旧実装は行頭・行末の正規表現だけを見ていたため、`{/* foo *\/} <span/>`
+ * のような「行内でコメントが閉じてコードが続く」ケースで未閉鎖コメント扱いし、
+ * 以降の行をすべてコメント行と誤認して directive が遠い違反を誤抑制する
+ * silent false negative を生んでいた (Codex P2 指摘)。
+ *
+ * 文字列リテラル中に `/*` を含むといった病的ケースは扱わない。JSX コメントと
+ * 同一行混在の実用パターンを正確にカバーすれば十分という判断。
  */
 function computeCommentLineFlags(lines: readonly string[]): boolean[] {
   const flags: boolean[] = Array.from({ length: lines.length }, () => false);
   let inBlockComment = false;
 
   for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
+    const line = lines[i];
+    let pos = 0;
+    let sawCode = false;
 
-    if (inBlockComment) {
-      flags[i] = true;
-      if (BLOCK_COMMENT_END_PATTERN.test(trimmed)) {
+    while (pos < line.length) {
+      if (inBlockComment) {
+        // ブロックコメント中: `*/` を探して閉じる。JSX の `*/}` は後続 `}` を余分に消費。
+        const endIdx = line.indexOf('*/', pos);
+        if (endIdx === -1) {
+          pos = line.length;
+          break;
+        }
+        pos = endIdx + 2;
+        if (line[pos] === '}') {
+          pos += 1;
+        }
         inBlockComment = false;
+        continue;
       }
-      continue;
-    }
 
-    if (trimmed === '') {
-      flags[i] = true;
-      continue;
-    }
+      const ch = line[pos];
+      if (ch === ' ' || ch === '\t') {
+        pos += 1;
+        continue;
+      }
 
-    if (trimmed.startsWith('//')) {
-      flags[i] = true;
-      continue;
-    }
+      // 行コメント `//` — 行末までコメント
+      if (ch === '/' && line[pos + 1] === '/') {
+        pos = line.length;
+        break;
+      }
 
-    if (trimmed.startsWith('{/*') || trimmed.startsWith('/*')) {
-      flags[i] = true;
-      if (!BLOCK_COMMENT_END_PATTERN.test(trimmed)) {
+      // JSX ブロックコメント `{/*`
+      if (ch === '{' && line[pos + 1] === '/' && line[pos + 2] === '*') {
         inBlockComment = true;
+        pos += 3;
+        continue;
       }
+
+      // 通常ブロックコメント `/*`
+      if (ch === '/' && line[pos + 1] === '*') {
+        inBlockComment = true;
+        pos += 2;
+        continue;
+      }
+
+      // コードトークンに到達。この行はコメント行ではない。
+      sawCode = true;
+      break;
     }
+
+    flags[i] = !sawCode;
   }
 
   return flags;

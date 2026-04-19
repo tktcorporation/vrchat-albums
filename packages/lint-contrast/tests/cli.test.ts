@@ -500,6 +500,27 @@ describe('runCli inline disable directive', () => {
     expect(parsed.issues).toEqual([]);
   });
 
+  it('directive と同じ行にコードが続く場合も directive の効果は当該行内に閉じる', async () => {
+    // {/* ... */} と同じ行に <span/> が続くパターン。
+    // 旧 computeCommentLineFlags の bug (Codex P2 指摘) では この行以降を
+    // コメント扱いし、遠くの text-low-fg の error まで silent に抑制していた。
+    // 新実装は行内で閉じたコメント後のコードをコード行として認識する。
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ng-disable-blocked-by-inline-code.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+  });
+
   it('directive と対象行の間にコード行があると無効化される', async () => {
     const exitCode = await runCli(
       buildArgv([
