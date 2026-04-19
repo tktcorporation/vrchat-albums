@@ -5,6 +5,7 @@ import z from 'zod';
 import { runEffect } from '../../lib/effectTRPC';
 import {
   ERROR_CATEGORIES,
+  type ErrorCode,
   ERROR_CODES,
   UserFacingError,
 } from '../../lib/errors';
@@ -302,6 +303,90 @@ const getDBLogsFromDatabase = async (
   return logRecords;
 };
 
+/**
+ * バックアップ・エクスポート・インポート系の Effect.mapError 用ヘルパー。
+ *
+ * 4 ハンドラで重複していた以下のボイラープレートを単一の関数に集約:
+ *   1. ドメイン固有 `getXxxErrorMessage(e)` でメッセージ抽出
+ *   2. `logger.error` で英文ログ出力（Sentry 相関のため操作名 + 詳細を残す）
+ *   3. `eventEmitter.emit('toast', ...)` でユーザー通知（オプション）
+ *   4. `UserFacingError.withStructuredInfo` で型付きエラーに包む
+ *
+ * `userMessageFromError` を渡すと「エクスポート」のように生メッセージをそのまま
+ * userMessage にする挙動も選択可能（4 ハンドラのうち 1 つだけ違うため）。
+ */
+const reportFailureAsUserFacing = <E>(config: {
+  /** 英文ログ用ラベル。例: "Export" → `"Export failed: ..."` */
+  logLabel: string;
+  /** 日本語 toast/userMessage 用ラベル。例: "エクスポート" → `"エクスポートに失敗しました: ..."` */
+  userLabel: string;
+  /** ドメイン固有のエラーメッセージ抽出関数 */
+  extractMessage: (e: E) => string;
+  /** ERROR_CODES。デフォルト UNKNOWN */
+  code?: ErrorCode;
+  /** false なら toast を発行しない（getImportBackupHistory のみ） */
+  emitToast?: boolean;
+  /** true なら userMessage を生メッセージのみにする（exportLogStoreData のみ） */
+  userMessageFromError?: boolean;
+}) => {
+  return (e: E): UserFacingError => {
+    const errorMessage = config.extractMessage(e);
+    logger.error({ message: `${config.logLabel} failed: ${errorMessage}` });
+    const userMessage = config.userMessageFromError
+      ? errorMessage
+      : `${config.userLabel}に失敗しました: ${errorMessage}`;
+    if (config.emitToast !== false) {
+      eventEmitter.emit('toast', userMessage);
+    }
+    return UserFacingError.withStructuredInfo({
+      code: config.code ?? ERROR_CODES.UNKNOWN,
+      category: ERROR_CATEGORIES.UNKNOWN_ERROR,
+      message: errorMessage,
+      userMessage,
+      cause: e instanceof Error ? e : new Error(errorMessage),
+    });
+  };
+};
+
+const mapExportError = reportFailureAsUserFacing({
+  logLabel: 'Export',
+  userLabel: 'エクスポート',
+  code: ERROR_CODES.EXPORT_ERROR,
+  extractMessage: getExportErrorMessage,
+  userMessageFromError: true,
+});
+
+const mapPreImportBackupError = reportFailureAsUserFacing({
+  logLabel: 'Pre-import backup',
+  userLabel: 'バックアップ作成',
+  extractMessage: getBackupErrorMessage,
+});
+
+const mapImportError = reportFailureAsUserFacing({
+  logLabel: 'LogStore import',
+  userLabel: 'インポート',
+  extractMessage: getImportErrorMessage,
+});
+
+const mapBackupHistoryError = reportFailureAsUserFacing({
+  logLabel: 'Failed to get backup history',
+  userLabel: 'バックアップ履歴の取得',
+  extractMessage: getBackupErrorMessage,
+  emitToast: false,
+});
+
+const mapGetBackupError = reportFailureAsUserFacing({
+  logLabel: 'Failed to get backup',
+  userLabel: 'バックアップの取得',
+  extractMessage: getBackupErrorMessage,
+});
+
+const mapRollbackError = reportFailureAsUserFacing({
+  logLabel: 'Rollback',
+  userLabel: 'ロールバック',
+  extractMessage: getRollbackErrorMessage,
+});
+
 export const vrchatLogRouter = () =>
   trpcRouter({
     appendLoglinesToFileFromLogFilePathList: procedure
@@ -344,23 +429,7 @@ export const vrchatLogRouter = () =>
               outputBasePath: input.outputPath,
             },
             getDBLogsFromDatabase,
-          ).pipe(
-            Effect.mapError((e) => {
-              const errorMessage = getExportErrorMessage(e);
-              logger.error({ message: `Export failed: ${errorMessage}` });
-              eventEmitter.emit(
-                'toast',
-                `エクスポートに失敗しました: ${errorMessage}`,
-              );
-              return UserFacingError.withStructuredInfo({
-                code: ERROR_CODES.EXPORT_ERROR,
-                category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-                message: errorMessage,
-                userMessage: errorMessage,
-                cause: e,
-              });
-            }),
-          ),
+          ).pipe(Effect.mapError(mapExportError)),
         );
 
         logger.info(
@@ -378,25 +447,9 @@ export const vrchatLogRouter = () =>
       logger.info('Creating pre-import backup');
 
       const backup = await runEffect(
-        backupService.createPreImportBackup(getDBLogsFromDatabase).pipe(
-          Effect.mapError((e) => {
-            const errorMessage = getBackupErrorMessage(e);
-            logger.error({
-              message: `Pre-import backup failed: ${errorMessage}`,
-            });
-            eventEmitter.emit(
-              'toast',
-              `バックアップ作成に失敗しました: ${errorMessage}`,
-            );
-            return UserFacingError.withStructuredInfo({
-              code: ERROR_CODES.UNKNOWN,
-              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-              message: errorMessage,
-              userMessage: `バックアップ作成に失敗しました: ${errorMessage}`,
-              cause: e,
-            });
-          }),
-        ),
+        backupService
+          .createPreImportBackup(getDBLogsFromDatabase)
+          .pipe(Effect.mapError(mapPreImportBackupError)),
       );
 
       logger.info(`Pre-import backup created successfully: ${backup.id}`);
@@ -422,25 +475,7 @@ export const vrchatLogRouter = () =>
         const result = await runEffect(
           importService
             .importLogStoreFiles(input.filePaths, getDBLogsFromDatabase)
-            .pipe(
-              Effect.mapError((e) => {
-                const errorMessage = getImportErrorMessage(e);
-                logger.error({
-                  message: `LogStore import failed: ${errorMessage}`,
-                });
-                eventEmitter.emit(
-                  'toast',
-                  `インポートに失敗しました: ${errorMessage}`,
-                );
-                return UserFacingError.withStructuredInfo({
-                  code: ERROR_CODES.UNKNOWN,
-                  category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-                  message: errorMessage,
-                  userMessage: `インポートに失敗しました: ${errorMessage}`,
-                  cause: e,
-                });
-              }),
-            ),
+            .pipe(Effect.mapError(mapImportError)),
         );
 
         logger.info(
@@ -458,21 +493,9 @@ export const vrchatLogRouter = () =>
       logger.info('Getting import backup history');
 
       return runEffect(
-        backupService.getBackupHistory().pipe(
-          Effect.mapError((e) => {
-            const errorMessage = getBackupErrorMessage(e);
-            logger.error({
-              message: `Failed to get backup history: ${errorMessage}`,
-            });
-            return UserFacingError.withStructuredInfo({
-              code: ERROR_CODES.UNKNOWN,
-              category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-              message: errorMessage,
-              userMessage: `バックアップ履歴の取得に失敗しました: ${errorMessage}`,
-              cause: e,
-            });
-          }),
-        ),
+        backupService
+          .getBackupHistory()
+          .pipe(Effect.mapError(mapBackupHistoryError)),
       );
     }),
     rollbackToBackup: procedure
@@ -486,45 +509,15 @@ export const vrchatLogRouter = () =>
         logger.info(`Starting rollback to backup: ${input.backupId}`);
 
         const backup = await runEffect(
-          backupService.getBackup(input.backupId).pipe(
-            Effect.mapError((e) => {
-              const errorMessage = getBackupErrorMessage(e);
-              logger.error({
-                message: `Failed to get backup: ${errorMessage}`,
-              });
-              eventEmitter.emit(
-                'toast',
-                `バックアップの取得に失敗しました: ${errorMessage}`,
-              );
-              return UserFacingError.withStructuredInfo({
-                code: ERROR_CODES.UNKNOWN,
-                category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-                message: errorMessage,
-                userMessage: `バックアップの取得に失敗しました: ${errorMessage}`,
-                cause: e,
-              });
-            }),
-          ),
+          backupService
+            .getBackup(input.backupId)
+            .pipe(Effect.mapError(mapGetBackupError)),
         );
 
         await runEffect(
-          rollbackService.rollbackToBackup(backup).pipe(
-            Effect.mapError((e) => {
-              const errorMessage = getRollbackErrorMessage(e);
-              logger.error({ message: `Rollback failed: ${errorMessage}` });
-              eventEmitter.emit(
-                'toast',
-                `ロールバックに失敗しました: ${errorMessage}`,
-              );
-              return UserFacingError.withStructuredInfo({
-                code: ERROR_CODES.UNKNOWN,
-                category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-                message: errorMessage,
-                userMessage: `ロールバックに失敗しました: ${errorMessage}`,
-                cause: e,
-              });
-            }),
-          ),
+          rollbackService
+            .rollbackToBackup(backup)
+            .pipe(Effect.mapError(mapRollbackError)),
         );
 
         logger.info(`Rollback completed successfully: ${input.backupId}`);

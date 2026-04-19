@@ -2,28 +2,18 @@ import { Effect } from 'effect';
 import { z } from 'zod';
 
 import { runEffect } from '../../lib/effectTRPC';
-import {
-  ERROR_CATEGORIES,
-  ERROR_CODES,
-  UserFacingError,
-} from '../../lib/errors';
+import { mapToUnknownError } from '../../lib/errorMapping';
 import { procedure, router as trpcRouter } from '../../trpc';
-import type { ImageGenerationError } from './errors';
 import { generateSharePreview } from './service';
 
 /**
  * ImageGenerationError → UserFacingError 変換ヘルパー
  *
- * cause を含めて Sentry が元エラーを追跡可能にする
+ * cause を含めて Sentry が元エラーを追跡可能にする。
  */
-const mapImageGenerationError = (e: ImageGenerationError) =>
-  UserFacingError.withStructuredInfo({
-    code: ERROR_CODES.UNKNOWN,
-    category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-    message: `Image generation failed: ${e.message}`,
-    userMessage: '画像生成中にエラーが発生しました。',
-    cause: e,
-  });
+const mapImageGenerationError = mapToUnknownError(
+  '画像生成中にエラーが発生しました。',
+);
 
 /**
  * 画像生成の tRPC ルーター

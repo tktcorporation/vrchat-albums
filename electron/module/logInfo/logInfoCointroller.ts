@@ -4,11 +4,22 @@ import z from 'zod';
 
 import { BATCH_CONFIG } from '../../constants/batchConfig';
 import { runEffect, runEffectExit } from '../../lib/effectTRPC';
+import { toUserFacing } from '../../lib/errorMapping';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
   UserFacingError,
 } from '../../lib/errors';
+
+/**
+ * ワールド参加ログ DB エラー → UserFacingError 変換。
+ * 「ワールド参加ログの取得中にエラー」を一貫して表示するための SSOT。
+ */
+const mapWorldJoinLogDbError = toUserFacing<{ message: string }>({
+  code: ERROR_CODES.DATABASE_ERROR,
+  category: ERROR_CATEGORIES.DATABASE_ERROR,
+  userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
+});
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 import { findVRChatWorldJoinLogFromPhotoList } from '../vrchatWorldJoinLogFromPhoto/service';
@@ -114,15 +125,7 @@ const getVRCWorldJoinLogList = (): Effect.Effect<
         updatedAt: joinLog.updatedAt as Date,
       })),
     ),
-    Effect.mapError((dbError) =>
-      UserFacingError.withStructuredInfo({
-        code: ERROR_CODES.DATABASE_ERROR,
-        category: ERROR_CATEGORIES.DATABASE_ERROR,
-        message: `Failed to get world join log list: ${dbError.message}`,
-        userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
-        cause: new Error(dbError.message),
-      }),
-    ),
+    Effect.mapError(mapWorldJoinLogDbError),
   );
 
 /**

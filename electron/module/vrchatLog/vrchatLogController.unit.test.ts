@@ -29,6 +29,8 @@ vi.mock('./exportService/exportService', () => {
         exportEndTime: new Date(),
       }),
     ),
+    // mapExportError がトップレベルで参照するため、モック側でも export しておく必要がある
+    getExportErrorMessage: vi.fn((e: unknown) => String(e)),
   };
 });
 

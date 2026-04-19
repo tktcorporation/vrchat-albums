@@ -1,0 +1,24 @@
+id: use-error-mapping-helper
+language: TypeScript
+severity: warning
+message: |
+  Effect.mapError 内で UserFacingError.withStructuredInfo を直接生成しないでください。
+  electron/lib/errorMapping.ts のヘルパー (toUserFacing / mapToFileOperationError /
+  mapToOpenPathError / mapToUnknownError / mapByTag) を使うか、
+  モジュールローカルのトップレベルにヘルパーを抽出してください。
+note: |
+  ボイラープレート（同じユーザーメッセージや cause 変換）が散在すると、
+  メッセージ修正漏れや Sentry 上の cause 欠落のリスクが上がります。
+  参照: .claude/rules/error-handling.md
+rule:
+  any:
+    - pattern: Effect.mapError(($$$ARGS) => UserFacingError.withStructuredInfo($$$BODY))
+    - pattern: Effect.mapError(($$$ARGS) => { $$$STMTS; return UserFacingError.withStructuredInfo($$$BODY); })
+    - pattern: Effect.mapError(($$$ARGS) => { $$$STMTS; return UserFacingError.withStructuredInfo($$$BODY) })
+files:
+  - electron/**/*.ts
+ignores:
+  - electron/lib/errorMapping.ts
+  - electron/lib/errorMapping.test.ts
+  - '**/*.test.ts'
+  - '**/*.spec.ts'

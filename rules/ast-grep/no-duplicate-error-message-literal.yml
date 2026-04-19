@@ -1,0 +1,24 @@
+id: no-duplicate-error-message-literal
+language: TypeScript
+severity: warning
+message: |
+  この日本語ユーザーメッセージは electron/lib/errorMapping.ts で SSOT 化されています。
+  対応するヘルパーを使ってください:
+    - 'ファイル操作中にエラーが発生しました。' → mapToFileOperationError
+    - 'ファイルを開けませんでした。' → mapToOpenPathError
+note: |
+  メッセージ修正漏れを防ぐため、ユーザー向けメッセージはヘルパー経由で表示してください。
+  参照: electron/lib/errorMapping.ts
+rule:
+  any:
+    - pattern: "'ファイル操作中にエラーが発生しました。'"
+    - pattern: '"ファイル操作中にエラーが発生しました。"'
+    - pattern: "'ファイルを開けませんでした。'"
+    - pattern: '"ファイルを開けませんでした。"'
+files:
+  - electron/**/*.ts
+ignores:
+  - electron/lib/errorMapping.ts
+  - electron/lib/errorMapping.test.ts
+  - '**/*.test.ts'
+  - '**/*.spec.ts'

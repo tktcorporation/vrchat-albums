@@ -9,55 +9,13 @@ import { reloadMainWindow } from '../../../electronUtil';
 import { runEffect } from '../../../lib/effectTRPC';
 import { getClipboard } from '../../../lib/electronModules';
 import {
-  ERROR_CATEGORIES,
-  ERROR_CODES,
-  UserFacingError,
-} from '../../../lib/errors';
+  mapToFileOperationError,
+  mapToOpenPathError,
+} from '../../../lib/errorMapping';
 import * as exiftool from '../../../lib/wrappedExifTool';
-import type {
-  DownloadImageError,
-  FileIOError,
-  OpenPathFailed,
-} from '../errors';
 import { eventEmitter, procedure, router as trpcRouter } from './../../../trpc';
 import { DirectoryPathSchema } from './../../../valueObjects/index';
 import * as utilsService from './../service';
-
-/**
- * DownloadImageError → UserFacingError 変換ヘルパー
- */
-const mapDownloadImageError = (e: DownloadImageError) =>
-  UserFacingError.withStructuredInfo({
-    code: ERROR_CODES.UNKNOWN,
-    category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-    message: `File operation failed: ${e.message}`,
-    userMessage: 'ファイル操作中にエラーが発生しました。',
-    cause: e,
-  });
-
-/**
- * FileIOError → UserFacingError 変換ヘルパー
- */
-const mapFileIOError = (e: FileIOError) =>
-  UserFacingError.withStructuredInfo({
-    code: ERROR_CODES.UNKNOWN,
-    category: ERROR_CATEGORIES.UNKNOWN_ERROR,
-    message: `File operation failed: ${e.message}`,
-    userMessage: 'ファイル操作中にエラーが発生しました。',
-    cause: e,
-  });
-
-/**
- * OpenPathFailed → UserFacingError 変換ヘルパー
- */
-const mapOpenPathError = (e: OpenPathFailed) =>
-  UserFacingError.withStructuredInfo({
-    code: ERROR_CODES.FILE_NOT_FOUND,
-    category: ERROR_CATEGORIES.FILE_NOT_FOUND,
-    message: `Failed to open path: ${e.message}`,
-    userMessage: 'ファイルを開けませんでした。',
-    cause: e,
-  });
 
 export const electronUtilRouter = () =>
   trpcRouter({
@@ -113,7 +71,7 @@ export const electronUtilRouter = () =>
             Effect.catchTag('OperationCanceled', () =>
               Effect.succeed(false as const),
             ),
-            Effect.mapError(mapDownloadImageError),
+            Effect.mapError(mapToFileOperationError),
           ),
         ),
       ),
@@ -179,7 +137,7 @@ export const electronUtilRouter = () =>
         runEffect(
           utilsService.copyImageByBase64(input).pipe(
             Effect.map(() => true as const),
-            Effect.mapError(mapFileIOError),
+            Effect.mapError(mapToFileOperationError),
           ),
         ),
       ),
@@ -189,7 +147,7 @@ export const electronUtilRouter = () =>
         runEffect(
           utilsService.openPhotoPathWithPhotoApp(input).pipe(
             Effect.map(() => true as const),
-            Effect.mapError(mapOpenPathError),
+            Effect.mapError(mapToOpenPathError),
           ),
         ),
       ),
@@ -214,7 +172,7 @@ export const electronUtilRouter = () =>
         runEffect(
           utilsService.openPathWithAssociatedApp(input).pipe(
             Effect.map(() => true as const),
-            Effect.mapError(mapOpenPathError),
+            Effect.mapError(mapToOpenPathError),
           ),
         ),
       ),

@@ -1,0 +1,186 @@
+/**
+ * Effect.mapError と組み合わせる UserFacingError 変換ヘルパー
+ *
+ * 背景: コントローラー層で
+ * `Effect.mapError(e => UserFacingError.withStructuredInfo({ code, category, message, userMessage, cause: ... }))`
+ * のボイラープレートが各 tRPC ルーターで重複していた。
+ * SSOT 化することで「同じユーザーメッセージが複数箇所に散在 → メッセージ修正漏れ」のリスクを排除する。
+ *
+ * 使い分け:
+ * - 単一エラー型を変換: `toUserFacing()` / プリセット (`mapToFileOperationError` 等)
+ * - 複数 tag を分岐: `mapByTag()`（ts-pattern の `match` + `_tag` 判定をラップ）
+ *
+ * @see electron/lib/errors.ts - UserFacingError 定義
+ * @see electron/lib/effectTRPC.ts - runEffect (tRPC 実行境界)
+ */
+
+import { match, P } from 'ts-pattern';
+
+import {
+  ERROR_CATEGORIES,
+  type ErrorCategory,
+  ERROR_CODES,
+  type ErrorCode,
+  UserFacingError,
+} from './errors';
+
+/**
+ * 任意の値を Error に正規化する。
+ *
+ * UserFacingError の `cause` にスタックトレースを残すため、
+ * Error 以外（string、tagged error の plain object など）はラップする。
+ *
+ * `e instanceof Error ? e : new Error(String(e))` のイディオムが
+ * 各所で重複していたため SSOT 化。
+ */
+export const toError = (e: unknown): Error =>
+  e instanceof Error ? e : new Error(String(e));
+
+/**
+ * `toUserFacing` のオプション。
+ *
+ * `userMessage` / `message` を関数で受けることで、
+ * 元エラーの内容を埋め込んだメッセージ生成（例: `アップデートに失敗しました: ${e.message}`）に対応する。
+ *
+ * E は任意の型を許容する（string literal の Tagged Error も含む）。
+ */
+export interface UserFacingFactoryOptions<E> {
+  code?: ErrorCode;
+  category?: ErrorCategory;
+  /** ユーザー向けメッセージ。文字列 or 元エラーから生成する関数 */
+  userMessage: string | ((e: E) => string);
+  /** 内部 message。省略時は `${userMessage} (${e.message})` を生成 */
+  message?: string | ((e: E) => string);
+}
+
+/**
+ * 任意の値からメッセージ文字列を取り出す。
+ *
+ * `{ message: string }` を持つオブジェクトはそのプロパティを、
+ * 文字列はそのまま、それ以外は `String()` で変換する。
+ */
+const extractErrorMessage = (e: unknown): string => {
+  if (typeof e === 'string') {
+    return e;
+  }
+  if (e && typeof e === 'object' && 'message' in e) {
+    return String((e as { message: unknown }).message);
+  }
+  return String(e);
+};
+
+/**
+ * `Effect.mapError` 用の UserFacingError 変換ファクトリ。
+ *
+ * @example
+ * ```typescript
+ * const mapMyError = toUserFacing<MyError>({
+ *   code: ERROR_CODES.DATABASE_ERROR,
+ *   category: ERROR_CATEGORIES.DATABASE_ERROR,
+ *   userMessage: 'データの取得に失敗しました。',
+ * });
+ *
+ * service.getData().pipe(Effect.mapError(mapMyError));
+ * ```
+ */
+const resolveTemplate = <E>(
+  template: string | ((e: E) => string) | undefined,
+  fallback: string,
+  e: E,
+): string =>
+  match(template)
+    .with(P.string, (s) => s)
+    .with(P.nullish, () => fallback)
+    .otherwise((fn) => fn(e));
+
+export const toUserFacing =
+  <E>(opts: UserFacingFactoryOptions<E>) =>
+  (e: E): UserFacingError => {
+    const userMessage = resolveTemplate(opts.userMessage, '', e);
+    const errorMessage = extractErrorMessage(e);
+    const message = resolveTemplate(
+      opts.message,
+      `${userMessage} (${errorMessage})`,
+      e,
+    );
+    return UserFacingError.withStructuredInfo({
+      code: opts.code ?? ERROR_CODES.UNKNOWN,
+      category: opts.category ?? ERROR_CATEGORIES.UNKNOWN_ERROR,
+      message,
+      userMessage,
+      cause: toError(e),
+    });
+  };
+
+/**
+ * 汎用ファイル操作エラー → UserFacingError。
+ *
+ * `electronUtilController` / `api.ts` の openPathOnExplorer 等で重複していた
+ * 「ファイル操作中にエラーが発生しました。」のマッパー。
+ */
+export const mapToFileOperationError = toUserFacing<{ message: string }>({
+  userMessage: 'ファイル操作中にエラーが発生しました。',
+});
+
+/**
+ * パスオープン失敗エラー → UserFacingError。
+ *
+ * `OpenPathFailed` を「ファイルを開けませんでした」として表示する用途。
+ * `electronUtilController` で重複していたパターン。
+ */
+export const mapToOpenPathError = toUserFacing<{ message: string }>({
+  code: ERROR_CODES.FILE_NOT_FOUND,
+  category: ERROR_CATEGORIES.FILE_NOT_FOUND,
+  userMessage: 'ファイルを開けませんでした。',
+});
+
+/**
+ * 汎用 UNKNOWN エラー → UserFacingError ファクトリ。
+ *
+ * `userMessage` だけ指定したい場合のショートハンド。
+ * `imageGeneratorController` / `vrchatLogController` 等のドメイン固有マッパーから利用。
+ *
+ * @example
+ * ```typescript
+ * const mapImageGenerationError = mapToUnknownError(
+ *   '画像生成中にエラーが発生しました。',
+ * );
+ * ```
+ */
+export const mapToUnknownError = (
+  userMessage: string,
+): (<E>(e: E) => UserFacingError) => toUserFacing({ userMessage });
+
+/**
+ * Tagged Error の `_tag` で分岐し、対応するユーザーメッセージに変換する。
+ *
+ * `logSyncController` のように複数の Tagged Error をまとめて変換する箇所で、
+ * `match(e._tag).with(...).otherwise(...)` のボイラープレートを排除する。
+ *
+ * `_tag` は optional で受け、未定義のエラー（旧来の `Error` 派生クラス等）は
+ * 自動で `fallback` に流れる。
+ *
+ * @param patterns - `_tag` をキーとした変換関数のマップ。未列挙の tag は `fallback` が処理。
+ * @param fallback - patterns に一致しなかった場合のデフォルト変換。省略時は UNKNOWN/UNKNOWN_ERROR。
+ *
+ * @example
+ * ```typescript
+ * const mapSyncError = mapByTag<MySyncError>({
+ *   LogFileDirNotFound: () => UserFacingError.withStructuredInfo({...}),
+ *   LogFilesNotFound: () => UserFacingError.withStructuredInfo({...}),
+ * }, mapToUnknownError('ログ同期中にエラーが発生しました。'));
+ * ```
+ */
+export const mapByTag =
+  <E extends { _tag?: string; message: string }>(
+    patterns: Record<string, (e: E) => UserFacingError>,
+    fallback: (e: E) => UserFacingError = mapToUnknownError(
+      '予期しないエラーが発生しました。',
+    ),
+  ) =>
+  (e: E): UserFacingError => {
+    const handler = typeof e._tag === 'string' ? patterns[e._tag] : undefined;
+    return match(handler)
+      .with(undefined, () => fallback(e))
+      .otherwise((h) => h(e));
+  };
