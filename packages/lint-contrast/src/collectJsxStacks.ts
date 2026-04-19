@@ -879,54 +879,106 @@ const NON_OPAQUE_BG_KEYWORDS = new Set(['transparent', 'current', 'inherit']);
  * (bgCandidates に残らないため masking 情報が失われる)。
  * jsxContainsGradientClass と同じ戦略で生文字列を直接スキャンする。
  */
+/**
+ * opaque bg の中間計算状態。masking 情報は `light && !lightMasked` のように
+ * 最後にまとめて適用するため、文字列 / AST ノード間での合成ではこの 4 値を
+ * そのまま保持する。
+ *
+ * `cn('bg-white', 'dark:bg-transparent')` のように Literal が分かれていても、
+ * 両者を merge してから masking を適用することで `'bg-white dark:bg-transparent'`
+ * と等価な結果を得られる (Codex P1 指摘への対応)。
+ */
+interface OpaqueAccum {
+  light: boolean;
+  dark: boolean;
+  lightMasked: boolean;
+  darkMasked: boolean;
+}
+
+const NO_OPAQUE: OpaqueAccum = {
+  light: false,
+  dark: false,
+  lightMasked: false,
+  darkMasked: false,
+};
+
+function mergeOpaqueAccum(a: OpaqueAccum, b: OpaqueAccum): OpaqueAccum {
+  return {
+    light: a.light || b.light,
+    dark: a.dark || b.dark,
+    lightMasked: a.lightMasked || b.lightMasked,
+    darkMasked: a.darkMasked || b.darkMasked,
+  };
+}
+
 function jsxOpaqueBgFlags(valueNode: AstNode | null): GradientFlags {
   if (valueNode === null) {
     return NO_GRADIENT;
   }
-  return extractOpaqueFromAst(valueNode);
+  const acc = extractOpaqueFromAst(valueNode);
+  return {
+    light: acc.light && !acc.lightMasked,
+    dark: acc.dark && !acc.darkMasked,
+  };
 }
 
-function extractOpaqueFromAst(node: AstNode): GradientFlags {
+function extractOpaqueFromAst(node: AstNode): OpaqueAccum {
   if (node.type === 'Literal') {
     const value = (node as Literal).value;
-    return typeof value === 'string' ? opaqueBgInString(value) : NO_GRADIENT;
+    return typeof value === 'string' ? opaqueAccumInString(value) : NO_OPAQUE;
   }
 
   if (node.type === 'TemplateLiteral') {
     const quasis = (node as TemplateLiteral).quasis;
-    let acc: GradientFlags = NO_GRADIENT;
+    let acc: OpaqueAccum = NO_OPAQUE;
     for (const q of quasis) {
       const cooked = q.value?.cooked ?? '';
-      acc = mergeGradient(acc, opaqueBgInString(cooked));
+      acc = mergeOpaqueAccum(acc, opaqueAccumInString(cooked));
     }
-    if (acc.light || acc.dark) {
-      return acc;
-    }
+    // `${...}` で埋め込まれた expressions も下の子ノード走査で処理される
   }
 
-  let acc: GradientFlags = NO_GRADIENT;
+  let acc: OpaqueAccum = NO_OPAQUE;
   for (const key of Object.keys(node)) {
     const val = node[key];
     if (Array.isArray(val)) {
       for (const child of val) {
         if (child && typeof child === 'object' && 'type' in child) {
-          acc = mergeGradient(acc, extractOpaqueFromAst(child as AstNode));
-          if (acc.light && acc.dark) {
-            return acc;
-          }
+          acc = mergeOpaqueAccum(acc, extractOpaqueFromAst(child as AstNode));
         }
       }
     } else if (val && typeof val === 'object' && 'type' in val) {
-      acc = mergeGradient(acc, extractOpaqueFromAst(val as AstNode));
-      if (acc.light && acc.dark) {
-        return acc;
-      }
+      acc = mergeOpaqueAccum(acc, extractOpaqueFromAst(val as AstNode));
     }
   }
   return acc;
 }
 
-function opaqueBgInString(classStr: string): GradientFlags {
+/**
+ * 単一クラス列からの opaque bg 中間表現を計算する。
+ *
+ * Tailwind の cascading を踏まえた分類:
+ * - variant なし opaque bg (例: `bg-white`): light/dark 両方で solid
+ * - `dark:` 付き opaque bg (例: `dark:bg-card`): dark のみで solid
+ * - `hover:`/`focus:`/`sm:` 等の非 dark variant: 常時適用でないため ignore
+ * - variant なし alpha/gradient/透明 (例: `bg-transparent`): 両テーマで masking
+ * - `dark:` 付き alpha/gradient/透明 (例: `dark:bg-transparent`): dark を masking
+ *
+ * masking はすでに立った solid フラグを打ち消す (例: `bg-white dark:bg-transparent`
+ * → light=true, dark=false)。これにより dark モードでは solid ではないので、
+ * 祖先の `dark:bg-gradient-*` は引き続き伝播する (Codex P1 指摘)。
+ *
+ * masking の最終適用は呼出側 (jsxOpaqueBgFlags) で行う。関数間合成に備えて
+ * ここでは masked を解除せず中間表現のまま返すのが重要 (Codex P1 #2 指摘:
+ * `cn('bg-white', 'dark:bg-transparent')` のように Literal が分かれた際に
+ * 外側から masking 情報が失われないようにするため)。
+ *
+ * 注意: ClassCandidate ではなく生の classNameValue AST を走査するのは、
+ * extractColorClasses が `bg-transparent` を色クラスでないとして除外するため
+ * (bgCandidates に残らないため masking 情報が失われる)。
+ * jsxContainsGradientClass と同じ戦略で生文字列を直接スキャンする。
+ */
+function opaqueAccumInString(classStr: string): OpaqueAccum {
   let light = false;
   let dark = false;
   let lightMasked = false;
@@ -966,10 +1018,7 @@ function opaqueBgInString(classStr: string): GradientFlags {
     }
   }
 
-  return {
-    light: light && !lightMasked,
-    dark: dark && !darkMasked,
-  };
+  return { light, dark, lightMasked, darkMasked };
 }
 
 /**

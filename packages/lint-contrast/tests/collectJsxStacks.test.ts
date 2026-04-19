@@ -1184,6 +1184,32 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     });
   });
 
+  it('cn() で分割された Literal 間でも masking が波及する', () => {
+    // Codex P1 対応: cn('bg-white', 'dark:bg-transparent') のように
+    // opaque と masking が別 Literal に分かれていても、全 Literal を
+    // merge してから最終 masking を適用することで
+    // `'bg-white dark:bg-transparent'` と等価な結果を得る。
+    const source = `
+      import { cn } from '@/lib/utils';
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black dark:bg-gradient-to-t">
+            <div className={cn('bg-white', 'dark:bg-transparent')}>
+              <p className="text-black">split mask</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: true,
+    });
+  });
+
   it('dark: prefix 付き gradient は dark のみ flag 付与', () => {
     // Codex P1 対応: `bg-low-bg dark:bg-gradient-to-t` のような
     // 「light は solid, dark は gradient」のクラスは、light 側だけ AA 評価すべき。
