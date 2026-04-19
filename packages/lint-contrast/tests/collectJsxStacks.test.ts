@@ -1210,6 +1210,31 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     });
   });
 
+  it('バックティック静的テンプレート ({`bg-white`}) の opaque 情報も保持される', () => {
+    // Codex P1 対応: 旧実装は TemplateLiteral の quasis 処理結果を関数後半で
+    // 捨てていたため、static template での opaque 情報が失われ、
+    // 祖先の gradient が誤って子に伝播していた。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className={\`bg-white\`}>
+              <p className="text-black">template literal bg</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // bg-white が opaque として認識され gradient をカバーするため両テーマ false
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
   it('dark: prefix 付き gradient は dark のみ flag 付与', () => {
     // Codex P1 対応: `bg-low-bg dark:bg-gradient-to-t` のような
     // 「light は solid, dark は gradient」のクラスは、light 側だけ AA 評価すべき。

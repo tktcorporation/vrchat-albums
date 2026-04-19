@@ -928,17 +928,23 @@ function extractOpaqueFromAst(node: AstNode): OpaqueAccum {
     return typeof value === 'string' ? opaqueAccumInString(value) : NO_OPAQUE;
   }
 
+  // 関数先頭で acc を宣言し、TemplateLiteral の quasis 処理結果も
+  // その後の子ノード走査にマージする (Codex P1 指摘: 旧実装は quasis 処理結果を
+  // 捨てていたため `className={\`bg-white\`}` 等の静的テンプレートで
+  // opaque 情報が失われていた)。
+  let acc: OpaqueAccum = NO_OPAQUE;
+
   if (node.type === 'TemplateLiteral') {
     const quasis = (node as TemplateLiteral).quasis;
-    let acc: OpaqueAccum = NO_OPAQUE;
     for (const q of quasis) {
       const cooked = q.value?.cooked ?? '';
       acc = mergeOpaqueAccum(acc, opaqueAccumInString(cooked));
     }
-    // `${...}` で埋め込まれた expressions も下の子ノード走査で処理される
+    // `${...}` で埋め込まれた expressions は下の共通 AST 走査で処理される。
+    // opaqueAccumInString は冪等 (OR 合成) なので、TemplateElement を再走査
+    // しても結果は変わらない。
   }
 
-  let acc: OpaqueAccum = NO_OPAQUE;
   for (const key of Object.keys(node)) {
     const val = node[key];
     if (Array.isArray(val)) {
@@ -1106,19 +1112,21 @@ function containsGradientInAst(node: AstNode): GradientFlags {
       : NO_GRADIENT;
   }
 
+  // 関数先頭で acc を宣言し、TemplateLiteral の quasis 処理結果も続く
+  // 子ノード走査にマージする (extractOpaqueFromAst と同じ Codex P1 対応)。
+  let acc: GradientFlags = NO_GRADIENT;
+
   if (node.type === 'TemplateLiteral') {
     const quasis = (node as TemplateLiteral).quasis;
-    let acc: GradientFlags = NO_GRADIENT;
     for (const q of quasis) {
       const cooked = q.value?.cooked ?? '';
       acc = mergeGradient(acc, hasEffectiveGradientBg(cooked));
     }
-    if (acc.light || acc.dark) {
+    if (acc.light && acc.dark) {
       return acc;
     }
   }
 
-  let acc: GradientFlags = NO_GRADIENT;
   for (const key of Object.keys(node)) {
     const val = node[key];
     if (Array.isArray(val)) {
