@@ -1,27 +1,18 @@
 import { captureException, captureMessage } from '@sentry/electron/main';
 import { Effect, Either } from 'effect';
-import type Electron from 'electron';
 import * as log from 'electron-log';
 import path from 'pathe';
 import { stackWithCauses } from 'pony-cause';
 import { match, P } from 'ts-pattern';
 
 import { getSettingStore } from '../module/settingStore';
+import { withElectronApp } from './electronModules';
 import { UserFacingError } from './errors';
 
-// ログファイルパスを遅延評価する
-const getLogFilePath = (): string => {
-  // effect-lint-allow-try-catch: Electron 環境検出パターン
-  try {
-    const { app } = require('electron') as typeof Electron;
-    return path.join(app.getPath('logs'), 'app.log');
-  } catch {
-    // テストまたは非Electron環境
-    return path.join(__dirname, 'test-app.log');
-  }
-};
-
-const logFilePath = getLogFilePath();
+const logFilePath = withElectronApp(
+  path.join(__dirname, 'test-app.log'),
+  (app) => path.join(app.getPath('logs'), 'app.log'),
+);
 
 log.transports.file.resolvePathFn = () => logFilePath;
 
@@ -29,17 +20,7 @@ log.transports.file.resolvePathFn = () => logFilePath;
 log.transports.file.maxSize = 5 * 1024 * 1024;
 
 // ログレベルの設定
-const getIsProduction = (): boolean => {
-  // effect-lint-allow-try-catch: Electron 環境検出パターン
-  try {
-    const { app } = require('electron') as typeof Electron;
-    return app.isPackaged;
-  } catch {
-    return false;
-  }
-};
-
-const isProduction = getIsProduction();
+const isProduction = withElectronApp(false, (app) => app.isPackaged);
 log.transports.file.level = isProduction ? 'info' : 'debug';
 log.transports.console.level = isProduction ? 'warn' : 'debug';
 

@@ -3,9 +3,9 @@ import * as path from 'node:path';
 
 import * as datefns from 'date-fns';
 import { Effect } from 'effect';
-import type Electron from 'electron';
 import { match } from 'ts-pattern';
 
+import { withElectronApp } from '../../../lib/electronModules';
 import {
   exportLogsToLogStore,
   formatLogStoreContent,
@@ -60,32 +60,21 @@ export type DBLogProvider = (
 ) => Promise<LogRecord[]>;
 
 /**
- * Electronのダウンロードパスを安全に取得
- * テスト環境などでappが利用できない場合はnullを返す
+ * Electronのダウンロードパスを安全に取得。
+ *
+ * テスト環境では app が存在しないため null。
+ * Electron 環境でも `getPath('downloads')` がプラットフォームによっては
+ * 失敗する可能性があるため、その場合も null。
  */
-const getElectronDownloadsPath = (): string | null => {
-  // Playwright テスト互換性のため遅延評価
-  // @see CLAUDE.md Electron Module Import パターン
-  const electronApp = (() => {
-    // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
+const getElectronDownloadsPath = (): string | null =>
+  withElectronApp<string | null>(null, (app) => {
+    // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
     try {
-      return (require('electron') as typeof Electron).app;
+      return app.getPath('downloads');
     } catch {
       return null;
     }
-  })();
-
-  if (!electronApp) {
-    return null;
-  }
-
-  // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
-  try {
-    return electronApp.getPath('downloads');
-  } catch {
-    return null;
-  }
-};
+  });
 
 /**
  * デフォルトのlogStoreディレクトリパスを取得

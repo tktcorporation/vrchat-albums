@@ -3,20 +3,23 @@ language: TypeScript
 severity: error
 message: |
   require('electron') を直接使用しないでください。
-  代わりに electron/lib/electronModules.ts の遅延取得ヘルパー (getApp, getShell 等) を使用してください。
+  代わりに electron/lib/electronModules.ts の遅延取得ヘルパーを使用してください:
+    - 必須: getApp / getShell / getDialog / getClipboard / getNativeImage
+    - フォールバック付き: withElectronApp(fallback, fn)
 note: |
   参照: .claude/rules/electron-import.md
   ヘルパー: electron/lib/electronModules.ts
-  使用例: import { getApp } from '../../lib/electronModules';
+  使用例: import { getApp, withElectronApp } from '../../lib/electronModules';
 rule:
   pattern: require('electron')
 files:
   - electron/module/**/*.ts
+  - electron/lib/**/*.ts
 ignores:
   - '**/*.test.ts'
   - '**/*.spec.ts'
   - '**/__tests__/**'
-  # try-catch フォールバック付きの Electron 環境検出パターン（テスト環境対応）
-  - electron/module/imageGenerator/renderSvg.ts
-  - electron/module/vrchatLog/exportService/exportService.ts
+  # ヘルパー本体（ヘルパー自身が require('electron') を使う）
+  - electron/lib/electronModules.ts
+  # 詳細なエラーログを必要とするため withElectronApp 化が困難なケース
   - electron/module/vrchatPhoto/vrchatPhoto.service.ts
