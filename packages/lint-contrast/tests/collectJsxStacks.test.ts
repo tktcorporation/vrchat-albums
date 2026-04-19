@@ -920,4 +920,139 @@ describe('P2: Tailwind important modifier (!bg-*, !text-*) support', () => {
     expect(hasBgBlack).toBe(true);
     expect(hasBgWhite).toBe(true);
   });
+
+  describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
+    // WCAG 1.4.11 (非テキスト 3:1) と gradient skip を CLI が正しく判定するための
+    // 事前フラグ付与ロジックを単体で検証する。cli.test.ts の統合テストと異なり、
+    // 「どの AST 形態でフラグがどう付くか」を直接アサートしてリグレッション検知を強化する。
+
+    it('標準 SVG primitives (<circle>) は isNonTextElement=true', () => {
+      const source = `
+        export function Foo() {
+          return (
+            <svg>
+              <circle className="text-foreground" />
+            </svg>
+          );
+        }
+      `;
+      const stacks = collectJsxStacks('test.tsx', source);
+      const circle = stacks.find((s) => s.elementName === 'circle');
+      expect(circle).toBeDefined();
+      expect(circle!.isNonTextElement).toBe(true);
+      expect(circle!.hasGradientBackground).toBe(false);
+    });
+
+    it('lucide-react import のコンポーネントは isNonTextElement=true', () => {
+      const source = `
+        import { Bug } from 'lucide-react';
+        export function Foo() {
+          return (
+            <div className="bg-card">
+              <Bug className="text-foreground" />
+            </div>
+          );
+        }
+      `;
+      const stacks = collectJsxStacks('test.tsx', source);
+      const bug = stacks.find((s) => s.elementName === 'Bug');
+      expect(bug).toBeDefined();
+      expect(bug!.isNonTextElement).toBe(true);
+    });
+
+    it('lucide-react 以外の import は isNonTextElement=false のまま', () => {
+      // カスタムラッパーや他ライブラリは今のところ非テキスト扱いにしない。
+      // react-icons 等を使うプロジェクトでは CLI オプション化等で対応する前提。
+      const source = `
+        import { Bug } from 'some-other-icons';
+        export function Foo() {
+          return (
+            <div className="bg-card">
+              <Bug className="text-foreground" />
+            </div>
+          );
+        }
+      `;
+      const stacks = collectJsxStacks('test.tsx', source);
+      const bug = stacks.find((s) => s.elementName === 'Bug');
+      expect(bug).toBeDefined();
+      expect(bug!.isNonTextElement).toBe(false);
+    });
+
+    it('bg-gradient-* を持つ要素は hasGradientBackground=true', () => {
+      const source = `
+        export function Foo() {
+          return (
+            <div className="bg-gradient-to-t from-black">
+              <p className="text-white">hello</p>
+            </div>
+          );
+        }
+      `;
+      const stacks = collectJsxStacks('test.tsx', source);
+      const pStack = stacks.find((s) => s.elementName === 'p');
+      expect(pStack).toBeDefined();
+      expect(pStack!.hasGradientBackground).toBe(true);
+    });
+
+    it('祖先の gradient 背景は子孫に継承される', () => {
+      const source = `
+        export function Foo() {
+          return (
+            <div className="bg-gradient-to-t from-black">
+              <section className="p-4">
+                <p className="text-white">nested</p>
+              </section>
+            </div>
+          );
+        }
+      `;
+      const stacks = collectJsxStacks('test.tsx', source);
+      const pStack = stacks.find((s) => s.elementName === 'p');
+      expect(pStack).toBeDefined();
+      expect(pStack!.hasGradientBackground).toBe(true);
+    });
+
+    it('Tailwind v4 の bg-linear-* / bg-radial-* / bg-conic-* も検出する', () => {
+      const source = `
+        export function Foo() {
+          return (
+            <>
+              <div className="bg-linear-to-r from-red-500">
+                <p className="text-white">linear</p>
+              </div>
+              <div className="bg-radial-to-tr">
+                <p className="text-white">radial</p>
+              </div>
+              <div className="bg-conic-to-bl">
+                <p className="text-white">conic</p>
+              </div>
+            </>
+          );
+        }
+      `;
+      const stacks = collectJsxStacks('test.tsx', source);
+      const pStacks = stacks.filter((s) => s.elementName === 'p');
+      expect(pStacks).toHaveLength(3);
+      for (const p of pStacks) {
+        expect(p.hasGradientBackground).toBe(true);
+      }
+    });
+
+    it('通常の bg-card 背景では hasGradientBackground=false', () => {
+      const source = `
+        export function Foo() {
+          return (
+            <div className="bg-card">
+              <p className="text-foreground">hello</p>
+            </div>
+          );
+        }
+      `;
+      const stacks = collectJsxStacks('test.tsx', source);
+      const pStack = stacks.find((s) => s.elementName === 'p');
+      expect(pStack).toBeDefined();
+      expect(pStack!.hasGradientBackground).toBe(false);
+    });
+  });
 });

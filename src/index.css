@@ -53,7 +53,9 @@
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --ring: 32 95% 52% / 0.3;
+    /* --ring は --primary のアルファ薄色を意図。primary の L 変更 (52%→35%) に追随させ、
+       フォーカスリングとボタン塗りの色相が乖離しないよう同じ値を維持する。 */
+    --ring: 32 95% 35% / 0.3;
 
     --radius: 0.75rem;
 
