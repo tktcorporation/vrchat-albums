@@ -336,6 +336,9 @@ describe('runCli non-text element and gradient handling', () => {
   });
 
   it('lucide-react からインポートしたアイコンは issue を出さない (非テキスト扱い)', async () => {
+    // ok-non-text-icon.tsx は text-mid-fg × low-bg で ratio ≈ 3.66〜4.11。
+    // 本文基準 4.5 なら error だが、非テキスト基準 3 なら OK。
+    // 閾値切替ロジックが壊れれば errorCount > 0 に変わり、本テストが回帰検知する。
     const exitCode = await runCli(
       buildArgv(['--format', 'json', '--glob', 'ok-non-text-icon.tsx']),
     );
@@ -352,6 +355,24 @@ describe('runCli non-text element and gradient handling', () => {
       buildArgv(['--format', 'json', '--glob', 'ok-non-text-threshold.tsx']),
     );
     expect(exitCode).toBe(0);
+  });
+
+  it('同じ色でも <p> (本文テキスト) は 4.5 基準で error になる (対照テスト)', async () => {
+    // 非テキスト fixture と同じ text-mid-fg × low-bg を使うが、
+    // 要素が <p> の場合は AA 4.5:1 を満たさないため error になるべき。
+    // この対照で「閾値切替が実際に働いていること」を discriminative に検証する。
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ng-text-threshold.tsx']),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: { message: string }[];
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+    // error メッセージに WCAG AA 基準 (非テキスト 1.4.11 ではなく) が使われることも確認
+    expect(parsed.issues.some((i) => i.message.includes('WCAG AA'))).toBe(true);
   });
 
   it('bg-gradient-* を持つ親の配下の要素は skip される', async () => {
@@ -395,6 +416,27 @@ describe('runCli inline disable directive', () => {
   it('JSX コメント形式の disable-next-line で issue が抑制される', async () => {
     const exitCode = await runCli(
       buildArgv(['--format', 'json', '--glob', 'ok-inline-disable.tsx']),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('同一行 {/* lint-contrast-disable */} でも issue が抑制される', async () => {
+    // -next-line サフィックスを持たない同一行ディレクティブの検証。
+    // DIRECTIVE_DISABLE 正規表現が期待通り動作することを確認する。
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ok-inline-disable-same-line.tsx',
+      ]),
     );
     expect(exitCode).toBe(0);
 
