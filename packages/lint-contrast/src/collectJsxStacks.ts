@@ -911,6 +911,27 @@ function mergeOpaqueAccum(a: OpaqueAccum, b: OpaqueAccum): OpaqueAccum {
   };
 }
 
+/**
+ * 相互排他的 branch (`cond && X` や `cond ? A : B`) の AST を合成する際の
+ * マージ規則。opaque は OR (「どちらかの branch で opaque なら覆う可能性がある」)、
+ * masking は AND (「全 branch で揃って masked のときのみ確実に masked」) で合成する。
+ *
+ * これにより `cn('bg-low-bg', cond && 'dark:bg-transparent')` のような
+ * branch 分岐で、cond=false 側の solid 背景を正しく AA 評価できる
+ * (Codex P1 指摘: branch に masked が片寄ると全ケースで skip されていた問題)。
+ *
+ * linter の設計哲学として「疑わしきは AA 評価」を採り、branch が分かれたら
+ * 最も opaque が強く出る方に倒して false negative を避ける。
+ */
+function mergeOpaqueBranches(a: OpaqueAccum, b: OpaqueAccum): OpaqueAccum {
+  return {
+    light: a.light || b.light,
+    dark: a.dark || b.dark,
+    lightMasked: a.lightMasked && b.lightMasked,
+    darkMasked: a.darkMasked && b.darkMasked,
+  };
+}
+
 function jsxOpaqueBgFlags(valueNode: AstNode | null): GradientFlags {
   if (valueNode === null) {
     return NO_GRADIENT;
@@ -926,6 +947,32 @@ function extractOpaqueFromAst(node: AstNode): OpaqueAccum {
   if (node.type === 'Literal') {
     const value = (node as Literal).value;
     return typeof value === 'string' ? opaqueAccumInString(value) : NO_OPAQUE;
+  }
+
+  // 相互排他的 branch: LogicalExpression (`&&` / `||` / `??`) と
+  // ConditionalExpression (`cond ? A : B`) は「ランタイムで一方の branch のみ
+  // 適用される」形なので、子の opaque 情報は branch 合成 (masking は AND) で
+  // 統合する。
+  if (node.type === 'LogicalExpression') {
+    const left = (node as AstNode & { left: AstNode }).left;
+    const right = (node as AstNode & { right: AstNode }).right;
+    // cond && X: cond=true の branch で両方適用、cond=false の branch で left のみ。
+    // 実用的には left は boolean なので leftAcc は NO_OPAQUE になることが多い。
+    // 「両方適用」ケースを OR 合成で表し、「left のみ」ケースを別 branch として
+    // branch 合成する。
+    const leftAcc = extractOpaqueFromAst(left);
+    const rightAcc = extractOpaqueFromAst(right);
+    const bothBranch = mergeOpaqueAccum(leftAcc, rightAcc);
+    return mergeOpaqueBranches(leftAcc, bothBranch);
+  }
+
+  if (node.type === 'ConditionalExpression') {
+    const consequent = (node as AstNode & { consequent: AstNode }).consequent;
+    const alternate = (node as AstNode & { alternate: AstNode }).alternate;
+    return mergeOpaqueBranches(
+      extractOpaqueFromAst(consequent),
+      extractOpaqueFromAst(alternate),
+    );
   }
 
   // 関数先頭で acc を宣言し、TemplateLiteral の quasis 処理結果も

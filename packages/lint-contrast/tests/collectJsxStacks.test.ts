@@ -1260,6 +1260,61 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     });
   });
 
+  it('相互排他的 branch (cn(a, cond && b)) で masking は全 branch 合意のみ有効', () => {
+    // Codex P1 対応: cn('bg-low-bg', cond && 'dark:bg-transparent') では
+    // cond=false branch は solid のまま。旧実装は全 branch を OR 合成していた
+    // ため darkMasked が常に true になり、cond=false の AA 違反を silent に
+    // 見逃していた。LogicalExpression は branch 合成 (masking AND) に切替。
+    const source = `
+      import { cn } from '@/lib/utils';
+      export function Foo({ cond }: { cond: boolean }) {
+        return (
+          <div className="bg-card dark:bg-gradient-to-t">
+            <div className={cn('bg-low-bg', cond && 'dark:bg-transparent')}>
+              <p className="text-black">branch masking</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // 両 branch とも bg-low-bg (opaque) を持つため、darkMasked の AND は false。
+    // dark 側は祖先 dark:bg-gradient が bg-low-bg によって覆われて評価可能。
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
+  it('ConditionalExpression (cond ? A : B) も branch 合成される', () => {
+    const source = `
+      export function Foo({ cond }: { cond: boolean }) {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className={cond ? 'bg-white' : 'bg-transparent'}>
+              <p className="text-black">ternary</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // consequent: bg-white → solid 両テーマ
+    // alternate: bg-transparent → 両テーマ masked
+    // branch 合成: masking は AND なので lightMasked=false, darkMasked=false
+    //               opaque は OR なので light=true, dark=true
+    // → 両 branch で確実に opaque とは言えないが、少なくとも 1 branch で
+    //    masking されずに opaque になるので、保守的に evaluate する方針。
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
   it('dark: prefix 付き gradient は dark のみ flag 付与', () => {
     // Codex P1 対応: `bg-low-bg dark:bg-gradient-to-t` のような
     // 「light は solid, dark は gradient」のクラスは、light 側だけ AA 評価すべき。
