@@ -1235,6 +1235,31 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     });
   });
 
+  it('bg-cover / bg-center など色でない bg-* utility は solid masking に計上しない', () => {
+    // Codex P2 対応: bg-cover / bg-center / bg-repeat 等は「背景画像の配置/
+    // 繰り返し」指定であり背景色としての意味を持たない。旧実装は単に
+    // `bg-*` で始まるかだけで opaque 判定していたため、祖先の gradient を
+    // 誤って覆ったことにし false negative を生んでいた。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className="bg-cover bg-center">
+              <p className="text-white">still under gradient</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: true,
+      dark: true,
+    });
+  });
+
   it('dark: prefix 付き gradient は dark のみ flag 付与', () => {
     // Codex P1 対応: `bg-low-bg dark:bg-gradient-to-t` のような
     // 「light は solid, dark は gradient」のクラスは、light 側だけ AA 評価すべき。

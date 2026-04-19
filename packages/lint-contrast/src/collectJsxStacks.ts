@@ -1003,10 +1003,20 @@ function opaqueAccumInString(classStr: string): OpaqueAccum {
       continue;
     }
 
-    const isAlpha = ALPHA_MODIFIER_PATTERN.test(base);
-    const isGradient = GRADIENT_CLASS_PATTERN.test(base);
     const suffix = base.slice(3);
     const isTransparent = NON_OPAQUE_BG_KEYWORDS.has(suffix);
+    const isAlpha = ALPHA_MODIFIER_PATTERN.test(base);
+    const isGradient = GRADIENT_CLASS_PATTERN.test(base);
+
+    // `bg-cover` / `bg-center` / `bg-repeat` / `bg-clip-*` 等の「色ではない
+    // bg-* utility」は背景色としての意味を持たないため opaque masking にも
+    // 計上しない (Codex P2 指摘)。isColorClass で色クラスかを判定する。
+    // ただし transparent/current/inherit は色クラス判定からは外れるが masking
+    // として扱う必要があるため、ここでは除外しない (下の分岐で処理)。
+    if (!isTransparent && !isAlpha && !isGradient && !isColorClass(base)) {
+      continue;
+    }
+
     const isOpaque = !isAlpha && !isGradient && !isTransparent;
 
     if (hasDarkVariant) {
