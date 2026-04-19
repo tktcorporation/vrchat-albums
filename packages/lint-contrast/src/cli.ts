@@ -166,20 +166,151 @@ Options:
 }
 
 // ---------------------------------------------------------------------------
+// Inline ignore directive
+// ---------------------------------------------------------------------------
+
+/**
+ * `lint-contrast-disable` マーカー (next-line バリアント以外) を検出する正規表現。
+ *
+ * `-next-line` サフィックスを含む形式は `lines.includes('lint-contrast-disable-next-line')`
+ * で直接検出するため、この定数は「同一行ディレクティブ」専用。
+ *
+ * JSX 内では `//` コメントが書けないため、`{/* ... *\/}` 形式もサポートする。
+ * そのため単純に行テキストにマーカー文字列が含まれるかでチェックする。
+ */
+const DIRECTIVE_DISABLE = /lint-contrast-disable\b(?!-next-line)/;
+
+/**
+ * 複数行 JSX/ブロックコメントの終端を検出する正規表現。
+ *
+ * `*\/` または `*\/}` が行末までのいずれかの位置で終わるパターン。
+ * 本文が英字で始まる中継行を誤ってコメントでないと判定しないよう、
+ * ブロックコメントは行単位の開閉状態で追跡する。
+ */
+const BLOCK_COMMENT_END_PATTERN = /\*\/\}?\s*$/;
+
+/**
+ * 各行が「コメント/空白のみで構成されているか」を表すフラグ配列を計算する。
+ *
+ * `isDisabledByDirective` から呼ばれる前処理。複数行の JSX コメント
+ * (`{/* ... *\/}`) やブロックコメント (`/* ... *\/`) の中継行（英字で
+ * 始まる本文のみの行）も正しくコメントと判定するため、行ベースで開閉状態を追跡する。
+ *
+ * 文字列リテラル中に `/*` を含むといった病的ケースは扱わない。
+ * JSX コメントの実用パターンをカバーすれば十分という判断。
+ */
+function computeCommentLineFlags(lines: readonly string[]): boolean[] {
+  const flags: boolean[] = Array.from({ length: lines.length }, () => false);
+  let inBlockComment = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    if (inBlockComment) {
+      flags[i] = true;
+      if (BLOCK_COMMENT_END_PATTERN.test(trimmed)) {
+        inBlockComment = false;
+      }
+      continue;
+    }
+
+    if (trimmed === '') {
+      flags[i] = true;
+      continue;
+    }
+
+    if (trimmed.startsWith('//')) {
+      flags[i] = true;
+      continue;
+    }
+
+    if (trimmed.startsWith('{/*') || trimmed.startsWith('/*')) {
+      flags[i] = true;
+      if (!BLOCK_COMMENT_END_PATTERN.test(trimmed)) {
+        inBlockComment = true;
+      }
+    }
+  }
+
+  return flags;
+}
+
+/**
+ * 指定行のコントラスト検査を ignore ディレクティブが無効化しているか判定する。
+ *
+ * 以下のどちらかを満たすと true を返す:
+ * - 対象行自体に `lint-contrast-disable` マーカーがある
+ *   （例: `<p className="..."> {/* lint-contrast-disable *\/} </p>`）
+ * - 対象行より前方の連続するコメント/空白行群のいずれかに
+ *   `lint-contrast-disable-next-line` マーカーがある
+ *   （directive の直後に補足説明コメントを挟んでも効かせるため、
+ *    コード行に当たるまで遡って探索する）
+ *
+ * 非テキスト要素 (アイコン、progress indicator) や linter が解釈できない
+ * グラデーション背景上のテキストなど、擬陽性を抑制するために使用する。
+ *
+ * @param lines - ソースを改行で分割した配列
+ * @param lineNumber - 1-indexed の行番号（JsxStack.line と同じ形式）
+ */
+function isDisabledByDirective(
+  lines: readonly string[],
+  commentFlags: readonly boolean[],
+  lineNumber: number,
+): boolean {
+  if (lineNumber <= 0 || lineNumber > lines.length) {
+    return false;
+  }
+
+  const targetLine = lines[lineNumber - 1];
+  if (DIRECTIVE_DISABLE.test(targetLine)) {
+    return true;
+  }
+
+  // 対象行より前を遡り、連続するコメント/空白行の中に directive があれば有効。
+  // コード行に到達したら停止する（関係のない箇所の directive を拾わないため）。
+  for (let i = lineNumber - 2; i >= 0; i--) {
+    if (!commentFlags[i]) {
+      return false;
+    }
+    if (lines[i].includes('lint-contrast-disable-next-line')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // コントラスト評価ロジック
 // ---------------------------------------------------------------------------
+
+/**
+ * WCAG 1.4.11 (非テキスト UI コンポーネント) の閾値。
+ *
+ * アイコン・グラフィック・状態インジケーター等は「隣接色と 3:1 以上」で
+ * AA 適合となるため、本文テキスト基準 (4.5) より緩い閾値を適用する。
+ * ref: https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html
+ */
+const WCAG_NON_TEXT_THRESHOLD = 3;
 
 /**
  * 単一の JsxStack を評価してコントラスト違反を生成する。
  *
  * classifyStack が 'resolvable' を返した場合のみコントラスト計算を行う。
  * 'unknown' は warning, 'skip' は報告なし。
+ * 非テキスト UI コンポーネント (アイコン、SVG primitives) には 3:1 基準を適用する。
+ * グラデーション背景は静的に単色として解けないため skip 扱い。
  */
 function evaluateStack(
   stack: JsxStack,
   cssVars: Record<Theme, Record<string, Rgba>>,
   opts: CliOptions,
 ): ContrastIssue[] {
+  // グラデーション背景の要素は linter が正確に色を解けないため skip。
+  // 擬陽性 (from-black/60 上の text-white を「白地白文字」と誤判定) を防ぐ。
+  if (stack.hasGradientBackground) {
+    return [];
+  }
+
   const resolution = classifyStack(stack, cssVars, opts.maxCombinations);
   const issues: ContrastIssue[] = [];
 
@@ -200,13 +331,21 @@ function evaluateStack(
     return issues;
   }
 
+  // 非テキスト要素は WCAG 1.4.11 の 3:1 基準、テキスト要素は AA 4.5:1 (opts.threshold) を適用。
+  const elementThreshold = stack.isNonTextElement
+    ? WCAG_NON_TEXT_THRESHOLD
+    : opts.threshold;
+  const criterionLabel = stack.isNonTextElement
+    ? 'WCAG 1.4.11 non-text'
+    : 'WCAG AA';
+
   // resolvable: compute contrast for both themes using pre-computed worst-case pairs
   const themes: Theme[] = ['light', 'dark'];
   for (const theme of themes) {
     const themeData = resolution.themes[theme];
     const ratio = wcagContrastRatio(themeData.fg, themeData.bg);
 
-    if (ratio < opts.threshold) {
+    if (ratio < elementThreshold) {
       issues.push({
         file: stack.file,
         line: stack.line,
@@ -214,7 +353,7 @@ function evaluateStack(
         severity: 'error',
         theme,
         ratio,
-        message: `[contrast] <${stack.elementName}> contrast ratio ${ratio.toFixed(2)} < ${opts.threshold} (WCAG AA) in ${theme} mode`,
+        message: `[contrast] <${stack.elementName}> contrast ratio ${ratio.toFixed(2)} < ${elementThreshold} (${criterionLabel}) in ${theme} mode`,
       });
     }
   }
@@ -338,8 +477,13 @@ export async function runCli(argv: string[]): Promise<number> {
   for (const file of files) {
     const source = readFileSync(file, 'utf8');
     const stacks = collectJsxStacks(file, source);
+    const sourceLines = source.split('\n');
+    const commentFlags = computeCommentLineFlags(sourceLines);
 
     for (const stack of stacks) {
+      if (isDisabledByDirective(sourceLines, commentFlags, stack.line)) {
+        continue;
+      }
       const issues = evaluateStack(stack, cssVars, opts);
       allIssues.push(...issues);
     }

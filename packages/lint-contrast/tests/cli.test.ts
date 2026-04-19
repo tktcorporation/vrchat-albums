@@ -310,3 +310,169 @@ describe('runCli --max-combinations invalid value warns (F6)', () => {
     ).resolves.toBeTypeOf('number');
   });
 });
+
+describe('runCli non-text element and gradient handling', () => {
+  // WCAG 1.4.11 の非テキスト UI コンポーネント (3:1 基準) と
+  // グラデーション背景の skip 判定を検証する。
+  // コード側に ignore directive を書かずに linter 単独で擬陽性を吸収する機能。
+
+  let consoleLogs: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
+
+  beforeEach(() => {
+    consoleLogs = [];
+    originalConsolaLevel = consola.level;
+    logSpy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((...args: unknown[]) => {
+        consoleLogs.push(args.map(String).join(' '));
+      });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    consola.level = originalConsolaLevel;
+  });
+
+  it('lucide-react からインポートしたアイコンは issue を出さない (非テキスト扱い)', async () => {
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-non-text-icon.tsx']),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBe(0);
+  });
+
+  it('SVG primitives (<circle>) も非テキスト扱いになる', async () => {
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-non-text-threshold.tsx']),
+    );
+    expect(exitCode).toBe(0);
+  });
+
+  it('bg-gradient-* を持つ親の配下の要素は skip される', async () => {
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-gradient-bg-skip.tsx']),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      issues: unknown[];
+    };
+    expect(parsed.issues).toEqual([]);
+  });
+});
+
+describe('runCli inline disable directive', () => {
+  // `lint-contrast-disable-next-line` / `lint-contrast-disable` マーカーで
+  // 個別要素の検査を抑制できることを確認する。
+  // 非テキスト要素 (アイコン) やグラデーション上のテキストなど、
+  // 静的解析では正しく判定できない擬陽性を抑制するための機能。
+
+  let consoleLogs: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
+
+  beforeEach(() => {
+    consoleLogs = [];
+    originalConsolaLevel = consola.level;
+    logSpy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((...args: unknown[]) => {
+        consoleLogs.push(args.map(String).join(' '));
+      });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    consola.level = originalConsolaLevel;
+  });
+
+  it('JSX コメント形式の disable-next-line で issue が抑制される', async () => {
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-inline-disable.tsx']),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('directive が無ければ同じクラスでも error になる (対照テスト)', async () => {
+    // ng-low-contrast-dark.tsx は ok-inline-disable.tsx と同じクラスを使うが
+    // directive が無いので dark モードで error が出る。
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ng-low-contrast-dark.tsx']),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+  });
+
+  it('directive と対象行の間に説明コメントを挟んでも有効', async () => {
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ok-inline-disable-with-comment.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('directive の後に複数行 JSX コメントが続いても有効', async () => {
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ok-inline-disable-multiline-comment.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('directive と対象行の間にコード行があると無効化される', async () => {
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ng-disable-blocked-by-code.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: { line: number }[];
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+  });
+});

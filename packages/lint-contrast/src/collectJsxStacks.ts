@@ -718,6 +718,147 @@ function getElementName(nameNode: AstNode): string {
 }
 
 /**
+ * WCAG 1.4.11 の「非テキスト UI コンポーネント」扱いにする標準 HTML / SVG 要素名。
+ *
+ * これらは装飾・状態表現であり「本文テキスト」ではないため、4.5:1 基準ではなく
+ * 3:1 基準で評価する（「隣接色と 3:1 以上」の要件に対応）。
+ *
+ * ref: https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html
+ */
+const NON_TEXT_HTML_ELEMENTS = new Set([
+  'svg',
+  'circle',
+  'rect',
+  'path',
+  'line',
+  'polyline',
+  'polygon',
+  'ellipse',
+  'g',
+  'use',
+]);
+
+/**
+ * import 元パッケージ名が「装飾アイコンライブラリ」であることを示すリスト。
+ *
+ * これらからデフォルトエクスポート・名前付きエクスポートされた React コンポーネントは
+ * 装飾アイコンとして扱い、3:1 基準で評価する。
+ * 新しいアイコンライブラリを使う場合はここに追加する。
+ */
+const ICON_PACKAGE_NAMES = new Set(['lucide-react']);
+
+/**
+ * ファイル先頭のみを走査して「装飾アイコンコンポーネント名」の集合を収集する。
+ *
+ * ESM import 文のみ対象。CommonJS require や dynamic import は対象外。
+ * バンドルサイズ最適化のため、全 AST ノードの走査は避けて Program.body の
+ * トップレベル statement のみを見る。
+ */
+function collectIconComponentNames(program: AstNode): Set<string> {
+  const names = new Set<string>();
+  const body = (program as AstNode & { body?: AstNode[] }).body;
+  if (!Array.isArray(body)) {
+    return names;
+  }
+
+  for (const stmt of body) {
+    if (stmt.type !== 'ImportDeclaration') {
+      continue;
+    }
+    const source = (
+      stmt as AstNode & { source?: AstNode & { value?: unknown } }
+    ).source;
+    const sourceValue = source?.value;
+    if (typeof sourceValue !== 'string') {
+      continue;
+    }
+    if (!ICON_PACKAGE_NAMES.has(sourceValue)) {
+      continue;
+    }
+
+    const specifiers =
+      (stmt as AstNode & { specifiers?: AstNode[] }).specifiers ?? [];
+    for (const spec of specifiers) {
+      const local = (spec as AstNode & { local?: AstNode & { name?: string } })
+        .local;
+      const localName = local?.name;
+      if (typeof localName === 'string') {
+        names.add(localName);
+      }
+    }
+  }
+  return names;
+}
+
+/**
+ * `bg-gradient-*` / `bg-linear-*` / `bg-radial-*` / `bg-conic-*` を含む
+ * Tailwind クラス検出用の正規表現。
+ *
+ * Tailwind v3 は `bg-gradient-to-*`、v4 は `bg-linear-*` / `bg-radial-*` /
+ * `bg-conic-*` が対応するため両方拾う。
+ * 単語境界の直後に bg- から始まるグラデーション指定がくる箇所を探し、
+ * `dark:bg-gradient-to-t` のような variant prefix 付きも拾う。
+ */
+const GRADIENT_CLASS_PATTERN = /(?<![\w-])bg-(?:gradient|linear|radial|conic)-/;
+
+/**
+ * className の value AST を走査して gradient クラスが含まれるか判定する。
+ *
+ * `isColorClass` は `bg-gradient-*` を「色クラスでない」として除外するため、
+ * ClassCandidate 経由ではグラデーション背景を検出できない。
+ * ここでは静的文字列を直接スキャンして擬陽性抑制用のフラグを得る。
+ * cn()/clsx() 経由の条件分岐も含めて走査するため、条件の真偽に関わらず
+ * グラデーションが含まれれば skip 対象とする (conservative な判定)。
+ */
+function jsxContainsGradientClass(valueNode: AstNode | null): boolean {
+  if (valueNode === null) {
+    return false;
+  }
+  return containsGradientInAst(valueNode);
+}
+
+function containsGradientInAst(node: AstNode): boolean {
+  if (node.type === 'Literal') {
+    const value = (node as Literal).value;
+    return typeof value === 'string' && GRADIENT_CLASS_PATTERN.test(value);
+  }
+
+  if (node.type === 'TemplateLiteral') {
+    const quasis = (node as TemplateLiteral).quasis;
+    for (const q of quasis) {
+      const cooked = q.value?.cooked ?? '';
+      if (GRADIENT_CLASS_PATTERN.test(cooked)) {
+        return true;
+      }
+    }
+  }
+
+  for (const key of Object.keys(node)) {
+    const val = node[key];
+    if (Array.isArray(val)) {
+      for (const child of val) {
+        if (
+          child &&
+          typeof child === 'object' &&
+          'type' in child &&
+          containsGradientInAst(child as AstNode)
+        ) {
+          return true;
+        }
+      }
+    } else if (
+      val &&
+      typeof val === 'object' &&
+      'type' in val &&
+      containsGradientInAst(val as AstNode)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * バイトオフセット → 行/列番号の変換を効率化するインデックス。
  *
  * ファイル単位で改行位置を一度だけ走査してキャッシュし、
@@ -769,12 +910,20 @@ class OffsetIndex {
  * @param parentBgStack - 親要素から継承した bg クラス候補の階層配列 (外→内)
  * @param results - 収集結果を追記するリスト
  */
+interface VisitContext {
+  offsetIndex: OffsetIndex;
+  filePath: string;
+  results: JsxStack[];
+  /** ファイル内で `lucide-react` 等から import された装飾アイコン名の集合 */
+  iconNames: Set<string>;
+}
+
 function visitNode(
   node: AstNode,
-  offsetIndex: OffsetIndex,
-  filePath: string,
+  ctx: VisitContext,
   parentBgStack: ClassCandidate[][],
-  results: JsxStack[],
+  /** 祖先要素が bg-gradient-* を持っているか。子要素まで継承する */
+  ancestorHasGradient: boolean,
 ): void {
   if (!isJsxElement(node)) {
     // Recurse into non-JSX nodes' children
@@ -785,21 +934,14 @@ function visitNode(
           if (child && typeof child === 'object' && 'type' in child) {
             visitNode(
               child as AstNode,
-              offsetIndex,
-              filePath,
+              ctx,
               parentBgStack,
-              results,
+              ancestorHasGradient,
             );
           }
         }
       } else if (val && typeof val === 'object' && 'type' in val) {
-        visitNode(
-          val as AstNode,
-          offsetIndex,
-          filePath,
-          parentBgStack,
-          results,
-        );
+        visitNode(val as AstNode, ctx, parentBgStack, ancestorHasGradient);
       }
     }
     return;
@@ -881,26 +1023,39 @@ function visitNode(
       ? [...parentBgStack, bgCandidates] // この要素の候補群を 1 層として追加
       : parentBgStack;
 
+  // WCAG 1.4.11 判定: 標準 SVG primitives とファイル内の装飾アイコン import を
+  // 非テキスト UI コンポーネントとして扱う。CLI 側で閾値を 3:1 に切り替える。
+  const isNonTextElement =
+    NON_TEXT_HTML_ELEMENTS.has(elementName) || ctx.iconNames.has(elementName);
+
+  // 自要素の bg-gradient-* クラスを検出。親から継承した gradient も考慮する。
+  // グラデーション背景は単色として扱えず静的コントラスト計算が不正確になるため、
+  // CLI 側で skip の目印として使う。
+  const myHasGradient = jsxContainsGradientClass(classNameValue);
+  const hasGradientBackground = ancestorHasGradient || myHasGradient;
+
   // If this element has text candidates, record a JsxStack entry.
   // bgStack が空 (祖先に bg 指定なし) の場合も記録する。
   // classify.ts Rule 6 が bgStack 空時に暗黙の --background をベースとして使うため、
   // ページデフォルト背景に描画される一般テキストのコントラスト検証が可能になる。
   if (textCandidates.length > 0) {
-    const { line, column } = offsetIndex.toLineCol(opening.start);
-    results.push({
-      file: filePath,
+    const { line, column } = ctx.offsetIndex.toLineCol(opening.start);
+    ctx.results.push({
+      file: ctx.filePath,
       line,
       column,
       bgStack: newBgStack,
       textCandidates,
       elementName,
+      isNonTextElement,
+      hasGradientBackground,
     });
   }
 
   // Recurse into children with the new bg stack
   for (const child of node.children) {
     if (child && typeof child === 'object' && 'type' in child) {
-      visitNode(child, offsetIndex, filePath, newBgStack, results);
+      visitNode(child, ctx, newBgStack, hasGradientBackground);
     }
   }
 
@@ -919,7 +1074,7 @@ function visitNode(
       if (value.type === 'JSXExpressionContainer') {
         const expr = (value as AstNode & { expression: AstNode }).expression;
         if (expr && isJsxElement(expr)) {
-          visitNode(expr, offsetIndex, filePath, [], results);
+          visitNode(expr, ctx, [], false);
         }
       }
     }
@@ -956,7 +1111,14 @@ export function collectJsxStacks(filePath: string, source: string): JsxStack[] {
   // ファイル単位で改行インデックスを一度だけ構築し、二分探索で行番号計算する
   const offsetIndex = new OffsetIndex(source);
 
-  visitNode(program, offsetIndex, filePath, [], stacks);
+  const ctx: VisitContext = {
+    offsetIndex,
+    filePath,
+    results: stacks,
+    iconNames: collectIconComponentNames(program),
+  };
+
+  visitNode(program, ctx, [], false);
 
   return stacks;
 }
