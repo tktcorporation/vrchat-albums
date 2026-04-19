@@ -407,7 +407,7 @@ const Contents = memo(() => {
                           href="https://github.com/your-repo/issues/new"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary hover:underline"
+                          className="underline text-foreground hover:text-primary"
                         >
                           バグを報告する
                         </a>

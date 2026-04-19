@@ -162,7 +162,7 @@ const SqliteConsole: React.FC<SqliteConsoleProps> = ({ isOpen, onClose }) => {
               >
                 {t('debug.sqliteConsole.queryLabel') || 'SQL Query'}
               </label>
-              <span className="text-xs text-muted-foreground/80">
+              <span className="text-xs text-muted-foreground">
                 {t('debug.sqliteConsole.shortcut') ||
                   'Press Cmd/Ctrl + Enter to execute'}
               </span>

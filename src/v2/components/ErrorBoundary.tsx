@@ -36,7 +36,7 @@ const ErrorFallback: React.FC<{
           予期せぬエラーが発生しました
         </h2>
         <p className="mt-2 text-muted-foreground">{getErrorMessage(error)}</p>
-        <p className="mt-1 text-sm text-muted-foreground/80">
+        <p className="mt-1 text-sm text-muted-foreground">
           再読み込みを試してください
         </p>
         <button

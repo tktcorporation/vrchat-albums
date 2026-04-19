@@ -137,10 +137,10 @@ export const MigrationDialog: React.FC<MigrationDialogProps> = ({
             <div className="flex gap-3">
               <AlertCircle className="h-5 w-5 text-warning flex-shrink-0" />
               <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium text-warning">
+                <p className="text-sm font-medium text-foreground">
                   {t('migration.labels.notes')}
                 </p>
-                <ul className="text-xs text-warning/80 space-y-1 ml-2">
+                <ul className="text-xs text-muted-foreground space-y-1 ml-2">
                   <li>• {t('migration.labels.note1')}</li>
                   <li>• {t('migration.labels.note2')}</li>
                 </ul>

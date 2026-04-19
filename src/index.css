@@ -23,7 +23,8 @@
     --foreground: 0 0% 9%;
 
     --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    /* 38% は白背景で約 6.6:1。/60 〜 /80 のアルファ付きでも AA (4.5:1) を維持する。 */
+    --muted-foreground: 0 0% 38%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 9%;
@@ -34,7 +35,10 @@
     --card: 0 0% 100%;
     --card-foreground: 0 0% 9%;
 
-    --primary: 32 95% 52%;
+    /* 52% だと白背景で ~2.4:1 と AA 未達になり bg-primary + primary-foreground (白)
+       の組合せも含めて視認性が低下する。L=35% に下げてブランドオレンジを保ちつつ
+       WCAG AA (4.5:1) を全ての text-primary / bg-primary 用途でクリアする。 */
+    --primary: 32 95% 35%;
     --primary-foreground: 0 0% 100%;
 
     --secondary-muted: 0 0% 96%;
@@ -44,19 +48,24 @@
     --accent: 30 6% 96%;
     --accent-foreground: 32 80% 42%;
 
-    --destructive: 0 84% 60%;
+    /* text-destructive を白背景で 4.5:1 以上にするため L を 45% に下げる。
+       ついでに彩度を 84% → 72% に抑え、より落ち着いた赤に寄せる。 */
+    --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
 
     --ring: 32 95% 52% / 0.3;
 
     --radius: 0.75rem;
 
-    /* Status colors - semantic feedback colors */
-    --success: 142 76% 36%;
+    /* Status colors - semantic feedback colors.
+       light mode では text-* 用途で 4.5:1 以上になるよう L を下げる。 */
+    --success: 142 72% 30%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    /* warning はテキスト用途では暗め、bg-warning 用途では 10% alpha で重ねるため両立する値を選択 */
+    --warning: 38 92% 38%;
     --warning-foreground: 38 92% 20%;
-    --info: 200 98% 39%;
+    /* info は 30% まで下げて白背景 4.5:1 以上を確保 */
+    --info: 200 98% 30%;
     --info-foreground: 0 0% 100%;
 
     /* Surface hierarchy */
