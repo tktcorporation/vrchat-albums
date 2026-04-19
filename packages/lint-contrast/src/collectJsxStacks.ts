@@ -754,6 +754,11 @@ const SVG_TEXT_ELEMENTS = new Set(['text', 'tspan', 'textPath']);
 
 /**
  * 指定ノードのサブツリーに SVG の text 要素が含まれるかを判定する。
+ *
+ * JSXElement だけでなく JSXExpressionContainer / LogicalExpression /
+ * ConditionalExpression 等も走査する必要がある (Codex P1 指摘:
+ * `<svg>{show && <text>Label</text>}</svg>` のような条件埋め込み内の
+ * <text> が見逃され、<svg> が誤って非テキスト扱いされていた)。
  */
 function containsSvgTextElement(node: AstNode): boolean {
   if (isJsxElement(node)) {
@@ -761,15 +766,30 @@ function containsSvgTextElement(node: AstNode): boolean {
     if (SVG_TEXT_ELEMENTS.has(name)) {
       return true;
     }
-    for (const child of node.children) {
-      if (
-        child &&
-        typeof child === 'object' &&
-        'type' in child &&
-        containsSvgTextElement(child)
-      ) {
-        return true;
+  }
+
+  // 全フィールドを再帰走査して JSXExpressionContainer の expression 等も辿る。
+  // containsGradientInAst と同じ戦略。
+  for (const key of Object.keys(node)) {
+    const val = node[key];
+    if (Array.isArray(val)) {
+      for (const child of val) {
+        if (
+          child &&
+          typeof child === 'object' &&
+          'type' in child &&
+          containsSvgTextElement(child as AstNode)
+        ) {
+          return true;
+        }
       }
+    } else if (
+      val &&
+      typeof val === 'object' &&
+      'type' in val &&
+      containsSvgTextElement(val as AstNode)
+    ) {
+      return true;
     }
   }
   return false;

@@ -950,6 +950,24 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     expect(svg!.isNonTextElement).toBe(false);
   });
 
+  it('<svg> に JSXExpressionContainer 内の <text> があってもテキスト扱い', () => {
+    // Codex P1 対応: containsSvgTextElement が JSXElement のみ再帰していたため、
+    // `{show && <text/>}` のような条件埋め込み内の <text> を見逃していた。
+    const source = `
+      export function Chart({ show }: { show: boolean }) {
+        return (
+          <svg className="text-foreground">
+            {show && <text x="0" y="10">Label</text>}
+          </svg>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const svg = stacks.find((s) => s.elementName === 'svg');
+    expect(svg).toBeDefined();
+    expect(svg!.isNonTextElement).toBe(false);
+  });
+
   it('<svg> に <text> が無ければ非テキスト扱い (isNonTextElement=true)', () => {
     const source = `
       export function Icon() {
