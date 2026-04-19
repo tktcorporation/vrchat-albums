@@ -42,7 +42,7 @@ function makeStack(
     bgStack,
     textCandidates,
     isNonTextElement: false,
-    hasGradientBackground: false,
+    hasGradientBackground: { light: false, dark: false },
   };
 }
 

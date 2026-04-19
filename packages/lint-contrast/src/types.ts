@@ -97,12 +97,16 @@ export interface JsxStack {
    */
   isNonTextElement: boolean;
   /**
-   * 背景に `bg-gradient-*` が含まれており linter が静的に解決できない要素。
+   * 背景に `bg-gradient-*` が含まれており linter が静的に解決できない要素を
+   * テーマ別にトラッキングしたフラグ。
    *
-   * グラデーション background では要素を単色として扱えないため、
-   * fg vs bg のコントラスト判定は不正確になる。CLI 側で skip する目印。
+   * `dark:bg-gradient-to-t` のように一方のテーマでのみ gradient 化する
+   * ケースがあるため、単一 boolean だと「dark のみ gradient」のときに
+   * light 側の AA 評価まで silent に skip してしまう (Codex P1 指摘)。
+   * テーマ別に持つことで、常時 gradient のテーマのみ skip、solid の
+   * テーマは AA 評価する。
    */
-  hasGradientBackground: boolean;
+  hasGradientBackground: { light: boolean; dark: boolean };
 }
 
 /**

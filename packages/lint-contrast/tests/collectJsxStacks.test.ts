@@ -945,7 +945,10 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     const circle = stacks.find((s) => s.elementName === 'circle');
     expect(circle).toBeDefined();
     expect(circle!.isNonTextElement).toBe(true);
-    expect(circle!.hasGradientBackground).toBe(false);
+    expect(circle!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
   });
 
   it('lucide-react import のコンポーネントは isNonTextElement=true', () => {
@@ -984,7 +987,7 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     expect(bug!.isNonTextElement).toBe(false);
   });
 
-  it('bg-gradient-* を持つ要素は hasGradientBackground=true', () => {
+  it('bg-gradient-* を持つ要素は hasGradientBackground が両テーマ true', () => {
     const source = `
       export function Foo() {
         return (
@@ -997,7 +1000,7 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     const stacks = collectJsxStacks('test.tsx', source);
     const pStack = stacks.find((s) => s.elementName === 'p');
     expect(pStack).toBeDefined();
-    expect(pStack!.hasGradientBackground).toBe(true);
+    expect(pStack!.hasGradientBackground).toEqual({ light: true, dark: true });
   });
 
   it('祖先の gradient 背景は子孫に継承される', () => {
@@ -1015,7 +1018,7 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     const stacks = collectJsxStacks('test.tsx', source);
     const pStack = stacks.find((s) => s.elementName === 'p');
     expect(pStack).toBeDefined();
-    expect(pStack!.hasGradientBackground).toBe(true);
+    expect(pStack!.hasGradientBackground).toEqual({ light: true, dark: true });
   });
 
   it('Tailwind v4 の bg-linear-* / bg-radial-* / bg-conic-* も検出する', () => {
@@ -1040,11 +1043,11 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     const pStacks = stacks.filter((s) => s.elementName === 'p');
     expect(pStacks).toHaveLength(3);
     for (const p of pStacks) {
-      expect(p.hasGradientBackground).toBe(true);
+      expect(p.hasGradientBackground).toEqual({ light: true, dark: true });
     }
   });
 
-  it('通常の bg-card 背景では hasGradientBackground=false', () => {
+  it('通常の bg-card 背景では hasGradientBackground が両テーマ false', () => {
     const source = `
       export function Foo() {
         return (
@@ -1057,7 +1060,10 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     const stacks = collectJsxStacks('test.tsx', source);
     const pStack = stacks.find((s) => s.elementName === 'p');
     expect(pStack).toBeDefined();
-    expect(pStack!.hasGradientBackground).toBe(false);
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
   });
 
   it('子孫が自前の solid bg-* を宣言すると gradient flag はリセットされる', () => {
@@ -1079,6 +1085,30 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     const stacks = collectJsxStacks('test.tsx', source);
     const pStack = stacks.find((s) => s.elementName === 'p');
     expect(pStack).toBeDefined();
-    expect(pStack!.hasGradientBackground).toBe(false);
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
+  it('dark: prefix 付き gradient は dark のみ flag 付与', () => {
+    // Codex P1 対応: `bg-low-bg dark:bg-gradient-to-t` のような
+    // 「light は solid, dark は gradient」のクラスは、light 側だけ AA 評価すべき。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-card dark:bg-gradient-to-t">
+            <p className="text-foreground">mixed</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: true,
+    });
   });
 });

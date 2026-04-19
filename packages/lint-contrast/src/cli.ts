@@ -341,9 +341,11 @@ function evaluateStack(
   cssVars: Record<Theme, Record<string, Rgba>>,
   opts: CliOptions,
 ): ContrastIssue[] {
-  // グラデーション背景の要素は linter が正確に色を解けないため skip。
-  // 擬陽性 (from-black/60 上の text-white を「白地白文字」と誤判定) を防ぐ。
-  if (stack.hasGradientBackground) {
+  // 両テーマとも gradient で解けない場合はこの要素全体を skip。
+  // 片方のみ gradient のときは、solid テーマ側の評価は続行する必要があるため
+  // ここで早期 return しない (Codex P1 指摘: dark:bg-gradient + bg-low-bg で
+  // light 側の AA 違反が silent に suppress される問題)。
+  if (stack.hasGradientBackground.light && stack.hasGradientBackground.dark) {
     return [];
   }
 
@@ -378,6 +380,11 @@ function evaluateStack(
   // resolvable: compute contrast for both themes using pre-computed worst-case pairs
   const themes: Theme[] = ['light', 'dark'];
   for (const theme of themes) {
+    // gradient が常時適用されるテーマはコントラスト計算不能なのでテーマ単位で skip。
+    if (stack.hasGradientBackground[theme]) {
+      continue;
+    }
+
     const themeData = resolution.themes[theme];
     const ratio = wcagContrastRatio(themeData.fg, themeData.bg);
 

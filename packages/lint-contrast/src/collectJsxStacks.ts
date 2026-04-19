@@ -816,80 +816,108 @@ const GRADIENT_CLASS_PATTERN = /(?<![\w-])bg-(?:gradient|linear|radial|conic)-/;
  * `bg-low-bg hover:bg-gradient-to-*` のような通常 solid + hover のみグラデ、
  * というパターンで通常状態の AA 違反を silent に見逃す (Codex P1 指摘)。
  */
-function jsxContainsGradientClass(valueNode: AstNode | null): boolean {
+function jsxContainsGradientClass(valueNode: AstNode | null): GradientFlags {
   if (valueNode === null) {
-    return false;
+    return NO_GRADIENT;
   }
   return containsGradientInAst(valueNode);
 }
 
+/** テーマ別の gradient 有無フラグ。 */
+interface GradientFlags {
+  light: boolean;
+  dark: boolean;
+}
+
+const NO_GRADIENT: GradientFlags = { light: false, dark: false };
+
+/** 2 つの GradientFlags を OR 合成する。 */
+function mergeGradient(a: GradientFlags, b: GradientFlags): GradientFlags {
+  return { light: a.light || b.light, dark: a.dark || b.dark };
+}
+
 /**
- * 単一の className 文字列中に「常時適用される gradient 背景」があるか判定する。
+ * 単一の className 文字列中に「常時適用される gradient 背景」があるかを
+ * テーマ別に判定する。
  *
  * 各クラスを空白で分割し、variant prefix を剥がしてから gradient パターンに
- * 該当するかを見る。`dark:` は dark モードで常時適用なので gradient 扱いにする。
- * `hover:`/`focus:`/`sm:` 等の state/media variant は ignore して通常状態の
- * AA 評価が働くようにする。
+ * 該当するかを見る:
+ * - バリアントなし: light/dark 両方で常時適用 → 両方 true
+ * - `dark:` のみ: dark モードでのみ適用 → dark=true のみ
+ * - `hover:`/`focus:`/`sm:` 等: 状態依存で常時適用でない → ignore (両方 false)
+ * - `md:dark:` 等のチェーン: `dark:` 以外の variant が混ざるため状態依存と判定 → ignore
  */
-function hasEffectiveGradientBg(classStr: string): boolean {
+function hasEffectiveGradientBg(classStr: string): GradientFlags {
+  let light = false;
+  let dark = false;
+
   for (const rawCls of classStr.split(/\s+/)) {
     const trimmed = rawCls.trim();
     if (!trimmed) {
       continue;
     }
 
-    const { base, hasNonDarkVariant } = extractBase(trimmed);
-    // hover:, focus:, sm: 等は常時適用でないため、gradient skip の対象外。
+    const { base, hasDarkVariant, hasNonDarkVariant } = extractBase(trimmed);
+    // hover:, focus:, sm: 等が混ざれば常時適用でないため無視。
     if (hasNonDarkVariant) {
       continue;
     }
 
-    if (GRADIENT_CLASS_PATTERN.test(base)) {
-      return true;
+    if (!GRADIENT_CLASS_PATTERN.test(base)) {
+      continue;
+    }
+
+    if (hasDarkVariant) {
+      dark = true;
+    } else {
+      light = true;
+      dark = true;
     }
   }
-  return false;
+
+  return { light, dark };
 }
 
-function containsGradientInAst(node: AstNode): boolean {
+function containsGradientInAst(node: AstNode): GradientFlags {
   if (node.type === 'Literal') {
     const value = (node as Literal).value;
-    return typeof value === 'string' && hasEffectiveGradientBg(value);
+    return typeof value === 'string'
+      ? hasEffectiveGradientBg(value)
+      : NO_GRADIENT;
   }
 
   if (node.type === 'TemplateLiteral') {
     const quasis = (node as TemplateLiteral).quasis;
+    let acc: GradientFlags = NO_GRADIENT;
     for (const q of quasis) {
       const cooked = q.value?.cooked ?? '';
-      if (hasEffectiveGradientBg(cooked)) {
-        return true;
-      }
+      acc = mergeGradient(acc, hasEffectiveGradientBg(cooked));
+    }
+    if (acc.light || acc.dark) {
+      return acc;
     }
   }
 
+  let acc: GradientFlags = NO_GRADIENT;
   for (const key of Object.keys(node)) {
     const val = node[key];
     if (Array.isArray(val)) {
       for (const child of val) {
-        if (
-          child &&
-          typeof child === 'object' &&
-          'type' in child &&
-          containsGradientInAst(child as AstNode)
-        ) {
-          return true;
+        if (child && typeof child === 'object' && 'type' in child) {
+          acc = mergeGradient(acc, containsGradientInAst(child as AstNode));
+          if (acc.light && acc.dark) {
+            return acc;
+          }
         }
       }
-    } else if (
-      val &&
-      typeof val === 'object' &&
-      'type' in val &&
-      containsGradientInAst(val as AstNode)
-    ) {
-      return true;
+    } else if (val && typeof val === 'object' && 'type' in val) {
+      acc = mergeGradient(acc, containsGradientInAst(val as AstNode));
+      if (acc.light && acc.dark) {
+        return acc;
+      }
     }
   }
-  return false;
+  return acc;
 }
 
 /**
@@ -956,8 +984,8 @@ function visitNode(
   node: AstNode,
   ctx: VisitContext,
   parentBgStack: ClassCandidate[][],
-  /** 祖先要素が bg-gradient-* を持っているか。子要素まで継承する */
-  ancestorHasGradient: boolean,
+  /** 祖先要素が bg-gradient-* を持っているか (テーマ別)。子要素まで継承する。 */
+  ancestorHasGradient: GradientFlags,
 ): void {
   if (!isJsxElement(node)) {
     // Recurse into non-JSX nodes' children
@@ -1065,16 +1093,19 @@ function visitNode(
   // 自要素の bg-gradient-* クラスを検出。親から継承した gradient も考慮する。
   // グラデーション背景は単色として扱えず静的コントラスト計算が不正確になるため、
   // CLI 側で skip の目印として使う。
-  const myHasGradient = jsxContainsGradientClass(classNameValue);
+  const myGradient = jsxContainsGradientClass(classNameValue);
   // 自要素が非グラデの solid bg-* を持てば、祖先のグラデはこの要素でカバーされる
   // (不透明な背景で上書きされる) ので、子孫には gradient フラグを引き継がない。
   // これをやらないと `<div bg-gradient-to-t><div bg-white><p text-white/></div></div>`
   // のような「グラデ下にさらに不透明レイヤーを重ねて上書き」パターンで、
   // p 要素の `text-white on bg-white` (1:1) 違反を silent に見逃す false negative が出る。
-  const myHasSolidBg =
-    !myHasGradient && bgCandidates.some((c) => c.classes.length > 0);
-  const hasGradientBackground =
-    myHasGradient || (ancestorHasGradient && !myHasSolidBg);
+  const myHasSolidBg = bgCandidates.some((c) => c.classes.length > 0);
+  // テーマ別に gradient を伝播する。自要素がそのテーマで gradient を宣言しているか、
+  // 祖先の gradient が有効 & かつ自要素で solid bg による上書きが無い場合に true。
+  const hasGradientBackground: GradientFlags = {
+    light: myGradient.light || (ancestorHasGradient.light && !myHasSolidBg),
+    dark: myGradient.dark || (ancestorHasGradient.dark && !myHasSolidBg),
+  };
 
   // If this element has text candidates, record a JsxStack entry.
   // bgStack が空 (祖先に bg 指定なし) の場合も記録する。
@@ -1116,7 +1147,7 @@ function visitNode(
       if (value.type === 'JSXExpressionContainer') {
         const expr = (value as AstNode & { expression: AstNode }).expression;
         if (expr && isJsxElement(expr)) {
-          visitNode(expr, ctx, [], false);
+          visitNode(expr, ctx, [], NO_GRADIENT);
         }
       }
     }
@@ -1160,7 +1191,7 @@ export function collectJsxStacks(filePath: string, source: string): JsxStack[] {
     iconNames: collectIconComponentNames(program),
   };
 
-  visitNode(program, ctx, [], false);
+  visitNode(program, ctx, [], NO_GRADIENT);
 
   return stacks;
 }
