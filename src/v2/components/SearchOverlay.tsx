@@ -284,7 +284,7 @@ const SearchOverlay = memo(
                 if (isLoading && debouncedQuery.length > 0) {
                   return (
                     <div className="p-6 text-center text-muted-foreground">
-                      検索中...
+                      {t('common.search.loading')}
                     </div>
                   );
                 }
@@ -292,8 +292,8 @@ const SearchOverlay = memo(
                   return (
                     <div className="p-6 text-center text-muted-foreground">
                       {debouncedQuery.length > 0
-                        ? '候補が見つかりません'
-                        : 'よく利用する項目を読み込み中...'}
+                        ? t('common.search.noSuggestions')
+                        : t('common.search.loadingFrequentItems')}
                     </div>
                   );
                 }
@@ -301,7 +301,7 @@ const SearchOverlay = memo(
                   <div className="p-2">
                     {debouncedQuery.length === 0 && (
                       <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        よく利用する項目
+                        {t('common.search.frequentItems')}
                       </div>
                     )}
                     {suggestions.map((suggestion, index) => (

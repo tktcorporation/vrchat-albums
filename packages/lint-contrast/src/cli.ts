@@ -177,6 +177,16 @@ Options:
  *
  * JSX 内では `//` コメントが書けないため、`{/* ... *\/}` 形式もサポートする。
  * そのため単純に行テキストにマーカー文字列が含まれるかでチェックする。
+ *
+ * 病的ケース (Pathological cases):
+ * - 本正規表現は AST ではなく生ソース行に対して適用されるため、
+ *   文字列リテラルや属性値内にトークンが含まれるケース
+ *   (例: `<p title="lint-contrast-disable">…</p>`、URL/データ URI 内) でも
+ *   silent に該当要素の検査を無効化してしまう。
+ * - directive は内部向けの escape hatch (最終手段) として設計されており、
+ *   実運用でこれらの文字列パターンが頻出するとは想定していない。
+ *   回避が必要な場合は対象要素から離れた場所に directive を書く、
+ *   または className を別行に分けるなどで対応する。
  */
 const DIRECTIVE_DISABLE = /lint-contrast-disable\b(?!-next-line)/;
 
@@ -221,7 +231,11 @@ function computeCommentLineFlags(lines: readonly string[]): boolean[] {
       }
 
       const ch = line[pos];
-      if (ch === ' ' || ch === '\t') {
+      // `\r` は CRLF 改行の前半分。splitLines で `\n` 区切りにしているため
+      // CRLF 行末には `\r` が残る。空白として扱わないと行末の `\r` がコード
+      // トークンと誤認され、Windows 改行のファイルで directive が効かなく
+      // なる (Codex P2 指摘)。
+      if (ch === ' ' || ch === '\t' || ch === '\r') {
         pos += 1;
         continue;
       }

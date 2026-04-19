@@ -386,6 +386,21 @@ describe('runCli non-text element and gradient handling', () => {
     };
     expect(parsed.issues).toEqual([]);
   });
+
+  it('variant prefix のみの gradient (hover:bg-gradient-*) は skip 対象外', async () => {
+    // Codex P1 対応: variant-only gradient は常時適用されないため skip すべきでない。
+    // fixture は `bg-low-bg hover:bg-gradient-to-t` の親下に text-low-fg を置き、
+    // dark モードの AA 違反 (2.63:1) が error として報告されるべきことを検証する。
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ng-gradient-variant-only.tsx']),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+  });
 });
 
 describe('runCli inline disable directive', () => {
@@ -425,6 +440,52 @@ describe('runCli inline disable directive', () => {
     };
     expect(parsed.errorCount).toBe(0);
     expect(parsed.issues).toEqual([]);
+  });
+
+  it(String.raw`CRLF 改行 (\r\n) のファイルでも directive が効く`, async () => {
+    // Codex P2 対応: computeCommentLineFlags が \r を空白扱いしないと、
+    // Windows 改行の JSX ファイルで行末 \r がコードトークンとして認識され
+    // directive が遠くの違反を抑制できなくなる。
+    // test-fixture を動的に CRLF に変換するのではなく、fs で読み込んだあと
+    // runCli が内部的に扱うのは LF 分割なので、代わりに直接関数レベルで
+    // 検証しにくい。ここでは ok-inline-disable.tsx を読み込んで一時的に
+    // CRLF 化したファイルを作成し、それを CLI に食わせる。
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path2 = await import('node:path');
+    const src = fs.readFileSync(
+      path.resolve(FIXTURES_DIR, 'ok-inline-disable.tsx'),
+      'utf8',
+    );
+    const crlfDir = fs.mkdtempSync(path2.join(os.tmpdir(), 'lc-crlf-'));
+    const crlfFile = path2.join(crlfDir, 'ok-inline-disable-crlf.tsx');
+    fs.writeFileSync(crlfFile, src.replaceAll('\n', '\r\n'), 'utf8');
+    // mock-index.css も同ディレクトリに必要 (相対パス解決のため)
+    fs.copyFileSync(
+      path.resolve(FIXTURES_DIR, MOCK_CSS),
+      path2.join(crlfDir, MOCK_CSS),
+    );
+
+    const exitCode = await runCli([
+      'node',
+      'lint-contrast',
+      '--project',
+      crlfDir,
+      '--css',
+      MOCK_CSS,
+      '--glob',
+      '*.tsx',
+      '--format',
+      'json',
+    ]);
+
+    fs.rmSync(crlfDir, { recursive: true, force: true });
+
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBe(0);
   });
 
   it('同一行 {/* lint-contrast-disable */} でも issue が抑制される', async () => {

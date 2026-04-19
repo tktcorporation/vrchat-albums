@@ -11,7 +11,17 @@ const ja: Translations = {
     refresh: '更新',
     search: {
       placeholder: '検索...',
+      loading: '検索中...',
+      noSuggestions: '候補が見つかりません',
+      loadingFrequentItems: 'よく利用する項目を読み込み中...',
+      frequentItems: 'よく利用する項目',
     },
+    errorBoundary: {
+      title: '予期せぬエラーが発生しました',
+      retryHint: '再読み込みを試してください',
+      retry: '再読み込み',
+    },
+    reportBug: 'バグを報告する',
     toast: {
       settingsDeleted: '設定を削除しました',
       allSettingsDeleted: '設定をすべて削除しました',

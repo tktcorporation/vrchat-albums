@@ -4,6 +4,8 @@ import { match, P } from 'ts-pattern';
 
 import { trpcReact } from '@/trpc';
 
+import { useI18n } from '../i18n/store';
+
 interface Props {
   children: React.ReactNode;
 }
@@ -21,6 +23,7 @@ const ErrorFallback: React.FC<{
   error: unknown;
   resetErrorBoundary: () => void;
 }> = ({ error, resetErrorBoundary }) => {
+  const { t } = useI18n();
   const reloadMutation = trpcReact.electronUtil.reloadWindow.useMutation();
 
   /** エラー発生時にウィンドウをリロードして再試行する */
@@ -33,18 +36,18 @@ const ErrorFallback: React.FC<{
     <div className="flex items-center justify-center h-screen bg-background">
       <div className="text-center p-4 max-w-md mx-auto">
         <h2 className="text-xl font-semibold text-destructive">
-          予期せぬエラーが発生しました
+          {t('common.errorBoundary.title')}
         </h2>
         <p className="mt-2 text-muted-foreground">{getErrorMessage(error)}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          再読み込みを試してください
+          {t('common.errorBoundary.retryHint')}
         </p>
         <button
           type="button"
           onClick={handleRetry}
           className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors duration-150"
         >
-          再読み込み
+          {t('common.errorBoundary.retry')}
         </button>
       </div>
     </div>

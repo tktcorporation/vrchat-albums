@@ -11,7 +11,17 @@ const en: Translations = {
     refresh: 'Refresh',
     search: {
       placeholder: 'Search...',
+      loading: 'Searching...',
+      noSuggestions: 'No suggestions found',
+      loadingFrequentItems: 'Loading frequent items...',
+      frequentItems: 'Frequent items',
     },
+    errorBoundary: {
+      title: 'An unexpected error occurred',
+      retryHint: 'Try reloading the page',
+      retry: 'Reload',
+    },
+    reportBug: 'Report a bug',
     toast: {
       settingsDeleted: 'Settings deleted',
       allSettingsDeleted: 'All settings deleted',

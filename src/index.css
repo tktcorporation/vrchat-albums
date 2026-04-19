@@ -316,7 +316,9 @@
   .glass-button:hover {
     background: hsl(var(--primary) / 0.9);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(247, 148, 29, 0.2);
+    /* hover shadow は primary の半透明色。トークンを参照することで --primary の
+       L 値変更 (52%→35% 等) に追随し、ボタン塗りとシャドウの色相がずれない。 */
+    box-shadow: 0 4px 12px hsl(var(--primary) / 0.2);
   }
 
   .glass-input {

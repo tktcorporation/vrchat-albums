@@ -802,13 +802,19 @@ function collectIconComponentNames(program: AstNode): Set<string> {
 const GRADIENT_CLASS_PATTERN = /(?<![\w-])bg-(?:gradient|linear|radial|conic)-/;
 
 /**
- * className の value AST を走査して gradient クラスが含まれるか判定する。
+ * className の value AST を走査して gradient クラスが「常時適用される状態で」
+ * 含まれるか判定する。
  *
  * `isColorClass` は `bg-gradient-*` を「色クラスでない」として除外するため、
  * ClassCandidate 経由ではグラデーション背景を検出できない。
  * ここでは静的文字列を直接スキャンして擬陽性抑制用のフラグを得る。
  * cn()/clsx() 経由の条件分岐も含めて走査するため、条件の真偽に関わらず
  * グラデーションが含まれれば skip 対象とする (conservative な判定)。
+ *
+ * ただし `hover:bg-gradient-to-t` のように `dark:` 以外の variant prefix が
+ * ついた gradient は「状態依存で常時適用されない」ので無視する。そうしないと
+ * `bg-low-bg hover:bg-gradient-to-*` のような通常 solid + hover のみグラデ、
+ * というパターンで通常状態の AA 違反を silent に見逃す (Codex P1 指摘)。
  */
 function jsxContainsGradientClass(valueNode: AstNode | null): boolean {
   if (valueNode === null) {
@@ -817,17 +823,45 @@ function jsxContainsGradientClass(valueNode: AstNode | null): boolean {
   return containsGradientInAst(valueNode);
 }
 
+/**
+ * 単一の className 文字列中に「常時適用される gradient 背景」があるか判定する。
+ *
+ * 各クラスを空白で分割し、variant prefix を剥がしてから gradient パターンに
+ * 該当するかを見る。`dark:` は dark モードで常時適用なので gradient 扱いにする。
+ * `hover:`/`focus:`/`sm:` 等の state/media variant は ignore して通常状態の
+ * AA 評価が働くようにする。
+ */
+function hasEffectiveGradientBg(classStr: string): boolean {
+  for (const rawCls of classStr.split(/\s+/)) {
+    const trimmed = rawCls.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const { base, hasNonDarkVariant } = extractBase(trimmed);
+    // hover:, focus:, sm: 等は常時適用でないため、gradient skip の対象外。
+    if (hasNonDarkVariant) {
+      continue;
+    }
+
+    if (GRADIENT_CLASS_PATTERN.test(base)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function containsGradientInAst(node: AstNode): boolean {
   if (node.type === 'Literal') {
     const value = (node as Literal).value;
-    return typeof value === 'string' && GRADIENT_CLASS_PATTERN.test(value);
+    return typeof value === 'string' && hasEffectiveGradientBg(value);
   }
 
   if (node.type === 'TemplateLiteral') {
     const quasis = (node as TemplateLiteral).quasis;
     for (const q of quasis) {
       const cooked = q.value?.cooked ?? '';
-      if (GRADIENT_CLASS_PATTERN.test(cooked)) {
+      if (hasEffectiveGradientBg(cooked)) {
         return true;
       }
     }
@@ -1032,7 +1066,15 @@ function visitNode(
   // グラデーション背景は単色として扱えず静的コントラスト計算が不正確になるため、
   // CLI 側で skip の目印として使う。
   const myHasGradient = jsxContainsGradientClass(classNameValue);
-  const hasGradientBackground = ancestorHasGradient || myHasGradient;
+  // 自要素が非グラデの solid bg-* を持てば、祖先のグラデはこの要素でカバーされる
+  // (不透明な背景で上書きされる) ので、子孫には gradient フラグを引き継がない。
+  // これをやらないと `<div bg-gradient-to-t><div bg-white><p text-white/></div></div>`
+  // のような「グラデ下にさらに不透明レイヤーを重ねて上書き」パターンで、
+  // p 要素の `text-white on bg-white` (1:1) 違反を silent に見逃す false negative が出る。
+  const myHasSolidBg =
+    !myHasGradient && bgCandidates.some((c) => c.classes.length > 0);
+  const hasGradientBackground =
+    myHasGradient || (ancestorHasGradient && !myHasSolidBg);
 
   // If this element has text candidates, record a JsxStack entry.
   // bgStack が空 (祖先に bg 指定なし) の場合も記録する。
