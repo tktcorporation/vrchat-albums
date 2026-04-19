@@ -718,6 +718,553 @@ function getElementName(nameNode: AstNode): string {
 }
 
 /**
+ * 常に「非テキスト UI コンポーネント」扱いにする純粋なグラフィック要素。
+ *
+ * これらは装飾・状態表現であり「本文テキスト」ではないため、4.5:1 基準ではなく
+ * WCAG 1.4.11 の 3:1 基準で評価する。
+ *
+ * ref: https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html
+ */
+const NON_TEXT_HTML_ELEMENTS = new Set([
+  'circle',
+  'rect',
+  'path',
+  'line',
+  'polyline',
+  'polygon',
+  'ellipse',
+  'use',
+]);
+
+/**
+ * SVG の「コンテナ」要素。`<text>` / `<tspan>` / `<textPath>` を含む場合は
+ * テキスト扱い (4.5:1)、含まない場合は純粋なアイコン扱い (3:1) と分岐する。
+ *
+ * CodeRabbit 指摘: `<svg className="text-muted-foreground"><text>...</text></svg>`
+ * のようなチャート・ラベル SVG を無条件に 3:1 で評価すると、可読性の低いテキストが
+ * silent に見逃される false negative になる。
+ */
+const SVG_CONTAINER_ELEMENTS = new Set(['svg', 'g']);
+
+/**
+ * SVG 内で本文テキストを描画する要素。これらの子孫があるコンテナは
+ * テキスト基準 (4.5:1) で評価する。
+ */
+const SVG_TEXT_ELEMENTS = new Set(['text', 'tspan', 'textPath']);
+
+/**
+ * 指定ノードのサブツリーに SVG の text 要素が含まれるかを判定する。
+ *
+ * JSXElement だけでなく JSXExpressionContainer / LogicalExpression /
+ * ConditionalExpression 等も走査する必要がある (Codex P1 指摘:
+ * `<svg>{show && <text>Label</text>}</svg>` のような条件埋め込み内の
+ * <text> が見逃され、<svg> が誤って非テキスト扱いされていた)。
+ */
+function containsSvgTextElement(node: AstNode): boolean {
+  if (isJsxElement(node)) {
+    const name = getElementName(node.openingElement.name);
+    if (SVG_TEXT_ELEMENTS.has(name)) {
+      return true;
+    }
+  }
+
+  // 全フィールドを再帰走査して JSXExpressionContainer の expression 等も辿る。
+  // containsGradientInAst と同じ戦略。
+  for (const key of Object.keys(node)) {
+    const val = node[key];
+    if (Array.isArray(val)) {
+      for (const child of val) {
+        if (
+          child &&
+          typeof child === 'object' &&
+          'type' in child &&
+          containsSvgTextElement(child as AstNode)
+        ) {
+          return true;
+        }
+      }
+    } else if (
+      val &&
+      typeof val === 'object' &&
+      'type' in val &&
+      containsSvgTextElement(val as AstNode)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * import 元パッケージ名が「装飾アイコンライブラリ」であることを示すリスト。
+ *
+ * これらからデフォルトエクスポート・名前付きエクスポートされた React コンポーネントは
+ * 装飾アイコンとして扱い、3:1 基準で評価する。
+ * 新しいアイコンライブラリを使う場合はここに追加する。
+ */
+const ICON_PACKAGE_NAMES = new Set(['lucide-react']);
+
+/**
+ * ファイル先頭のみを走査して「装飾アイコンコンポーネント名」の集合を収集する。
+ *
+ * ESM import 文のみ対象。CommonJS require や dynamic import は対象外。
+ * バンドルサイズ最適化のため、全 AST ノードの走査は避けて Program.body の
+ * トップレベル statement のみを見る。
+ */
+interface IconIdentifiers {
+  /** 名前付き import された装飾アイコンコンポーネント名 */
+  names: Set<string>;
+  /** `import * as Icons from 'lucide-react'` の namespace 名 */
+  namespaces: Set<string>;
+}
+
+/**
+ * ファイル先頭のみを走査して「装飾アイコンコンポーネント名」の集合を収集する。
+ *
+ * ESM import 文のみ対象。CommonJS require や dynamic import は対象外。
+ * バンドルサイズ最適化のため、全 AST ノードの走査は避けて Program.body の
+ * トップレベル statement のみを見る。
+ *
+ * 名前付き import (`{ Bug }`) / default import (`Bug`) は names に、
+ * namespace import (`* as Icons`) は namespaces に分けて記録する。
+ * JSX 側で `<Icons.Bug>` のように member expression で参照された場合は
+ * `elementName.startsWith(ns + '.')` で判定する。
+ */
+function collectIconComponentNames(program: AstNode): IconIdentifiers {
+  const names = new Set<string>();
+  const namespaces = new Set<string>();
+  const body = (program as AstNode & { body?: AstNode[] }).body;
+  if (!Array.isArray(body)) {
+    return { names, namespaces };
+  }
+
+  for (const stmt of body) {
+    if (stmt.type !== 'ImportDeclaration') {
+      continue;
+    }
+    const source = (
+      stmt as AstNode & { source?: AstNode & { value?: unknown } }
+    ).source;
+    const sourceValue = source?.value;
+    if (typeof sourceValue !== 'string') {
+      continue;
+    }
+    if (!ICON_PACKAGE_NAMES.has(sourceValue)) {
+      continue;
+    }
+
+    const specifiers =
+      (stmt as AstNode & { specifiers?: AstNode[] }).specifiers ?? [];
+    for (const spec of specifiers) {
+      const local = (spec as AstNode & { local?: AstNode & { name?: string } })
+        .local;
+      const localName = local?.name;
+      if (typeof localName !== 'string') {
+        continue;
+      }
+      if (spec.type === 'ImportNamespaceSpecifier') {
+        namespaces.add(localName);
+      } else {
+        // ImportSpecifier (名前付き) / ImportDefaultSpecifier (default)
+        names.add(localName);
+      }
+    }
+  }
+  return { names, namespaces };
+}
+
+/**
+ * 要素名が装飾アイコンコンポーネントに該当するか判定する。
+ *
+ * 名前付き/デフォルト import は `names.has(elementName)` で直接一致、
+ * namespace import は `elementName` が `{namespace}.` で始まるかで判定する。
+ */
+function isIconElement(elementName: string, iconIds: IconIdentifiers): boolean {
+  if (iconIds.names.has(elementName)) {
+    return true;
+  }
+  for (const ns of iconIds.namespaces) {
+    if (elementName.startsWith(`${ns}.`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * `bg-gradient-*` / `bg-linear-*` / `bg-radial*` / `bg-conic*` を含む Tailwind
+ * グラデーション utility を検出する正規表現。
+ *
+ * Tailwind v3 は `bg-gradient-to-*`、v4 は `bg-linear-*` / `bg-radial` /
+ * `bg-conic` (ハイフン無し bare form) / `bg-conic/decreasing` (スラッシュ修飾子)
+ * / `bg-[linear-gradient(...)]` (arbitrary value) を提供する。
+ * 単語境界の直後に bg- から始まるグラデーション指定がくる箇所を探し、
+ * `dark:bg-gradient-to-t` のような variant prefix 付きも拾う。
+ */
+const GRADIENT_CLASS_PATTERN =
+  /(?<![\w-])bg-(?:(?:gradient|linear)-|(?:radial|conic)(?:$|[-/[(])|\[(?:linear|radial|conic)-gradient\()/;
+
+/**
+ * Tailwind の alpha 修飾子 (`/50`, `/[0.3]`, `/[50%]`) が後続するかを検出。
+ *
+ * 半透明な背景は祖先のグラデーションを完全には覆わないため、solid 判定から
+ * 除外する必要がある (Codex P2 指摘)。
+ */
+const ALPHA_MODIFIER_PATTERN = /\/(?:\d|\[)/;
+
+/**
+ * bg-transparent / bg-current / bg-inherit など、実効的に「色を持たない」
+ * 背景クラスのサフィックス。これらは solid 扱いしない。
+ */
+const NON_OPAQUE_BG_KEYWORDS = new Set(['transparent', 'current', 'inherit']);
+
+/**
+ * className の value AST を走査して「祖先 gradient を覆い隠せる不透明 bg-*」が
+ * 含まれるかをテーマ別に判定する。
+ *
+ * Tailwind の cascading を踏まえた分類:
+ * - variant なし opaque bg (例: `bg-white`): light/dark 両方で solid
+ * - `dark:` 付き opaque bg (例: `dark:bg-card`): dark のみで solid
+ * - `hover:`/`focus:`/`sm:` 等の非 dark variant: 常時適用でないため ignore
+ * - variant なし alpha/gradient/透明 (例: `bg-transparent`): 両テーマで masking
+ * - `dark:` 付き alpha/gradient/透明 (例: `dark:bg-transparent`): dark を masking
+ *
+ * masking はすでに立った solid フラグを打ち消す (例: `bg-white dark:bg-transparent`
+ * → light=true, dark=false)。これにより dark モードでは solid ではないので、
+ * 祖先の `dark:bg-gradient-*` は引き続き伝播する (Codex P1 指摘)。
+ *
+ * 注意: ClassCandidate ではなく生の classNameValue AST を走査するのは、
+ * extractColorClasses が `bg-transparent` を色クラスでないとして除外するため
+ * (bgCandidates に残らないため masking 情報が失われる)。
+ * jsxContainsGradientClass と同じ戦略で生文字列を直接スキャンする。
+ */
+/**
+ * opaque bg の中間計算状態。masking 情報は `light && !lightMasked` のように
+ * 最後にまとめて適用するため、文字列 / AST ノード間での合成ではこの 4 値を
+ * そのまま保持する。
+ *
+ * `cn('bg-white', 'dark:bg-transparent')` のように Literal が分かれていても、
+ * 両者を merge してから masking を適用することで `'bg-white dark:bg-transparent'`
+ * と等価な結果を得られる (Codex P1 指摘への対応)。
+ */
+interface OpaqueAccum {
+  light: boolean;
+  dark: boolean;
+  lightMasked: boolean;
+  darkMasked: boolean;
+}
+
+const NO_OPAQUE: OpaqueAccum = {
+  light: false,
+  dark: false,
+  lightMasked: false,
+  darkMasked: false,
+};
+
+function mergeOpaqueAccum(a: OpaqueAccum, b: OpaqueAccum): OpaqueAccum {
+  return {
+    light: a.light || b.light,
+    dark: a.dark || b.dark,
+    lightMasked: a.lightMasked || b.lightMasked,
+    darkMasked: a.darkMasked || b.darkMasked,
+  };
+}
+
+/**
+ * 相互排他的 branch (`cond && X` や `cond ? A : B`) の AST を合成する際の
+ * マージ規則。opaque は OR (「どちらかの branch で opaque なら覆う可能性がある」)、
+ * masking は AND (「全 branch で揃って masked のときのみ確実に masked」) で合成する。
+ *
+ * これにより `cn('bg-low-bg', cond && 'dark:bg-transparent')` のような
+ * branch 分岐で、cond=false 側の solid 背景を正しく AA 評価できる
+ * (Codex P1 指摘: branch に masked が片寄ると全ケースで skip されていた問題)。
+ *
+ * linter の設計哲学として「疑わしきは AA 評価」を採り、branch が分かれたら
+ * 最も opaque が強く出る方に倒して false negative を避ける。
+ */
+function mergeOpaqueBranches(a: OpaqueAccum, b: OpaqueAccum): OpaqueAccum {
+  return {
+    light: a.light || b.light,
+    dark: a.dark || b.dark,
+    lightMasked: a.lightMasked && b.lightMasked,
+    darkMasked: a.darkMasked && b.darkMasked,
+  };
+}
+
+function jsxOpaqueBgFlags(valueNode: AstNode | null): GradientFlags {
+  if (valueNode === null) {
+    return NO_GRADIENT;
+  }
+  const acc = extractOpaqueFromAst(valueNode);
+  return {
+    light: acc.light && !acc.lightMasked,
+    dark: acc.dark && !acc.darkMasked,
+  };
+}
+
+function extractOpaqueFromAst(node: AstNode): OpaqueAccum {
+  if (node.type === 'Literal') {
+    const value = (node as Literal).value;
+    return typeof value === 'string' ? opaqueAccumInString(value) : NO_OPAQUE;
+  }
+
+  // 相互排他的 branch: LogicalExpression (`&&` / `||` / `??`) と
+  // ConditionalExpression (`cond ? A : B`) は「ランタイムで一方の branch のみ
+  // 適用される」形なので、子の opaque 情報は branch 合成 (masking は AND) で
+  // 統合する。
+  if (node.type === 'LogicalExpression') {
+    const left = (node as AstNode & { left: AstNode }).left;
+    const right = (node as AstNode & { right: AstNode }).right;
+    // cond && X: cond=true の branch で両方適用、cond=false の branch で left のみ。
+    // 実用的には left は boolean なので leftAcc は NO_OPAQUE になることが多い。
+    // 「両方適用」ケースを OR 合成で表し、「left のみ」ケースを別 branch として
+    // branch 合成する。
+    const leftAcc = extractOpaqueFromAst(left);
+    const rightAcc = extractOpaqueFromAst(right);
+    const bothBranch = mergeOpaqueAccum(leftAcc, rightAcc);
+    return mergeOpaqueBranches(leftAcc, bothBranch);
+  }
+
+  if (node.type === 'ConditionalExpression') {
+    const consequent = (node as AstNode & { consequent: AstNode }).consequent;
+    const alternate = (node as AstNode & { alternate: AstNode }).alternate;
+    return mergeOpaqueBranches(
+      extractOpaqueFromAst(consequent),
+      extractOpaqueFromAst(alternate),
+    );
+  }
+
+  // 関数先頭で acc を宣言し、TemplateLiteral の quasis 処理結果も
+  // その後の子ノード走査にマージする (Codex P1 指摘: 旧実装は quasis 処理結果を
+  // 捨てていたため `className={\`bg-white\`}` 等の静的テンプレートで
+  // opaque 情報が失われていた)。
+  let acc: OpaqueAccum = NO_OPAQUE;
+
+  if (node.type === 'TemplateLiteral') {
+    const quasis = (node as TemplateLiteral).quasis;
+    for (const q of quasis) {
+      const cooked = q.value?.cooked ?? '';
+      acc = mergeOpaqueAccum(acc, opaqueAccumInString(cooked));
+    }
+    // `${...}` で埋め込まれた expressions は下の共通 AST 走査で処理される。
+    // opaqueAccumInString は冪等 (OR 合成) なので、TemplateElement を再走査
+    // しても結果は変わらない。
+  }
+
+  for (const key of Object.keys(node)) {
+    const val = node[key];
+    if (Array.isArray(val)) {
+      for (const child of val) {
+        if (child && typeof child === 'object' && 'type' in child) {
+          acc = mergeOpaqueAccum(acc, extractOpaqueFromAst(child as AstNode));
+        }
+      }
+    } else if (val && typeof val === 'object' && 'type' in val) {
+      acc = mergeOpaqueAccum(acc, extractOpaqueFromAst(val as AstNode));
+    }
+  }
+  return acc;
+}
+
+/**
+ * 単一クラス列からの opaque bg 中間表現を計算する。
+ *
+ * Tailwind の cascading を踏まえた分類:
+ * - variant なし opaque bg (例: `bg-white`): light/dark 両方で solid
+ * - `dark:` 付き opaque bg (例: `dark:bg-card`): dark のみで solid
+ * - `hover:`/`focus:`/`sm:` 等の非 dark variant: 常時適用でないため ignore
+ * - variant なし alpha/gradient/透明 (例: `bg-transparent`): 両テーマで masking
+ * - `dark:` 付き alpha/gradient/透明 (例: `dark:bg-transparent`): dark を masking
+ *
+ * masking はすでに立った solid フラグを打ち消す (例: `bg-white dark:bg-transparent`
+ * → light=true, dark=false)。これにより dark モードでは solid ではないので、
+ * 祖先の `dark:bg-gradient-*` は引き続き伝播する (Codex P1 指摘)。
+ *
+ * masking の最終適用は呼出側 (jsxOpaqueBgFlags) で行う。関数間合成に備えて
+ * ここでは masked を解除せず中間表現のまま返すのが重要 (Codex P1 #2 指摘:
+ * `cn('bg-white', 'dark:bg-transparent')` のように Literal が分かれた際に
+ * 外側から masking 情報が失われないようにするため)。
+ *
+ * 注意: ClassCandidate ではなく生の classNameValue AST を走査するのは、
+ * extractColorClasses が `bg-transparent` を色クラスでないとして除外するため
+ * (bgCandidates に残らないため masking 情報が失われる)。
+ * jsxContainsGradientClass と同じ戦略で生文字列を直接スキャンする。
+ */
+function opaqueAccumInString(classStr: string): OpaqueAccum {
+  let light = false;
+  let dark = false;
+  let lightMasked = false;
+  let darkMasked = false;
+
+  for (const rawCls of classStr.split(/\s+/)) {
+    const trimmed = rawCls.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const { base, hasDarkVariant, hasNonDarkVariant } = extractBase(trimmed);
+    if (hasNonDarkVariant) {
+      continue;
+    }
+    if (!base.startsWith('bg-')) {
+      continue;
+    }
+
+    const suffix = base.slice(3);
+    const isTransparent = NON_OPAQUE_BG_KEYWORDS.has(suffix);
+    const isAlpha = ALPHA_MODIFIER_PATTERN.test(base);
+    const isGradient = GRADIENT_CLASS_PATTERN.test(base);
+
+    // `bg-cover` / `bg-center` / `bg-repeat` / `bg-clip-*` 等の「色ではない
+    // bg-* utility」は背景色としての意味を持たないため opaque masking にも
+    // 計上しない (Codex P2 指摘)。isColorClass で色クラスかを判定する。
+    // ただし transparent/current/inherit は色クラス判定からは外れるが masking
+    // として扱う必要があるため、ここでは除外しない (下の分岐で処理)。
+    if (!isTransparent && !isAlpha && !isGradient && !isColorClass(base)) {
+      continue;
+    }
+
+    const isOpaque = !isAlpha && !isGradient && !isTransparent;
+
+    if (hasDarkVariant) {
+      if (isOpaque) {
+        dark = true;
+      } else {
+        darkMasked = true;
+      }
+    } else if (isOpaque) {
+      light = true;
+      dark = true;
+    } else {
+      lightMasked = true;
+      darkMasked = true;
+    }
+  }
+
+  return { light, dark, lightMasked, darkMasked };
+}
+
+/**
+ * className の value AST を走査して gradient クラスが「常時適用される状態で」
+ * 含まれるか判定する。
+ *
+ * `isColorClass` は `bg-gradient-*` を「色クラスでない」として除外するため、
+ * ClassCandidate 経由ではグラデーション背景を検出できない。
+ * ここでは静的文字列を直接スキャンして擬陽性抑制用のフラグを得る。
+ * cn()/clsx() 経由の条件分岐も含めて走査するため、条件の真偽に関わらず
+ * グラデーションが含まれれば skip 対象とする (conservative な判定)。
+ *
+ * ただし `hover:bg-gradient-to-t` のように `dark:` 以外の variant prefix が
+ * ついた gradient は「状態依存で常時適用されない」ので無視する。そうしないと
+ * `bg-low-bg hover:bg-gradient-to-*` のような通常 solid + hover のみグラデ、
+ * というパターンで通常状態の AA 違反を silent に見逃す (Codex P1 指摘)。
+ */
+function jsxContainsGradientClass(valueNode: AstNode | null): GradientFlags {
+  if (valueNode === null) {
+    return NO_GRADIENT;
+  }
+  return containsGradientInAst(valueNode);
+}
+
+/** テーマ別の gradient 有無フラグ。 */
+interface GradientFlags {
+  light: boolean;
+  dark: boolean;
+}
+
+const NO_GRADIENT: GradientFlags = { light: false, dark: false };
+
+/** 2 つの GradientFlags を OR 合成する。 */
+function mergeGradient(a: GradientFlags, b: GradientFlags): GradientFlags {
+  return { light: a.light || b.light, dark: a.dark || b.dark };
+}
+
+/**
+ * 単一の className 文字列中に「常時適用される gradient 背景」があるかを
+ * テーマ別に判定する。
+ *
+ * 各クラスを空白で分割し、variant prefix を剥がしてから gradient パターンに
+ * 該当するかを見る:
+ * - バリアントなし: light/dark 両方で常時適用 → 両方 true
+ * - `dark:` のみ: dark モードでのみ適用 → dark=true のみ
+ * - `hover:`/`focus:`/`sm:` 等: 状態依存で常時適用でない → ignore (両方 false)
+ * - `md:dark:` 等のチェーン: `dark:` 以外の variant が混ざるため状態依存と判定 → ignore
+ */
+function hasEffectiveGradientBg(classStr: string): GradientFlags {
+  let light = false;
+  let dark = false;
+
+  for (const rawCls of classStr.split(/\s+/)) {
+    const trimmed = rawCls.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const { base, hasDarkVariant, hasNonDarkVariant } = extractBase(trimmed);
+    // hover:, focus:, sm: 等が混ざれば常時適用でないため無視。
+    if (hasNonDarkVariant) {
+      continue;
+    }
+
+    if (!GRADIENT_CLASS_PATTERN.test(base)) {
+      continue;
+    }
+
+    if (hasDarkVariant) {
+      dark = true;
+    } else {
+      light = true;
+      dark = true;
+    }
+  }
+
+  return { light, dark };
+}
+
+function containsGradientInAst(node: AstNode): GradientFlags {
+  if (node.type === 'Literal') {
+    const value = (node as Literal).value;
+    return typeof value === 'string'
+      ? hasEffectiveGradientBg(value)
+      : NO_GRADIENT;
+  }
+
+  // 関数先頭で acc を宣言し、TemplateLiteral の quasis 処理結果も続く
+  // 子ノード走査にマージする (extractOpaqueFromAst と同じ Codex P1 対応)。
+  let acc: GradientFlags = NO_GRADIENT;
+
+  if (node.type === 'TemplateLiteral') {
+    const quasis = (node as TemplateLiteral).quasis;
+    for (const q of quasis) {
+      const cooked = q.value?.cooked ?? '';
+      acc = mergeGradient(acc, hasEffectiveGradientBg(cooked));
+    }
+    if (acc.light && acc.dark) {
+      return acc;
+    }
+  }
+
+  for (const key of Object.keys(node)) {
+    const val = node[key];
+    if (Array.isArray(val)) {
+      for (const child of val) {
+        if (child && typeof child === 'object' && 'type' in child) {
+          acc = mergeGradient(acc, containsGradientInAst(child as AstNode));
+          if (acc.light && acc.dark) {
+            return acc;
+          }
+        }
+      }
+    } else if (val && typeof val === 'object' && 'type' in val) {
+      acc = mergeGradient(acc, containsGradientInAst(val as AstNode));
+      if (acc.light && acc.dark) {
+        return acc;
+      }
+    }
+  }
+  return acc;
+}
+
+/**
  * バイトオフセット → 行/列番号の変換を効率化するインデックス。
  *
  * ファイル単位で改行位置を一度だけ走査してキャッシュし、
@@ -769,12 +1316,20 @@ class OffsetIndex {
  * @param parentBgStack - 親要素から継承した bg クラス候補の階層配列 (外→内)
  * @param results - 収集結果を追記するリスト
  */
+interface VisitContext {
+  offsetIndex: OffsetIndex;
+  filePath: string;
+  results: JsxStack[];
+  /** ファイル内で `lucide-react` 等から import された装飾アイコン名/namespace */
+  iconIds: IconIdentifiers;
+}
+
 function visitNode(
   node: AstNode,
-  offsetIndex: OffsetIndex,
-  filePath: string,
+  ctx: VisitContext,
   parentBgStack: ClassCandidate[][],
-  results: JsxStack[],
+  /** 祖先要素が bg-gradient-* を持っているか (テーマ別)。子要素まで継承する。 */
+  ancestorHasGradient: GradientFlags,
 ): void {
   if (!isJsxElement(node)) {
     // Recurse into non-JSX nodes' children
@@ -785,21 +1340,14 @@ function visitNode(
           if (child && typeof child === 'object' && 'type' in child) {
             visitNode(
               child as AstNode,
-              offsetIndex,
-              filePath,
+              ctx,
               parentBgStack,
-              results,
+              ancestorHasGradient,
             );
           }
         }
       } else if (val && typeof val === 'object' && 'type' in val) {
-        visitNode(
-          val as AstNode,
-          offsetIndex,
-          filePath,
-          parentBgStack,
-          results,
-        );
+        visitNode(val as AstNode, ctx, parentBgStack, ancestorHasGradient);
       }
     }
     return;
@@ -881,26 +1429,65 @@ function visitNode(
       ? [...parentBgStack, bgCandidates] // この要素の候補群を 1 層として追加
       : parentBgStack;
 
+  // WCAG 1.4.11 判定: 標準 SVG primitives とファイル内の装飾アイコン import を
+  // 非テキスト UI コンポーネントとして扱う。CLI 側で閾値を 3:1 に切り替える。
+  // ただし SVG コンテナ (<svg> / <g>) が <text> / <tspan> / <textPath> 子孫を
+  // 含む場合はチャート・ラベル等の本文テキスト用途なのでテキスト扱い (4.5:1)
+  // にする (CodeRabbit 指摘)。
+  const isSvgContainer = SVG_CONTAINER_ELEMENTS.has(elementName);
+  const isTextBearingSvg = isSvgContainer && containsSvgTextElement(node);
+  const isNonTextElement =
+    (NON_TEXT_HTML_ELEMENTS.has(elementName) ||
+      (isSvgContainer && !isTextBearingSvg) ||
+      isIconElement(elementName, ctx.iconIds)) &&
+    !isTextBearingSvg;
+
+  // 自要素の bg-gradient-* クラスを検出。親から継承した gradient も考慮する。
+  // グラデーション背景は単色として扱えず静的コントラスト計算が不正確になるため、
+  // CLI 側で skip の目印として使う。
+  const myGradient = jsxContainsGradientClass(classNameValue);
+  // 自要素が非グラデの solid bg-* を持てば、祖先のグラデはこの要素でカバーされる
+  // (不透明な背景で上書きされる) ので、子孫には gradient フラグを引き継がない。
+  // これをやらないと `<div bg-gradient-to-t><div bg-white><p text-white/></div></div>`
+  // のような「グラデ下にさらに不透明レイヤーを重ねて上書き」パターンで、
+  // p 要素の `text-white on bg-white` (1:1) 違反を silent に見逃す false negative が出る。
+  //
+  // 重要:
+  // - 半透明な bg-* (`bg-white/50`, `bg-muted/40`) は祖先のグラデを完全には
+  //   覆わないため solid 扱いしない (Codex P2 指摘)。
+  // - `bg-white dark:bg-transparent` のようにテーマ別に透明度が変わるクラスは
+  //   テーマ別に solid 有無を判定する必要がある (Codex P1 指摘: 単一 boolean
+  //   では dark モードの gradient propagation が誤ってクリアされる)。
+  const myOpaqueBg: GradientFlags = jsxOpaqueBgFlags(classNameValue);
+  // テーマ別に gradient を伝播する。自要素がそのテーマで gradient を宣言しているか、
+  // 祖先の gradient が有効 & かつ自要素で solid bg による上書きが無い場合に true。
+  const hasGradientBackground: GradientFlags = {
+    light: myGradient.light || (ancestorHasGradient.light && !myOpaqueBg.light),
+    dark: myGradient.dark || (ancestorHasGradient.dark && !myOpaqueBg.dark),
+  };
+
   // If this element has text candidates, record a JsxStack entry.
   // bgStack が空 (祖先に bg 指定なし) の場合も記録する。
   // classify.ts Rule 6 が bgStack 空時に暗黙の --background をベースとして使うため、
   // ページデフォルト背景に描画される一般テキストのコントラスト検証が可能になる。
   if (textCandidates.length > 0) {
-    const { line, column } = offsetIndex.toLineCol(opening.start);
-    results.push({
-      file: filePath,
+    const { line, column } = ctx.offsetIndex.toLineCol(opening.start);
+    ctx.results.push({
+      file: ctx.filePath,
       line,
       column,
       bgStack: newBgStack,
       textCandidates,
       elementName,
+      isNonTextElement,
+      hasGradientBackground,
     });
   }
 
   // Recurse into children with the new bg stack
   for (const child of node.children) {
     if (child && typeof child === 'object' && 'type' in child) {
-      visitNode(child, offsetIndex, filePath, newBgStack, results);
+      visitNode(child, ctx, newBgStack, hasGradientBackground);
     }
   }
 
@@ -919,7 +1506,7 @@ function visitNode(
       if (value.type === 'JSXExpressionContainer') {
         const expr = (value as AstNode & { expression: AstNode }).expression;
         if (expr && isJsxElement(expr)) {
-          visitNode(expr, offsetIndex, filePath, [], results);
+          visitNode(expr, ctx, [], NO_GRADIENT);
         }
       }
     }
@@ -956,7 +1543,14 @@ export function collectJsxStacks(filePath: string, source: string): JsxStack[] {
   // ファイル単位で改行インデックスを一度だけ構築し、二分探索で行番号計算する
   const offsetIndex = new OffsetIndex(source);
 
-  visitNode(program, offsetIndex, filePath, [], stacks);
+  const ctx: VisitContext = {
+    offsetIndex,
+    filePath,
+    results: stacks,
+    iconIds: collectIconComponentNames(program),
+  };
+
+  visitNode(program, ctx, [], NO_GRADIENT);
 
   return stacks;
 }

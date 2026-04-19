@@ -310,3 +310,293 @@ describe('runCli --max-combinations invalid value warns (F6)', () => {
     ).resolves.toBeTypeOf('number');
   });
 });
+
+describe('runCli non-text element and gradient handling', () => {
+  // WCAG 1.4.11 の非テキスト UI コンポーネント (3:1 基準) と
+  // グラデーション背景の skip 判定を検証する。
+  // コード側に ignore directive を書かずに linter 単独で擬陽性を吸収する機能。
+
+  let consoleLogs: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
+
+  beforeEach(() => {
+    consoleLogs = [];
+    originalConsolaLevel = consola.level;
+    logSpy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((...args: unknown[]) => {
+        consoleLogs.push(args.map(String).join(' '));
+      });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    consola.level = originalConsolaLevel;
+  });
+
+  it('lucide-react からインポートしたアイコンは issue を出さない (非テキスト扱い)', async () => {
+    // ok-non-text-icon.tsx は text-mid-fg × low-bg で ratio ≈ 3.66〜4.11。
+    // 本文基準 4.5 なら error だが、非テキスト基準 3 なら OK。
+    // 閾値切替ロジックが壊れれば errorCount > 0 に変わり、本テストが回帰検知する。
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-non-text-icon.tsx']),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBe(0);
+  });
+
+  it('SVG primitives (<circle>) も非テキスト扱いになる', async () => {
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-non-text-threshold.tsx']),
+    );
+    expect(exitCode).toBe(0);
+  });
+
+  it('同じ色でも <p> (本文テキスト) は 4.5 基準で error になる (対照テスト)', async () => {
+    // 非テキスト fixture と同じ text-mid-fg × low-bg を使うが、
+    // 要素が <p> の場合は AA 4.5:1 を満たさないため error になるべき。
+    // この対照で「閾値切替が実際に働いていること」を discriminative に検証する。
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ng-text-threshold.tsx']),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: { message: string }[];
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+    // error メッセージに WCAG AA 基準 (非テキスト 1.4.11 ではなく) が使われることも確認
+    expect(parsed.issues.some((i) => i.message.includes('WCAG AA'))).toBe(true);
+  });
+
+  it('bg-gradient-* を持つ親の配下の要素は skip される', async () => {
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-gradient-bg-skip.tsx']),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      issues: unknown[];
+    };
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('variant prefix のみの gradient (hover:bg-gradient-*) は skip 対象外', async () => {
+    // Codex P1 対応: variant-only gradient は常時適用されないため skip すべきでない。
+    // fixture は `bg-low-bg hover:bg-gradient-to-t` の親下に text-low-fg を置き、
+    // dark モードの AA 違反 (2.63:1) が error として報告されるべきことを検証する。
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ng-gradient-variant-only.tsx']),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+  });
+});
+
+describe('runCli inline disable directive', () => {
+  // `lint-contrast-disable-next-line` / `lint-contrast-disable` マーカーで
+  // 個別要素の検査を抑制できることを確認する。
+  // 非テキスト要素 (アイコン) やグラデーション上のテキストなど、
+  // 静的解析では正しく判定できない擬陽性を抑制するための機能。
+
+  let consoleLogs: string[] = [];
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let originalConsolaLevel: number;
+
+  beforeEach(() => {
+    consoleLogs = [];
+    originalConsolaLevel = consola.level;
+    logSpy = vi
+      .spyOn(console, 'log')
+      .mockImplementation((...args: unknown[]) => {
+        consoleLogs.push(args.map(String).join(' '));
+      });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    consola.level = originalConsolaLevel;
+  });
+
+  it('JSX コメント形式の disable-next-line で issue が抑制される', async () => {
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ok-inline-disable.tsx']),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it(String.raw`CRLF 改行 (\r\n) のファイルでも directive が効く`, async () => {
+    // Codex P2 対応: computeCommentLineFlags が \r を空白扱いしないと、
+    // Windows 改行の JSX ファイルで行末 \r がコードトークンとして認識され
+    // directive が遠くの違反を抑制できなくなる。
+    // test-fixture を動的に CRLF に変換するのではなく、fs で読み込んだあと
+    // runCli が内部的に扱うのは LF 分割なので、代わりに直接関数レベルで
+    // 検証しにくい。ここでは ok-inline-disable.tsx を読み込んで一時的に
+    // CRLF 化したファイルを作成し、それを CLI に食わせる。
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path2 = await import('node:path');
+    const src = fs.readFileSync(
+      path.resolve(FIXTURES_DIR, 'ok-inline-disable.tsx'),
+      'utf8',
+    );
+    const crlfDir = fs.mkdtempSync(path2.join(os.tmpdir(), 'lc-crlf-'));
+    const crlfFile = path2.join(crlfDir, 'ok-inline-disable-crlf.tsx');
+    fs.writeFileSync(crlfFile, src.replaceAll('\n', '\r\n'), 'utf8');
+    // mock-index.css も同ディレクトリに必要 (相対パス解決のため)
+    fs.copyFileSync(
+      path.resolve(FIXTURES_DIR, MOCK_CSS),
+      path2.join(crlfDir, MOCK_CSS),
+    );
+
+    const exitCode = await runCli([
+      'node',
+      'lint-contrast',
+      '--project',
+      crlfDir,
+      '--css',
+      MOCK_CSS,
+      '--glob',
+      '*.tsx',
+      '--format',
+      'json',
+    ]);
+
+    fs.rmSync(crlfDir, { recursive: true, force: true });
+
+    expect(exitCode).toBe(0);
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBe(0);
+  });
+
+  it('同一行 {/* lint-contrast-disable */} でも issue が抑制される', async () => {
+    // -next-line サフィックスを持たない同一行ディレクティブの検証。
+    // DIRECTIVE_DISABLE 正規表現が期待通り動作することを確認する。
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ok-inline-disable-same-line.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('directive が無ければ同じクラスでも error になる (対照テスト)', async () => {
+    // ng-low-contrast-dark.tsx は ok-inline-disable.tsx と同じクラスを使うが
+    // directive が無いので dark モードで error が出る。
+    const exitCode = await runCli(
+      buildArgv(['--format', 'json', '--glob', 'ng-low-contrast-dark.tsx']),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+  });
+
+  it('directive と対象行の間に説明コメントを挟んでも有効', async () => {
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ok-inline-disable-with-comment.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('directive の後に複数行 JSX コメントが続いても有効', async () => {
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ok-inline-disable-multiline-comment.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(0);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: unknown[];
+    };
+    expect(parsed.errorCount).toBe(0);
+    expect(parsed.issues).toEqual([]);
+  });
+
+  it('directive と同じ行にコードが続く場合も directive の効果は当該行内に閉じる', async () => {
+    // {/* ... */} と同じ行に <span/> が続くパターン。
+    // 旧 computeCommentLineFlags の bug (Codex P2 指摘) では この行以降を
+    // コメント扱いし、遠くの text-low-fg の error まで silent に抑制していた。
+    // 新実装は行内で閉じたコメント後のコードをコード行として認識する。
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ng-disable-blocked-by-inline-code.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+  });
+
+  it('directive と対象行の間にコード行があると無効化される', async () => {
+    const exitCode = await runCli(
+      buildArgv([
+        '--format',
+        'json',
+        '--glob',
+        'ng-disable-blocked-by-code.tsx',
+      ]),
+    );
+    expect(exitCode).toBe(1);
+
+    const parsed = JSON.parse(consoleLogs.join('\n')) as {
+      errorCount: number;
+      issues: { line: number }[];
+    };
+    expect(parsed.errorCount).toBeGreaterThan(0);
+  });
+});

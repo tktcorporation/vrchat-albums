@@ -41,6 +41,8 @@ function makeStack(
     elementName: 'p',
     bgStack,
     textCandidates,
+    isNonTextElement: false,
+    hasGradientBackground: { light: false, dark: false },
   };
 }
 

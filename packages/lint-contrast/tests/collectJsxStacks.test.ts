@@ -921,3 +921,508 @@ describe('P2: Tailwind important modifier (!bg-*, !text-*) support', () => {
     expect(hasBgWhite).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// WCAG 1.4.11 (非テキスト 3:1) と gradient skip の事前フラグ付与
+// ---------------------------------------------------------------------------
+
+describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
+  // CLI が 3:1/4.5 の閾値切替や gradient skip を正しく判定するための
+  // 事前フラグ付与ロジックを単体で検証する。cli.test.ts の統合テストと異なり、
+  // 「どの AST 形態でフラグがどう付くか」を直接アサートしてリグレッション検知を強化する。
+
+  it('<svg> に <text> 子孫があればテキスト扱い (isNonTextElement=false)', () => {
+    // CodeRabbit 指摘: SVG コンテナが本文テキストを含む場合は 4.5:1 基準で評価すべき。
+    const source = `
+      export function Chart() {
+        return (
+          <svg className="text-foreground">
+            <g>
+              <text x="0" y="10">Label</text>
+            </g>
+          </svg>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const svg = stacks.find((s) => s.elementName === 'svg');
+    expect(svg).toBeDefined();
+    expect(svg!.isNonTextElement).toBe(false);
+  });
+
+  it('<svg> に JSXExpressionContainer 内の <text> があってもテキスト扱い', () => {
+    // Codex P1 対応: containsSvgTextElement が JSXElement のみ再帰していたため、
+    // `{show && <text/>}` のような条件埋め込み内の <text> を見逃していた。
+    const source = `
+      export function Chart({ show }: { show: boolean }) {
+        return (
+          <svg className="text-foreground">
+            {show && <text x="0" y="10">Label</text>}
+          </svg>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const svg = stacks.find((s) => s.elementName === 'svg');
+    expect(svg).toBeDefined();
+    expect(svg!.isNonTextElement).toBe(false);
+  });
+
+  it('<svg> に <text> が無ければ非テキスト扱い (isNonTextElement=true)', () => {
+    const source = `
+      export function Icon() {
+        return (
+          <svg className="text-foreground">
+            <circle cx="10" cy="10" r="5" />
+          </svg>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const svg = stacks.find((s) => s.elementName === 'svg');
+    expect(svg).toBeDefined();
+    expect(svg!.isNonTextElement).toBe(true);
+  });
+
+  it('Tailwind v4 の bare form (bg-radial / bg-conic) / slash 修飾子も gradient として検出', () => {
+    // CodeRabbit 指摘: bare form と slash modifier が GRADIENT_CLASS_PATTERN から
+    // 漏れており、dark-only gradient が detection を逃れて AA 評価されていた。
+    const source = `
+      export function Foo() {
+        return (
+          <>
+            <div className="bg-radial">
+              <p className="text-white">radial bare</p>
+            </div>
+            <div className="bg-conic">
+              <p className="text-white">conic bare</p>
+            </div>
+            <div className="bg-conic/decreasing">
+              <p className="text-white">conic slash</p>
+            </div>
+            <div className="dark:bg-linear-to-r">
+              <p className="text-white">dark linear</p>
+            </div>
+          </>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStacks = stacks.filter((s) => s.elementName === 'p');
+    expect(pStacks).toHaveLength(4);
+    // 最初の 3 つは variant なしの bare/slash なので両テーマ gradient
+    for (const p of pStacks.slice(0, 3)) {
+      expect(p.hasGradientBackground).toEqual({ light: true, dark: true });
+    }
+    // 最後は dark: variant のみなので dark のみ gradient
+    expect(pStacks[3].hasGradientBackground).toEqual({
+      light: false,
+      dark: true,
+    });
+  });
+
+  it('標準 SVG primitives (<circle>) は isNonTextElement=true', () => {
+    const source = `
+      export function Foo() {
+        return (
+          <svg>
+            <circle className="text-foreground" />
+          </svg>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const circle = stacks.find((s) => s.elementName === 'circle');
+    expect(circle).toBeDefined();
+    expect(circle!.isNonTextElement).toBe(true);
+    expect(circle!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
+  it('lucide-react import のコンポーネントは isNonTextElement=true', () => {
+    const source = `
+      import { Bug } from 'lucide-react';
+      export function Foo() {
+        return (
+          <div className="bg-card">
+            <Bug className="text-foreground" />
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const bug = stacks.find((s) => s.elementName === 'Bug');
+    expect(bug).toBeDefined();
+    expect(bug!.isNonTextElement).toBe(true);
+  });
+
+  it('lucide-react の namespace import (<Icons.Bug>) も isNonTextElement=true', () => {
+    // Codex P2 対応: import * as Icons from 'lucide-react' で `<Icons.Bug>` を
+    // 使った場合、要素名は "Icons.Bug" なので単純な Set.has では引けない。
+    // namespace を別枠で記録し、elementName.startsWith(ns + '.') で判定する。
+    const source = `
+      import * as Icons from 'lucide-react';
+      export function Foo() {
+        return (
+          <div className="bg-card">
+            <Icons.Bug className="text-foreground" />
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const bug = stacks.find((s) => s.elementName === 'Icons.Bug');
+    expect(bug).toBeDefined();
+    expect(bug!.isNonTextElement).toBe(true);
+  });
+
+  it('lucide-react 以外の import は isNonTextElement=false のまま', () => {
+    // カスタムラッパーや他ライブラリは今のところ非テキスト扱いにしない。
+    // react-icons 等を使うプロジェクトでは CLI オプション化等で対応する前提。
+    const source = `
+      import { Bug } from 'some-other-icons';
+      export function Foo() {
+        return (
+          <div className="bg-card">
+            <Bug className="text-foreground" />
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const bug = stacks.find((s) => s.elementName === 'Bug');
+    expect(bug).toBeDefined();
+    expect(bug!.isNonTextElement).toBe(false);
+  });
+
+  it('bg-gradient-* を持つ要素は hasGradientBackground が両テーマ true', () => {
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <p className="text-white">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({ light: true, dark: true });
+  });
+
+  it('祖先の gradient 背景は子孫に継承される', () => {
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <section className="p-4">
+              <p className="text-white">nested</p>
+            </section>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({ light: true, dark: true });
+  });
+
+  it('Tailwind v4 の bg-linear-* / bg-radial-* / bg-conic-* も検出する', () => {
+    const source = `
+      export function Foo() {
+        return (
+          <>
+            <div className="bg-linear-to-r from-red-500">
+              <p className="text-white">linear</p>
+            </div>
+            <div className="bg-radial-to-tr">
+              <p className="text-white">radial</p>
+            </div>
+            <div className="bg-conic-to-bl">
+              <p className="text-white">conic</p>
+            </div>
+          </>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStacks = stacks.filter((s) => s.elementName === 'p');
+    expect(pStacks).toHaveLength(3);
+    for (const p of pStacks) {
+      expect(p.hasGradientBackground).toEqual({ light: true, dark: true });
+    }
+  });
+
+  it('通常の bg-card 背景では hasGradientBackground が両テーマ false', () => {
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-card">
+            <p className="text-foreground">hello</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
+  it('半透明な bg-*/XX は solid 扱いせず gradient flag を維持する', () => {
+    // Codex P2 対応: bg-white/50 のような半透明レイヤーは祖先のグラデを
+    // 完全に覆わないため、実効背景は依然として gradient 依存になる。
+    // solid 扱いしてリセットしてしまうと誤った AA 判定に繋がる。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className="bg-white/50">
+              <p className="text-white">still gradient-dependent</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: true,
+      dark: true,
+    });
+  });
+
+  it('bg-transparent / bg-current は solid 扱いしない', () => {
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className="bg-transparent">
+              <p className="text-white">gradient still bleeds through</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: true,
+      dark: true,
+    });
+  });
+
+  it('子孫が自前の solid bg-* を宣言すると gradient flag はリセットされる', () => {
+    // Codex / CodeRabbit の指摘 (sticky gradient flag): 祖先に bg-gradient-* が
+    // あっても、途中で不透明な bg-white 等が入れば以降は評価可能なはず。
+    // そうしないと「bg-gradient-to-t > bg-white > text-white (1:1)」の
+    // false negative を見逃す。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className="bg-white">
+              <p className="text-white">should be evaluable</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
+  it('`bg-white dark:bg-transparent` のテーマ別 masking を正しく扱う', () => {
+    // Codex P1 対応: variant なし opaque + dark-only 透明の組合せ。
+    // light モードは bg-white が効くので solid (祖先グラデを覆う)、
+    // dark モードは bg-transparent が上書きするので非 solid (祖先グラデは
+    // 引き続き伝播する) べき。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black dark:bg-gradient-to-t">
+            <div className="bg-white dark:bg-transparent">
+              <p className="text-black">mixed masking</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // light モード: bg-white が祖先の gradient を覆う → false
+    // dark モード: dark:bg-transparent が masking、祖先の dark:bg-gradient-to-t
+    //              は依然として有効 → true
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: true,
+    });
+  });
+
+  it('cn() で分割された Literal 間でも masking が波及する', () => {
+    // Codex P1 対応: cn('bg-white', 'dark:bg-transparent') のように
+    // opaque と masking が別 Literal に分かれていても、全 Literal を
+    // merge してから最終 masking を適用することで
+    // `'bg-white dark:bg-transparent'` と等価な結果を得る。
+    const source = `
+      import { cn } from '@/lib/utils';
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black dark:bg-gradient-to-t">
+            <div className={cn('bg-white', 'dark:bg-transparent')}>
+              <p className="text-black">split mask</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: true,
+    });
+  });
+
+  it('バックティック静的テンプレート ({`bg-white`}) の opaque 情報も保持される', () => {
+    // Codex P1 対応: 旧実装は TemplateLiteral の quasis 処理結果を関数後半で
+    // 捨てていたため、static template での opaque 情報が失われ、
+    // 祖先の gradient が誤って子に伝播していた。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className={\`bg-white\`}>
+              <p className="text-black">template literal bg</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // bg-white が opaque として認識され gradient をカバーするため両テーマ false
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
+  it('bg-cover / bg-center など色でない bg-* utility は solid masking に計上しない', () => {
+    // Codex P2 対応: bg-cover / bg-center / bg-repeat 等は「背景画像の配置/
+    // 繰り返し」指定であり背景色としての意味を持たない。旧実装は単に
+    // `bg-*` で始まるかだけで opaque 判定していたため、祖先の gradient を
+    // 誤って覆ったことにし false negative を生んでいた。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className="bg-cover bg-center">
+              <p className="text-white">still under gradient</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: true,
+      dark: true,
+    });
+  });
+
+  it('相互排他的 branch (cn(a, cond && b)) で masking は全 branch 合意のみ有効', () => {
+    // Codex P1 対応: cn('bg-low-bg', cond && 'dark:bg-transparent') では
+    // cond=false branch は solid のまま。旧実装は全 branch を OR 合成していた
+    // ため darkMasked が常に true になり、cond=false の AA 違反を silent に
+    // 見逃していた。LogicalExpression は branch 合成 (masking AND) に切替。
+    const source = `
+      import { cn } from '@/lib/utils';
+      export function Foo({ cond }: { cond: boolean }) {
+        return (
+          <div className="bg-card dark:bg-gradient-to-t">
+            <div className={cn('bg-low-bg', cond && 'dark:bg-transparent')}>
+              <p className="text-black">branch masking</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // 両 branch とも bg-low-bg (opaque) を持つため、darkMasked の AND は false。
+    // dark 側は祖先 dark:bg-gradient が bg-low-bg によって覆われて評価可能。
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
+  it('ConditionalExpression (cond ? A : B) も branch 合成される', () => {
+    const source = `
+      export function Foo({ cond }: { cond: boolean }) {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className={cond ? 'bg-white' : 'bg-transparent'}>
+              <p className="text-black">ternary</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // consequent: bg-white → solid 両テーマ
+    // alternate: bg-transparent → 両テーマ masked
+    // branch 合成: masking は AND なので lightMasked=false, darkMasked=false
+    //               opaque は OR なので light=true, dark=true
+    // → 両 branch で確実に opaque とは言えないが、少なくとも 1 branch で
+    //    masking されずに opaque になるので、保守的に evaluate する方針。
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: false,
+    });
+  });
+
+  it('dark: prefix 付き gradient は dark のみ flag 付与', () => {
+    // Codex P1 対応: `bg-low-bg dark:bg-gradient-to-t` のような
+    // 「light は solid, dark は gradient」のクラスは、light 側だけ AA 評価すべき。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-card dark:bg-gradient-to-t">
+            <p className="text-foreground">mixed</p>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: true,
+    });
+  });
+});

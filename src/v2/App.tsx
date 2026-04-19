@@ -24,6 +24,7 @@ import { StartupProvider, useStartup } from './contexts/StartupContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useToast } from './hooks/use-toast';
 import { useLoadingState } from './hooks/useLoadingState';
+import { useI18n } from './i18n/store';
 
 interface ErrorEvent extends Event {
   type: undefined;
@@ -313,6 +314,7 @@ const ToasterWrapper = () => {
  * 初期同期やエラー状態を監視しながら各画面を表示する。
  */
 const Contents = memo(() => {
+  const { t } = useI18n();
   const {
     stage,
     error,
@@ -404,12 +406,12 @@ const Contents = memo(() => {
                         予期せぬエラーが発生しました。
                         <br />
                         <a
-                          href="https://github.com/your-repo/issues/new"
+                          href="https://github.com/tktcorporation/vrchat-albums/issues/new"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary hover:underline"
+                          className="underline text-foreground hover:text-primary"
                         >
-                          バグを報告する
+                          {t('common.reportBug')}
                         </a>
                       </>
                     ))}
@@ -482,7 +484,7 @@ const Contents = memo(() => {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="3"
-                    className="text-primary transition-all duration-300"
+                    className="text-accent-foreground transition-all duration-300"
                     strokeDasharray="226"
                     strokeDashoffset={226 - (226 * progressPercent) / 100}
                     strokeLinecap="round"

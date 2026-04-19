@@ -283,25 +283,25 @@ const SearchOverlay = memo(
               {(() => {
                 if (isLoading && debouncedQuery.length > 0) {
                   return (
-                    <div className="p-6 text-center text-muted-foreground/80">
-                      検索中...
+                    <div className="p-6 text-center text-muted-foreground">
+                      {t('common.search.loading')}
                     </div>
                   );
                 }
                 if (suggestions.length === 0) {
                   return (
-                    <div className="p-6 text-center text-muted-foreground/80">
+                    <div className="p-6 text-center text-muted-foreground">
                       {debouncedQuery.length > 0
-                        ? '候補が見つかりません'
-                        : 'よく利用する項目を読み込み中...'}
+                        ? t('common.search.noSuggestions')
+                        : t('common.search.loadingFrequentItems')}
                     </div>
                   );
                 }
                 return (
                   <div className="p-2">
                     {debouncedQuery.length === 0 && (
-                      <div className="px-3 py-2 text-xs font-medium text-muted-foreground/60 uppercase tracking-wide">
-                        よく利用する項目
+                      <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        {t('common.search.frequentItems')}
                       </div>
                     )}
                     {suggestions.map((suggestion, index) => (

@@ -13,6 +13,11 @@
  *   --low-fg:            ライトは中灰 (0 0% 35%), ダークは若干明るい灰 (0 0% 40%)
  *                        → light: bg=100%L, fg=35%L → ratio ≈ 6.98 (AA クリア、余裕あり)
  *                        → dark:  bg=15%L,  fg=40%L → ratio ≈ 2.63 (AA 未満)
+ *   --mid-fg:            閾値切替の discriminative 検証用の中間コントラスト色。
+ *                        low-bg と組み合わせて「本文 4.5:1 は未達 / 非テキスト 3:1 はクリア」
+ *                        となる値を設定する。
+ *                        → light: bg=100%L, fg=55%L → ratio ≈ 3.66 (text NG, non-text OK)
+ *                        → dark:  bg=15%L,  fg=55%L → ratio ≈ 4.11 (text NG, non-text OK)
  */
 
 @layer base {
@@ -26,6 +31,7 @@
     --border: 0 0% 89%;
     --low-bg: 0 0% 100%;
     --low-fg: 0 0% 35%;
+    --mid-fg: 0 0% 55%;
   }
 
   .dark {
@@ -38,5 +44,6 @@
     --border: 220 15% 20%;
     --low-bg: 0 0% 15%;
     --low-fg: 0 0% 40%;
+    --mid-fg: 0 0% 55%;
   }
 }

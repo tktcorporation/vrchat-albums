@@ -88,6 +88,25 @@ export interface JsxStack {
   textCandidates: ClassCandidate[];
   /** 報告時に表示する JSX タグ名 */
   elementName: string;
+  /**
+   * WCAG 1.4.11 の「非テキスト UI コンポーネント」扱いで 3:1 基準を適用すべき要素。
+   *
+   * アイコン (lucide-react からの import) や SVG primitives (`<circle>`,
+   * `<path>` など) は装飾・状態表現であり本文テキストではない。
+   * 4.5:1 は過剰基準になるため `evaluateStack` で閾値を 3.0 に切り替える。
+   */
+  isNonTextElement: boolean;
+  /**
+   * 背景に `bg-gradient-*` が含まれており linter が静的に解決できない要素を
+   * テーマ別にトラッキングしたフラグ。
+   *
+   * `dark:bg-gradient-to-t` のように一方のテーマでのみ gradient 化する
+   * ケースがあるため、単一 boolean だと「dark のみ gradient」のときに
+   * light 側の AA 評価まで silent に skip してしまう (Codex P1 指摘)。
+   * テーマ別に持つことで、常時 gradient のテーマのみ skip、solid の
+   * テーマは AA 評価する。
+   */
+  hasGradientBackground: { light: boolean; dark: boolean };
 }
 
 /**

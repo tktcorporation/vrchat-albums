@@ -24,7 +24,17 @@ export interface Translations {
     refresh: string;
     search: {
       placeholder: string;
+      loading: string;
+      noSuggestions: string;
+      loadingFrequentItems: string;
+      frequentItems: string;
     };
+    errorBoundary: {
+      title: string;
+      retryHint: string;
+      retry: string;
+    };
+    reportBug: string;
     toast: {
       settingsDeleted: string;
       allSettingsDeleted: string;
