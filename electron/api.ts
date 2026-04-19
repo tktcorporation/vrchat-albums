@@ -211,7 +211,9 @@ export const router = trpcRouter({
             // キャンセルは silent（ユーザーの意図的な操作）
             return Effect.void;
           }
-          return Effect.fail(mapToFileOperationError({ message: String(e) }));
+          // 元のエラーオブジェクトをそのまま mapToFileOperationError に渡し、
+          // toUserFacing 側で `cause` として元の Error/スタックトレースを保持する
+          return Effect.fail(mapToFileOperationError(e));
         }),
       ),
     );
