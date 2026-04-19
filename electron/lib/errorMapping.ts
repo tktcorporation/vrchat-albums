@@ -23,38 +23,6 @@ import {
 } from './errors';
 
 /**
- * 任意の値を Error に正規化する。
- *
- * UserFacingError の `cause` にスタックトレースを残すため、
- * Error 以外（string、tagged error の plain object など）はラップする。
- *
- * `e instanceof Error ? e : new Error(String(e))` のイディオムが
- * 各所で重複していたため SSOT 化。
- */
-export const toError = (e: unknown): Error =>
-  e instanceof Error ? e : new Error(String(e));
-
-/**
- * `toUserFacing` のオプション。
- *
- * `userMessage` / `message` を関数で受けることで、
- * 元エラーの内容を埋め込んだメッセージ生成（例: `アップデートに失敗しました: ${e.message}`）に対応する。
- *
- * E は任意の型を許容する（string literal の Tagged Error も含む）。
- */
-export interface UserFacingFactoryOptions<E> {
-  code?: ErrorCode;
-  category?: ErrorCategory;
-  /** ユーザー向けメッセージ。文字列 or 元エラーから生成する関数 */
-  userMessage: string | ((e: E) => string);
-  /**
-   * 内部 message（Sentry/ログ用）。省略時は元エラーの `message` プロパティ (=`e.message`) を
-   * そのまま使う。旧コードの `message: e.message` 相当を維持するためのデフォルト。
-   */
-  message?: string | ((e: E) => string);
-}
-
-/**
  * 任意の値からメッセージ文字列を取り出す。
  *
  * `{ message: string }` を持つオブジェクトはそのプロパティを、
@@ -75,6 +43,38 @@ const extractErrorMessage = (e: unknown): string => {
   }
   return String(e);
 };
+
+/**
+ * 任意の値を Error に正規化する。
+ *
+ * UserFacingError の `cause` にスタックトレースを残すため、
+ * Error 以外（string、Tagged Error の plain object など）はラップする。
+ * Tagged Error の plain object でも `message` フィールドを保持するため、
+ * `extractErrorMessage` 経由で意味のあるメッセージを抜き出して Error 化する
+ * (旧 `String(e)` だと `[object Object]` になりメッセージが失われていた)。
+ */
+export const toError = (e: unknown): Error =>
+  e instanceof Error ? e : new Error(extractErrorMessage(e));
+
+/**
+ * `toUserFacing` のオプション。
+ *
+ * `userMessage` / `message` を関数で受けることで、
+ * 元エラーの内容を埋め込んだメッセージ生成（例: `アップデートに失敗しました: ${e.message}`）に対応する。
+ *
+ * E は任意の型を許容する（string literal の Tagged Error も含む）。
+ */
+export interface UserFacingFactoryOptions<E> {
+  code?: ErrorCode;
+  category?: ErrorCategory;
+  /** ユーザー向けメッセージ。文字列 or 元エラーから生成する関数 */
+  userMessage: string | ((e: E) => string);
+  /**
+   * 内部 message（Sentry/ログ用）。省略時は元エラーの `message` プロパティ (=`e.message`) を
+   * そのまま使う。旧コードの `message: e.message` 相当を維持するためのデフォルト。
+   */
+  message?: string | ((e: E) => string);
+}
 
 /**
  * `Effect.mapError` 用の UserFacingError 変換ファクトリ。
@@ -185,12 +185,21 @@ export const mapToUnknownError = (
  */
 export const mapByTag =
   <E extends { _tag?: string; message: string }>(
-    patterns: Record<string, (e: E) => UserFacingError>,
+    patterns: Partial<
+      Record<NonNullable<E['_tag']>, (e: E) => UserFacingError>
+    >,
     fallback: (e: E) => UserFacingError = mapToUnknownError(
       '予期しないエラーが発生しました。',
     ),
   ) =>
   (e: E): UserFacingError => {
-    const handler = typeof e._tag === 'string' ? patterns[e._tag] : undefined;
+    // 型上は `Partial<Record<NonNullable<E['_tag']>, ...>>` だが、
+    // ランタイムでは任意の string キーで lookup したいため一度緩めて参照する
+    const handler =
+      typeof e._tag === 'string'
+        ? (patterns as Record<string, ((e: E) => UserFacingError) | undefined>)[
+            e._tag
+          ]
+        : undefined;
     return handler ? handler(e) : fallback(e);
   };

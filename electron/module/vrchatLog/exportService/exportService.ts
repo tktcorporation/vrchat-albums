@@ -62,19 +62,13 @@ export type DBLogProvider = (
 /**
  * Electronのダウンロードパスを安全に取得。
  *
- * テスト環境では app が存在しないため null。
- * Electron 環境でも `getPath('downloads')` がプラットフォームによっては
- * 失敗する可能性があるため、その場合も null。
+ * `withElectronApp` が以下のいずれの失敗も fallback (null) に倒すため、
+ * 内部の try/catch は不要:
+ * - テスト/非 Electron 環境: `require('electron')` 失敗
+ * - Electron 環境: `app.getPath('downloads')` 失敗（プラットフォーム依存）
  */
 const getElectronDownloadsPath = (): string | null =>
-  withElectronApp<string | null>(null, (app) => {
-    // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
-    try {
-      return app.getPath('downloads');
-    } catch {
-      return null;
-    }
-  });
+  withElectronApp<string | null>(null, (app) => app.getPath('downloads'));
 
 /**
  * デフォルトのlogStoreディレクトリパスを取得

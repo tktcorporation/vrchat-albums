@@ -27,6 +27,12 @@ describe('toError', () => {
     const result = toError({ foo: 'bar' });
     expect(result).toBeInstanceOf(Error);
   });
+
+  it('Tagged Error 風の plain object は message を保持する', () => {
+    const tagged = { _tag: 'MyError', message: '原因メッセージ' };
+    const result = toError(tagged);
+    expect(result.message).toBe('原因メッセージ');
+  });
 });
 
 describe('toUserFacing', () => {

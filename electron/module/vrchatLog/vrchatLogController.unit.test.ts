@@ -29,7 +29,9 @@ vi.mock('./exportService/exportService', () => {
         exportEndTime: new Date(),
       }),
     ),
-    // mapExportError がトップレベルで参照するため、モック側でも export しておく必要がある
+    // vi.mock はモジュールを完全に差し替えるため、controller 側の
+    // import { getExportErrorMessage } を解決させるためにも export 必須。
+    // 未指定だと undefined となり、エラー経路で TypeError を投げる。
     getExportErrorMessage: vi.fn(String),
   };
 });
