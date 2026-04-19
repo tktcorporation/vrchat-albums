@@ -931,6 +931,78 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
   // 事前フラグ付与ロジックを単体で検証する。cli.test.ts の統合テストと異なり、
   // 「どの AST 形態でフラグがどう付くか」を直接アサートしてリグレッション検知を強化する。
 
+  it('<svg> に <text> 子孫があればテキスト扱い (isNonTextElement=false)', () => {
+    // CodeRabbit 指摘: SVG コンテナが本文テキストを含む場合は 4.5:1 基準で評価すべき。
+    const source = `
+      export function Chart() {
+        return (
+          <svg className="text-foreground">
+            <g>
+              <text x="0" y="10">Label</text>
+            </g>
+          </svg>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const svg = stacks.find((s) => s.elementName === 'svg');
+    expect(svg).toBeDefined();
+    expect(svg!.isNonTextElement).toBe(false);
+  });
+
+  it('<svg> に <text> が無ければ非テキスト扱い (isNonTextElement=true)', () => {
+    const source = `
+      export function Icon() {
+        return (
+          <svg className="text-foreground">
+            <circle cx="10" cy="10" r="5" />
+          </svg>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const svg = stacks.find((s) => s.elementName === 'svg');
+    expect(svg).toBeDefined();
+    expect(svg!.isNonTextElement).toBe(true);
+  });
+
+  it('Tailwind v4 の bare form (bg-radial / bg-conic) / slash 修飾子も gradient として検出', () => {
+    // CodeRabbit 指摘: bare form と slash modifier が GRADIENT_CLASS_PATTERN から
+    // 漏れており、dark-only gradient が detection を逃れて AA 評価されていた。
+    const source = `
+      export function Foo() {
+        return (
+          <>
+            <div className="bg-radial">
+              <p className="text-white">radial bare</p>
+            </div>
+            <div className="bg-conic">
+              <p className="text-white">conic bare</p>
+            </div>
+            <div className="bg-conic/decreasing">
+              <p className="text-white">conic slash</p>
+            </div>
+            <div className="dark:bg-linear-to-r">
+              <p className="text-white">dark linear</p>
+            </div>
+          </>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStacks = stacks.filter((s) => s.elementName === 'p');
+    expect(pStacks).toHaveLength(4);
+    // 最初の 3 つは variant なしの bare/slash なので両テーマ gradient
+    for (const p of pStacks.slice(0, 3)) {
+      expect(p.hasGradientBackground).toEqual({ light: true, dark: true });
+    }
+    // 最後は dark: variant のみなので dark のみ gradient
+    expect(pStacks[3].hasGradientBackground).toEqual({
+      light: false,
+      dark: true,
+    });
+  });
+
   it('標準 SVG primitives (<circle>) は isNonTextElement=true', () => {
     const source = `
       export function Foo() {

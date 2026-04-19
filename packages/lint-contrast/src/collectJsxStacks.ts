@@ -718,15 +718,14 @@ function getElementName(nameNode: AstNode): string {
 }
 
 /**
- * WCAG 1.4.11 の「非テキスト UI コンポーネント」扱いにする標準 HTML / SVG 要素名。
+ * 常に「非テキスト UI コンポーネント」扱いにする純粋なグラフィック要素。
  *
  * これらは装飾・状態表現であり「本文テキスト」ではないため、4.5:1 基準ではなく
- * 3:1 基準で評価する（「隣接色と 3:1 以上」の要件に対応）。
+ * WCAG 1.4.11 の 3:1 基準で評価する。
  *
  * ref: https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html
  */
 const NON_TEXT_HTML_ELEMENTS = new Set([
-  'svg',
   'circle',
   'rect',
   'path',
@@ -734,9 +733,47 @@ const NON_TEXT_HTML_ELEMENTS = new Set([
   'polyline',
   'polygon',
   'ellipse',
-  'g',
   'use',
 ]);
+
+/**
+ * SVG の「コンテナ」要素。`<text>` / `<tspan>` / `<textPath>` を含む場合は
+ * テキスト扱い (4.5:1)、含まない場合は純粋なアイコン扱い (3:1) と分岐する。
+ *
+ * CodeRabbit 指摘: `<svg className="text-muted-foreground"><text>...</text></svg>`
+ * のようなチャート・ラベル SVG を無条件に 3:1 で評価すると、可読性の低いテキストが
+ * silent に見逃される false negative になる。
+ */
+const SVG_CONTAINER_ELEMENTS = new Set(['svg', 'g']);
+
+/**
+ * SVG 内で本文テキストを描画する要素。これらの子孫があるコンテナは
+ * テキスト基準 (4.5:1) で評価する。
+ */
+const SVG_TEXT_ELEMENTS = new Set(['text', 'tspan', 'textPath']);
+
+/**
+ * 指定ノードのサブツリーに SVG の text 要素が含まれるかを判定する。
+ */
+function containsSvgTextElement(node: AstNode): boolean {
+  if (isJsxElement(node)) {
+    const name = getElementName(node.openingElement.name);
+    if (SVG_TEXT_ELEMENTS.has(name)) {
+      return true;
+    }
+    for (const child of node.children) {
+      if (
+        child &&
+        typeof child === 'object' &&
+        'type' in child &&
+        containsSvgTextElement(child)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 /**
  * import 元パッケージ名が「装飾アイコンライブラリ」であることを示すリスト。
@@ -835,15 +872,17 @@ function isIconElement(elementName: string, iconIds: IconIdentifiers): boolean {
 }
 
 /**
- * `bg-gradient-*` / `bg-linear-*` / `bg-radial-*` / `bg-conic-*` を含む
- * Tailwind クラス検出用の正規表現。
+ * `bg-gradient-*` / `bg-linear-*` / `bg-radial*` / `bg-conic*` を含む Tailwind
+ * グラデーション utility を検出する正規表現。
  *
- * Tailwind v3 は `bg-gradient-to-*`、v4 は `bg-linear-*` / `bg-radial-*` /
- * `bg-conic-*` が対応するため両方拾う。
+ * Tailwind v3 は `bg-gradient-to-*`、v4 は `bg-linear-*` / `bg-radial` /
+ * `bg-conic` (ハイフン無し bare form) / `bg-conic/decreasing` (スラッシュ修飾子)
+ * / `bg-[linear-gradient(...)]` (arbitrary value) を提供する。
  * 単語境界の直後に bg- から始まるグラデーション指定がくる箇所を探し、
  * `dark:bg-gradient-to-t` のような variant prefix 付きも拾う。
  */
-const GRADIENT_CLASS_PATTERN = /(?<![\w-])bg-(?:gradient|linear|radial|conic)-/;
+const GRADIENT_CLASS_PATTERN =
+  /(?<![\w-])bg-(?:(?:gradient|linear)-|(?:radial|conic)(?:$|[-/[(])|\[(?:linear|radial|conic)-gradient\()/;
 
 /**
  * Tailwind の alpha 修飾子 (`/50`, `/[0.3]`, `/[50%]`) が後続するかを検出。
@@ -1372,9 +1411,16 @@ function visitNode(
 
   // WCAG 1.4.11 判定: 標準 SVG primitives とファイル内の装飾アイコン import を
   // 非テキスト UI コンポーネントとして扱う。CLI 側で閾値を 3:1 に切り替える。
+  // ただし SVG コンテナ (<svg> / <g>) が <text> / <tspan> / <textPath> 子孫を
+  // 含む場合はチャート・ラベル等の本文テキスト用途なのでテキスト扱い (4.5:1)
+  // にする (CodeRabbit 指摘)。
+  const isSvgContainer = SVG_CONTAINER_ELEMENTS.has(elementName);
+  const isTextBearingSvg = isSvgContainer && containsSvgTextElement(node);
   const isNonTextElement =
-    NON_TEXT_HTML_ELEMENTS.has(elementName) ||
-    isIconElement(elementName, ctx.iconIds);
+    (NON_TEXT_HTML_ELEMENTS.has(elementName) ||
+      (isSvgContainer && !isTextBearingSvg) ||
+      isIconElement(elementName, ctx.iconIds)) &&
+    !isTextBearingSvg;
 
   // 自要素の bg-gradient-* クラスを検出。親から継承した gradient も考慮する。
   // グラデーション背景は単色として扱えず静的コントラスト計算が不正確になるため、
