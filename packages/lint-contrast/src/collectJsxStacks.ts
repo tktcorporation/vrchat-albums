@@ -860,34 +860,116 @@ const ALPHA_MODIFIER_PATTERN = /\/(?:\d|\[)/;
 const NON_OPAQUE_BG_KEYWORDS = new Set(['transparent', 'current', 'inherit']);
 
 /**
- * この ClassCandidate が「祖先 gradient を覆い隠せる不透明 bg-*」を持つか判定する。
+ * className の value AST を走査して「祖先 gradient を覆い隠せる不透明 bg-*」が
+ * 含まれるかをテーマ別に判定する。
  *
- * - `bg-card` / `bg-white` / `bg-[hsl(...)]` 等の色指定: solid
- * - `bg-white/50` / `bg-muted/40` / `bg-black/[0.3]` 等 alpha 付き: 非 solid
- * - `bg-transparent` / `bg-current` / `bg-inherit`: 非 solid
- * - `bg-gradient-*` / `bg-linear-*` 等グラデーション: 非 solid (自身がグラデ)
- * - 存在しない色エイリアス (非 color class) は extractColorClasses で既に
- *   フィルタ済みなので classes に残っていれば色指定とみなしてよい。
+ * Tailwind の cascading を踏まえた分類:
+ * - variant なし opaque bg (例: `bg-white`): light/dark 両方で solid
+ * - `dark:` 付き opaque bg (例: `dark:bg-card`): dark のみで solid
+ * - `hover:`/`focus:`/`sm:` 等の非 dark variant: 常時適用でないため ignore
+ * - variant なし alpha/gradient/透明 (例: `bg-transparent`): 両テーマで masking
+ * - `dark:` 付き alpha/gradient/透明 (例: `dark:bg-transparent`): dark を masking
+ *
+ * masking はすでに立った solid フラグを打ち消す (例: `bg-white dark:bg-transparent`
+ * → light=true, dark=false)。これにより dark モードでは solid ではないので、
+ * 祖先の `dark:bg-gradient-*` は引き続き伝播する (Codex P1 指摘)。
+ *
+ * 注意: ClassCandidate ではなく生の classNameValue AST を走査するのは、
+ * extractColorClasses が `bg-transparent` を色クラスでないとして除外するため
+ * (bgCandidates に残らないため masking 情報が失われる)。
+ * jsxContainsGradientClass と同じ戦略で生文字列を直接スキャンする。
  */
-function hasOpaqueBgCandidate(candidate: ClassCandidate): boolean {
-  for (const cls of candidate.classes) {
-    const { base } = extractBase(cls);
+function jsxOpaqueBgFlags(valueNode: AstNode | null): GradientFlags {
+  if (valueNode === null) {
+    return NO_GRADIENT;
+  }
+  return extractOpaqueFromAst(valueNode);
+}
+
+function extractOpaqueFromAst(node: AstNode): GradientFlags {
+  if (node.type === 'Literal') {
+    const value = (node as Literal).value;
+    return typeof value === 'string' ? opaqueBgInString(value) : NO_GRADIENT;
+  }
+
+  if (node.type === 'TemplateLiteral') {
+    const quasis = (node as TemplateLiteral).quasis;
+    let acc: GradientFlags = NO_GRADIENT;
+    for (const q of quasis) {
+      const cooked = q.value?.cooked ?? '';
+      acc = mergeGradient(acc, opaqueBgInString(cooked));
+    }
+    if (acc.light || acc.dark) {
+      return acc;
+    }
+  }
+
+  let acc: GradientFlags = NO_GRADIENT;
+  for (const key of Object.keys(node)) {
+    const val = node[key];
+    if (Array.isArray(val)) {
+      for (const child of val) {
+        if (child && typeof child === 'object' && 'type' in child) {
+          acc = mergeGradient(acc, extractOpaqueFromAst(child as AstNode));
+          if (acc.light && acc.dark) {
+            return acc;
+          }
+        }
+      }
+    } else if (val && typeof val === 'object' && 'type' in val) {
+      acc = mergeGradient(acc, extractOpaqueFromAst(val as AstNode));
+      if (acc.light && acc.dark) {
+        return acc;
+      }
+    }
+  }
+  return acc;
+}
+
+function opaqueBgInString(classStr: string): GradientFlags {
+  let light = false;
+  let dark = false;
+  let lightMasked = false;
+  let darkMasked = false;
+
+  for (const rawCls of classStr.split(/\s+/)) {
+    const trimmed = rawCls.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const { base, hasDarkVariant, hasNonDarkVariant } = extractBase(trimmed);
+    if (hasNonDarkVariant) {
+      continue;
+    }
     if (!base.startsWith('bg-')) {
       continue;
     }
-    if (ALPHA_MODIFIER_PATTERN.test(base)) {
-      continue;
-    }
-    if (GRADIENT_CLASS_PATTERN.test(base)) {
-      continue;
-    }
+
+    const isAlpha = ALPHA_MODIFIER_PATTERN.test(base);
+    const isGradient = GRADIENT_CLASS_PATTERN.test(base);
     const suffix = base.slice(3);
-    if (NON_OPAQUE_BG_KEYWORDS.has(suffix)) {
-      continue;
+    const isTransparent = NON_OPAQUE_BG_KEYWORDS.has(suffix);
+    const isOpaque = !isAlpha && !isGradient && !isTransparent;
+
+    if (hasDarkVariant) {
+      if (isOpaque) {
+        dark = true;
+      } else {
+        darkMasked = true;
+      }
+    } else if (isOpaque) {
+      light = true;
+      dark = true;
+    } else {
+      lightMasked = true;
+      darkMasked = true;
     }
-    return true;
   }
-  return false;
+
+  return {
+    light: light && !lightMasked,
+    dark: dark && !darkMasked,
+  };
 }
 
 /**
@@ -1190,16 +1272,18 @@ function visitNode(
   // のような「グラデ下にさらに不透明レイヤーを重ねて上書き」パターンで、
   // p 要素の `text-white on bg-white` (1:1) 違反を silent に見逃す false negative が出る。
   //
-  // 重要: 半透明な bg-* (`bg-white/50`, `bg-black/[0.3]`, `bg-muted/40`) は
-  // 祖先のグラデを完全には覆わない (合成結果が gradient 依存) ため solid 扱いしない。
-  // そうしないと `bg-gradient-* > bg-white/50 > text-*` の実効背景が gradient 依存
-  // なのに solid として推論されてしまい、誤った AA 判定になる (Codex P2 指摘)。
-  const myHasSolidBg = bgCandidates.some((c) => hasOpaqueBgCandidate(c));
+  // 重要:
+  // - 半透明な bg-* (`bg-white/50`, `bg-muted/40`) は祖先のグラデを完全には
+  //   覆わないため solid 扱いしない (Codex P2 指摘)。
+  // - `bg-white dark:bg-transparent` のようにテーマ別に透明度が変わるクラスは
+  //   テーマ別に solid 有無を判定する必要がある (Codex P1 指摘: 単一 boolean
+  //   では dark モードの gradient propagation が誤ってクリアされる)。
+  const myOpaqueBg: GradientFlags = jsxOpaqueBgFlags(classNameValue);
   // テーマ別に gradient を伝播する。自要素がそのテーマで gradient を宣言しているか、
   // 祖先の gradient が有効 & かつ自要素で solid bg による上書きが無い場合に true。
   const hasGradientBackground: GradientFlags = {
-    light: myGradient.light || (ancestorHasGradient.light && !myHasSolidBg),
-    dark: myGradient.dark || (ancestorHasGradient.dark && !myHasSolidBg),
+    light: myGradient.light || (ancestorHasGradient.light && !myOpaqueBg.light),
+    dark: myGradient.dark || (ancestorHasGradient.dark && !myOpaqueBg.dark),
   };
 
   // If this element has text candidates, record a JsxStack entry.

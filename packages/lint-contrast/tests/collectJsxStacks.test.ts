@@ -1156,6 +1156,34 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     });
   });
 
+  it('`bg-white dark:bg-transparent` のテーマ別 masking を正しく扱う', () => {
+    // Codex P1 対応: variant なし opaque + dark-only 透明の組合せ。
+    // light モードは bg-white が効くので solid (祖先グラデを覆う)、
+    // dark モードは bg-transparent が上書きするので非 solid (祖先グラデは
+    // 引き続き伝播する) べき。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black dark:bg-gradient-to-t">
+            <div className="bg-white dark:bg-transparent">
+              <p className="text-black">mixed masking</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    // light モード: bg-white が祖先の gradient を覆う → false
+    // dark モード: dark:bg-transparent が masking、祖先の dark:bg-gradient-to-t
+    //              は依然として有効 → true
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: false,
+      dark: true,
+    });
+  });
+
   it('dark: prefix 付き gradient は dark のみ flag 付与', () => {
     // Codex P1 対応: `bg-low-bg dark:bg-gradient-to-t` のような
     // 「light は solid, dark は gradient」のクラスは、light 側だけ AA 評価すべき。
