@@ -306,14 +306,18 @@ const getDBLogsFromDatabase = async (
 /**
  * バックアップ・エクスポート・インポート系の Effect.mapError 用ヘルパー。
  *
- * 4 ハンドラで重複していた以下のボイラープレートを単一の関数に集約:
+ * 6 ハンドラで重複していた以下のボイラープレートを単一の関数に集約:
  *   1. ドメイン固有 `getXxxErrorMessage(e)` でメッセージ抽出
  *   2. `logger.error` で英文ログ出力（Sentry 相関のため操作名 + 詳細を残す）
  *   3. `eventEmitter.emit('toast', ...)` でユーザー通知（オプション）
  *   4. `UserFacingError.withStructuredInfo` で型付きエラーに包む
  *
  * `userMessageFromError` を渡すと「エクスポート」のように生メッセージをそのまま
- * userMessage にする挙動も選択可能（4 ハンドラのうち 1 つだけ違うため）。
+ * userMessage にする挙動も選択可能（6 ハンドラのうち 1 つだけ違うため）。
+ *
+ * 注意: 各 mapXxxError は `vrchatLogRouter()` 関数内で構築する。
+ * トップレベルで構築するとモジュール読み込み時に `getXxxErrorMessage` 等を即時参照し、
+ * テスト側で対応する関数のモック忘れがあると `TypeError` を起こすため。
  */
 const reportFailureAsUserFacing = <E>(config: {
   /** 英文ログ用ラベル。例: "Export" → `"Export failed: ..."` */
@@ -343,52 +347,56 @@ const reportFailureAsUserFacing = <E>(config: {
       category: ERROR_CATEGORIES.UNKNOWN_ERROR,
       message: errorMessage,
       userMessage,
-      cause: e instanceof Error ? e : new Error(errorMessage),
+      // 元エラーが Error 派生（Data.TaggedError 等）ならそのまま渡し、
+      // そうでないものだけラップ。情報損失を最小化する。
+      cause: e instanceof Error ? e : new Error(errorMessage, { cause: e }),
     });
   };
 };
 
-const mapExportError = reportFailureAsUserFacing({
-  logLabel: 'Export',
-  userLabel: 'エクスポート',
-  code: ERROR_CODES.EXPORT_ERROR,
-  extractMessage: getExportErrorMessage,
-  userMessageFromError: true,
-});
+export const vrchatLogRouter = () => {
+  // mapXxxError は router 関数内に閉じ込め、`getXxxErrorMessage` 等の
+  // 遅延参照を保証する（テスト側のモック構築タイミングと整合させるため）。
+  const mapExportError = reportFailureAsUserFacing({
+    logLabel: 'Export',
+    userLabel: 'エクスポート',
+    code: ERROR_CODES.EXPORT_ERROR,
+    extractMessage: getExportErrorMessage,
+    userMessageFromError: true,
+  });
 
-const mapPreImportBackupError = reportFailureAsUserFacing({
-  logLabel: 'Pre-import backup',
-  userLabel: 'バックアップ作成',
-  extractMessage: getBackupErrorMessage,
-});
+  const mapPreImportBackupError = reportFailureAsUserFacing({
+    logLabel: 'Pre-import backup',
+    userLabel: 'バックアップ作成',
+    extractMessage: getBackupErrorMessage,
+  });
 
-const mapImportError = reportFailureAsUserFacing({
-  logLabel: 'LogStore import',
-  userLabel: 'インポート',
-  extractMessage: getImportErrorMessage,
-});
+  const mapImportError = reportFailureAsUserFacing({
+    logLabel: 'LogStore import',
+    userLabel: 'インポート',
+    extractMessage: getImportErrorMessage,
+  });
 
-const mapBackupHistoryError = reportFailureAsUserFacing({
-  logLabel: 'Failed to get backup history',
-  userLabel: 'バックアップ履歴の取得',
-  extractMessage: getBackupErrorMessage,
-  emitToast: false,
-});
+  const mapBackupHistoryError = reportFailureAsUserFacing({
+    logLabel: 'Failed to get backup history',
+    userLabel: 'バックアップ履歴の取得',
+    extractMessage: getBackupErrorMessage,
+    emitToast: false,
+  });
 
-const mapGetBackupError = reportFailureAsUserFacing({
-  logLabel: 'Failed to get backup',
-  userLabel: 'バックアップの取得',
-  extractMessage: getBackupErrorMessage,
-});
+  const mapGetBackupError = reportFailureAsUserFacing({
+    logLabel: 'Failed to get backup',
+    userLabel: 'バックアップの取得',
+    extractMessage: getBackupErrorMessage,
+  });
 
-const mapRollbackError = reportFailureAsUserFacing({
-  logLabel: 'Rollback',
-  userLabel: 'ロールバック',
-  extractMessage: getRollbackErrorMessage,
-});
+  const mapRollbackError = reportFailureAsUserFacing({
+    logLabel: 'Rollback',
+    userLabel: 'ロールバック',
+    extractMessage: getRollbackErrorMessage,
+  });
 
-export const vrchatLogRouter = () =>
-  trpcRouter({
+  return trpcRouter({
     appendLoglinesToFileFromLogFilePathList: procedure
       .input(
         z
@@ -529,3 +537,4 @@ export const vrchatLogRouter = () =>
         return { success: true, backup };
       }),
   });
+};

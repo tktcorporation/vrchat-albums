@@ -43,7 +43,8 @@ describe('toUserFacing', () => {
     expect(result.code).toBe(ERROR_CODES.DATABASE_ERROR);
     expect(result.category).toBe(ERROR_CATEGORIES.DATABASE_ERROR);
     expect(result.userMessage).toBe('DBエラー');
-    expect(result.errorInfo?.message).toBe('DBエラー (connection failed)');
+    // message のデフォルトは raw e.message（旧コード互換）
+    expect(result.errorInfo?.message).toBe('connection failed');
   });
 
   it('userMessage を関数で動的生成できる', () => {

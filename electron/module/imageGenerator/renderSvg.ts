@@ -25,7 +25,7 @@ let fontFilePaths: string[] = [];
  * フォント解決の優先順位:
  * 1. Electron パッケージ済み: process.resourcesPath/fonts/
  * 2. 開発環境: electron/resources/fonts/ (__dirname からの相対パス)
- * 3. テスト環境: 同じ相対パスで解決（Electron require が失敗するため catch で処理）
+ * 3. テスト環境: 同じ相対パスで解決（withElectronApp の fallback 経由）
  */
 const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
   if (fontsLoaded) {

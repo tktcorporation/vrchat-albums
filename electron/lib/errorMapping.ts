@@ -14,8 +14,6 @@
  * @see electron/lib/effectTRPC.ts - runEffect (tRPC 実行境界)
  */
 
-import { match, P } from 'ts-pattern';
-
 import {
   ERROR_CATEGORIES,
   type ErrorCategory,
@@ -49,7 +47,10 @@ export interface UserFacingFactoryOptions<E> {
   category?: ErrorCategory;
   /** ユーザー向けメッセージ。文字列 or 元エラーから生成する関数 */
   userMessage: string | ((e: E) => string);
-  /** 内部 message。省略時は `${userMessage} (${e.message})` を生成 */
+  /**
+   * 内部 message（Sentry/ログ用）。省略時は元エラーの `message` プロパティ (=`e.message`) を
+   * そのまま使う。旧コードの `message: e.message` 相当を維持するためのデフォルト。
+   */
   message?: string | ((e: E) => string);
 }
 
@@ -58,13 +59,19 @@ export interface UserFacingFactoryOptions<E> {
  *
  * `{ message: string }` を持つオブジェクトはそのプロパティを、
  * 文字列はそのまま、それ以外は `String()` で変換する。
+ *
+ * `e.message` が `undefined` のケースで `"undefined"` 文字列が
+ * 表示に紛れ込まないよう、string 以外は `String(e)` にフォールバックする。
  */
 const extractErrorMessage = (e: unknown): string => {
   if (typeof e === 'string') {
     return e;
   }
   if (e && typeof e === 'object' && 'message' in e) {
-    return String((e as { message: unknown }).message);
+    const msg = (e as { message: unknown }).message;
+    if (typeof msg === 'string') {
+      return msg;
+    }
   }
   return String(e);
 };
@@ -87,22 +94,24 @@ const resolveTemplate = <E>(
   template: string | ((e: E) => string) | undefined,
   fallback: string,
   e: E,
-): string =>
-  match(template)
-    .with(P.string, (s) => s)
-    .with(P.nullish, () => fallback)
-    .otherwise((fn) => fn(e));
+): string => {
+  if (template === undefined) {
+    return fallback;
+  }
+  if (typeof template === 'string') {
+    return template;
+  }
+  return template(e);
+};
 
 export const toUserFacing =
   <E>(opts: UserFacingFactoryOptions<E>) =>
   (e: E): UserFacingError => {
     const userMessage = resolveTemplate(opts.userMessage, '', e);
+    // 旧コード互換のため message のデフォルトは raw `e.message`
+    // （内部ログや Sentry で元のエラー文面を失わないため）
     const errorMessage = extractErrorMessage(e);
-    const message = resolveTemplate(
-      opts.message,
-      `${userMessage} (${errorMessage})`,
-      e,
-    );
+    const message = resolveTemplate(opts.message, errorMessage, e);
     return UserFacingError.withStructuredInfo({
       code: opts.code ?? ERROR_CODES.UNKNOWN,
       category: opts.category ?? ERROR_CATEGORIES.UNKNOWN_ERROR,
@@ -157,8 +166,11 @@ export const mapToUnknownError = (
  * `logSyncController` のように複数の Tagged Error をまとめて変換する箇所で、
  * `match(e._tag).with(...).otherwise(...)` のボイラープレートを排除する。
  *
- * `_tag` は optional で受け、未定義のエラー（旧来の `Error` 派生クラス等）は
- * 自動で `fallback` に流れる。
+ * 対応するエラー型: `Data.TaggedError` 由来の `_tag: string` を持つもの。
+ * `_tag` は optional で受け、未定義のエラー（旧来の `Error` 派生クラスや
+ * `code` フィールドのみのエラー）は自動で `fallback` に流れる。
+ * その種のエラーを個別分岐したい場合は `match(e).with({ code: 'X' }, ...)` のような
+ * 専用ハンドラを別途用意するか、まずエラー型を `Data.TaggedError` に移行すること。
  *
  * @param patterns - `_tag` をキーとした変換関数のマップ。未列挙の tag は `fallback` が処理。
  * @param fallback - patterns に一致しなかった場合のデフォルト変換。省略時は UNKNOWN/UNKNOWN_ERROR。
@@ -180,7 +192,5 @@ export const mapByTag =
   ) =>
   (e: E): UserFacingError => {
     const handler = typeof e._tag === 'string' ? patterns[e._tag] : undefined;
-    return match(handler)
-      .with(undefined, () => fallback(e))
-      .otherwise((h) => h(e));
+    return handler ? handler(e) : fallback(e);
   };
