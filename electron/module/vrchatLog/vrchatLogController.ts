@@ -336,11 +336,15 @@ const reportFailureAsUserFacing = <E>(config: {
   return (e: E): UserFacingError => {
     const errorMessage = config.extractMessage(e);
     logger.error({ message: `${config.logLabel} failed: ${errorMessage}` });
+    // toast は常に「<操作名>に失敗しました: <詳細>」形式で出す（旧コード互換）。
+    // userMessage は `userMessageFromError: true` の場合のみ詳細メッセージ単体になる
+    // （旧 export ハンドラの挙動を維持）。
+    const prefixedMessage = `${config.userLabel}に失敗しました: ${errorMessage}`;
     const userMessage = config.userMessageFromError
       ? errorMessage
-      : `${config.userLabel}に失敗しました: ${errorMessage}`;
+      : prefixedMessage;
     if (config.emitToast !== false) {
-      eventEmitter.emit('toast', userMessage);
+      eventEmitter.emit('toast', prefixedMessage);
     }
     return UserFacingError.withStructuredInfo({
       code: config.code ?? ERROR_CODES.UNKNOWN,
