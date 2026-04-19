@@ -968,6 +968,26 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     expect(bug!.isNonTextElement).toBe(true);
   });
 
+  it('lucide-react の namespace import (<Icons.Bug>) も isNonTextElement=true', () => {
+    // Codex P2 対応: import * as Icons from 'lucide-react' で `<Icons.Bug>` を
+    // 使った場合、要素名は "Icons.Bug" なので単純な Set.has では引けない。
+    // namespace を別枠で記録し、elementName.startsWith(ns + '.') で判定する。
+    const source = `
+      import * as Icons from 'lucide-react';
+      export function Foo() {
+        return (
+          <div className="bg-card">
+            <Icons.Bug className="text-foreground" />
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const bug = stacks.find((s) => s.elementName === 'Icons.Bug');
+    expect(bug).toBeDefined();
+    expect(bug!.isNonTextElement).toBe(true);
+  });
+
   it('lucide-react 以外の import は isNonTextElement=false のまま', () => {
     // カスタムラッパーや他ライブラリは今のところ非テキスト扱いにしない。
     // react-icons 等を使うプロジェクトでは CLI オプション化等で対応する前提。
@@ -1063,6 +1083,51 @@ describe('isNonTextElement / hasGradientBackground フラグ付与', () => {
     expect(pStack!.hasGradientBackground).toEqual({
       light: false,
       dark: false,
+    });
+  });
+
+  it('半透明な bg-*/XX は solid 扱いせず gradient flag を維持する', () => {
+    // Codex P2 対応: bg-white/50 のような半透明レイヤーは祖先のグラデを
+    // 完全に覆わないため、実効背景は依然として gradient 依存になる。
+    // solid 扱いしてリセットしてしまうと誤った AA 判定に繋がる。
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className="bg-white/50">
+              <p className="text-white">still gradient-dependent</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: true,
+      dark: true,
+    });
+  });
+
+  it('bg-transparent / bg-current は solid 扱いしない', () => {
+    const source = `
+      export function Foo() {
+        return (
+          <div className="bg-gradient-to-t from-black">
+            <div className="bg-transparent">
+              <p className="text-white">gradient still bleeds through</p>
+            </div>
+          </div>
+        );
+      }
+    `;
+    const stacks = collectJsxStacks('test.tsx', source);
+    const pStack = stacks.find((s) => s.elementName === 'p');
+    expect(pStack).toBeDefined();
+    expect(pStack!.hasGradientBackground).toEqual({
+      light: true,
+      dark: true,
     });
   });
 

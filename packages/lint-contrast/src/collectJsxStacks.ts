@@ -754,11 +754,31 @@ const ICON_PACKAGE_NAMES = new Set(['lucide-react']);
  * バンドルサイズ最適化のため、全 AST ノードの走査は避けて Program.body の
  * トップレベル statement のみを見る。
  */
-function collectIconComponentNames(program: AstNode): Set<string> {
+interface IconIdentifiers {
+  /** 名前付き import された装飾アイコンコンポーネント名 */
+  names: Set<string>;
+  /** `import * as Icons from 'lucide-react'` の namespace 名 */
+  namespaces: Set<string>;
+}
+
+/**
+ * ファイル先頭のみを走査して「装飾アイコンコンポーネント名」の集合を収集する。
+ *
+ * ESM import 文のみ対象。CommonJS require や dynamic import は対象外。
+ * バンドルサイズ最適化のため、全 AST ノードの走査は避けて Program.body の
+ * トップレベル statement のみを見る。
+ *
+ * 名前付き import (`{ Bug }`) / default import (`Bug`) は names に、
+ * namespace import (`* as Icons`) は namespaces に分けて記録する。
+ * JSX 側で `<Icons.Bug>` のように member expression で参照された場合は
+ * `elementName.startsWith(ns + '.')` で判定する。
+ */
+function collectIconComponentNames(program: AstNode): IconIdentifiers {
   const names = new Set<string>();
+  const namespaces = new Set<string>();
   const body = (program as AstNode & { body?: AstNode[] }).body;
   if (!Array.isArray(body)) {
-    return names;
+    return { names, namespaces };
   }
 
   for (const stmt of body) {
@@ -782,12 +802,36 @@ function collectIconComponentNames(program: AstNode): Set<string> {
       const local = (spec as AstNode & { local?: AstNode & { name?: string } })
         .local;
       const localName = local?.name;
-      if (typeof localName === 'string') {
+      if (typeof localName !== 'string') {
+        continue;
+      }
+      if (spec.type === 'ImportNamespaceSpecifier') {
+        namespaces.add(localName);
+      } else {
+        // ImportSpecifier (名前付き) / ImportDefaultSpecifier (default)
         names.add(localName);
       }
     }
   }
-  return names;
+  return { names, namespaces };
+}
+
+/**
+ * 要素名が装飾アイコンコンポーネントに該当するか判定する。
+ *
+ * 名前付き/デフォルト import は `names.has(elementName)` で直接一致、
+ * namespace import は `elementName` が `{namespace}.` で始まるかで判定する。
+ */
+function isIconElement(elementName: string, iconIds: IconIdentifiers): boolean {
+  if (iconIds.names.has(elementName)) {
+    return true;
+  }
+  for (const ns of iconIds.namespaces) {
+    if (elementName.startsWith(`${ns}.`)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -800,6 +844,51 @@ function collectIconComponentNames(program: AstNode): Set<string> {
  * `dark:bg-gradient-to-t` のような variant prefix 付きも拾う。
  */
 const GRADIENT_CLASS_PATTERN = /(?<![\w-])bg-(?:gradient|linear|radial|conic)-/;
+
+/**
+ * Tailwind の alpha 修飾子 (`/50`, `/[0.3]`, `/[50%]`) が後続するかを検出。
+ *
+ * 半透明な背景は祖先のグラデーションを完全には覆わないため、solid 判定から
+ * 除外する必要がある (Codex P2 指摘)。
+ */
+const ALPHA_MODIFIER_PATTERN = /\/(?:\d|\[)/;
+
+/**
+ * bg-transparent / bg-current / bg-inherit など、実効的に「色を持たない」
+ * 背景クラスのサフィックス。これらは solid 扱いしない。
+ */
+const NON_OPAQUE_BG_KEYWORDS = new Set(['transparent', 'current', 'inherit']);
+
+/**
+ * この ClassCandidate が「祖先 gradient を覆い隠せる不透明 bg-*」を持つか判定する。
+ *
+ * - `bg-card` / `bg-white` / `bg-[hsl(...)]` 等の色指定: solid
+ * - `bg-white/50` / `bg-muted/40` / `bg-black/[0.3]` 等 alpha 付き: 非 solid
+ * - `bg-transparent` / `bg-current` / `bg-inherit`: 非 solid
+ * - `bg-gradient-*` / `bg-linear-*` 等グラデーション: 非 solid (自身がグラデ)
+ * - 存在しない色エイリアス (非 color class) は extractColorClasses で既に
+ *   フィルタ済みなので classes に残っていれば色指定とみなしてよい。
+ */
+function hasOpaqueBgCandidate(candidate: ClassCandidate): boolean {
+  for (const cls of candidate.classes) {
+    const { base } = extractBase(cls);
+    if (!base.startsWith('bg-')) {
+      continue;
+    }
+    if (ALPHA_MODIFIER_PATTERN.test(base)) {
+      continue;
+    }
+    if (GRADIENT_CLASS_PATTERN.test(base)) {
+      continue;
+    }
+    const suffix = base.slice(3);
+    if (NON_OPAQUE_BG_KEYWORDS.has(suffix)) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
 
 /**
  * className の value AST を走査して gradient クラスが「常時適用される状態で」
@@ -976,8 +1065,8 @@ interface VisitContext {
   offsetIndex: OffsetIndex;
   filePath: string;
   results: JsxStack[];
-  /** ファイル内で `lucide-react` 等から import された装飾アイコン名の集合 */
-  iconNames: Set<string>;
+  /** ファイル内で `lucide-react` 等から import された装飾アイコン名/namespace */
+  iconIds: IconIdentifiers;
 }
 
 function visitNode(
@@ -1088,7 +1177,8 @@ function visitNode(
   // WCAG 1.4.11 判定: 標準 SVG primitives とファイル内の装飾アイコン import を
   // 非テキスト UI コンポーネントとして扱う。CLI 側で閾値を 3:1 に切り替える。
   const isNonTextElement =
-    NON_TEXT_HTML_ELEMENTS.has(elementName) || ctx.iconNames.has(elementName);
+    NON_TEXT_HTML_ELEMENTS.has(elementName) ||
+    isIconElement(elementName, ctx.iconIds);
 
   // 自要素の bg-gradient-* クラスを検出。親から継承した gradient も考慮する。
   // グラデーション背景は単色として扱えず静的コントラスト計算が不正確になるため、
@@ -1099,7 +1189,12 @@ function visitNode(
   // これをやらないと `<div bg-gradient-to-t><div bg-white><p text-white/></div></div>`
   // のような「グラデ下にさらに不透明レイヤーを重ねて上書き」パターンで、
   // p 要素の `text-white on bg-white` (1:1) 違反を silent に見逃す false negative が出る。
-  const myHasSolidBg = bgCandidates.some((c) => c.classes.length > 0);
+  //
+  // 重要: 半透明な bg-* (`bg-white/50`, `bg-black/[0.3]`, `bg-muted/40`) は
+  // 祖先のグラデを完全には覆わない (合成結果が gradient 依存) ため solid 扱いしない。
+  // そうしないと `bg-gradient-* > bg-white/50 > text-*` の実効背景が gradient 依存
+  // なのに solid として推論されてしまい、誤った AA 判定になる (Codex P2 指摘)。
+  const myHasSolidBg = bgCandidates.some((c) => hasOpaqueBgCandidate(c));
   // テーマ別に gradient を伝播する。自要素がそのテーマで gradient を宣言しているか、
   // 祖先の gradient が有効 & かつ自要素で solid bg による上書きが無い場合に true。
   const hasGradientBackground: GradientFlags = {
@@ -1188,7 +1283,7 @@ export function collectJsxStacks(filePath: string, source: string): JsxStack[] {
     offsetIndex,
     filePath,
     results: stacks,
-    iconNames: collectIconComponentNames(program),
+    iconIds: collectIconComponentNames(program),
   };
 
   visitNode(program, ctx, [], NO_GRADIENT);
