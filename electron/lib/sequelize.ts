@@ -18,6 +18,13 @@ import { Migrations } from './sequelize/migrations.model';
 let rdbClient: ReturnType<typeof _newRDBClient> | null = null;
 let migrationProgeress = false;
 
+/**
+ * Sequelize の `retry-as-promised` に渡す識別子。
+ * Sentry のエラー集約・診断容易性のため `electron/lib/sequelize.ts` と
+ * 同設定の不変条件テストで共有する。詳細: docs/adr/004-no-sequelize-retry-timeout.md
+ */
+export const SEQUELIZE_RETRY_NAME = 'sequelize-query';
+
 type SequelizeOptions = ConstructorParameters<typeof Sequelize>[0] & {
   storage: string;
 };
@@ -37,7 +44,7 @@ const _newRDBClient = (props: { db_url: string }) => {
     // - name は Sentry 集約・診断容易性のための識別子。
     retry: {
       max: 3,
-      name: 'sequelize-query',
+      name: SEQUELIZE_RETRY_NAME,
     },
     models: [
       VRChatWorldJoinLogModel,
