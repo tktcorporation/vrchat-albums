@@ -198,8 +198,7 @@
       "flatted": ">=3.4.2",
       "smol-toml": ">=1.6.1",
       "@xmldom/xmldom": ">=0.8.13",
-      "@tootallnate/once": ">=3.0.1",
-      "uuid": ">=14.0.0"
+      "@tootallnate/once": ">=3.0.1"
     },
     "onlyBuiltDependencies": [
       "@ast-grep/cli",
