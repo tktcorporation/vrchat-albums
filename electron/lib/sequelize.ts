@@ -29,9 +29,19 @@ const _newRDBClient = (props: { db_url: string }) => {
   const sequelizeOptions: SequelizeOptions = {
     dialect: SqliteDialect,
     storage: props.db_url,
+    // retry-as-promised に渡る設定。
+    // - timeout は意図的に未指定（クエリ全体に壁時間を設けない）。
+    //   PCスリープ復帰直後など SQLite の初回アクセスが10秒超になる環境で
+    //   `TimeoutError: <name> timed out` が発生し初期化が失敗するため。
+    //   タイムアウトの代替: SQLite の busy_timeout=5000 PRAGMA（ロック待ち）と
+    //   DBQueue の timeout=60000（タスク全体）が二段で保護している。
+    //   詳細: docs/adr/004-no-sequelize-retry-timeout.md
+    // - max は SQLITE_BUSY などの一過性エラー回復用に最小限に絞る。
+    //   max を大きくすると Effect 側の上位リトライと合算して待機時間が爆発するため 3 に抑制。
+    // - name はエラー文言の特定（`sequelize-query timed out`）と Sentry 集約のため明示する。
     retry: {
-      max: 10,
-      timeout: 10000,
+      max: 3,
+      name: 'sequelize-query',
     },
     models: [
       VRChatWorldJoinLogModel,
