@@ -170,12 +170,12 @@
     "oxlint": "^1.56.0",
     "oxlint-tsgolint": "^0.17.1",
     "playwright": "1.57.0",
-    "postcss": "8.5.6",
+    "postcss": "8.5.10",
     "rimraf": "6.1.2",
     "simple-git-hooks": "2.13.1",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "vite": "^8.0.3",
+    "vite": "^8.0.5",
     "vitest": "^4.1.2"
   },
   "simple-git-hooks": {
@@ -196,7 +196,10 @@
       "undici": ">=6.24.0",
       "picomatch": ">=4.0.4",
       "flatted": ">=3.4.2",
-      "smol-toml": ">=1.6.1"
+      "smol-toml": ">=1.6.1",
+      "@xmldom/xmldom": ">=0.8.13",
+      "@tootallnate/once": ">=3.0.1",
+      "uuid": ">=14.0.0"
     },
     "onlyBuiltDependencies": [
       "@ast-grep/cli",
