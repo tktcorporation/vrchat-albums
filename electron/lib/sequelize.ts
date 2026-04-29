@@ -18,6 +18,13 @@ import { Migrations } from './sequelize/migrations.model';
 let rdbClient: ReturnType<typeof _newRDBClient> | null = null;
 let migrationProgeress = false;
 
+/**
+ * Sequelize の `retry-as-promised` に渡す識別子。
+ * Sentry のエラー集約・診断容易性のため `electron/lib/sequelize.ts` と
+ * 同設定の不変条件テストで共有する。詳細: docs/adr/004-no-sequelize-retry-timeout.md
+ */
+export const SEQUELIZE_RETRY_NAME = 'sequelize-query';
+
 type SequelizeOptions = ConstructorParameters<typeof Sequelize>[0] & {
   storage: string;
 };
@@ -29,9 +36,16 @@ const _newRDBClient = (props: { db_url: string }) => {
   const sequelizeOptions: SequelizeOptions = {
     dialect: SqliteDialect,
     storage: props.db_url,
+    // retry-as-promised に渡る設定。詳細: docs/adr/004-no-sequelize-retry-timeout.md
+    // - timeout は意図的に未指定。主な壁時間制御は SQLite の busy_timeout=5000 PRAGMA と
+    //   DBQueue の timeout=60000 に委譲する。ただし DBQueue の timeout は DBQueue 経由
+    //   タスクのみに適用される点に注意（PRAGMA 設定や sync() は対象外）。
+    // - max は SQLITE_BUSY 等の一過性エラー回復に必要な最小限。
+    //   Effect 上位リトライとの合算待機を抑えるため小さく保つ。
+    // - name は Sentry 集約・診断容易性のための識別子。
     retry: {
-      max: 10,
-      timeout: 10000,
+      max: 3,
+      name: SEQUELIZE_RETRY_NAME,
     },
     models: [
       VRChatWorldJoinLogModel,

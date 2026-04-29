@@ -87,4 +87,25 @@ describe('syncRDBClient migration skip', () => {
     const noMigration = await client.checkMigrationRDBClient(currentVersion);
     expect(noMigration).toBe(false);
   });
+
+  // ADR-004 の不変条件を機械的に守るためのリグレッションガード。
+  // `retry-as-promised` の `timeout` をクエリ全体に被せると、PCスリープ復帰直後の
+  // SQLite 初回アクセスなど正常処理可能なケースで `TimeoutError` が発生する。
+  // 詳細: docs/adr/004-no-sequelize-retry-timeout.md
+  it('Sequelize retry オプションが ADR-004 の不変条件を満たす', async () => {
+    const client = await import('./sequelize');
+    const sequelizeOptions = client.getRDBClient().__client.options as {
+      retry?: { timeout?: unknown; max?: number; name?: string };
+    };
+    const retryOptions = sequelizeOptions.retry;
+
+    expect(retryOptions).toBeDefined();
+    // timeout を再導入してはならない（クエリ全体への壁時間禁止）。
+    // ADR の「未指定」を機械的に守るため、`timeout: undefined` の明示も含めてキー不在を要求する。
+    expect('timeout' in (retryOptions as Record<string, unknown>)).toBe(false);
+    // max は ADR-004 で 3 に固定。引き下げ・引き上げいずれも ADR の見直しを伴う
+    expect(retryOptions?.max).toBe(3);
+    // 診断容易性（Sentry集約等）のため name は明示する。文字列は SSOT として export 済み
+    expect(retryOptions?.name).toBe(client.SEQUELIZE_RETRY_NAME);
+  });
 });
