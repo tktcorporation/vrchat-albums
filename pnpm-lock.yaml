@@ -15,7 +15,6 @@ overrides:
   flatted: '>=3.4.2'
   smol-toml: '>=1.6.1'
   '@xmldom/xmldom': '>=0.8.13'
-  '@tootallnate/once': '>=3.0.1'
 
 importers:
 
@@ -3351,9 +3350,9 @@ packages:
     engines: {node: '>=20.0.0'}
     hasBin: true
 
-  '@tootallnate/once@3.0.1':
-    resolution: {integrity: sha512-VyMVKRrpHTT8PnotUeV8L/mDaMwD5DaAKCFLP73zAqAtvF0FCqky+Ki7BYbFCYQmqFyTe9316Ed5zS70QUR9eg==}
-    engines: {node: '>= 10'}
+  '@tootallnate/once@1.1.2':
+    resolution: {integrity: sha512-RbzJvlNzmRq5c3O09UipeuXno4tA1FE6ikOjxZK0tuxVv3412l64l5t1W5pj4+rJq9vpkm/kwiR07aZXnsKPxw==}
+    engines: {node: '>= 6'}
 
   '@trpc/client@11.8.1':
     resolution: {integrity: sha512-L/SJFGanr9xGABmuDoeXR4xAdHJmsXsiF9OuH+apecJ+8sUITzVT1EPeqp0ebqA6lBhEl5pPfg3rngVhi/h60Q==}
@@ -9798,7 +9797,7 @@ snapshots:
       chalk: 5.6.2
       fast-glob: 3.3.3
 
-  '@tootallnate/once@3.0.1':
+  '@tootallnate/once@1.1.2':
     optional: true
 
   '@trpc/client@11.8.1(@trpc/server@11.8.1(typescript@5.9.3))(typescript@5.9.3)':
@@ -11551,7 +11550,7 @@ snapshots:
 
   http-proxy-agent@4.0.1:
     dependencies:
-      '@tootallnate/once': 3.0.1
+      '@tootallnate/once': 1.1.2
       agent-base: 6.0.2
       debug: 4.4.3
     transitivePeerDependencies:
