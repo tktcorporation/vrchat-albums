@@ -37,8 +37,9 @@ const _newRDBClient = (props: { db_url: string }) => {
     dialect: SqliteDialect,
     storage: props.db_url,
     // retry-as-promised に渡る設定。詳細: docs/adr/004-no-sequelize-retry-timeout.md
-    // - timeout は意図的に未指定。クエリ全体への壁時間は SQLite の
-    //   busy_timeout=5000 PRAGMA と DBQueue の timeout=60000 で代替済み。
+    // - timeout は意図的に未指定。主な壁時間制御は SQLite の busy_timeout=5000 PRAGMA と
+    //   DBQueue の timeout=60000 に委譲する。ただし DBQueue の timeout は DBQueue 経由
+    //   タスクのみに適用される点に注意（PRAGMA 設定や sync() は対象外）。
     // - max は SQLITE_BUSY 等の一過性エラー回復に必要な最小限。
     //   Effect 上位リトライとの合算待機を抑えるため小さく保つ。
     // - name は Sentry 集約・診断容易性のための識別子。

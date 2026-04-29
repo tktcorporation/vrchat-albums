@@ -100,8 +100,9 @@ describe('syncRDBClient migration skip', () => {
     const retryOptions = sequelizeOptions.retry;
 
     expect(retryOptions).toBeDefined();
-    // timeout を再導入してはならない（クエリ全体への壁時間禁止）
-    expect(retryOptions?.timeout).toBeUndefined();
+    // timeout を再導入してはならない（クエリ全体への壁時間禁止）。
+    // ADR の「未指定」を機械的に守るため、`timeout: undefined` の明示も含めてキー不在を要求する。
+    expect('timeout' in (retryOptions as Record<string, unknown>)).toBe(false);
     // max は ADR-004 で 3 に固定。引き下げ・引き上げいずれも ADR の見直しを伴う
     expect(retryOptions?.max).toBe(3);
     // 診断容易性（Sentry集約等）のため name は明示する。文字列は SSOT として export 済み
