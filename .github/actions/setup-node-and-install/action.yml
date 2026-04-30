@@ -57,21 +57,16 @@ runs:
         path: packages/exif-native/*.node
         key: ${{ runner.os }}-${{ runner.arch }}-exif-native-${{ hashFiles('packages/exif-native/Cargo.lock', 'packages/exif-native/Cargo.toml', 'packages/exif-native/build.rs', 'packages/exif-native/src/**', '.github/actions/setup-node-and-install/action.yml') }}
 
-    # lint 専用 job (include-native=false) では postinstall を全部スキップする。
-    # postinstall は rebuild-native（電子モジュール再ビルド）を含むため、
-    # Rust toolchain 無しだと失敗するし、そもそも lint には不要。
-    # license-check:generate や simple-git-hooks も lint には不要なので一括 skip でよい。
+    # include-native=false の場合は SKIP_REBUILD_NATIVE=1 で rebuild-native を no-op 化する。
+    # `--ignore-scripts` を使うと pnpm.onlyBuiltDependencies (@ast-grep/cli 等) の
+    # install script もスキップされ、lint:ast-grep などが壊れる。
+    # rebuild-native だけ条件スキップすることで、他の必要な install scripts は通常通り実行される。
     - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        INCLUDE_NATIVE: ${{ inputs.include-native }}
-      run: |
-        if [ "$INCLUDE_NATIVE" = "true" ]; then
-          pnpm install --frozen-lockfile
-        else
-          pnpm install --frozen-lockfile --ignore-scripts
-        fi
+        SKIP_REBUILD_NATIVE: ${{ inputs.include-native == 'true' && '' || '1' }}
+      run: pnpm install --frozen-lockfile
 
     # cargo test は変更がなくても保険として毎回流す（数十秒で済む）。
     # Rust 側のリグレッションを test job 全体より早い段階で検出するのが狙い。
