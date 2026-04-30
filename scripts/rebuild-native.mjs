@@ -20,13 +20,16 @@ if (process.env.SKIP_REBUILD_NATIVE) {
 
 const targets = ['clip-filepaths', '@vrchat-albums/exif-native'];
 
-// Windows では pnpm が pnpm.cmd として配布されるため shell 経由が必要。
-const isWindows = process.platform === 'win32';
-const cmd = isWindows ? 'pnpm.cmd' : 'pnpm';
+// Windows の pnpm は `pnpm.cmd` として配布される。Node の execFileSync は
+// CreateProcess を直接呼ぶため、`.cmd` ファイルは cmd.exe 経由じゃないと
+// 実行できない（"%1 is not a valid Win32 application" 等で失敗）。
+// `shell: true` で cmd.exe を介して resolve させる。args は配列のまま渡せる。
+const useShell = process.platform === 'win32';
 
 for (const target of targets) {
   console.log(`[rebuild-native] electron-rebuild -w ${target}`);
-  execFileSync(cmd, ['exec', 'electron-rebuild', '-f', '-w', target], {
+  execFileSync('pnpm', ['exec', 'electron-rebuild', '-f', '-w', target], {
     stdio: 'inherit',
+    shell: useShell,
   });
 }
