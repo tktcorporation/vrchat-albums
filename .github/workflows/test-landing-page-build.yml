@@ -6,6 +6,10 @@ permissions:
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   test-build:
     runs-on: ubuntu-latest

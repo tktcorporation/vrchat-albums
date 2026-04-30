@@ -3,6 +3,10 @@ name: PR Screenshot Commenter
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   screenshot:
     runs-on: ubuntu-22.04
@@ -17,6 +21,26 @@ jobs:
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
 
+      # Playwright の browser binary（~150MB）を cache。
+      # OS deps（apt 経由）は cache できないので別ステップで毎回入れる。
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers (only on cache miss)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+
+      # OS deps（libnss3, libatk1.0-0 等）は sudo apt の都合で都度実行が必要。
+      # browsers と分離することで cache hit 時の所要時間を大幅短縮。
+      - name: Install Playwright OS deps
+        run: pnpm exec playwright install-deps chromium
+
       - name: build app
         run: pnpm build
 
@@ -26,10 +50,10 @@ jobs:
       - name: Setup dummy photos by command
         run: pnpm generate:debug-data
 
-      - name: Install Playwright Browsers
-        run: pnpm exec playwright install --with-deps
+      # test:playwright:ci は build + playwright test のみ（install をスキップ）。
+      # 上のステップで browsers / OS deps を準備済みなので二重実行しない。
       - name: Run Playwright tests
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test:playwright
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test:playwright:ci
 
       - name: upload screenshot
         id: upload-screenshot

@@ -1,48 +1,82 @@
 name: 'Setup Node.js and Install Dependencies'
-description: 'Common setup for Node.js and dependency installation'
+description: 'Common setup for Node.js, pnpm, and (optionally) native Rust addons'
 inputs:
   working-directory:
     description: 'Working directory for the installation'
     required: false
     default: '.'
+  include-native:
+    # lint 専用 job では napi build / cargo test を丸ごとスキップして高速化する。
+    # test / build / playwright 系の job では 'true' のまま。
+    description: 'Build native Rust addons (set to "false" for lint-only jobs)'
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
   steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version-file: 'package.json'
-
+    # corepack を先に有効化してから setup-node の cache: 'pnpm' を使う。
+    # setup-node は内部で `pnpm config get store-dir` を呼ぶため、
+    # この時点で pnpm が PATH 上にある必要がある。
     - name: Enable Corepack
       shell: bash
       run: corepack enable
 
+    - name: Setup Node.js with pnpm cache
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: 'package.json'
+        cache: 'pnpm'
+
     - name: Setup Rust toolchain
+      if: inputs.include-native == 'true'
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache Cargo registry and build
+    # Swatinem/rust-cache は cargo registry / git / target を OS / Cargo.lock /
+    # rustc バージョン込みで賢くキャッシュする。素の actions/cache よりヒット率が高く、
+    # incremental 成果物の自動 prune も入る。
+    - name: Cache Rust build (cargo registry / target)
+      if: inputs.include-native == 'true'
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: 'packages/exif-native -> target'
+
+    # napi build の最終生成物 (.node ファイル) は target/ ではなく
+    # packages/exif-native/ 直下に置かれる。これを別 key で cache し、
+    # ヒットした場合は napi build 自体をスキップする。
+    - name: Cache exif-native binary output
+      if: inputs.include-native == 'true'
+      id: native-output-cache
       uses: actions/cache@v4
       with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          packages/exif-native/target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('packages/exif-native/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+        path: packages/exif-native/*.node
+        key: ${{ runner.os }}-exif-native-${{ hashFiles('packages/exif-native/Cargo.lock', 'packages/exif-native/Cargo.toml', 'packages/exif-native/build.rs', 'packages/exif-native/src/**') }}
 
+    # lint 専用 job (include-native=false) では postinstall を全部スキップする。
+    # postinstall は rebuild-native（電子モジュール再ビルド）を含むため、
+    # Rust toolchain 無しだと失敗するし、そもそも lint には不要。
+    # license-check:generate や simple-git-hooks も lint には不要なので一括 skip でよい。
     - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      env:
+        INCLUDE_NATIVE: ${{ inputs.include-native }}
       run: |
-        pnpm install --frozen-lockfile
+        if [ "$INCLUDE_NATIVE" = "true" ]; then
+          pnpm install --frozen-lockfile
+        else
+          pnpm install --frozen-lockfile --ignore-scripts
+        fi
 
+    # cargo test は変更がなくても保険として毎回流す（数十秒で済む）。
+    # Rust 側のリグレッションを test job 全体より早い段階で検出するのが狙い。
     - name: Run Rust tests
+      if: inputs.include-native == 'true'
       shell: bash
       run: cd packages/exif-native && cargo test
 
+    # napi build は cache hit 時はスキップ（重い処理。Windows で特に）
     - name: Build exif-native
+      if: inputs.include-native == 'true' && steps.native-output-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: |
-        cd packages/exif-native && npx -p @napi-rs/cli@3.6.1 napi build --platform
+      run: cd packages/exif-native && npx -p @napi-rs/cli@3.6.1 napi build --platform
