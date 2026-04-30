@@ -20,6 +20,9 @@ jobs:
 
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
+        with:
+          # changesets/action は package.json と CHANGELOG を編集するだけ
+          include-native: 'false'
 
       - name: Create Release Pull Request
         uses: changesets/action@v1

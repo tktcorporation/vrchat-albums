@@ -22,6 +22,9 @@ jobs:
 
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
+        with:
+          # knip は TS の AST 解析だけで native binding は不要（types は committed）
+          include-native: 'false'
 
       - name: Run knip
         id: knip

@@ -37,8 +37,8 @@ jobs:
       - name: Setup dummy photos by command
         run: pnpm generate:debug-data
 
-      # test:playwright:ci は build + playwright test のみ（install をスキップ）。
-      # 上のステップで browsers / OS deps を準備済みなので二重実行しない。
+      # test:playwright:ci は playwright test 実行のみ。
+      # build と browsers/OS deps install は前段ステップで完了しているので二重実行しない。
       - name: Run Playwright tests
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test:playwright:ci
 

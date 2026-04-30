@@ -17,7 +17,10 @@ jobs:
     
         - name: Setup Node and Install Dependencies
           uses: ./.github/actions/setup-node-and-install
-        
+          with:
+            # license-checker は node_modules の package.json を読むだけ
+            include-native: 'false'
+
         - name: run license-checker
           run: |
             pnpm license-check:validate
