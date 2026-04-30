@@ -18,7 +18,7 @@
   "main": "main/index.cjs",
   "scripts": {
     "postinstall": "simple-git-hooks && pnpm run license-check:generate && pnpm run rebuild-native",
-    "rebuild-native": "node -e \"if(process.env.SKIP_REBUILD_NATIVE)process.exit(0)\" && pnpm exec electron-rebuild -f -w clip-filepaths && pnpm exec electron-rebuild -f -w @vrchat-albums/exif-native",
+    "rebuild-native": "node scripts/rebuild-native.mjs",
     "setup:debug": "bash debug/genDevFiles.sh",
     "generate:debug-data": "tsx scripts/generate-debug-data.mts",
     "generate:icons": "tsx scripts/generate-platform-icons.ts",
