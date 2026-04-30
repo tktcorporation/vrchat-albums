@@ -12,19 +12,24 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # cache key は `pnpm-lock.yaml` の hash を採用。
-    # Playwright browser のバージョンは npm package（playwright / @playwright/test）の
-    # バージョンで決まり、それは lockfile に記録される。playwright.config.ts は
-    # browser リストよりも timeout / reporter 等の runtime 設定が中心なので
-    # cache key に含めると無関係な変更で都度 miss してしまう。
-    # 部分復元: OS が同じなら restore-keys 経由で古い cache から差分取得。
+    # cache key の構成:
+    # - runner.os: OS 別バイナリ
+    # - inputs.browsers: 要求された browser セット。これを含めないと、別の workflow が
+    #   `chromium firefox` 等で呼んだ時に chromium のみの cache が hit して install が
+    #   skip され、firefox 不在で test が壊れる
+    # - pnpm-lock.yaml の hash: playwright npm パッケージのバージョン変更を検知
+    #
+    # playwright.config.ts は timeout / reporter 等の runtime 設定が中心で、
+    # cache key に含めると無関係な変更で都度 miss するため除外。
+    # 部分復元: OS + browsers が同じなら restore-keys 経由で古い cache から差分取得。
     - name: Cache Playwright browsers
       id: playwright-cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+        key: ${{ runner.os }}-playwright-${{ inputs.browsers }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
+          ${{ runner.os }}-playwright-${{ inputs.browsers }}-
           ${{ runner.os }}-playwright-
 
     # cache miss 時のみ browser binary を取得
