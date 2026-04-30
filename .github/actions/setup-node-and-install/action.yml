@@ -44,13 +44,18 @@ runs:
     # napi build の最終生成物 (.node ファイル) は target/ ではなく
     # packages/exif-native/ 直下に置かれる。これを別 key で cache し、
     # ヒットした場合は napi build 自体をスキップする。
+    #
+    # cache key 構成:
+    # - runner.os + runner.arch: macOS arm64/x64 のような同 OS 異 arch を区別
+    # - Rust source hash: ソース変更で invalidate
+    # - action.yml 自身: napi-rs/cli の pin バージョン変更等を捕捉
     - name: Cache exif-native binary output
       if: inputs.include-native == 'true'
       id: native-output-cache
       uses: actions/cache@v4
       with:
         path: packages/exif-native/*.node
-        key: ${{ runner.os }}-exif-native-${{ hashFiles('packages/exif-native/Cargo.lock', 'packages/exif-native/Cargo.toml', 'packages/exif-native/build.rs', 'packages/exif-native/src/**') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-exif-native-${{ hashFiles('packages/exif-native/Cargo.lock', 'packages/exif-native/Cargo.toml', 'packages/exif-native/build.rs', 'packages/exif-native/src/**', '.github/actions/setup-node-and-install/action.yml') }}
 
     # lint 専用 job (include-native=false) では postinstall を全部スキップする。
     # postinstall は rebuild-native（電子モジュール再ビルド）を含むため、

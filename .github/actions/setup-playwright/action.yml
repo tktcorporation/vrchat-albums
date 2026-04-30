@@ -8,10 +8,6 @@ inputs:
     description: 'インストールする browser (例: chromium / chromium firefox / all)'
     required: false
     default: 'chromium'
-outputs:
-  cache-hit:
-    description: 'Playwright browser cache が hit したか (true/false)'
-    value: ${{ steps.playwright-cache.outputs.cache-hit }}
 
 runs:
   using: 'composite'
