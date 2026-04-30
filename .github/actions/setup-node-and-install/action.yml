@@ -41,9 +41,12 @@ runs:
       with:
         workspaces: 'packages/exif-native -> target'
 
-    # napi build の最終生成物 (.node ファイル) は target/ ではなく
-    # packages/exif-native/ 直下に置かれる。これを別 key で cache し、
-    # ヒットした場合は napi build 自体をスキップする。
+    # napi build の最終生成物は packages/exif-native/ 直下に置かれる:
+    # - index.js: napi-rs が自動生成する platform 検出 loader
+    # - *.node: platform 固有のネイティブバイナリ
+    # ランタイムは index.js を import し、その中から .node を require する。
+    # **両方** cache しないと cache hit 時に loader が欠落して
+    # "Cannot find module ...index.js" でテストが落ちる。
     #
     # cache key 構成:
     # - runner.os + runner.arch: macOS arm64/x64 のような同 OS 異 arch を区別
@@ -54,7 +57,9 @@ runs:
       id: native-output-cache
       uses: actions/cache@v4
       with:
-        path: packages/exif-native/*.node
+        path: |
+          packages/exif-native/*.node
+          packages/exif-native/index.js
         key: ${{ runner.os }}-${{ runner.arch }}-exif-native-${{ hashFiles('packages/exif-native/Cargo.lock', 'packages/exif-native/Cargo.toml', 'packages/exif-native/build.rs', 'packages/exif-native/src/**', '.github/actions/setup-node-and-install/action.yml') }}
 
     # include-native=false の場合は SKIP_REBUILD_NATIVE=1 で rebuild-native を no-op 化する。
