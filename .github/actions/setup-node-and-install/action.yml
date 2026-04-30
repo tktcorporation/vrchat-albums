@@ -61,11 +61,15 @@ runs:
     # `--ignore-scripts` を使うと pnpm.onlyBuiltDependencies (@ast-grep/cli 等) の
     # install script もスキップされ、lint:ast-grep などが壊れる。
     # rebuild-native だけ条件スキップすることで、他の必要な install scripts は通常通り実行される。
+    #
+    # 式の書き方注意: GitHub Actions の `A && B || C` は JS の三項とは違い、
+    # B が falsy（空文字含む）なら A が true でも C が採用される。
+    # そのため truthy 値（'1'）を `&&` の右に置き、empty を `||` の右に置く形にする。
     - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        SKIP_REBUILD_NATIVE: ${{ inputs.include-native == 'true' && '' || '1' }}
+        SKIP_REBUILD_NATIVE: ${{ inputs.include-native != 'true' && '1' || '' }}
       run: pnpm install --frozen-lockfile
 
     # cargo test は変更がなくても保険として毎回流す（数十秒で済む）。
