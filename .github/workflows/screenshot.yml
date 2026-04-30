@@ -21,25 +21,12 @@ jobs:
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
 
-      # Playwright の browser binary（~150MB）を cache。
-      # OS deps（apt 経由）は cache できないので別ステップで毎回入れる。
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
+      # Playwright browser cache + OS deps install を共通 action にまとめている。
+      # cache hit 時は browser ダウンロード（~150MB）を skip。
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
         with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: Install Playwright browsers (only on cache miss)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
-
-      # OS deps（libnss3, libatk1.0-0 等）は sudo apt の都合で都度実行が必要。
-      # browsers と分離することで cache hit 時の所要時間を大幅短縮。
-      - name: Install Playwright OS deps
-        run: pnpm exec playwright install-deps chromium
+          browsers: chromium
 
       - name: build app
         run: pnpm build
