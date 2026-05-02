@@ -3,6 +3,10 @@ name: PR Screenshot Commenter
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   screenshot:
     runs-on: ubuntu-22.04
@@ -17,6 +21,13 @@ jobs:
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
 
+      # Playwright browser cache + OS deps install を共通 action にまとめている。
+      # cache hit 時は browser ダウンロード（~150MB）を skip。
+      - name: Setup Playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          browsers: chromium
+
       - name: build app
         run: pnpm build
 
@@ -26,10 +37,10 @@ jobs:
       - name: Setup dummy photos by command
         run: pnpm generate:debug-data
 
-      - name: Install Playwright Browsers
-        run: pnpm exec playwright install --with-deps
+      # test:playwright:ci は playwright test 実行のみ。
+      # build と browsers/OS deps install は前段ステップで完了しているので二重実行しない。
       - name: Run Playwright tests
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test:playwright
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test:playwright:ci
 
       - name: upload screenshot
         id: upload-screenshot

@@ -24,6 +24,9 @@ jobs:
 
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
+        with:
+          # landing page は pages/ workspace のみ。main app の native binding は不要
+          include-native: 'false'
 
       - name: Build Landing Page
         uses: ./.github/actions/build-landing-page

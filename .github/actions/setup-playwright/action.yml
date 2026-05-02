@@ -1,0 +1,49 @@
+name: 'Setup Playwright'
+description: |
+  Playwright browser binary を cache し、OS deps と browser install を分離する composite action。
+  cache hit 時は browser ダウンロード（~150MB）を skip。OS deps は sudo apt install のため
+  毎回必要なので分離している。
+inputs:
+  browsers:
+    description: 'インストールする browser (例: chromium / chromium firefox / all)'
+    required: false
+    default: 'chromium'
+
+runs:
+  using: 'composite'
+  steps:
+    # cache key の構成:
+    # - runner.os: OS 別バイナリ
+    # - inputs.browsers: 要求された browser セット。これを含めないと、別の workflow が
+    #   `chromium firefox` 等で呼んだ時に chromium のみの cache が hit して install が
+    #   skip され、firefox 不在で test が壊れる
+    # - pnpm-lock.yaml の hash: playwright npm パッケージのバージョン変更を検知
+    #
+    # playwright.config.ts は timeout / reporter 等の runtime 設定が中心で、
+    # cache key に含めると無関係な変更で都度 miss するため除外。
+    # 部分復元: OS + browsers が同じなら restore-keys 経由で古い cache から差分取得。
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ inputs.browsers }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-${{ inputs.browsers }}-
+          ${{ runner.os }}-playwright-
+
+    # cache miss 時のみ browser binary を取得
+    - name: Install Playwright browsers
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: pnpm exec playwright install $BROWSERS
+
+    # OS deps（libnss3, libatk1.0-0 等）は sudo apt install なので cache 不可。
+    # browser cache の hit/miss に関わらず毎回流す。
+    - name: Install Playwright OS deps
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: pnpm exec playwright install-deps $BROWSERS

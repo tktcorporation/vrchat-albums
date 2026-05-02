@@ -135,6 +135,18 @@ jobs:
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
 
+      # electron 本体 (~80MB) と electron-builder のツール（Wine, icon converter 等）は
+      # version が変わらない限り再利用できる。3 OS × 都度 download を避けて短縮する。
+      - name: Cache Electron and Electron Builder
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
+
       - name: Build and Publish Electron App
         env:
           NODE_ENV: production

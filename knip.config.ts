@@ -35,6 +35,9 @@ const config: KnipConfig = {
     'minimatch',
     // electron-builder の optional peer dependency（直接 import されないが macOS/Windows ビルドに必要）
     'electron-builder-squirrel-windows',
+    // scripts/rebuild-native.mjs から execFile 経由で `pnpm exec electron-rebuild` を呼ぶ。
+    // knip は scripts/** を ignore しているため動的呼び出しを追跡できない
+    '@electron/rebuild',
   ],
   ignore: [
     // shadcn/ui components

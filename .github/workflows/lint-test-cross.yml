@@ -3,6 +3,11 @@ name: Lint and Test Cross
 on:
   push:
 
+# 同 branch への連続 push では古い run を中断（main は念のため残す）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   lint:
     runs-on: ubuntu-22.04
@@ -13,6 +18,10 @@ jobs:
 
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
+        with:
+          # lint は napi 実行物を必要としない（types は committed の index.d.ts を使う）。
+          # cargo test / napi build を丸ごとスキップして start-up 時間を短縮。
+          include-native: 'false'
 
       - name: lint
         run: pnpm lint

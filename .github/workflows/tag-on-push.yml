@@ -17,6 +17,9 @@ jobs:
 
       - name: Setup Node and Install Dependencies
         uses: ./.github/actions/setup-node-and-install
+        with:
+          # lint は committed types のみで通るので native binding 不要
+          include-native: 'false'
 
       - name: lint
         run: pnpm lint

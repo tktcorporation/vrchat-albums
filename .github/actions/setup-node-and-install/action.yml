@@ -1,48 +1,91 @@
 name: 'Setup Node.js and Install Dependencies'
-description: 'Common setup for Node.js and dependency installation'
+description: 'Common setup for Node.js, pnpm, and (optionally) native Rust addons'
 inputs:
   working-directory:
     description: 'Working directory for the installation'
     required: false
     default: '.'
+  include-native:
+    # lint 専用 job では napi build / cargo test を丸ごとスキップして高速化する。
+    # test / build / playwright 系の job では 'true' のまま。
+    description: 'Build native Rust addons (set to "false" for lint-only jobs)'
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
   steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version-file: 'package.json'
-
+    # corepack を先に有効化してから setup-node の cache: 'pnpm' を使う。
+    # setup-node は内部で `pnpm config get store-dir` を呼ぶため、
+    # この時点で pnpm が PATH 上にある必要がある。
     - name: Enable Corepack
       shell: bash
       run: corepack enable
 
+    - name: Setup Node.js with pnpm cache
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: 'package.json'
+        cache: 'pnpm'
+
     - name: Setup Rust toolchain
+      if: inputs.include-native == 'true'
       uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache Cargo registry and build
+    # Swatinem/rust-cache は cargo registry / git / target を OS / Cargo.lock /
+    # rustc バージョン込みで賢くキャッシュする。素の actions/cache よりヒット率が高く、
+    # incremental 成果物の自動 prune も入る。
+    - name: Cache Rust build (cargo registry / target)
+      if: inputs.include-native == 'true'
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: 'packages/exif-native -> target'
+
+    # napi build の最終生成物は packages/exif-native/ 直下に置かれる:
+    # - index.js: napi-rs が自動生成する platform 検出 loader
+    # - *.node: platform 固有のネイティブバイナリ
+    # ランタイムは index.js を import し、その中から .node を require する。
+    # **両方** cache しないと cache hit 時に loader が欠落して
+    # "Cannot find module ...index.js" でテストが落ちる。
+    #
+    # cache key 構成:
+    # - runner.os + runner.arch: macOS arm64/x64 のような同 OS 異 arch を区別
+    # - Rust source hash: ソース変更で invalidate
+    # - action.yml 自身: napi-rs/cli の pin バージョン変更等を捕捉
+    - name: Cache exif-native binary output
+      if: inputs.include-native == 'true'
+      id: native-output-cache
       uses: actions/cache@v4
       with:
         path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          packages/exif-native/target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('packages/exif-native/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-
+          packages/exif-native/*.node
+          packages/exif-native/index.js
+        key: ${{ runner.os }}-${{ runner.arch }}-exif-native-${{ hashFiles('packages/exif-native/Cargo.lock', 'packages/exif-native/Cargo.toml', 'packages/exif-native/build.rs', 'packages/exif-native/src/**', '.github/actions/setup-node-and-install/action.yml') }}
 
+    # include-native=false の場合は SKIP_REBUILD_NATIVE=1 で rebuild-native を no-op 化する。
+    # `--ignore-scripts` を使うと pnpm.onlyBuiltDependencies (@ast-grep/cli 等) の
+    # install script もスキップされ、lint:ast-grep などが壊れる。
+    # rebuild-native だけ条件スキップすることで、他の必要な install scripts は通常通り実行される。
+    #
+    # 式の書き方注意: GitHub Actions の `A && B || C` は JS の三項とは違い、
+    # B が falsy（空文字含む）なら A が true でも C が採用される。
+    # そのため truthy 値（'1'）を `&&` の右に置き、empty を `||` の右に置く形にする。
     - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: |
-        pnpm install --frozen-lockfile
+      env:
+        SKIP_REBUILD_NATIVE: ${{ inputs.include-native != 'true' && '1' || '' }}
+      run: pnpm install --frozen-lockfile
 
+    # cargo test は変更がなくても保険として毎回流す（数十秒で済む）。
+    # Rust 側のリグレッションを test job 全体より早い段階で検出するのが狙い。
     - name: Run Rust tests
+      if: inputs.include-native == 'true'
       shell: bash
       run: cd packages/exif-native && cargo test
 
+    # napi build は cache hit 時はスキップ（重い処理。Windows で特に）
     - name: Build exif-native
+      if: inputs.include-native == 'true' && steps.native-output-cache.outputs.cache-hit != 'true'
       shell: bash
-      run: |
-        cd packages/exif-native && npx -p @napi-rs/cli@3.6.1 napi build --platform
+      run: cd packages/exif-native && npx -p @napi-rs/cli@3.6.1 napi build --platform

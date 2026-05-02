@@ -18,7 +18,7 @@
   "main": "main/index.cjs",
   "scripts": {
     "postinstall": "simple-git-hooks && pnpm run license-check:generate && pnpm run rebuild-native",
-    "rebuild-native": "pnpm exec electron-rebuild -f -w clip-filepaths && pnpm exec electron-rebuild -f -w @vrchat-albums/exif-native",
+    "rebuild-native": "node scripts/rebuild-native.mjs",
     "setup:debug": "bash debug/genDevFiles.sh",
     "generate:debug-data": "tsx scripts/generate-debug-data.mts",
     "generate:icons": "tsx scripts/generate-platform-icons.ts",
@@ -47,7 +47,9 @@
     "test:web": "vitest run --project web",
     "test:electron": "vitest run --project electron",
     "test:playwright": "SENTRY_DSN='' run-s build \"playwright:setup-and-run\" sync-landing-images",
+    "test:playwright:ci": "SENTRY_DSN='' run-s playwright:run sync-landing-images",
     "playwright:setup-and-run": "playwright install --with-deps && playwright test --timeout=60000",
+    "playwright:run": "playwright test --timeout=60000",
     "sync-landing-images": "bash scripts/sync-landing-images.sh",
     "lint": "run-p lint:oxlint lint:fmt-check lint:type-check lint:actionlint lint:ast-grep lint:custom",
     "lint:custom": "tsx scripts/lint-custom.ts",
