@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.30.2
+
+### Patch Changes
+
+- [#813](https://github.com/tktcorporation/vrchat-albums/pull/813) [`3847685`](https://github.com/tktcorporation/vrchat-albums/commit/384768517df2e51235f524c1482c3d3a9c00ddd6) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix(electron): 初期化が `unknown timed out` で失敗する問題を解消
+
+  Sequelize の `retry: { max: 10, timeout: 10000 }` 設定が `retry-as-promised` に渡り、クエリ実行全体に 10 秒の壁を作っていたため、PC スリープ復帰直後・SQLite 初回アクセスのスピンアップなど正常に処理可能なクエリでも `TimeoutError: unknown timed out` で初期化が失敗するケースがあった。`retry.timeout` を撤廃し、`retry.max` を 3 に削減、`retry.name` を `'sequelize-query'` に明示。タイムアウト制御は SQLite の `busy_timeout=5000` PRAGMA と DBQueue の `timeout=60000` で代替済み。判断記録は `docs/adr/004-no-sequelize-retry-timeout.md`。
+
+- [#817](https://github.com/tktcorporation/vrchat-albums/pull/817) [`e5be3bf`](https://github.com/tktcorporation/vrchat-albums/commit/e5be3bf27ae41cf49466ebe31904c89f21f13459) Thanks [@tktcorporation](https://github.com/tktcorporation)! - fix(deps): macOS ビルドが plist パース失敗で落ちる問題を解消
+
+  `electron-builder --mac` の `createMacApp` → `parsePlistFile` で `DOMParser.parseFromString: the provided mimeType "undefined" is not valid` が発生し macOS ビルドが必ず失敗していた問題を修正。
+
+  原因は PR [#815](https://github.com/tktcorporation/vrchat-albums/issues/815) で追加した `@xmldom/xmldom: ">=0.8.13"` override が upper bound を持たず `0.9.10` まで解決されていたこと。`@xmldom/xmldom@0.9.0` で DOMParser が仕様準拠化されて mimeType 引数が必須化された一方、`plist@3.1.0` は `parseFromString(xml)` のままで追従していないため、xmldom 0.9 系を引き込むと plist のパースが必ず失敗する。
+
+  修正: `pnpm.overrides` の `@xmldom/xmldom` エントリを削除。これにより `plist@3.1.0` 自身の制約 `^0.8.8` が効き、`@xmldom/xmldom@0.8.13`（GHSA-9pgh-qqpf-7wqj 修正済み）に自然解決される。0.8 系の DOMParser は `parseFromString(xml)`（mimeType なし）呼び出しを許容するためプラットフォーム互換性が回復し、セキュリティ後退も発生しない。
+
+- [#815](https://github.com/tktcorporation/vrchat-albums/pull/815) [`b6a2e30`](https://github.com/tktcorporation/vrchat-albums/commit/b6a2e30b527c41b38a431397b2d74526ffda4d54) Thanks [@tktcorporation](https://github.com/tktcorporation)! - セキュリティ強化: Dependabot で報告された脆弱性を解消する依存関係アップデート
+
+  - vite: `^8.0.3` → `^8.0.5` (root) / `^7.1.11` → `^7.3.2` (pages)
+    - GHSA-v2wj-q39q-566r (server.fs.deny bypass)
+    - GHSA-p9ff-h696-f583 (WebSocket arbitrary file read)
+    - GHSA-4w7w-66w2-5vf9 (Optimized Deps `.map` path traversal)
+  - postcss: `8.5.6` → `8.5.10` (GHSA-qx2v-qp2m-jg93 XSS)
+  - pnpm.overrides 追加:
+    - `@xmldom/xmldom: ">=0.8.13"` (GHSA-2v35-w6hq-6mfw / GHSA-f6ww-3ggp-fr8h / GHSA-x6wf-f3px-wcqx / GHSA-j759-j44w-7fr8)
+
 ## 0.30.1
 
 ### Patch Changes
