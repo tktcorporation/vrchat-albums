@@ -18,7 +18,8 @@ packages:
 minimumReleaseAge: 4320
 minimumReleaseAgeExclude: []
 
-# 既知の脆弱性を含む古いバージョンの解決を防ぐため最高解像度モードを使用する。
+# 依存バージョンの解決方針。highest = 範囲内で最も新しいバージョンを選ぶ。
+# 既知の脆弱性を含む古いバージョンが解決されるのを防ぐ（画像解像度とは無関係）。
 resolutionMode: highest
 
 # === Electron ビルド互換性 ===
