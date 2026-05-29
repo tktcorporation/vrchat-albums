@@ -104,7 +104,11 @@ function parseAsarUnpackPatterns(): string[] {
  *
  * 新規 YAML 依存を増やさないため、`publicHoistPattern:` 直下のリスト項目
  * （`  - 'pattern'` 形式）だけを行ベースで抽出する。
- * インデントが浅くなる（次のキーが始まる）か EOF でブロック終端とみなす。
+ * ブロック終端の判定:
+ *   - 最初のリスト項目のインデント幅を基準に固定し、それと異なるインデントの
+ *     行（＝別のネストブロックや次の top-level キー）に到達したら終端する。
+ *   - リスト項目以外の非空・非コメント行（次のキー等）に到達しても終端する。
+ * これにより、後続の別ブロックの項目を誤って取り込むことを防ぐ。
  */
 function parseHoistPatterns(): string[] {
   const workspacePath = path.join(ROOT, 'pnpm-workspace.yaml');
@@ -112,25 +116,34 @@ function parseHoistPatterns(): string[] {
 
   const patterns: string[] = [];
   let inBlock = false;
+  // 最初のリスト項目のインデント幅。以降の項目はこれと一致しなければ別ブロックとみなす。
+  let itemIndent: number | null = null;
   for (const line of content.split('\n')) {
-    if (/^publicHoistPattern\s*:/.test(line)) {
-      inBlock = true;
-      continue;
-    }
     if (!inBlock) {
+      if (/^publicHoistPattern\s*:/.test(line)) {
+        inBlock = true;
+      }
       continue;
     }
-    // 空行・コメント行はブロック内のノイズとしてスキップ
-    if (line.trim() === '' || line.trim().startsWith('#')) {
+    // ブロック内の空行・コメント行はスキップ
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) {
       continue;
     }
-    const itemMatch = line.match(/^\s+-\s*(.+)$/);
+    const itemMatch = line.match(/^(\s+)-\s*(.+)$/);
+    // リスト項目でない行（次の top-level キー等）に到達したらブロック終端
     if (!itemMatch) {
-      // インデントされたリスト項目でなくなったらブロック終端
+      break;
+    }
+    const indent = itemMatch[1].length;
+    if (itemIndent === null) {
+      itemIndent = indent;
+    } else if (indent !== itemIndent) {
+      // インデントが変わった ＝ 別ブロックに入ったとみなして終端
       break;
     }
     // 値を取り出し、前後のクォートと行末コメントを除去する
-    let value = itemMatch[1].trim().replace(/\s+#.*$/, '');
+    let value = itemMatch[2].trim().replace(/\s+#.*$/, '');
     value = value.replaceAll(/^['"]|['"]$/g, '');
     patterns.push(value);
   }
