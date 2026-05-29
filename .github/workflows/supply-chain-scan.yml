@@ -1,0 +1,54 @@
+name: Supply Chain Scan
+
+# Shai-Hulud 等のサプライチェーン攻撃対策の多層防御の一層。
+# Aikido Safe Chain で依存ツリー全体のインストールを実行し、
+# Aikido Intel の脅威インテリジェンスと照合してマルウェア / typosquat /
+# 汚染リリースを検知・ブロックする。
+# （pnpm-workspace.yaml の minimumReleaseAge は「新規版を一定期間掴まない」防御、
+#  こちらは「既知の悪性パッケージを掴まない」防御で、役割が異なる）
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同 branch への連続 push では古い run を中断（main は念のため残す）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  safe-chain:
+    # マルウェア検知はネイティブビルドを必要としないため Linux 単一で十分。
+    # （Aikido のインストーラは bash 前提のため Windows runner は対象外）
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # corepack を先に有効化してから setup-node の cache: 'pnpm' を使う。
+      - name: Enable Corepack
+        shell: bash
+        run: corepack enable
+
+      - name: Setup Node.js with pnpm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+          cache: 'pnpm'
+
+      # --ci フラグは shell alias ではなく PATH 上の shim を設定する（CI 向け）。
+      # 以降の pnpm 呼び出しは Safe Chain のプロキシ経由になり、
+      # レジストリからのダウンロードがリアルタイムでマルウェア検査される。
+      - name: Install Aikido Safe Chain
+        shell: bash
+        run: curl -fsSL https://github.com/AikidoSec/safe-chain/releases/latest/download/install-safe-chain.sh | sh -s -- --ci
+
+      # Safe Chain shim 経由で依存をインストールしマルウェアを検査する。
+      # SKIP_REBUILD_NATIVE=1 で postinstall のネイティブビルドを no-op 化し、
+      # Rust toolchain なしでスキャンを完結させる（検査対象は install スクリプト自体）。
+      - name: Install dependencies through Safe Chain
+        shell: bash
+        env:
+          SKIP_REBUILD_NATIVE: '1'
+        run: pnpm install --frozen-lockfile
