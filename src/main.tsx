@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 
 /// <reference types="@welldone-software/why-did-you-render" />
 import './components/lib/wdyr';
+
 import './index.css';
 import App from './v2/App';
 

@@ -88,6 +88,7 @@ describe('vrchatLogController', () => {
         type: 'mutation',
         getRawInput: async () => ({ outputPath: '/custom/path' }),
         signal: new AbortController().signal,
+        batchIndex: 0,
       });
 
       expect(result).toEqual(mockExportResult);
@@ -135,6 +136,7 @@ describe('vrchatLogController', () => {
           outputPath: '/custom/path',
         }),
         signal: new AbortController().signal,
+        batchIndex: 0,
       });
 
       expect(result).toEqual(mockExportResult);
@@ -175,6 +177,7 @@ describe('vrchatLogController', () => {
             endDate: new Date('2023-10-08T23:59:59'),
           }),
           signal: new AbortController().signal,
+          batchIndex: 0,
         }),
       ).rejects.toThrow(
         'データベースクエリに失敗しました: Database connection error',
@@ -205,6 +208,7 @@ describe('vrchatLogController', () => {
         type: 'mutation',
         getRawInput: async () => ({}),
         signal: new AbortController().signal,
+        batchIndex: 0,
       });
 
       // exportLogStoreFromDBが期間指定なしで呼ばれることを確認
@@ -249,6 +253,7 @@ describe('vrchatLogController', () => {
         type: 'mutation',
         getRawInput: async () => ({ startDate, endDate }),
         signal: new AbortController().signal,
+        batchIndex: 0,
       });
 
       // getDBLogsFromDatabase関数が期待される引数で呼ばれることを確認

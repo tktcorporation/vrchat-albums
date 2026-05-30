@@ -1,5 +1,5 @@
 {
-  "@chenglou/pretext@0.0.5": {
+  "@chenglou/pretext@0.0.7": {
     "licenses": "MIT",
     "repository": "https://github.com/chenglou/pretext",
     "path": "node_modules/@chenglou/pretext",
@@ -68,68 +68,68 @@
     "path": "node_modules/@resvg/resvg-js",
     "licenseFile": "node_modules/@resvg/resvg-js/LICENSE"
   },
-  "@sentry/cli@3.0.3": {
+  "@sentry/cli@3.4.3": {
     "licenses": "FSL-1.1-MIT",
     "repository": "https://github.com/getsentry/sentry-cli",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/cli",
     "licenseFile": "node_modules/@sentry/cli/LICENSE"
   },
-  "@sentry/electron@7.5.0": {
+  "@sentry/electron@7.13.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-electron",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/electron",
     "licenseFile": "node_modules/@sentry/electron/LICENSE"
   },
-  "@sentry/vite-plugin@4.7.0": {
+  "@sentry/vite-plugin@5.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/vite-plugin",
     "licenseFile": "node_modules/@sentry/vite-plugin/LICENSE"
   },
-  "@sequelize/core@7.0.0-alpha.47": {
+  "@sequelize/core@7.0.0-alpha.48": {
     "licenses": "MIT",
     "repository": "https://github.com/sequelize/sequelize",
     "path": "node_modules/@sequelize/core",
     "licenseFile": "node_modules/@sequelize/core/LICENSE"
   },
-  "@sequelize/sqlite3@7.0.0-alpha.47": {
+  "@sequelize/sqlite3@7.0.0-alpha.48": {
     "licenses": "MIT",
     "repository": "https://github.com/sequelize/sequelize",
     "path": "node_modules/@sequelize/sqlite3",
     "licenseFile": "node_modules/@sequelize/sqlite3/LICENSE"
   },
-  "@tanstack/react-query@5.90.20": {
+  "@tanstack/react-query@5.100.14": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
     "path": "node_modules/@tanstack/react-query",
     "licenseFile": "node_modules/@tanstack/react-query/LICENSE"
   },
-  "@tanstack/react-virtual@3.13.18": {
+  "@tanstack/react-virtual@3.13.26": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/virtual",
     "publisher": "Tanner Linsley",
     "path": "node_modules/@tanstack/react-virtual",
     "licenseFile": "node_modules/@tanstack/react-virtual/LICENSE"
   },
-  "@trpc/client@11.8.1": {
+  "@trpc/client@11.17.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/client",
     "licenseFile": "node_modules/@trpc/client/LICENSE"
   },
-  "@trpc/react-query@11.8.1": {
+  "@trpc/react-query@11.17.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/react-query",
     "licenseFile": "node_modules/@trpc/react-query/LICENSE"
   },
-  "@trpc/server@11.8.1": {
+  "@trpc/server@11.17.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
@@ -169,13 +169,13 @@
     "path": "node_modules/consola",
     "licenseFile": "node_modules/consola/LICENSE"
   },
-  "date-fns@4.1.0": {
+  "date-fns@4.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/date-fns/date-fns",
     "path": "node_modules/date-fns",
     "licenseFile": "node_modules/date-fns/LICENSE.md"
   },
-  "effect@3.21.0": {
+  "effect@3.21.2": {
     "licenses": "MIT",
     "repository": "https://github.com/Effect-TS/effect",
     "path": "node_modules/effect",
@@ -206,7 +206,7 @@
     "path": "node_modules/electron-unhandled",
     "licenseFile": "node_modules/electron-unhandled/license"
   },
-  "electron-updater@6.6.2": {
+  "electron-updater@6.8.3": {
     "licenses": "MIT",
     "repository": "https://github.com/electron-userland/electron-builder",
     "publisher": "Vladimir Krivosheev",
@@ -221,7 +221,7 @@
     "path": "node_modules/exiftool-vendored",
     "licenseFile": "node_modules/exiftool-vendored/LICENSE"
   },
-  "glob@13.0.0": {
+  "glob@13.0.6": {
     "licenses": "BlueOak-1.0.0",
     "repository": "https://github.com/isaacs/node-glob",
     "publisher": "Isaac Z. Schlueter",
@@ -239,14 +239,14 @@
     "path": "node_modules/hash-wasm",
     "licenseFile": "node_modules/hash-wasm/LICENSE"
   },
-  "jotai@2.16.2": {
+  "jotai@2.20.0": {
     "licenses": "MIT",
     "repository": "https://github.com/pmndrs/jotai",
     "publisher": "Daishi Kato",
     "path": "node_modules/jotai",
     "licenseFile": "node_modules/jotai/LICENSE"
   },
-  "lucide-react@0.562.0": {
+  "lucide-react@1.16.0": {
     "licenses": "ISC",
     "repository": "https://github.com/lucide-icons/lucide",
     "publisher": "Eric Fennis",
@@ -259,7 +259,7 @@
     "path": "node_modules/ofetch",
     "licenseFile": "node_modules/ofetch/LICENSE"
   },
-  "p-queue@9.0.1": {
+  "p-queue@9.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/sindresorhus/p-queue",
     "path": "node_modules/p-queue",
@@ -280,13 +280,13 @@
     "path": "node_modules/pony-cause",
     "licenseFile": "node_modules/pony-cause/LICENSE"
   },
-  "react-dom@19.2.3": {
+  "react-dom@19.2.6": {
     "licenses": "MIT",
     "repository": "https://github.com/facebook/react",
     "path": "node_modules/react-dom",
     "licenseFile": "node_modules/react-dom/LICENSE"
   },
-  "react-error-boundary@6.1.0": {
+  "react-error-boundary@6.1.2": {
     "licenses": "MIT",
     "repository": "https://github.com/bvaughn/react-error-boundary",
     "publisher": "Brian Vaughn",
@@ -302,7 +302,7 @@
     "path": "node_modules/react-markdown",
     "licenseFile": "node_modules/react-markdown/license"
   },
-  "react@19.2.3": {
+  "react@19.2.6": {
     "licenses": "MIT",
     "repository": "https://github.com/facebook/react",
     "path": "node_modules/react",
@@ -334,14 +334,14 @@
     "path": "node_modules/superjson",
     "licenseFile": "node_modules/superjson/LICENSE"
   },
-  "tailwind-merge@3.4.0": {
+  "tailwind-merge@3.6.0": {
     "licenses": "MIT",
     "repository": "https://github.com/dcastil/tailwind-merge",
     "publisher": "Dany Castillo",
     "path": "node_modules/tailwind-merge",
     "licenseFile": "node_modules/tailwind-merge/LICENSE.md"
   },
-  "tailwindcss@4.2.2": {
+  "tailwindcss@4.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/tailwindlabs/tailwindcss",
     "path": "node_modules/tailwindcss",
@@ -368,13 +368,13 @@
     "path": "node_modules/tw-animate-css",
     "licenseFile": "node_modules/tw-animate-css/LICENSE"
   },
-  "ufo@1.6.3": {
+  "ufo@1.6.4": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/ufo",
     "path": "node_modules/ufo",
     "licenseFile": "node_modules/ufo/LICENSE"
   },
-  "uuidv7@1.1.0": {
+  "uuidv7@1.2.1": {
     "licenses": "Apache-2.0",
     "repository": "https://github.com/LiosK/uuidv7",
     "publisher": "LiosK",
@@ -389,7 +389,7 @@
     "path": "",
     "licenseFile": "README.md"
   },
-  "zod@4.3.6": {
+  "zod@4.4.3": {
     "licenses": "MIT",
     "repository": "https://github.com/colinhacks/zod",
     "publisher": "Colin McDonnell",

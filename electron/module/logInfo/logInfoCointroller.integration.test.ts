@@ -113,6 +113,7 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
       type: 'query',
       getRawInput: async () => ({ limit: 3 }),
       signal: new AbortController().signal,
+      batchIndex: 0,
     });
 
     // 頻度順で返されることを確認
@@ -187,6 +188,7 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
       type: 'query',
       getRawInput: async () => ({ limit: 2 }),
       signal: new AbortController().signal,
+      batchIndex: 0,
     });
 
     expect(result).toHaveLength(2);
@@ -204,6 +206,7 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
       type: 'query',
       getRawInput: async () => ({ limit: 5 }),
       signal: new AbortController().signal,
+      batchIndex: 0,
     });
 
     expect(result).toEqual([]);
@@ -265,6 +268,7 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
       type: 'query',
       getRawInput: async () => ({ limit: 5 }),
       signal: new AbortController().signal,
+      batchIndex: 0,
     });
 
     expect(result).toHaveLength(5); // デフォルトの5件
