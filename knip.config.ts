@@ -26,6 +26,10 @@ const config: KnipConfig = {
     'grit',
     // napi-rs CLI — CI で npx -p @napi-rs/cli napi build として使用
     'napi',
+    // Aikido Safe Chain が実行時に shim として提供するコマンド。
+    // .github/workflows/supply-chain-scan.yml で `pnpm safe-chain-verify` として
+    // 使うが、依存パッケージのバイナリではないため knip には登録できない。
+    'safe-chain-verify',
   ],
   ignoreDependencies: [
     '@antfu/ni',
