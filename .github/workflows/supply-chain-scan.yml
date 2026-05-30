@@ -36,16 +36,20 @@ jobs:
           # GITHUB_TOKEN を .git/config に残さない（postinstall からの窃取を防ぐ）。
           persist-credentials: false
 
-      # corepack を先に有効化してから setup-node の cache: 'pnpm' を使う。
       - name: Enable Corepack
         shell: bash
         run: corepack enable
 
-      - name: Setup Node.js with pnpm cache
+      # pnpm store のキャッシュは意図的に無効化している（cache: 'pnpm' を付けない）。
+      # ウォームな store が復元されると `pnpm install --frozen-lockfile` は
+      # ローカル store からリンクするだけでレジストリからダウンロードせず、
+      # Safe Chain のプロキシが検査できない。その結果、既にロック済みの
+      # 悪性パッケージ（後から Aikido が悪性判定したもの）を再実行時に見逃す。
+      # スキャンを毎回確実に全 tarball へ効かせるため、ウォーム store を持ち込まない。
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: 'package.json'
-          cache: 'pnpm'
 
       # Safe Chain インストーラを固定バージョン + SHA256 で pin する。
       # このスクリプトは「Safe Chain が有効になる前に走る唯一の未検証コード」であり、
