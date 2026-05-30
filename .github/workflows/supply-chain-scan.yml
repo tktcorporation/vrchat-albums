@@ -1,0 +1,94 @@
+name: Supply Chain Scan
+
+# Shai-Hulud 等のサプライチェーン攻撃対策の多層防御の一層。
+# Aikido Safe Chain で依存ツリー全体のインストールを実行し、
+# Aikido Intel の脅威インテリジェンスと照合してマルウェア / typosquat /
+# 汚染リリースを検知・ブロックする。
+# （pnpm-workspace.yaml の minimumReleaseAge は「新規版を一定期間掴まない」防御、
+#  こちらは「既知の悪性パッケージを掴まない」防御で、役割が異なる）
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同 branch への連続 push では古い run を中断（main は念のため残す）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# 最小権限: マルウェアスキャンは checkout の読み取りのみで十分。
+# このジョブは意図的に未検証の install スクリプトを実行するため、
+# 万一それが悪性でも GITHUB_TOKEN の権限を絞って影響範囲を最小化する。
+permissions:
+  contents: read
+
+jobs:
+  safe-chain:
+    # マルウェア検知はネイティブビルドを必要としないため Linux 単一で十分。
+    # （Aikido のインストーラは bash 前提のため Windows runner は対象外）
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # このジョブは未検証の install スクリプトを実行するため、
+          # GITHUB_TOKEN を .git/config に残さない（postinstall からの窃取を防ぐ）。
+          persist-credentials: false
+
+      - name: Enable Corepack
+        shell: bash
+        run: corepack enable
+
+      # pnpm store のキャッシュは意図的に無効化している（cache: 'pnpm' を付けない）。
+      # ウォームな store が復元されると `pnpm install --frozen-lockfile` は
+      # ローカル store からリンクするだけでレジストリからダウンロードせず、
+      # Safe Chain のプロキシが検査できない。その結果、既にロック済みの
+      # 悪性パッケージ（後から Aikido が悪性判定したもの）を再実行時に見逃す。
+      # スキャンを毎回確実に全 tarball へ効かせるため、ウォーム store を持ち込まない。
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+
+      # Safe Chain インストーラを固定バージョン + SHA256 で pin する。
+      # このスクリプトは「Safe Chain が有効になる前に走る唯一の未検証コード」であり、
+      # 可変の releases/latest を `curl | sh` すると上流の差し替え/regression が
+      # レビューなしに全 PR / main スキャンへ波及する（このワークフロー自身の脅威モデルに反する）。
+      # 一度ファイルに落として sha256sum で照合してから実行することで bootstrap を再現可能にする。
+      # バージョン更新時は SAFE_CHAIN_VERSION と SHA256 を同時に更新すること
+      # （新しい install-safe-chain.sh の `sha256sum` で確認）。
+      #
+      # --ci フラグは shell alias ではなく PATH 上の shim を設定する（CI 向け）。
+      # GitHub Actions では shim ディレクトリを $GITHUB_PATH に追記して後続ステップへ
+      # 引き継ぐが、環境差で持続しないことがあるため明示的にも追記して確実に載せる。
+      - name: Install Aikido Safe Chain
+        shell: bash
+        env:
+          SAFE_CHAIN_VERSION: '1.5.3'
+          SAFE_CHAIN_INSTALLER_SHA256: '0107cbbbf90159379756157e902acae512d62ffbd174307e42c5fe9f266792d3'
+        run: |
+          set -euo pipefail
+          installer="$(mktemp)"
+          curl -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/${SAFE_CHAIN_VERSION}/install-safe-chain.sh" -o "$installer"
+          echo "${SAFE_CHAIN_INSTALLER_SHA256}  ${installer}" | sha256sum -c -
+          sh "$installer" --ci
+          if [ -d "$HOME/.safe-chain/shims" ]; then
+            echo "$HOME/.safe-chain/shims" >> "$GITHUB_PATH"
+          fi
+
+      # pnpm が Safe Chain の shim 経由になっていることを検証する（fail-fast）。
+      # shim が PATH に載っていないと素の pnpm が走りスキャンがサイレントに
+      # バイパスされてしまうため、ここで確実に検知して落とす。
+      - name: Verify Safe Chain is active
+        shell: bash
+        run: pnpm safe-chain-verify
+
+      # Safe Chain shim 経由で依存をインストールしマルウェアを検査する。
+      # SKIP_REBUILD_NATIVE=1 で postinstall のネイティブビルドを no-op 化し、
+      # Rust toolchain なしでスキャンを完結させる（検査対象は install スクリプト自体）。
+      - name: Install dependencies through Safe Chain
+        shell: bash
+        env:
+          SKIP_REBUILD_NATIVE: '1'
+        run: pnpm install --frozen-lockfile

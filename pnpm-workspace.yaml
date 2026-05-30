@@ -2,3 +2,63 @@ packages:
   - '.'
   - 'pages'
   - 'packages/*'
+
+# === サプライチェーン攻撃対策 (Shai-Hulud 等) ===
+# 公開から一定時間未満のパッケージバージョンの「解決」を拒否する。
+# 悪意あるパッケージ（typosquatting / account takeover / 自己増殖ワーム Shai-Hulud 等）は
+# 通常公開直後にセキュリティコミュニティが検知・yank するため、この待機期間を設けることで
+# 汚染されたバージョンを掴むリスクを大幅に下げられる。
+#
+# 値は分単位。3 日 = 4320 分。
+# frozen-lockfile での install には影響しない（既に解決済みの版をそのまま入れる）。
+# 影響するのは `pnpm add` / `pnpm update` 等の新規解決時のみ。
+#
+# 緊急のセキュリティパッチ等で公開直後の版を即時導入する必要がある場合は、
+# 該当パッケージを minimumReleaseAgeExclude に追加する。
+minimumReleaseAge: 4320
+minimumReleaseAgeExclude: []
+
+# 依存バージョンの解決方針。highest = 範囲内で最も新しいバージョンを選ぶ。
+# 既知の脆弱性を含む古いバージョンが解決されるのを防ぐ（画像解像度とは無関係）。
+resolutionMode: highest
+
+# === Electron ビルド互換性 ===
+# electron-builder は node_modules のフラットな構造を期待するが、pnpm の isolated
+# モードではオプショナル依存（プラットフォーム固有のネイティブバインディング）が
+# node_modules 直下に配置されない。これによりパッケージング後に
+# "Cannot find native binding" エラーが発生する。
+# 該当パッケージを publicHoistPattern でホイストすることで解決する。
+publicHoistPattern:
+  - '@napi-rs/image-*'
+  - '@resvg/resvg-js-*'
+  - sqlite3
+  - clip-filepaths
+  - clip-filepaths-*
+  - '@vrchat-albums/exif-native'
+  - '@vrchat-albums/exif-native-*'
+
+# === ビルドスクリプト実行の許可リスト (pnpm 11: onlyBuiltDependencies → allowBuilds) ===
+# pnpm はデフォルトで依存パッケージの install スクリプト（postinstall 等）を実行しない。
+# これは Shai-Hulud 等の install スクリプト経由のワーム感染に対する重要な防御層。
+# ここに列挙したパッケージだけが install スクリプトの実行を許可される（default-deny）。
+# 新たに build を許可する場合は `pnpm approve-builds` で精査してから追加すること。
+allowBuilds:
+  '@ast-grep/cli': true # lint:ast-grep 用のバイナリをダウンロード
+  '@sentry/cli': true # リリース時の sourcemap アップロード用バイナリ
+  electron: true # Electron 本体バイナリのダウンロード
+  electron-winstaller: true # Windows インストーラ生成
+  esbuild: true # プラットフォーム固有バイナリのダウンロード
+  simple-git-hooks: true # pre-commit フックのセットアップ
+  sqlite3: true # ネイティブモジュールのビルド
+
+# === 依存バージョンの上書き（脆弱性対応 / 互換性確保） ===
+overrides:
+  tar: '>=7.5.11'
+  cacache>glob: '10.5.0'
+  '@isaacs/brace-expansion': '>=5.0.1'
+  lodash: '>=4.18.0'
+  dottie: '>=2.0.7'
+  undici: '>=6.24.0'
+  picomatch: '>=4.0.4'
+  flatted: '>=3.4.2'
+  smol-toml: '>=1.6.1'

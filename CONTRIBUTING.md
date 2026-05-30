@@ -10,7 +10,7 @@
   - [https://github.com/features/codespaces](https://github.com/features/codespaces)
   - ref: [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)
     - linux
-    - nodejs (Node.js 20 が必須です)
+    - nodejs (Node.js 22 が必須です)
 
 1.  **リポジトリのクローン**:
 
@@ -26,7 +26,7 @@
     pnpm install
     ```
 
-    プロジェクトでは `pnpm` (バージョン10+) を使用しています。特別な理由がない限り、`pnpm` コマンドを使用してください。
+    プロジェクトでは `pnpm` (バージョン11+) を使用しています。特別な理由がない限り、`pnpm` コマンドを使用してください。
 
 3.  **ネイティブモジュールのリビルド** (必要な場合):
     特定のネイティブモジュール（例: `clip-filepaths`）で問題が発生した場合は、以下のコマンドでリビルドを試みてください。

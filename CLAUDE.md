@@ -24,7 +24,7 @@ VRChat 写真をログファイルと自動関連付けする Electron デスク
 
 ## 禁止
 
-- npm 使用禁止（pnpm 10+ のみ）
+- npm 使用禁止（pnpm 11+ のみ）
 - 自動生成ファイルの変更禁止: `src/assets/licenses.json`, `pnpm-lock.yaml`, `CHANGELOG.md`
 - ESLint 使用禁止（oxlint + oxfmt 移行済み）
 - ログ同期の個別関数呼び出し禁止 → `useLogSync` / `syncLogs()` のみ (ADR-001)

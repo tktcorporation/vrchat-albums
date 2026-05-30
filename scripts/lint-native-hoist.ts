@@ -6,13 +6,15 @@
  * 2つのチェックを行う:
  * 1. electronExternal にリストされたネイティブモジュール（プラットフォーム固有パッケージを持つもの）が
  *    asarUnpack に含まれているか（入れ忘れ検知）
- * 2. asarUnpack のワイルドカードパターンに対応する public-hoist-pattern が .npmrc に存在するか
+ * 2. asarUnpack のワイルドカードパターンに対応する publicHoistPattern が pnpm-workspace.yaml に存在するか
  *
  * 背景: pnpm の isolated モードでは、napi-rs 系ネイティブモジュールのプラットフォーム固有
  * パッケージ（例: clip-filepaths-win32-x64-msvc）が node_modules/.pnpm/ 内に配置される。
  * electron-builder の asarUnpack はトップレベル node_modules のみ対象とするため、
- * asarUnpack に含め、かつ .npmrc の public-hoist-pattern でホイストしないと
+ * asarUnpack に含め、かつ pnpm-workspace.yaml の publicHoistPattern でホイストしないと
  * ランタイムで "Cannot find module" エラーになる。
+ *
+ * 注: hoist パターンは pnpm 11 移行で .npmrc から pnpm-workspace.yaml に移設された。
  */
 
 import * as fs from 'node:fs';
@@ -98,18 +100,52 @@ function parseAsarUnpackPatterns(): string[] {
 }
 
 /**
- * .npmrc から public-hoist-pattern の値を全て取得する。
+ * pnpm-workspace.yaml の publicHoistPattern リストの値を全て取得する。
+ *
+ * 新規 YAML 依存を増やさないため、`publicHoistPattern:` 直下のリスト項目
+ * （`  - 'pattern'` 形式）だけを行ベースで抽出する。
+ * ブロック終端の判定:
+ *   - 最初のリスト項目のインデント幅を基準に固定し、それと異なるインデントの
+ *     行（＝別のネストブロックや次の top-level キー）に到達したら終端する。
+ *   - リスト項目以外の非空・非コメント行（次のキー等）に到達しても終端する。
+ * これにより、後続の別ブロックの項目を誤って取り込むことを防ぐ。
  */
 function parseHoistPatterns(): string[] {
-  const npmrcPath = path.join(ROOT, '.npmrc');
-  const content = fs.readFileSync(npmrcPath, 'utf8');
+  const workspacePath = path.join(ROOT, 'pnpm-workspace.yaml');
+  const content = fs.readFileSync(workspacePath, 'utf8');
 
   const patterns: string[] = [];
+  let inBlock = false;
+  // 最初のリスト項目のインデント幅。以降の項目はこれと一致しなければ別ブロックとみなす。
+  let itemIndent: number | null = null;
   for (const line of content.split('\n')) {
-    const match = line.match(/^public-hoist-pattern\[\]\s*=\s*(.+)/);
-    if (match) {
-      patterns.push(match[1].trim());
+    if (!inBlock) {
+      if (/^publicHoistPattern\s*:/.test(line)) {
+        inBlock = true;
+      }
+      continue;
     }
+    // ブロック内の空行・コメント行はスキップ
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      continue;
+    }
+    const itemMatch = line.match(/^(\s+)-\s*(.+)$/);
+    // リスト項目でない行（次の top-level キー等）に到達したらブロック終端
+    if (!itemMatch) {
+      break;
+    }
+    const indent = itemMatch[1].length;
+    if (itemIndent === null) {
+      itemIndent = indent;
+    } else if (indent !== itemIndent) {
+      // インデントが変わった ＝ 別ブロックに入ったとみなして終端
+      break;
+    }
+    // 値を取り出し、前後のクォートと行末コメントを除去する
+    let value = itemMatch[2].trim().replace(/\s+#.*$/, '');
+    value = value.replaceAll(/^['"]|['"]$/g, '');
+    patterns.push(value);
   }
   return patterns;
 }
@@ -186,8 +222,8 @@ function checkHoistPatterns(
     );
     if (!baseHoisted) {
       errors.push(
-        `"${baseName}" が asarUnpack に含まれていますが、.npmrc の public-hoist-pattern にありません。\n` +
-          `  追加してください: public-hoist-pattern[]=${baseName}`,
+        `"${baseName}" が asarUnpack に含まれていますが、pnpm-workspace.yaml の publicHoistPattern にありません。\n` +
+          `  追加してください: publicHoistPattern に "  - '${baseName}'" を追記`,
       );
     }
 
@@ -201,7 +237,7 @@ function checkHoistPatterns(
     if (!platformHoisted) {
       errors.push(
         `"${asarPattern}" が asarUnpack にありますが、プラットフォーム固有パッケージの hoist パターンがありません。\n` +
-          `  追加してください: public-hoist-pattern[]=${platformPattern}\n` +
+          `  追加してください: pnpm-workspace.yaml の publicHoistPattern に "  - '${platformPattern}'" を追記\n` +
           `  理由: pnpm isolated モードではプラットフォーム固有パッケージ（例: ${baseName}-win32-x64-msvc）が\n` +
           `         node_modules/.pnpm/ 内に配置され、electron-builder の asarUnpack に含まれません。`,
       );
