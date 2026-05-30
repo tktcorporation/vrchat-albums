@@ -16,14 +16,17 @@
     "sourceMap": true,
     "inlineSourceMap": false,
     "inlineSources": true,
-    "noEmit": false,
+    // 型チェック専用の設定。Electron main/preload の本番ビルドは vite
+    // (electron/vite.config.ts) が main/*.cjs を生成するため、この tsconfig からは
+    // emit しない。`../src` を import する関係で rootDir はリポジトリルートに広げる
+    // 必要があり、emit を有効にすると出力レイアウトが本番(vite)と乖離するため noEmit。
+    "noEmit": true,
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "outDir": "../main",
     "rootDir": ".."
   },
   "exclude": ["node_modules", "vite.config.ts"],

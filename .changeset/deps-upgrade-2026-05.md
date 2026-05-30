@@ -6,7 +6,7 @@
 
 - React 19.2.6 / `@trpc/*` 11.17 / `@tanstack/react-query` 5.100 / effect 3.21.2 /
   vite 8.0.14 / vitest 4.1.7 など、レンジ内の更新
-- TypeScript 6.0、lucide-react 1.16、exiftool-vendored 35、`@sequelize` alpha.48、
+- TypeScript 6.0、lucide-react 1.16、`@sequelize` alpha.48、
   knip 6、npm-run-all2 9、`@sentry/vite-plugin` 5、oxfmt 0.52、oxlint 1.67 など
 - tRPC 11.17 で必須化された `ProcedureCallOptions.batchIndex` をテストに追加
 - oxlint 1.67 / tsgo で必要となった `electron/tsconfig.json` の `rootDir` 明示

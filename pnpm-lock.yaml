@@ -116,8 +116,8 @@ importers:
         specifier: 6.8.3
         version: 6.8.3
       exiftool-vendored:
-        specifier: ^35.20.0
-        version: 35.20.0
+        specifier: ^34.3.0
+        version: 34.3.0
       glob:
         specifier: ^13.0.6
         version: 13.0.6
@@ -4408,8 +4408,8 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
-  batch-cluster@17.3.1:
-    resolution: {integrity: sha512-/aWEgZKXgvEseV3WEIRyjDoFka9FTrpt5+FYCxn+giUgveGBKxWjz3cl26V3aD+1kvOBP3nmANZZfcXDmKzcAA==}
+  batch-cluster@16.0.0:
+    resolution: {integrity: sha512-+T7Ho09ikx/kP4P8M+GEnpuePzRQa4gTUhtPIu6ApFC8+0GY0sri1y1PuB+yfXlQWl5DkHC/e58z3U6g0qCz/A==}
     engines: {node: '>=20'}
 
   before-after-hook@4.0.0:
@@ -5089,17 +5089,17 @@ packages:
   eventemitter3@5.0.4:
     resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
 
-  exiftool-vendored.exe@13.58.0:
-    resolution: {integrity: sha512-pV7SjQeOu4Q77DWuyF+hlRYWVlRcSAqfqTTujBZeGUy/Q9+RPAy877YgSZIxKOYW1TxmmL8KyBGxaG0JKYG8BQ==}
+  exiftool-vendored.exe@13.45.0:
+    resolution: {integrity: sha512-xa+gEnZ2Q9BAzaDr35xgADql+T6L92RqK0GjzOjzDuObwhr+sBr5RdySvZ3osHac9GJypxvk4cewNnj4OnPL3Q==}
     os: [win32]
 
-  exiftool-vendored.pl@13.58.0:
-    resolution: {integrity: sha512-+Z2xhZrYLMu/anO/s14AaS/K5HMJ5Cw9C3KefIeYNpkZRN4RRBJHm7R34yjj9Pv+elqYRZrQV9NcqvkBLn/68w==}
+  exiftool-vendored.pl@13.45.0:
+    resolution: {integrity: sha512-uA58bMcXqdSQAqsZbHa/SMU6XKXsmoMcJSlKJjsCmLlQKEThncuAlpg8wGVNhULNXxYmRXXnYQ1756UYQY9VIA==}
     os: ['!win32']
     hasBin: true
 
-  exiftool-vendored@35.20.0:
-    resolution: {integrity: sha512-Yn66dSBaWGcUaSbm5Nl4G28rxtceLlWf4PstqJMbLix9sN7w0okWHPEvdudiP56Q5Cjl7v3TLyKKwowUFlbD8g==}
+  exiftool-vendored@34.3.0:
+    resolution: {integrity: sha512-CpNH1FAhIQG5AlKndlTf05mNbuFxINyzG9629ZI/CKwr+39zWo8swxpnXc3GUfUvUfxkCCxumDPy2QVmi3XJkQ==}
     engines: {node: '>=20.0.0'}
 
   expand-template@2.0.3:
@@ -11288,7 +11288,7 @@ snapshots:
 
   baseline-browser-mapping@2.10.32: {}
 
-  batch-cluster@17.3.1: {}
+  batch-cluster@16.0.0: {}
 
   before-after-hook@4.0.0: {}
 
@@ -12075,22 +12075,22 @@ snapshots:
 
   eventemitter3@5.0.4: {}
 
-  exiftool-vendored.exe@13.58.0:
+  exiftool-vendored.exe@13.45.0:
     optional: true
 
-  exiftool-vendored.pl@13.58.0:
+  exiftool-vendored.pl@13.45.0:
     optional: true
 
-  exiftool-vendored@35.20.0:
+  exiftool-vendored@34.3.0:
     dependencies:
       '@photostructure/tz-lookup': 11.5.0
       '@types/luxon': 3.7.1
-      batch-cluster: 17.3.1
+      batch-cluster: 16.0.0
       he: 1.2.0
       luxon: 3.7.2
     optionalDependencies:
-      exiftool-vendored.exe: 13.58.0
-      exiftool-vendored.pl: 13.58.0
+      exiftool-vendored.exe: 13.45.0
+      exiftool-vendored.pl: 13.45.0
 
   expand-template@2.0.3: {}
 

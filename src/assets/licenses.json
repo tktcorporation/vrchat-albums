@@ -213,7 +213,7 @@
     "path": "node_modules/electron-updater",
     "licenseFile": "node_modules/electron-updater/LICENSE"
   },
-  "exiftool-vendored@35.20.0": {
+  "exiftool-vendored@34.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.js",
     "publisher": "Matthew McEachen",
