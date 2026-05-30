@@ -11,6 +11,8 @@
 - tRPC 11.17 で必須化された `ProcedureCallOptions.batchIndex` をテストに追加
 - oxlint 1.67 / tsgo で必要となった `electron/tsconfig.json` の `rootDir` 明示
 - oxlint 1.67 の新ルール対応（存在しなくなったルール削除・新規 correctness ルールの warn 化）
+- 冗長になった `undici` の pnpm.overrides を削除（@sentry/cli の宣言どおり undici 6.26.0
+  に自然解決され、セキュリティ下限 6.24.0 を満たす）
 
 electron 本体 / electron-store / electron-unhandled / jsdom / `@types/node` は
 ランタイム・ABI・ESM・engines 制約の検証が必要なため別 PR に分離。
