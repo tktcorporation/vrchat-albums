@@ -23,7 +23,8 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "outDir": "../main"
+    "outDir": "../main",
+    "rootDir": ".."
   },
   "exclude": ["node_modules", "vite.config.ts"],
   "include": ["./**/*.ts", "./**/*.tsx", "./**/*.js", "./**/*.d.ts"]

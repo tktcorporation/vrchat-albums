@@ -72,6 +72,7 @@ describe('electronUtilController', () => {
           filenameWithoutExt: 'test',
         }),
         signal: new AbortController().signal,
+        batchIndex: 0,
       });
 
       const expectedTempPath = path.join(os.tmpdir(), 'test-dir', 'test.png');
@@ -120,6 +121,7 @@ describe('electronUtilController', () => {
           filenameWithoutExt: 'test',
         }),
         signal: new AbortController().signal,
+        batchIndex: 0,
       });
 
       // 一時ファイルの作成は行われる
@@ -156,6 +158,7 @@ describe('electronUtilController', () => {
             filenameWithoutExt: 'test',
           }),
           signal: new AbortController().signal,
+          batchIndex: 0,
         }),
       ).rejects.toThrow('ファイル操作中にエラーが発生しました。');
 

@@ -26,7 +26,7 @@ export function createQueryStub<TData = unknown, TError = unknown>(
   // biome-ignore lint/suspicious/noExplicitAny: tRPCの完全な型定義との互換性は複雑すぎるため、実用的なアプローチとしてanyを使用
 ): any {
   const {
-    data = undefined,
+    data,
     isLoading = false,
     error = null,
     refetch = vi.fn(),
@@ -37,7 +37,7 @@ export function createQueryStub<TData = unknown, TError = unknown>(
   // 基本的なプロパティ
   const baseResult = {
     data: data as TData | undefined,
-    error: error,
+    error,
     // biome-ignore lint/suspicious/noExplicitAny: refetch function has complex overloads that are difficult to type
     refetch: refetch as never,
     isFetching,

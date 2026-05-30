@@ -82,7 +82,7 @@
     "path": "node_modules/@sentry/electron",
     "licenseFile": "node_modules/@sentry/electron/LICENSE"
   },
-  "@sentry/vite-plugin@4.7.0": {
+  "@sentry/vite-plugin@4.9.1": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -101,35 +101,35 @@
     "path": "node_modules/@sequelize/sqlite3",
     "licenseFile": "node_modules/@sequelize/sqlite3/LICENSE"
   },
-  "@tanstack/react-query@5.90.20": {
+  "@tanstack/react-query@5.100.14": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
     "path": "node_modules/@tanstack/react-query",
     "licenseFile": "node_modules/@tanstack/react-query/LICENSE"
   },
-  "@tanstack/react-virtual@3.13.18": {
+  "@tanstack/react-virtual@3.13.26": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/virtual",
     "publisher": "Tanner Linsley",
     "path": "node_modules/@tanstack/react-virtual",
     "licenseFile": "node_modules/@tanstack/react-virtual/LICENSE"
   },
-  "@trpc/client@11.8.1": {
+  "@trpc/client@11.17.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/client",
     "licenseFile": "node_modules/@trpc/client/LICENSE"
   },
-  "@trpc/react-query@11.8.1": {
+  "@trpc/react-query@11.17.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/react-query",
     "licenseFile": "node_modules/@trpc/react-query/LICENSE"
   },
-  "@trpc/server@11.8.1": {
+  "@trpc/server@11.17.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
@@ -169,13 +169,13 @@
     "path": "node_modules/consola",
     "licenseFile": "node_modules/consola/LICENSE"
   },
-  "date-fns@4.1.0": {
+  "date-fns@4.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/date-fns/date-fns",
     "path": "node_modules/date-fns",
     "licenseFile": "node_modules/date-fns/LICENSE.md"
   },
-  "effect@3.21.0": {
+  "effect@3.21.2": {
     "licenses": "MIT",
     "repository": "https://github.com/Effect-TS/effect",
     "path": "node_modules/effect",
@@ -221,7 +221,7 @@
     "path": "node_modules/exiftool-vendored",
     "licenseFile": "node_modules/exiftool-vendored/LICENSE"
   },
-  "glob@13.0.0": {
+  "glob@13.0.6": {
     "licenses": "BlueOak-1.0.0",
     "repository": "https://github.com/isaacs/node-glob",
     "publisher": "Isaac Z. Schlueter",
@@ -280,13 +280,13 @@
     "path": "node_modules/pony-cause",
     "licenseFile": "node_modules/pony-cause/LICENSE"
   },
-  "react-dom@19.2.3": {
+  "react-dom@19.2.6": {
     "licenses": "MIT",
     "repository": "https://github.com/facebook/react",
     "path": "node_modules/react-dom",
     "licenseFile": "node_modules/react-dom/LICENSE"
   },
-  "react-error-boundary@6.1.0": {
+  "react-error-boundary@6.1.2": {
     "licenses": "MIT",
     "repository": "https://github.com/bvaughn/react-error-boundary",
     "publisher": "Brian Vaughn",
@@ -302,7 +302,7 @@
     "path": "node_modules/react-markdown",
     "licenseFile": "node_modules/react-markdown/license"
   },
-  "react@19.2.3": {
+  "react@19.2.6": {
     "licenses": "MIT",
     "repository": "https://github.com/facebook/react",
     "path": "node_modules/react",
@@ -341,7 +341,7 @@
     "path": "node_modules/tailwind-merge",
     "licenseFile": "node_modules/tailwind-merge/LICENSE.md"
   },
-  "tailwindcss@4.2.2": {
+  "tailwindcss@4.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/tailwindlabs/tailwindcss",
     "path": "node_modules/tailwindcss",
@@ -368,7 +368,7 @@
     "path": "node_modules/tw-animate-css",
     "licenseFile": "node_modules/tw-animate-css/LICENSE"
   },
-  "ufo@1.6.3": {
+  "ufo@1.6.4": {
     "licenses": "MIT",
     "repository": "https://github.com/unjs/ufo",
     "path": "node_modules/ufo",
