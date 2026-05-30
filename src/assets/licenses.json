@@ -82,20 +82,20 @@
     "path": "node_modules/@sentry/electron",
     "licenseFile": "node_modules/@sentry/electron/LICENSE"
   },
-  "@sentry/vite-plugin@4.9.1": {
+  "@sentry/vite-plugin@5.3.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
     "path": "node_modules/@sentry/vite-plugin",
     "licenseFile": "node_modules/@sentry/vite-plugin/LICENSE"
   },
-  "@sequelize/core@7.0.0-alpha.47": {
+  "@sequelize/core@7.0.0-alpha.48": {
     "licenses": "MIT",
     "repository": "https://github.com/sequelize/sequelize",
     "path": "node_modules/@sequelize/core",
     "licenseFile": "node_modules/@sequelize/core/LICENSE"
   },
-  "@sequelize/sqlite3@7.0.0-alpha.47": {
+  "@sequelize/sqlite3@7.0.0-alpha.48": {
     "licenses": "MIT",
     "repository": "https://github.com/sequelize/sequelize",
     "path": "node_modules/@sequelize/sqlite3",
@@ -213,7 +213,7 @@
     "path": "node_modules/electron-updater",
     "licenseFile": "node_modules/electron-updater/LICENSE"
   },
-  "exiftool-vendored@34.3.0": {
+  "exiftool-vendored@35.20.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.js",
     "publisher": "Matthew McEachen",
@@ -246,7 +246,7 @@
     "path": "node_modules/jotai",
     "licenseFile": "node_modules/jotai/LICENSE"
   },
-  "lucide-react@0.562.0": {
+  "lucide-react@1.16.0": {
     "licenses": "ISC",
     "repository": "https://github.com/lucide-icons/lucide",
     "publisher": "Eric Fennis",

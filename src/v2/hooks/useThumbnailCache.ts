@@ -248,11 +248,10 @@ class LRUCache<K, V> {
  * キャッシュが残ることでリロード後も即座にサムネイルが表示される。
  *
  * ## テスト時の注意
- * テスト間でキャッシュ状態が影響しないよう、`resetGlobalCacheForTesting()`
- * を使用してキャッシュをリセットすること。
+ * テスト間でキャッシュ状態が影響しないよう、独立した LRU キャッシュインスタンスを
+ * 作成する `createLRUCacheForTesting()` を使用すること。
  *
  * @see createLRUCacheForTesting - 独立したLRUキャッシュインスタンス作成用
- * @see resetGlobalCacheForTesting - テスト用グローバルキャッシュリセット
  */
 const globalThumbnailCache = new LRUCache<string, string>(CACHE_MAX_SIZE);
 
@@ -270,15 +269,6 @@ function filterPathsNeedingFetch(paths: string[]): string[] {
   return paths.filter(
     (path) => !globalThumbnailCache.has(path) && !pendingRequests.has(path),
   );
-}
-
-/**
- * テスト用: グローバルキャッシュとpendingRequestsをリセット
- * @internal テスト専用 - プロダクションコードでは使用しない
- */
-export function resetGlobalCacheForTesting(): void {
-  globalThumbnailCache.clear();
-  pendingRequests.clear();
 }
 
 /**
