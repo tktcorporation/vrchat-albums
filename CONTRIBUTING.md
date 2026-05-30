@@ -10,7 +10,7 @@
   - [https://github.com/features/codespaces](https://github.com/features/codespaces)
   - ref: [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)
     - linux
-    - nodejs (Node.js 20 が必須です)
+    - nodejs (Node.js 22 が必須です)
 
 1.  **リポジトリのクローン**:
 

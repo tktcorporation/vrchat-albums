@@ -16,6 +16,12 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# 最小権限: マルウェアスキャンは checkout の読み取りのみで十分。
+# このジョブは意図的に未検証の install スクリプトを実行するため、
+# 万一それが悪性でも GITHUB_TOKEN の権限を絞って影響範囲を最小化する。
+permissions:
+  contents: read
+
 jobs:
   safe-chain:
     # マルウェア検知はネイティブビルドを必要としないため Linux 単一で十分。
@@ -25,6 +31,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # このジョブは未検証の install スクリプトを実行するため、
+          # GITHUB_TOKEN を .git/config に残さない（postinstall からの窃取を防ぐ）。
+          persist-credentials: false
 
       # corepack を先に有効化してから setup-node の cache: 'pnpm' を使う。
       - name: Enable Corepack
@@ -38,11 +48,22 @@ jobs:
           cache: 'pnpm'
 
       # --ci フラグは shell alias ではなく PATH 上の shim を設定する（CI 向け）。
-      # 以降の pnpm 呼び出しは Safe Chain のプロキシ経由になり、
-      # レジストリからのダウンロードがリアルタイムでマルウェア検査される。
+      # GitHub Actions では shim ディレクトリを $GITHUB_PATH に追記して後続ステップへ
+      # 引き継ぐが、環境差で持続しないことがあるため明示的にも追記して確実に載せる。
       - name: Install Aikido Safe Chain
         shell: bash
-        run: curl -fsSL https://github.com/AikidoSec/safe-chain/releases/latest/download/install-safe-chain.sh | sh -s -- --ci
+        run: |
+          curl -fsSL https://github.com/AikidoSec/safe-chain/releases/latest/download/install-safe-chain.sh | sh -s -- --ci
+          if [ -d "$HOME/.safe-chain/shims" ]; then
+            echo "$HOME/.safe-chain/shims" >> "$GITHUB_PATH"
+          fi
+
+      # pnpm が Safe Chain の shim 経由になっていることを検証する（fail-fast）。
+      # shim が PATH に載っていないと素の pnpm が走りスキャンがサイレントに
+      # バイパスされてしまうため、ここで確実に検知して落とす。
+      - name: Verify Safe Chain is active
+        shell: bash
+        run: pnpm safe-chain-verify
 
       # Safe Chain shim 経由で依存をインストールしマルウェアを検査する。
       # SKIP_REBUILD_NATIVE=1 で postinstall のネイティブビルドを no-op 化し、
