@@ -64,9 +64,11 @@ allowBuilds:
 #
 # 残したもの:
 #   - tar: sqlite3@5.1.7（node-sqlite3 最新）が tar@^6 をピンしており、撤去すると
-#     tar@6.2.1 に解決されて high 脆弱性 6 件（GHSA-r6q2-hw4h-h46w 等、いずれも
-#     patched >=7.5.4〜>=7.5.11）が復活する。引き込み元の sqlite3 / @sequelize/sqlite3
-#     はいずれも最新版で tar@7 系へ上げる手段がないため、override で >=7.5.11 を強制する。
+#     tar@6.2.1 に解決されて node-tar の high 脆弱性（GHSA-r6q2-hw4h-h46w 等、2026 年
+#     1〜3 月公開の複数件）が復活する。引き込み元の sqlite3（5.1.7 が最新）と
+#     @sequelize/sqlite3（7.0.0-alpha.x が最新ライン）はいずれも tar@7 系へ上げる手段が
+#     ないため、override で tar を最新パッチ版へ引き上げて塞ぐ。具体的な脆弱バージョンと
+#     必要な下限は `pnpm audit` を一次情報とすること（floor は patched 版の最大に追従させる）。
 #     install/build 時のみ使う依存で、tar 6→7 の強制は実環境（native rebuild）で検証済み。
 #
 # 新たな脆弱性は Dependabot / supply-chain-scan で検知し、まず直接依存のアップグレードで
