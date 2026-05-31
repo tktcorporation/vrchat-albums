@@ -51,17 +51,25 @@ allowBuilds:
   simple-git-hooks: true # pre-commit フックのセットアップ
   sqlite3: true # ネイティブモジュールのビルド
 
-
 # === 依存バージョンの上書き（脆弱性対応 / 互換性確保） ===
-# overrides は原則使わない方針。
-# 過去に脆弱性対応として tar / cacache>glob / picomatch / lodash / dottie /
-# flatted / smol-toml / @isaacs/brace-expansion を強制していたが、以下の理由で撤去した:
+# overrides は最小限に保つ方針。脆弱性対応で本当に必要なものだけを残す。
+#
+# 撤去したもの（8 → 1 件に削減）:
 #   - lodash / dottie / flatted / smol-toml / @isaacs/brace-expansion:
 #     resolutionMode: highest により override 無しでも同一の安全な版に解決されるため冗長だった。
-#   - tar(>=7.5.11) / picomatch(>=4.0.4) / cacache>glob(10.5.0):
-#     sqlite3 / micromatch / cacache などビルド・install 時専用の推移的依存に対し
-#     メジャーバージョン跨ぎ（tar 6→7 / picomatch 2→4 / glob 7→10）を強制しており、
-#     依存元が宣言するレンジと非互換で脆く、管理コストが高かった。各依存元の宣言レンジに
-#     戻し、最新パッチは resolutionMode: highest に委ねる。
+#   - picomatch(>=4.0.4) / cacache>glob(10.5.0):
+#     micromatch / cacache などビルド・install 時専用の推移的依存にメジャー跨ぎ
+#     （picomatch 2→4 / glob 7→10）を強制していたが、撤去後も `pnpm audit` で
+#     脆弱性は検出されなかったため、依存元の宣言レンジ（picomatch@2 / glob@7）へ戻した。
+#
+# 残したもの:
+#   - tar: sqlite3@5.1.7（node-sqlite3 最新）が tar@^6 をピンしており、撤去すると
+#     tar@6.2.1 に解決されて high 脆弱性 6 件（GHSA-r6q2-hw4h-h46w 等、いずれも
+#     patched >=7.5.4〜>=7.5.11）が復活する。引き込み元の sqlite3 / @sequelize/sqlite3
+#     はいずれも最新版で tar@7 系へ上げる手段がないため、override で >=7.5.11 を強制する。
+#     install/build 時のみ使う依存で、tar 6→7 の強制は実環境（native rebuild）で検証済み。
+#
 # 新たな脆弱性は Dependabot / supply-chain-scan で検知し、まず直接依存のアップグレードで
 # 解消する。それでも塞げない場合のみ、理由をコメントで明記した上で override を追加する。
+overrides:
+  tar: '>=7.5.11'
