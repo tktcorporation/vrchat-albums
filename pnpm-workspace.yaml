@@ -51,13 +51,17 @@ allowBuilds:
   simple-git-hooks: true # pre-commit フックのセットアップ
   sqlite3: true # ネイティブモジュールのビルド
 
+
 # === 依存バージョンの上書き（脆弱性対応 / 互換性確保） ===
-overrides:
-  tar: '>=7.5.11'
-  cacache>glob: '10.5.0'
-  '@isaacs/brace-expansion': '>=5.0.1'
-  lodash: '>=4.18.0'
-  dottie: '>=2.0.7'
-  picomatch: '>=4.0.4'
-  flatted: '>=3.4.2'
-  smol-toml: '>=1.6.1'
+# overrides は原則使わない方針。
+# 過去に脆弱性対応として tar / cacache>glob / picomatch / lodash / dottie /
+# flatted / smol-toml / @isaacs/brace-expansion を強制していたが、以下の理由で撤去した:
+#   - lodash / dottie / flatted / smol-toml / @isaacs/brace-expansion:
+#     resolutionMode: highest により override 無しでも同一の安全な版に解決されるため冗長だった。
+#   - tar(>=7.5.11) / picomatch(>=4.0.4) / cacache>glob(10.5.0):
+#     sqlite3 / micromatch / cacache などビルド・install 時専用の推移的依存に対し
+#     メジャーバージョン跨ぎ（tar 6→7 / picomatch 2→4 / glob 7→10）を強制しており、
+#     依存元が宣言するレンジと非互換で脆く、管理コストが高かった。各依存元の宣言レンジに
+#     戻し、最新パッチは resolutionMode: highest に委ねる。
+# 新たな脆弱性は Dependabot / supply-chain-scan で検知し、まず直接依存のアップグレードで
+# 解消する。それでも塞げない場合のみ、理由をコメントで明記した上で override を追加する。
