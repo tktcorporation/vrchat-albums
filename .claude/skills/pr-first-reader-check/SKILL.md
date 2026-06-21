@@ -58,7 +58,8 @@ PR を、**そのプロジェクトの文脈を一切知らない初見のレビ
 ```bash
 gh pr view <PR番号> --json title,body
 gh pr diff <PR番号>
-git log --format='%h %s%n%b' origin/main..HEAD   # コミットメッセージ
+DEFAULT_BRANCH="$(git remote show origin | sed -n 's/.*HEAD branch: //p')"
+git log --format='%h %s%n%b' "origin/${DEFAULT_BRANCH}..HEAD"   # コミットメッセージ
 ```
 
 ## ① 何を「初見に通じない」とみなすか（文脈）

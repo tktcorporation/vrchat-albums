@@ -4,7 +4,7 @@
 
 ### 推奨: `EnterWorktree` ツールを使う
 
-```
+```text
 EnterWorktree(name: "タスク名")
 ```
 
