@@ -114,7 +114,7 @@
     "electron-store": "^8.2.0",
     "electron-unhandled": "^4.0.1",
     "electron-updater": "6.8.3",
-    "exiftool-vendored": "^34.3.0",
+    "exiftool-vendored": "^35.19.0",
     "glob": "^13.0.6",
     "hash-wasm": "^4.12.0",
     "jotai": "~2.20.0",
