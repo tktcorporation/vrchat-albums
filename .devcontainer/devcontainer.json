@@ -139,7 +139,7 @@
     "install-vite-plus": [
       "bash",
       "-c",
-      "VP_NODE_MANAGER=no CI=true curl -fsSL https://vite.plus | bash"
+      "export VP_NODE_MANAGER=no CI=true && curl -fsSL https://vite.plus | bash"
     ]
   },
   "postCreateCommand": {
