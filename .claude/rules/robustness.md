@@ -1,3 +1,7 @@
+---
+paths: ['**/*.ts', '**/*.tsx']
+---
+
 # 堅牢性設計ガイドライン
 
 ## 基本理念: Design for Correctness

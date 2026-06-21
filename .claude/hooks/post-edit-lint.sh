@@ -15,8 +15,14 @@
 # フック全体が中断するのを防ぎ、可能な限りフィードバックを返す。
 set -uo pipefail
 
-# CLAUDE_FILE_PATHS: 変更されたファイルパスのリスト (改行区切り)
-if [[ -z "${CLAUDE_FILE_PATHS:-}" ]]; then
+# 変更ファイルのリスト: CLAUDE_FILE_PATHS (一部 harness が設定、改行区切り) を優先し、
+# 無ければ stdin の JSON から tool_input.file_path を取り出す (公式 Claude Code)。
+file_paths="${CLAUDE_FILE_PATHS:-}"
+if [[ -z "$file_paths" ]]; then
+  input="$(cat)"
+  file_paths="$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null || true)"
+fi
+if [[ -z "$file_paths" ]]; then
   exit 0
 fi
 
@@ -33,7 +39,7 @@ while IFS= read -r file; do
       fi
       ;;
   esac
-done <<< "$CLAUDE_FILE_PATHS"
+done <<< "$file_paths"
 
 if [[ ${#ts_files[@]} -eq 0 ]]; then
   exit 0
