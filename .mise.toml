@@ -4,6 +4,16 @@ uv = "latest"
 python = "3.14"
 pnpm = "11"
 jj = "latest"
+process-compose = "latest"
+stripe-cli = "latest"
+opentofu = "latest"
+flyctl = "latest"
+direnv = "latest"
+# infra/secrets を age で暗号化するための SOPS/age。
+# age は公開鍵暗号で、秘密鍵 ~/.config/sops/age/keys.txt を root of trust とする。
+# sops は YAML/env ファイルを in-place 暗号化し、decrypt した出力を tofu data source に渡す。
+sops = "latest"
+age = "latest"
 
 "npm:@anthropic-ai/claude-code" = "latest"
 "npm:@openai/codex" = "latest"
