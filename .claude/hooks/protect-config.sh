@@ -13,7 +13,7 @@ if [[ -z "$input" ]]; then
   exit 0
 fi
 
-# Write/Edit ツールの file_path を取得
+# Write/Edit/MultiEdit ツールの file_path を取得
 file="$(echo "$input" | jq -r '.file_path // .path // empty' 2>/dev/null || true)"
 if [[ -z "$file" ]]; then
   exit 0
