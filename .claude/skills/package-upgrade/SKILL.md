@@ -154,7 +154,7 @@ pnpm outdated <親package>        # 親依存に新版が出ていないか
 
 ## Phase 4: changeset (release pipeline を止めない)
 
-changeset を使うリポジトリでは、依存更新が **runtime artifact（実行時に使うライブラリ / 配布物）の挙動を変える**なら bump 付き changeset が必須。パッケージ名は `package.json` の `name` を参照する（[`.claude/rules/pr-workflow.md`](../../rules/pr-workflow.md)）。
+changeset を使うリポジトリでは、依存更新が **runtime artifact（実行時に使うライブラリ / 配布物）の挙動を変える**なら bump 付き changeset が必須。パッケージ名は `package.json` の `name` を参照する（[`.claude/rules/ci-workflow.md`](../../rules/ci-workflow.md)）。
 
 判断基準:
 

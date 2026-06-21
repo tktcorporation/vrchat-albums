@@ -149,9 +149,9 @@ devtools（Chrome DevTools MCP 等）で画面を確認できる環境なら、�
 
 commit・push・PR 作成まで依頼されている場合は、プロジェクトの PR フロールールに接続する。Phase 5 のセルフレビューは内省であり、PR 前に求められる外部レビューの代替にはならない。
 
-- **push 前**: CI で実行されるチェックをローカルで全て実行する（`pre-push-verification.md` / `ci-workflow.md`）
+- **push 前**: CI で実行されるチェックをローカルで全て実行する（`ci-workflow.md`）
 - **PR 作成前**: codex review 等の外部レビューを規定回数実施し、記録する（`pr-self-review.md`。hook＝ツール実行を自動ブロックする仕組みで強制されるプロジェクトもある）
-- **PR 作成後**: CI が全て pass するまで監視する。通るまで「完了」と報告しない（`pr-workflow.md` / `pr-ci-watch.md`）
+- **PR 作成後**: CI が全て pass するまで監視する。通るまで「完了」と報告しない（`pr-ci-watch.md`）
 
 これらのルールがないプロジェクトでも、push 前に CI 相当のチェックをローカルで通すことだけは省略しない。
 
