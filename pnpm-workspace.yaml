@@ -51,13 +51,18 @@ allowBuilds:
   simple-git-hooks: true # pre-commit フックのセットアップ
   sqlite3: true # ネイティブモジュールのビルド
 
-# === 依存バージョンの上書き（脆弱性対応 / 互換性確保） ===
+# === 依存バージョンの上書き（overrides） ===
+# 方針: overrides は最小限に保つ。脆弱性は原則として直接依存のアップグレードで解消し、
+# それが不可能な推移的依存に限って override で塞ぐ。override 無しでも同じ版に解決される
+# 冗長な指定は置かない（解決方針は resolutionMode: highest に委ねる）。
+#
+# tar: node-sqlite3（@sequelize/sqlite3 が依存）が古いメジャーの tar をピンしており、
+#   その系統には既知の脆弱性がある。引き込み元の sqlite3 / @sequelize/sqlite3 を、
+#   patched な tar を引く版へ上げる手段が無いため、override で patched 版へ引き上げて塞ぐ。
+#   tar は install/build 時のみ使われ、メジャー跨ぎの強制が動作することは native rebuild で
+#   検証している。必要な下限は `pnpm audit` を一次情報として patched 版に追従させること。
+#
+# override を追加・変更するときは、まず直接依存のアップグレードで解消できないかを検討し、
+# できない場合のみ理由を添えてここに記載する。
 overrides:
   tar: '>=7.5.11'
-  cacache>glob: '10.5.0'
-  '@isaacs/brace-expansion': '>=5.0.1'
-  lodash: '>=4.18.0'
-  dottie: '>=2.0.7'
-  picomatch: '>=4.0.4'
-  flatted: '>=3.4.2'
-  smol-toml: '>=1.6.1'
