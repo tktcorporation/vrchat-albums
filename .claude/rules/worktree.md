@@ -60,5 +60,3 @@ git worktree remove .claude/worktrees/<タスク名>
 ```
 
 `EnterWorktree` で作った場合は `ExitWorktree` で削除できる。
-</parameter>
-</invoke>
