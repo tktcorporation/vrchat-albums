@@ -20,10 +20,14 @@ cd "${CLAUDE_PROJECT_DIR:-.}"
 command -v mise >/dev/null 2>&1 || exit 0
 mise tasks ls --no-header 2>/dev/null | awk '{print $1}' | grep -qx 'claude-postedit' || exit 0
 
+# ツール入力 JSON: CLAUDE_TOOL_INPUT (一部 harness が設定) を優先し、
+# 無ければ stdin から読む (公式 Claude Code はフックへ stdin で JSON を渡す)。
 input="${CLAUDE_TOOL_INPUT:-}"
+[[ -z "$input" ]] && input="$(cat)"
 [[ -z "$input" ]] && exit 0
 
-file="$(echo "$input" | jq -r '.file_path // .path // empty' 2>/dev/null || true)"
+# フック完全ペイロードでは file_path が tool_input.file_path にネストされる。top-level も後方互換で許容。
+file="$(echo "$input" | jq -r '.tool_input.file_path // .tool_input.path // .file_path // .path // empty' 2>/dev/null || true)"
 [[ -z "$file" || ! -f "$file" ]] && exit 0
 
 if diag="$(mise run --quiet claude-postedit -- "$file" 2>&1)"; then

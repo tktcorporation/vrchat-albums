@@ -7,7 +7,9 @@
 
 set -euo pipefail
 
+# ツール入力 JSON: CLAUDE_TOOL_INPUT (一部 harness が設定) を優先し、無ければ stdin から読む。
 INPUT="${CLAUDE_TOOL_INPUT:-}"
+[[ -z "$INPUT" ]] && INPUT="$(cat)"
 
 # gh pr create 以外は無視
 if ! printf '%s' "$INPUT" | grep -qE 'gh\s+pr\s+create'; then

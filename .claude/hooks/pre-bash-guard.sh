@@ -13,7 +13,11 @@
 
 set -euo pipefail
 
+# ツール入力 JSON: CLAUDE_TOOL_INPUT (一部 harness が設定) を優先し、
+# 無ければ stdin から読む (公式 Claude Code はフックへ stdin で JSON を渡す)。
+# 以降は JSON 全体を grep するため tool_input のネスト有無に依存しない。
 INPUT="${CLAUDE_TOOL_INPUT:-}"
+[[ -z "$INPUT" ]] && INPUT="$(cat)"
 
 deny_with_json() {
   local reason="$1"

@@ -65,7 +65,7 @@
           },
           {
             "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'gh\\s+pr\\s+create'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PR を作成した。続けて必ず次の2つを実行し、指摘があれば直すこと: (1) pr-first-reader-check スキルで、PRタイトル・本文・コミットメッセージ・差分のコメント/識別子に、初見のレビュアーへ通じない語（issue/PR 限定の呼び名・PR外参照・未定義略語・暗黙の前提）が無いか検査。 (2) evergreen-comment チェック（.claude/rules/code-intent-documentation.md）で、差分のコメントが現在のWHYだけか（履歴・WHAT重複・コードに無いものへの言及が無いか）検査。\"}}'; fi"
+            "command": "input=\"${CLAUDE_TOOL_INPUT:-$(cat)}\"; if echo \"$input\" | grep -qE 'gh\\s+pr\\s+create'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PR を作成した。続けて必ず次の2つを実行し、指摘があれば直すこと: (1) pr-first-reader-check スキルで、PRタイトル・本文・コミットメッセージ・差分のコメント/識別子に、初見のレビュアーへ通じない語（issue/PR 限定の呼び名・PR外参照・未定義略語・暗黙の前提）が無いか検査。 (2) evergreen-comment チェック（.claude/rules/code-intent-documentation.md）で、差分のコメントが現在のWHYだけか（履歴・WHAT重複・コードに無いものへの言及が無いか）検査。\"}}'; fi"
           }
         ]
       }
