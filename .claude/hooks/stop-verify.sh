@@ -17,7 +17,10 @@ set -euo pipefail
 cd "${CLAUDE_PROJECT_DIR:-.}"
 
 command -v mise >/dev/null 2>&1 || exit 0
-mise tasks ls --no-header 2>/dev/null | awk '{print $1}' | grep -qx 'claude-verify' || exit 0
+# --local: グローバルタスク (~/.config/mise/tasks) を除外し、リポジトリが
+# claude-verify を定義していないときの no-op を保つ（同名のユーザー設定タスクで
+# 意図せず検証が走るのを防ぐ）。
+mise tasks ls --local --no-header 2>/dev/null | awk '{print $1}' | grep -qx 'claude-verify' || exit 0
 
 if errors="$(mise run --quiet claude-verify 2>&1)"; then
   exit 0

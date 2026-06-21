@@ -18,7 +18,10 @@ set -euo pipefail
 cd "${CLAUDE_PROJECT_DIR:-.}"
 
 command -v mise >/dev/null 2>&1 || exit 0
-mise tasks ls --no-header 2>/dev/null | awk '{print $1}' | grep -qx 'claude-postedit' || exit 0
+# --local: グローバルタスク (~/.config/mise/tasks) を除外し、リポジトリが
+# claude-postedit を定義していないときの no-op を保つ（同名のユーザー設定タスクで
+# 意図せず lint が走るのを防ぐ）。
+mise tasks ls --local --no-header 2>/dev/null | awk '{print $1}' | grep -qx 'claude-postedit' || exit 0
 
 # ツール入力 JSON: CLAUDE_TOOL_INPUT (一部 harness が設定) を優先し、
 # 無ければ stdin から読む (公式 Claude Code はフックへ stdin で JSON を渡す)。
