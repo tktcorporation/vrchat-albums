@@ -1,6 +1,7 @@
 ---
 paths: ['**/*.ts', '**/*.tsx']
 ---
+
 # 堅牢性設計ガイドライン
 
 ## 基本理念: Design for Correctness
@@ -16,15 +17,15 @@ paths: ['**/*.ts', '**/*.tsx']
 **Union型の網羅チェックには `match()` + `.exhaustive()` を使用する。** if文への書き換え禁止。
 
 ```typescript
-import { match, P } from "ts-pattern";
+import { match, P } from 'ts-pattern';
 
 // exhaustive checking で網羅性保証（新しい値の追加時にコンパイルエラー）
 const getMessage = (status: Status): string =>
   match(status)
-    .with("pending", () => "待機中")
-    .with("running", () => "実行中")
-    .with("completed", () => "完了")
-    .with("failed", () => "失敗")
+    .with('pending', () => '待機中')
+    .with('running', () => '実行中')
+    .with('completed', () => '完了')
+    .with('failed', () => '失敗')
     .exhaustive();
 ```
 
@@ -47,7 +48,7 @@ const getMessage = (status: Status): string =>
 const UserSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
-  role: z.enum(["admin", "user", "guest"]),
+  role: z.enum(['admin', 'user', 'guest']),
 });
 type User = z.infer<typeof UserSchema>;
 ```
@@ -55,8 +56,8 @@ type User = z.infer<typeof UserSchema>;
 ### Branded Types（ID混同防止）
 
 ```typescript
-const UserIdSchema = z.string().uuid().brand<"UserId">();
-const PhotoIdSchema = z.string().uuid().brand<"PhotoId">();
+const UserIdSchema = z.string().uuid().brand<'UserId'>();
+const PhotoIdSchema = z.string().uuid().brand<'PhotoId'>();
 // getPhoto(userId) → コンパイルエラー
 ```
 
@@ -76,10 +77,10 @@ interface State {
 
 // ✅ 不正な状態が型レベルで排除
 type State =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; data: Data }
-  | { status: "error"; error: Error };
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: Data }
+  | { status: 'error'; error: Error };
 ```
 
 ### Parse, Don't Validate

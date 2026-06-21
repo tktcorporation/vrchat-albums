@@ -22,12 +22,12 @@ description: |
 
 pnpm のサプライチェーン hardening が `pnpm-workspace.yaml` に設定されているリポジトリでは、更新作業中にこれらを「邪魔だから外す」のは禁止。設定されていなければ導入を検討する価値がある。
 
-| 設定 | 効果 | 作業中の意味 |
-|---|---|---|
-| `minimumReleaseAge` (cooldown) | 公開後 N 分未満の version を解決対象外にする | `pnpm add/update` が「枯れていない最新版」を勝手に掴まない。これが効くから安全に更新できる |
-| `strictDepBuilds: true` | 許可外の依存が build script を持つと install を **失敗** させる | 更新で新しい `postinstall` が紛れ込めば必ず炎上する。エラーが出たら歓迎すべきサイン |
-| `allowBuilds` | build script 実行を許可する allowlist | 更新で build エラーが出たら「なぜこの package が script を要るのか」を確認してから足す。安易に追加しない |
-| `blockExoticSubdeps` (pnpm 11 default true) | registry 外 (git / tarball) の subdep を拒否する | worm が exotic subdep として紛れ込むのを止める。エラーが出たら歓迎すべきサイン |
+| 設定                                        | 効果                                                            | 作業中の意味                                                                                             |
+| ------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `minimumReleaseAge` (cooldown)              | 公開後 N 分未満の version を解決対象外にする                    | `pnpm add/update` が「枯れていない最新版」を勝手に掴まない。これが効くから安全に更新できる               |
+| `strictDepBuilds: true`                     | 許可外の依存が build script を持つと install を **失敗** させる | 更新で新しい `postinstall` が紛れ込めば必ず炎上する。エラーが出たら歓迎すべきサイン                      |
+| `allowBuilds`                               | build script 実行を許可する allowlist                           | 更新で build エラーが出たら「なぜこの package が script を要るのか」を確認してから足す。安易に追加しない |
+| `blockExoticSubdeps` (pnpm 11 default true) | registry 外 (git / tarball) の subdep を拒否する                | worm が exotic subdep として紛れ込むのを止める。エラーが出たら歓迎すべきサイン                           |
 
 cooldown には escape hatch (`minimumReleaseAgeExclude`) があるが、常用しない（Phase 2-1）。リポジトリにこれらの設定値があるなら、必ずそちらを正として読む。
 
@@ -181,12 +181,12 @@ changeset を使うリポジトリでは、依存更新が **runtime artifact（
 
 ## アンチパターン
 
-| やりがち | なぜダメか | 代わりに |
-|---|---|---|
-| `pnpm update` で全部最新に上げる | cooldown は効くが breaking change の山を一度に抱える / 脆弱性の優先順位が消える | 脆弱性起点で対象を絞る (Phase 1) |
-| lockfile 差分を見ずに通す | worm は新規 transitive dep として紛れ込む | `git diff pnpm-lock.yaml` を必ず読む (Phase 2-2) |
-| `strictDepBuilds` のエラーを allowlist 追加で即黙らせる | 後付け postinstall を見逃す = worm の主要伝播経路を素通り | その script が何をするか確認してから (Phase 2-2) |
-| transitive 脆弱性に脊髄反射で override | 上流が直しても残る負債。別依存と非互換を起こす | 直接依存上げ → 上流確認 → 受容、を尽くす (Phase 3-1) |
-| 既存 override / 受容を見ない | 負債が溜まる一方。外せるのに残り続ける | 毎回棚卸しして外せないか確認 (Phase 3-2) |
-| cooldown が邪魔で `minimumReleaseAgeExclude` 常用 | hardening が骨抜き。汚染版を掴むリスクが戻る | hotfix の明確な理由があるときだけ、掃除前提で (Phase 2-1) |
-| runtime 依存更新で changeset を省く | release が発火せず変更がユーザーに届かない | runtime artifact が変わるなら bump 付き (Phase 4) |
+| やりがち                                                | なぜダメか                                                                      | 代わりに                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `pnpm update` で全部最新に上げる                        | cooldown は効くが breaking change の山を一度に抱える / 脆弱性の優先順位が消える | 脆弱性起点で対象を絞る (Phase 1)                          |
+| lockfile 差分を見ずに通す                               | worm は新規 transitive dep として紛れ込む                                       | `git diff pnpm-lock.yaml` を必ず読む (Phase 2-2)          |
+| `strictDepBuilds` のエラーを allowlist 追加で即黙らせる | 後付け postinstall を見逃す = worm の主要伝播経路を素通り                       | その script が何をするか確認してから (Phase 2-2)          |
+| transitive 脆弱性に脊髄反射で override                  | 上流が直しても残る負債。別依存と非互換を起こす                                  | 直接依存上げ → 上流確認 → 受容、を尽くす (Phase 3-1)      |
+| 既存 override / 受容を見ない                            | 負債が溜まる一方。外せるのに残り続ける                                          | 毎回棚卸しして外せないか確認 (Phase 3-2)                  |
+| cooldown が邪魔で `minimumReleaseAgeExclude` 常用       | hardening が骨抜き。汚染版を掴むリスクが戻る                                    | hotfix の明確な理由があるときだけ、掃除前提で (Phase 2-1) |
+| runtime 依存更新で changeset を省く                     | release が発火せず変更がユーザーに届かない                                      | runtime artifact が変わるなら bump 付き (Phase 4)         |
