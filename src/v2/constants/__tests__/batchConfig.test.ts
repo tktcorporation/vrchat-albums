@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { MAX_SESSION_BATCH_SIZE } from '../../../../electron/constants/batchConfig';
 import { BATCH_CONFIG } from '../batchConfig';
 
-describe('bATCH_CONFIG の SSOT', () => {
+describe('バッチ設定の SSOT', () => {
   it('フロントの送信上限は electron 側の単一ソース（tRPC 検証上限）と一致する', () => {
     // この一致が崩れると、フロントが送れる件数と tRPC が受け付ける件数が
     // 食い違い、ユーザーには成功に見えてバッチが弾かれる事故になる。
