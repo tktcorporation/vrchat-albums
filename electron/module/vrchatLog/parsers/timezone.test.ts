@@ -1,7 +1,14 @@
 import * as datefns from 'date-fns';
+import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 
-import { parseLogDateTime } from './baseParser';
+import { VRChatLogLineSchema } from '../model';
+import { LOG_DATE_TIME_REGEX, parseLogDateTime } from './baseParser';
+import {
+  extractPlayerJoinInfoFromLog,
+  extractPlayerLeaveInfoFromLog,
+} from './playerActionParser';
+import { extractWorldLeaveInfoFromLog } from './worldLeaveParser';
 
 describe('タイムゾーン処理の検証', () => {
   it('parseLogDateTime は local time として解釈する', () => {
@@ -93,6 +100,38 @@ describe('タイムゾーン処理の検証', () => {
     const diffInHours =
       (afterDST.getTime() - beforeDST.getTime()) / (1000 * 60 * 60);
     expect(diffInHours).toBe(26);
+  });
+
+  it('日付と時刻をグループ1・2で抽出する (LOG_DATE_TIME_REGEX)', () => {
+    const matched = LOG_DATE_TIME_REGEX.exec(
+      '2024.01.07 23:25:34 Log - [Behaviour] foo',
+    );
+    expect(matched?.[1]).toBe('2024.01.07');
+    expect(matched?.[2]).toBe('23:25:34');
+  });
+
+  it('全パーサーが同一タイムスタンプを parseLogDateTime と同じDateにSSOT解釈する', () => {
+    // ピリオド区切り(VRChatログ形式)とハイフン区切りで同じ瞬間になる(フォーマット集約の前提)
+    const expected = parseLogDateTime('2024.01.07', '23:25:34');
+    expect(expected.getTime()).toBe(new Date(2024, 0, 7, 23, 25, 34).getTime());
+
+    const joinLine = VRChatLogLineSchema.parse(
+      '2024.01.07 23:25:34 Log        -  [Behaviour] OnPlayerJoined TestPlayer',
+    );
+    const join = Effect.runSync(extractPlayerJoinInfoFromLog(joinLine));
+    expect(join.joinDate.getTime()).toBe(expected.getTime());
+
+    const leaveLine = VRChatLogLineSchema.parse(
+      '2024.01.07 23:25:34 Log        -  [Behaviour] OnPlayerLeft TestPlayer',
+    );
+    const leave = Effect.runSync(extractPlayerLeaveInfoFromLog(leaveLine));
+    expect(leave.leaveDate.getTime()).toBe(expected.getTime());
+
+    const worldLeaveLine = VRChatLogLineSchema.parse(
+      '2024.01.07 23:25:34 Log        -  VRCApplication: HandleApplicationQuit',
+    );
+    const worldLeave = extractWorldLeaveInfoFromLog(worldLeaveLine);
+    expect(worldLeave?.leaveDate.getTime()).toBe(expected.getTime());
   });
 
   it('境界ケース: 月末・年末の日時処理', () => {

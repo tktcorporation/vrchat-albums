@@ -1,7 +1,7 @@
 import { match } from 'ts-pattern';
 
 import type { VRChatLogLine } from '../model';
-import { parseLogDateTime } from './baseParser';
+import { LOG_DATE_TIME_REGEX, parseLogDateTime } from './baseParser';
 
 export interface VRChatWorldLeaveLog {
   logType: 'worldLeave';
@@ -40,8 +40,7 @@ export const extractWorldLeaveInfoFromLog = (
   const userActionPatterns: RegExp[] = [];
 
   // 日時を抽出
-  const dateTimeRegex = /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2})/;
-  const dateTimeMatch = logEntry.match(dateTimeRegex);
+  const dateTimeMatch = logEntry.match(LOG_DATE_TIME_REGEX);
 
   if (!dateTimeMatch) {
     return null;
@@ -107,8 +106,7 @@ export const inferWorldLeaveEvents = (
     // 退出時刻を推定
     const leaveLogEntry = logLines[leaveIndex];
     if (leaveLogEntry) {
-      const dateTimeRegex = /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2})/;
-      const dateTimeMatch = leaveLogEntry.match(dateTimeRegex);
+      const dateTimeMatch = leaveLogEntry.match(LOG_DATE_TIME_REGEX);
 
       if (dateTimeMatch) {
         const date = dateTimeMatch[1];
