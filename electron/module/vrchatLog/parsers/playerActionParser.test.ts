@@ -57,6 +57,23 @@ describe('playerActionParser', () => {
         }
       }
     });
+
+    it('形式は一致するが日時として不正な場合は DATE_PARSE_ERROR を返す', () => {
+      // 月13・日40・時刻99 は正規表現にはマッチするが datefns では Invalid Date
+      const logLine = VRChatLogLineSchema.parse(
+        '2025.13.40 99:99:99 Log        -  [Behaviour] OnPlayerJoined TestPlayer',
+      );
+
+      const exit = Effect.runSyncExit(extractPlayerJoinInfoFromLog(logLine));
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value).toBe('DATE_PARSE_ERROR');
+        }
+      }
+    });
   });
 
   describe('extractPlayerLeaveInfoFromLog', () => {
@@ -102,6 +119,22 @@ describe('playerActionParser', () => {
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value).toBe('LOG_FORMAT_MISMATCH');
+        }
+      }
+    });
+
+    it('形式は一致するが日時として不正な場合は DATE_PARSE_ERROR を返す', () => {
+      const logLine = VRChatLogLineSchema.parse(
+        '2025.13.40 99:99:99 Log        -  [Behaviour] OnPlayerLeft TestPlayer',
+      );
+
+      const exit = Effect.runSyncExit(extractPlayerLeaveInfoFromLog(logLine));
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value).toBe('DATE_PARSE_ERROR');
         }
       }
     });

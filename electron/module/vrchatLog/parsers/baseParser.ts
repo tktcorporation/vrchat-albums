@@ -16,6 +16,17 @@ import type { VRChatLogLine } from '../model';
 export const LOG_DATE_TIME_REGEX = /(\d{4}\.\d{2}\.\d{2}) (\d{2}:\d{2}:\d{2})/;
 
 /**
+ * 行頭固定版の {@link LOG_DATE_TIME_REGEX}。
+ *
+ * filterLogLinesByDate はログ行の先頭日時のみを対象にするため `^` 固定で照合する。
+ * パターンは `LOG_DATE_TIME_REGEX.source` から派生させ、フィルタとパーサーで
+ * 日時定義がずれないようにする (SSOT)。
+ */
+const LOG_DATE_TIME_ANCHORED_REGEX = new RegExp(
+  `^${LOG_DATE_TIME_REGEX.source}`,
+);
+
+/**
  * ログ行から日付と時刻を抽出してDateオブジェクトに変換
  *
  * VRChat ログの日時解釈はこの関数に集約する。日時フォーマット文字列
@@ -52,17 +63,13 @@ export const filterLogLinesByDate = (
   startDate: Date,
 ): VRChatLogLine[] => {
   return logLines.filter((logLine) => {
-    const dateTimeMatch =
-      /^(\d{4})\.(\d{2})\.(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(logLine);
+    const dateTimeMatch = LOG_DATE_TIME_ANCHORED_REGEX.exec(logLine);
     if (!dateTimeMatch) {
       return false;
     }
 
-    const [, year, month, day, hour, minute, second] = dateTimeMatch;
-    const logDate = parseLogDateTime(
-      `${year}.${month}.${day}`,
-      `${hour}:${minute}:${second}`,
-    );
+    const [, date, time] = dateTimeMatch;
+    const logDate = parseLogDateTime(date, time);
 
     if (!datefns.isValid(logDate)) {
       return false;

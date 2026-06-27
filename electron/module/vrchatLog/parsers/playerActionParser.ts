@@ -76,11 +76,19 @@ export const extractPlayerJoinInfoFromLog = (
 
   const [, date, time, playerName, playerId] = matches;
 
-  // 日付のパース（フォーマット解釈は parseLogDateTime に集約）
+  // 日付のパース（フォーマット解釈は parseLogDateTime に集約）。
+  // datefns.parse は不正な日時で例外ではなく Invalid Date を返すため、
+  // Effect.try だけでは捕捉できない。明示的に検証して DATE_PARSE_ERROR にする。
   const joinDate = Effect.try({
     try: () => parseLogDateTime(date, time),
     catch: () => 'DATE_PARSE_ERROR' as const,
-  });
+  }).pipe(
+    Effect.flatMap((parsed) =>
+      Number.isNaN(parsed.getTime())
+        ? Effect.fail('DATE_PARSE_ERROR' as const)
+        : Effect.succeed(parsed),
+    ),
+  );
 
   return Effect.gen(function* () {
     const parsedDate = yield* joinDate;
@@ -114,11 +122,18 @@ export const extractPlayerLeaveInfoFromLog = (
 
   const [, date, time, playerName, playerId] = matches;
 
-  // 日付のパース（フォーマット解釈は parseLogDateTime に集約）
+  // 日付のパース（フォーマット解釈は parseLogDateTime に集約）。
+  // Invalid Date は例外にならないため、明示的に検証して DATE_PARSE_ERROR にする。
   const leaveDate = Effect.try({
     try: () => parseLogDateTime(date, time),
     catch: () => 'DATE_PARSE_ERROR' as const,
-  });
+  }).pipe(
+    Effect.flatMap((parsed) =>
+      Number.isNaN(parsed.getTime())
+        ? Effect.fail('DATE_PARSE_ERROR' as const)
+        : Effect.succeed(parsed),
+    ),
+  );
 
   return Effect.gen(function* () {
     const parsedDate = yield* leaveDate;
