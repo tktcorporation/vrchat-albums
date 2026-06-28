@@ -3,7 +3,7 @@ import z from 'zod';
 
 import { initializeMainSentry } from './index';
 import { runEffect, runEffectExit } from './lib/effectTRPC';
-import { mapToFileOperationError } from './lib/errorMapping';
+import { mapToFileOperationError, toError } from './lib/errorMapping';
 import { ERROR_CATEGORIES, ERROR_CODES, UserFacingError } from './lib/errors';
 import { logger } from './lib/logger';
 import { backgroundSettingsRouter } from './module/backgroundSettings/controller/backgroundSettingsController';
@@ -300,7 +300,9 @@ export const router = trpcRouter({
         category: ERROR_CATEGORIES.UNKNOWN_ERROR,
         message: 'File dialog error',
         userMessage: 'ファイル選択ダイアログでエラーが発生しました。',
-        cause: new Error(String(error)),
+        // cause は errorMapping の toError に統一。元エラーが Error ならその
+        // スタックを保持し、それ以外はメッセージを保ったまま Error 化する。
+        cause: toError(error),
       });
     }),
 });

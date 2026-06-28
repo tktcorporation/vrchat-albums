@@ -12,26 +12,20 @@ import { Effect } from 'effect';
 import z from 'zod';
 
 import { runEffect } from '../../lib/effectTRPC';
-import {
-  ERROR_CATEGORIES,
-  ERROR_CODES,
-  UserFacingError,
-} from '../../lib/errors';
+import { toUserFacing } from '../../lib/errorMapping';
+import { ERROR_CATEGORIES, ERROR_CODES } from '../../lib/errors';
 import { procedure, router as trpcRouter } from '../../trpc';
 import * as metadataService from './service';
 
 /**
- * MetadataDbError → UserFacingError に変換するヘルパー
- * cause を含めて Sentry が元エラーを追跡可能にする
+ * MetadataDbError → UserFacingError に変換するヘルパー。
+ * cause（toError 経由）を含めて Sentry が元エラーを追跡可能にする。
  */
-const mapDbErrorToUserFacing = (e: { message: string }) =>
-  UserFacingError.withStructuredInfo({
-    code: ERROR_CODES.DATABASE_ERROR,
-    category: ERROR_CATEGORIES.DATABASE_ERROR,
-    message: e.message,
-    userMessage: '写真メタデータの取得中にエラーが発生しました。',
-    cause: e instanceof Error ? e : new Error(e.message),
-  });
+const mapDbErrorToUserFacing = toUserFacing<{ message: string }>({
+  code: ERROR_CODES.DATABASE_ERROR,
+  category: ERROR_CATEGORIES.DATABASE_ERROR,
+  userMessage: '写真メタデータの取得中にエラーが発生しました。',
+});
 
 export const vrchatPhotoMetadataRouter = () =>
   trpcRouter({

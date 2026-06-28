@@ -27,6 +27,27 @@ interface BoldPreviewProps {
 }
 
 /**
+ * プレイヤーバッジ（プレイヤー名 / 「+N more」）共通のインラインスタイル。
+ *
+ * SVG 内に書き出す共有画像のため Tailwind ではなくインラインスタイルで指定する。
+ * プレイヤー名バッジと残数バッジで同一だったものを単一ソース化したもの。
+ */
+const PLAYER_BADGE_STYLE: React.CSSProperties = {
+  background: 'rgba(0, 0, 0, 0.3)',
+  padding: '6px 12px',
+  borderRadius: '16px',
+  color: 'white',
+  fontSize: '14px',
+  fontWeight: 500,
+  display: 'inline-block',
+  whiteSpace: 'nowrap',
+  marginBottom: '2px',
+  height: '30px',
+  lineHeight: '18px',
+  boxSizing: 'border-box',
+};
+
+/**
  * VRChat のワールド入室イベントを共有用に表示する SVG を描画する。
  */
 export function BoldPreviewSvg({
@@ -288,43 +309,12 @@ export function BoldPreviewSvg({
             }}
           >
             {(showAllPlayers ? players : visiblePlayers)?.map((player) => (
-              <div
-                key={player.id}
-                style={{
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  display: 'inline-block',
-                  whiteSpace: 'nowrap',
-                  marginBottom: '2px',
-                  height: '30px',
-                  lineHeight: '18px',
-                  boxSizing: 'border-box',
-                }}
-              >
+              <div key={player.id} style={PLAYER_BADGE_STYLE}>
                 {player.playerName}
               </div>
             ))}
             {!showAllPlayers && hiddenCount > 0 && (
-              <div
-                style={{
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  display: 'inline-block',
-                  whiteSpace: 'nowrap',
-                  marginBottom: '2px',
-                  height: '30px',
-                  lineHeight: '18px',
-                  boxSizing: 'border-box',
-                }}
-              >
+              <div style={PLAYER_BADGE_STYLE}>
                 <span>+{hiddenCount} more</span>
               </div>
             )}

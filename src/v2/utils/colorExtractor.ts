@@ -1,4 +1,4 @@
-import { hslToRgb, rgbToHsl } from './colorUtils';
+import { hslToRgb, rgbToHsl } from '../../../electron/lib/colorUtils';
 
 /**
  * 画像要素をキャンバスに描画し、そのピクセルデータを取得するヘルパー。

@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 import z from 'zod';
 
-import { BATCH_CONFIG } from '../../constants/batchConfig';
+import { MAX_SESSION_BATCH_SIZE } from '../../constants/batchConfig';
 import { runEffect, runEffectExit } from '../../lib/effectTRPC';
 import { toUserFacing } from '../../lib/errorMapping';
 import {
@@ -595,8 +595,8 @@ export const logInfoRouter = () =>
      */
     getSessionInfoBatch: procedure
       .input(
-        z.array(z.date()).max(BATCH_CONFIG.MAX_SESSION_BATCH_SIZE, {
-          message: `セッション情報のバッチ取得は最大${BATCH_CONFIG.MAX_SESSION_BATCH_SIZE}件までです。現在の件数を確認してください。`,
+        z.array(z.date()).max(MAX_SESSION_BATCH_SIZE, {
+          message: `セッション情報のバッチ取得は最大${MAX_SESSION_BATCH_SIZE}件までです。現在の件数を確認してください。`,
         }),
       )
       .query(async (ctx) => {

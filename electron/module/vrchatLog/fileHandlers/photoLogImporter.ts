@@ -4,8 +4,7 @@ import { VRChatPhotoPathObjectSchema } from '../../../lib/pathObject';
 import type { VRChatPhotoDirPath } from '../../vrchatPhoto/valueObjects';
 import { createVRChatWorldJoinLogFromPhoto } from '../../vrchatWorldJoinLogFromPhoto/service';
 import type { VRChatWorldJoinLogFromPhoto } from '../../vrchatWorldJoinLogFromPhoto/vrchatWorldJoinLogFromPhoto.model';
-
-type WorldId = `wrld_${string}`;
+import type { WorldId } from '../type';
 
 /**
  * 写真ファイル名からログ情報をインポートする機能
