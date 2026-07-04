@@ -240,7 +240,7 @@ describe('useStartupStage - simplified implementation', () => {
     expect(result.current.errorMessage).toBe('');
   });
 
-  it('LOG_DIRECTORY_ERROR エラーは適切にハンドリングされる', async () => {
+  it('lOG_DIRECTORY_ERROR エラーは適切にハンドリングされる', async () => {
     const { result } = renderHook(() =>
       useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
     );
@@ -292,7 +292,7 @@ describe('useStartupStage - simplified implementation', () => {
 
     expect(result.current.stages.initialization).toBe('pending');
     expect(result.current.errorMessage).toBe('');
-    expect(mockReset).toHaveBeenCalled();
+    expect(mockReset).toHaveBeenCalledWith();
   });
 
   it('重複実行防止が機能する', async () => {
@@ -373,7 +373,128 @@ describe('useStartupStage - simplified implementation', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    expect(mockCallbacks.onComplete).toHaveBeenCalled();
+    expect(mockCallbacks.onComplete).toHaveBeenCalledWith();
+
+    vi.useRealTimers();
+  });
+
+  it('タイムアウト系のエラーはエラー画面を出さず自動的に再試行される', async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
+
+    const mutationOptions =
+      mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
+
+    act(() => {
+      mutationOptions.onMutate();
+    });
+
+    expect(mockMutate).toHaveBeenCalledTimes(1);
+
+    const timeoutError = new Error('sequelize-query timed out');
+
+    act(() => {
+      mutationOptions.onError(timeoutError);
+    });
+
+    // エラー画面には遷移せず、進行中のままユーザーには見えない
+    expect(result.current.stages.initialization).toBe('inProgress');
+    expect(result.current.errorMessage).toBe('');
+    expect(mockCallbacks.onError).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    // 自動的に再度 mutate が呼ばれる
+    expect(mockMutate).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it('自動再試行の上限に達すると最終的にエラー画面を表示する', async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
+
+    const mutationOptions =
+      mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
+
+    act(() => {
+      mutationOptions.onMutate();
+    });
+
+    const timeoutError = new Error('sequelize-query timed out');
+
+    // 自動再試行の上限回数分、連続で失敗させる
+    for (let i = 0; i < 2; i++) {
+      act(() => {
+        mutationOptions.onError(timeoutError);
+      });
+      expect(result.current.stages.initialization).toBe('inProgress');
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+    }
+
+    // 上限を超えた失敗でエラー画面に切り替わる
+    act(() => {
+      mutationOptions.onError(timeoutError);
+    });
+
+    expect(result.current.stages.initialization).toBe('error');
+    expect(result.current.errorMessage).toBe('sequelize-query timed out');
+
+    vi.useRealTimers();
+  });
+
+  it('retryProcess実行時に自動再試行の回数もリセットされる', async () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() =>
+      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
+    );
+
+    const mutationOptions =
+      mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
+
+    act(() => {
+      mutationOptions.onMutate();
+    });
+
+    const timeoutError = new Error('sequelize-query timed out');
+
+    // 上限回数分、自動再試行を使い切る
+    for (let i = 0; i < 2; i++) {
+      act(() => {
+        mutationOptions.onError(timeoutError);
+      });
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+    }
+
+    // 手動リトライで予算がリセットされる
+    act(() => {
+      result.current.retryProcess();
+    });
+
+    act(() => {
+      mutationOptions.onMutate();
+    });
+
+    act(() => {
+      mutationOptions.onError(timeoutError);
+    });
+
+    // リセット後の1回目の失敗なので、まだエラー画面には遷移しない
+    expect(result.current.stages.initialization).toBe('inProgress');
 
     vi.useRealTimers();
   });

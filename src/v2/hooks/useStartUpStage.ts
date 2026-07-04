@@ -12,6 +12,19 @@ type ProcessStage = 'pending' | 'inProgress' | 'success' | 'error' | 'skipped';
  */
 const MIN_LOADING_DISPLAY_MS = 800;
 
+/**
+ * 初期化失敗時に自動再試行する最大回数。
+ * PCスリープ復帰直後・SQLite初回アクセスのスピンアップ等、環境要因による
+ * 一過性のタイムアウトをエラー画面を見せずに吸収する。詳細: docs/adr/004-no-sequelize-retry-timeout.md
+ */
+const MAX_AUTO_RETRY_COUNT = 2;
+
+/** 自動再試行までの待機時間（ミリ秒） */
+const AUTO_RETRY_DELAY_MS = 2000;
+
+/** タイムアウト系の一過性エラーを検出するパターン。この形以外は再試行しても解決しないため即エラー表示する */
+const TRANSIENT_ERROR_PATTERN = /timed out|timeout|タイムアウト/i;
+
 export interface ProcessStages {
   /**
    * アプリケーション初期化処理の状態を追跡
@@ -56,6 +69,10 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
 
   // 初期化開始時刻を記録（最小表示時間保証用）
   const initStartTimeRef = useRef<number | null>(null);
+
+  // 一過性エラーによる自動再試行の状態管理
+  const autoRetryCountRef = useRef(0);
+  const autoRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // tRPC utils for query invalidation
   const utils = trpcReact.useUtils();
@@ -144,6 +161,21 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
           .with(P.instanceOf(Error), (e) => e.message)
           .otherwise(() => 'アプリケーション初期化に失敗しました');
 
+        // タイムアウト系の一過性エラーは、エラー画面を出す前に自動で再試行する
+        if (
+          TRANSIENT_ERROR_PATTERN.test(errorMessage) &&
+          autoRetryCountRef.current < MAX_AUTO_RETRY_COUNT
+        ) {
+          autoRetryCountRef.current += 1;
+          console.warn(
+            `Transient initialization error, auto-retrying (${autoRetryCountRef.current}/${MAX_AUTO_RETRY_COUNT}): ${errorMessage}`,
+          );
+          autoRetryTimerRef.current = setTimeout(() => {
+            mutationRef.current.mutate();
+          }, AUTO_RETRY_DELAY_MS);
+          return;
+        }
+
         // tRPCエラーオブジェクト全体を保持
         updateStage('initialization', 'error', errorMessage, syncError);
       },
@@ -186,10 +218,24 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
 
   // リトライ処理
   const retryProcess = useCallback(() => {
+    if (autoRetryTimerRef.current) {
+      clearTimeout(autoRetryTimerRef.current);
+      autoRetryTimerRef.current = null;
+    }
+    autoRetryCountRef.current = 0;
     setStages(initialStages);
     setError(null);
     mutationRef.current.reset();
     // startInitialization は useEffect で自動的に呼ばれる
+  }, []);
+
+  // アンマウント時に自動再試行タイマーが残らないようにする
+  useEffect(() => {
+    return () => {
+      if (autoRetryTimerRef.current) {
+        clearTimeout(autoRetryTimerRef.current);
+      }
+    };
   }, []);
 
   // 完了判定
