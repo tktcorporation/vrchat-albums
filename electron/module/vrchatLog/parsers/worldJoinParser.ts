@@ -30,7 +30,9 @@ export type WorldJoinParseError =
   | { type: 'LOG_FORMAT_MISMATCH' }
   | { type: 'INVALID_WORLD_ID'; worldId: string }
   | { type: 'INVALID_INSTANCE_ID'; instanceId: string; worldId: string }
-  | { type: 'WORLD_NAME_NOT_FOUND' };
+  | { type: 'WORLD_NAME_NOT_FOUND' }
+  | { type: 'INVALID_WORLD_NAME'; worldName: string }
+  | { type: 'INVALID_DATETIME'; date: string; time: string };
 
 /**
  * ワールド参加ログのパース機能
@@ -123,7 +125,22 @@ export const extractWorldJoinInfoFromLogs = (
   }
 
   const joinDate = parseLogDateTime(date, time);
-  const validatedWorldName = VRChatWorldNameSchema.parse(foundWorldName);
+  // 不正な日時はバッチ全体を止めず、型付きエラーとして収集する（部分的成功の維持）
+  if (Number.isNaN(joinDate.getTime())) {
+    return Effect.fail({ type: 'INVALID_DATETIME', date, time });
+  }
+
+  // ワールド名も worldId/instanceId と同様に safeParse で検証する。
+  // .parse() だと空白のみのワールド名で throw し、Effect の Exit 外で Defect 化して
+  // 同一バッチのログ解析全体を巻き込むため、型付きエラーに統一する。
+  const worldNameResult = VRChatWorldNameSchema.safeParse(foundWorldName);
+  if (!worldNameResult.success) {
+    return Effect.fail({
+      type: 'INVALID_WORLD_NAME',
+      worldName: foundWorldName,
+    });
+  }
+  const validatedWorldName = worldNameResult.data;
 
   return Effect.succeed({
     logType: 'worldJoin',
