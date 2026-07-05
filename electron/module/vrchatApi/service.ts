@@ -197,7 +197,8 @@ export const getVrcUserInfoByUserName = (
           // effect-lint-allow-try-catch: キュー内タスクは外側 Promise を必ず settle させる。
           // throw のまま抜けると reject に接続されず、呼び出し側 Promise が永久に未解決でハングする。
           try {
-            const reqUrl = `https://vrchat.com/api/1/users?sort=relevance&fuzzy=false&search=${userName}`;
+            // VRChat の表示名は空白・非ASCII・特殊文字を含みうるため URL エンコードする
+            const reqUrl = `https://vrchat.com/api/1/users?sort=relevance&fuzzy=false&search=${encodeURIComponent(userName)}`;
             const response = await fetch(reqUrl);
             if (!response.ok) {
               reject(
