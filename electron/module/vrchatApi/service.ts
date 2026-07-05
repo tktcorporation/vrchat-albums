@@ -166,17 +166,21 @@ const processQueue = async () => {
     return;
   }
   isProcessingQueue = true;
-  while (requestQueue.length > 0) {
-    const request = requestQueue.shift();
-    if (request) {
-      console.log('processQueue', requestQueue.length);
-      await request();
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 1000);
-      }); // Delay of 1 second
+  // effect-lint-allow-try-catch: キュー内タスクの失敗時も isProcessingQueue を必ず解放する。
+  // finally を外すと1件の失敗でフラグが true 固定になり、以降のリクエストが永久にハングする。
+  try {
+    while (requestQueue.length > 0) {
+      const request = requestQueue.shift();
+      if (request) {
+        await request();
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 1000);
+        }); // Delay of 1 second
+      }
     }
+  } finally {
+    isProcessingQueue = false;
   }
-  isProcessingQueue = false;
 };
 
 /**
@@ -190,26 +194,38 @@ export const getVrcUserInfoByUserName = (
     try: () =>
       new Promise<z.infer<typeof UserSchema>>((resolve, reject) => {
         requestQueue.push(async () => {
-          const reqUrl = `https://vrchat.com/api/1/users?sort=relevance&fuzzy=false&search=${userName}`;
-          const response = await fetch(reqUrl);
-          if (!response.ok) {
-            throw new Error(`getVrcUserInfoByUserName: ${response.statusText}`);
+          // effect-lint-allow-try-catch: キュー内タスクは外側 Promise を必ず settle させる。
+          // throw のまま抜けると reject に接続されず、呼び出し側 Promise が永久に未解決でハングする。
+          try {
+            const reqUrl = `https://vrchat.com/api/1/users?sort=relevance&fuzzy=false&search=${userName}`;
+            const response = await fetch(reqUrl);
+            if (!response.ok) {
+              reject(
+                new Error(`getVrcUserInfoByUserName: ${response.statusText}`),
+              );
+              return;
+            }
+            const json: unknown = await response.json();
+            const result = UsersSchema.safeParse(json);
+            if (!result.success) {
+              reject(
+                new Error(
+                  `fail to parse UsersSchema: ${JSON.stringify(result.error.issues)}`,
+                ),
+              );
+              return;
+            }
+            if (
+              result.data.length === 0 ||
+              result.data[0].displayName !== userName
+            ) {
+              reject(new Error('USER_NOT_FOUND'));
+              return;
+            }
+            resolve(result.data[0]);
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)));
           }
-          const json: unknown = await response.json();
-          const result = UsersSchema.safeParse(json);
-          if (!result.success) {
-            throw new Error(
-              `fail to parse UsersSchema: ${JSON.stringify(result.error.issues)}`,
-            );
-          }
-          if (
-            result.data.length === 0 ||
-            result.data[0].displayName !== userName
-          ) {
-            reject(new Error('USER_NOT_FOUND'));
-            return;
-          }
-          resolve(result.data[0]);
         });
         if (!isProcessingQueue) {
           void processQueue();
