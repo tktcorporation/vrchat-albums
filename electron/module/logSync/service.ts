@@ -45,11 +45,26 @@ export const LOG_SYNC_MODE = {
 export type LogSyncMode = (typeof LOG_SYNC_MODE)[keyof typeof LOG_SYNC_MODE];
 
 /**
+ * ログ同期の並行実行を直列化するセマフォ (permit=1)。
+ *
+ * logSyncController の定期バックグラウンド同期と、ユーザー操作による FULL/INCREMENTAL 同期が
+ * 同時に走ると、appendLoglines → loadLogInfo の順序前提が崩れ、DB 二重書き込みやキャッシュ不整合を
+ * 招く (ADR-001)。モジュールスコープで単一インスタンスを保持し、全ての syncLogs 呼び出しを直列化する。
+ *
+ * 生の boolean フラグ（共有可変状態）ではなく Semaphore を使う理由:
+ * withPermits は Effect の完了時（成功・失敗・中断のいずれでも）permit を必ず解放するため、
+ * フラグの戻し忘れやエラー経路での取りこぼしによるデッドロックが構造的に起きない。
+ */
+const syncMutex = Effect.runSync(Effect.makeSemaphore(1));
+
+/**
  * ログの同期処理を統一的に実行するサービス
  *
  * このサービスは以下の処理を順番に実行します：
  * 1. appendLoglines: VRChatのログファイルから新しいログ行を抽出し、アプリ内のログストアに保存
  * 2. loadLogInfo: 保存されたログをデータベースに読み込む
+ *
+ * 並行呼び出しは syncMutex により直列化され、同時実行による順序崩れを防ぐ。
  *
  * @param mode 同期モード (FULL: 全件処理, INCREMENTAL: 差分処理)
  * @returns 処理結果（作成されたログ情報を含む）
@@ -60,60 +75,62 @@ export function syncLogs(
   LogSyncResults,
   VRChatLogFileError | VRChatLogError | LogInfoError | LogInfoServiceError
 > {
-  return Effect.gen(function* () {
-    const isFullSync = mode === LOG_SYNC_MODE.FULL;
+  return syncMutex.withPermits(1)(
+    Effect.gen(function* () {
+      const isFullSync = mode === LOG_SYNC_MODE.FULL;
 
-    logger.info(`Starting log sync with mode: ${mode}`);
+      logger.info(`Starting log sync with mode: ${mode}`);
 
-    // Step 1: VRChatログファイルから新しいログ行を抽出・保存
-    emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
-    const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
-      try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
-      catch: (error) => {
-        logger.error({
-          message: 'Failed to append log lines',
-          details: {
-            error: error instanceof Error ? error.message : String(error),
-          },
-        });
-        if (error instanceof VRChatLogFileError) {
-          return error;
-        }
-        return new VRChatLogFileError({
-          code: 'UNKNOWN',
-          message: error instanceof Error ? error.message : String(error),
-        });
-      },
-    });
-    emitProgress({
-      stage: 'log_append',
-      progress: 100,
-      message: 'VRChatログファイルの読み込みが完了しました',
-    });
+      // Step 1: VRChatログファイルから新しいログ行を抽出・保存
+      emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
+      const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
+        try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
+        catch: (error) => {
+          logger.error({
+            message: 'Failed to append log lines',
+            details: {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
+          if (error instanceof VRChatLogFileError) {
+            return error;
+          }
+          return new VRChatLogFileError({
+            code: 'UNKNOWN',
+            message: error instanceof Error ? error.message : String(error),
+          });
+        },
+      });
+      emitProgress({
+        stage: 'log_append',
+        progress: 100,
+        message: 'VRChatログファイルの読み込みが完了しました',
+      });
 
-    // Step 2: 保存されたログをデータベースに読み込む
-    // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
-    // logStore ファイルの再読み込みをスキップする
-    emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
-    const loadResult = yield* loadLogInfoIndexFromVRChatLog({
-      excludeOldLogLoad: !isFullSync,
-      preLoadedLogLines: isFullSync
-        ? undefined
-        : appendResult.processedLogLines,
-    });
-    emitProgress({
-      stage: 'log_load',
-      progress: 100,
-      message: 'ログデータの保存が完了しました',
-    });
+      // Step 2: 保存されたログをデータベースに読み込む
+      // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
+      // logStore ファイルの再読み込みをスキップする
+      emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
+      const loadResult = yield* loadLogInfoIndexFromVRChatLog({
+        excludeOldLogLoad: !isFullSync,
+        preLoadedLogLines: isFullSync
+          ? undefined
+          : appendResult.processedLogLines,
+      });
+      emitProgress({
+        stage: 'log_load',
+        progress: 100,
+        message: 'ログデータの保存が完了しました',
+      });
 
-    logger.info(`Log sync completed successfully with mode: ${mode}`);
+      logger.info(`Log sync completed successfully with mode: ${mode}`);
 
-    // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
-    triggerWorldJoinImageGeneration();
+      // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
+      triggerWorldJoinImageGeneration();
 
-    return loadResult;
-  });
+      return loadResult;
+    }),
+  );
 }
 
 /**

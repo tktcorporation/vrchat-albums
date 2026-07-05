@@ -232,5 +232,56 @@ describe('worldJoinParser', () => {
 
       expect(value.worldInstanceId.value).toBe('04307~region(jp)');
     });
+
+    it('ワールド名が空白のみの場合、例外を投げず INVALID_WORLD_NAME エラーを返す', () => {
+      // 旧実装は .parse() で ZodError を throw し、Effect の Exit 外で Defect 化して
+      // 同一バッチのログ解析全体を巻き込んでいた。型付き Fail に収まることを固定する。
+      const logLines = [
+        VRChatLogLineSchema.parse(
+          '2023.10.08 15:30:45 Log        -  [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789abc:12345',
+        ),
+        VRChatLogLineSchema.parse(
+          '2023.10.08 15:30:46 Log        -  [Behaviour] Joining or Creating Room:    ',
+        ),
+      ];
+
+      const exit = Effect.runSyncExit(
+        extractWorldJoinInfoFromLogs(logLines, 0),
+      );
+
+      // Defect(Die) ではなく型付き Fail であること
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value.type).toBe('INVALID_WORLD_NAME');
+        }
+      }
+    });
+
+    it('日時が不正な値の場合、INVALID_DATETIME エラーを返す', () => {
+      const logLines = [
+        VRChatLogLineSchema.parse(
+          '9999.99.99 99:99:99 Log        -  [Behaviour] Joining wrld_12345678-1234-1234-1234-123456789abc:12345',
+        ),
+        VRChatLogLineSchema.parse(
+          '9999.99.99 99:99:99 Log        -  [Behaviour] Joining or Creating Room: Test World',
+        ),
+      ];
+
+      const exit = Effect.runSyncExit(
+        extractWorldJoinInfoFromLogs(logLines, 0),
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value.type).toBe('INVALID_DATETIME');
+        }
+      }
+    });
   });
 });

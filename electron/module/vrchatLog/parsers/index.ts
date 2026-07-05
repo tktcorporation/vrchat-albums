@@ -143,6 +143,14 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
             { type: 'WORLD_NAME_NOT_FOUND' },
             () => 'Failed to extract world name from subsequent log entries',
           )
+          .with(
+            { type: 'INVALID_WORLD_NAME' },
+            (e) => `Invalid world name: "${e.worldName}"`,
+          )
+          .with(
+            { type: 'INVALID_DATETIME' },
+            (e) => `Invalid datetime in world join log: "${e.date} ${e.time}"`,
+          )
           .exhaustive();
 
         errors.push({
