@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.3
+
+### Patch Changes
+
+- [#831](https://github.com/tktcorporation/vrchat-albums/pull/831) [`7837e6d`](https://github.com/tktcorporation/vrchat-albums/commit/7837e6de54919116e055b6e6437adb173c1a6a22) Thanks [@tktcorporation](https://github.com/tktcorporation)! - ログ同期・ワールド参加ログのパース・VRChat API 呼び出しの堅牢性を改善。定期バックグラウンド同期とユーザー操作の同時実行によるデータ不整合、空白ワールド名など不正なログ行によるバッチ全体のパース中断、API リクエストキューの永久ハングを解消。
+
 ## 0.30.2
 
 ### Patch Changes
