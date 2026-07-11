@@ -1,6 +1,7 @@
 import { Cause, Effect, Exit, Option } from 'effect';
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -355,6 +356,10 @@ describe('DBQueue', () => {
   });
 
   describe('Sentryトリアージ用のエラー情報', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it('addWithResultでSQLiteエラーコードを持つエラーの場合、コードとタスク名をログに含めること', async () => {
       const queue = getDBQueue();
       const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
@@ -387,8 +392,6 @@ describe('DBQueue', () => {
           sqliteErrorCode: 'SQLITE_IOERR',
         },
       });
-
-      errorSpy.mockRestore();
     });
 
     it('読み取り用キューではqueueラベルが read になること', async () => {
@@ -407,8 +410,6 @@ describe('DBQueue', () => {
         ([params]) => params.details?.queue === 'read',
       );
       expect(readQueueCall).toBeDefined();
-
-      errorSpy.mockRestore();
     });
 
     it('SQLiteエラーコードを持たない予期しないエラーではsqliteErrorCodeを含めないこと', async () => {
@@ -428,8 +429,28 @@ describe('DBQueue', () => {
       expect(taskLabeledCall?.[0].details).not.toHaveProperty(
         'sqliteErrorCode',
       );
+    });
 
-      errorSpy.mockRestore();
+    it('cause を持たずエラー自身に code がある場合もSQLiteエラーコードを抽出すること', async () => {
+      const queue = getDBQueue();
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      const errorWithDirectCode = Object.assign(
+        new Error('SQLITE_BUSY: database is locked'),
+        { code: 'SQLITE_BUSY' },
+      );
+      const task = vi.fn().mockRejectedValue(errorWithDirectCode);
+
+      await expect(
+        Effect.runPromise(queue.addWithResult(task, 'test.directCode')),
+      ).rejects.toThrow('SQLITE_BUSY: database is locked');
+
+      const taskLabeledCall = errorSpy.mock.calls.find(
+        ([params]) => params.details?.task === 'test.directCode',
+      );
+      expect(taskLabeledCall?.[0].details).toMatchObject({
+        sqliteErrorCode: 'SQLITE_BUSY',
+      });
     });
 
     it('addではエラー発生時にキュー/タスクの情報を付与してログ出力すること', async () => {
@@ -450,8 +471,6 @@ describe('DBQueue', () => {
         message: expect.stringContaining('test.addTask'),
         details: { queue: 'write', task: 'test.addTask' },
       });
-
-      errorSpy.mockRestore();
     });
 
     it('label はインスタンスの同一性判定（getConfigHash）に影響しないこと', () => {

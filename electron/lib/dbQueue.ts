@@ -149,24 +149,6 @@ class DBQueue {
       concurrency: this.options.concurrency,
       timeout: this.options.timeout,
     });
-
-    // エラーが発生した場合のみログ出力
-    // Note: p-queue はタスク失敗時に reject に加えてこの 'error' イベントも発火するため、
-    // add()/addWithResult() 側のログと合わせて同一失敗が最大2回 Sentry に送信され得る。
-    // ここではタスク単位の taskLabel を受け取れないため、キュー単位の情報のみ付与する。
-    this.queue.on('error', (error) => {
-      const info = buildDBQueueErrorInfo(error, {
-        queueLabel: this.options.label,
-      });
-      logger.error({
-        message: `${info.prefix}: エラーが発生しました${
-          info.sqliteErrorCode ? ` (${info.sqliteErrorCode})` : ''
-        }: ${info.normalizedError.message}`,
-        stack: info.normalizedError,
-        details: info.details,
-        tags: info.tags,
-      });
-    });
   }
 
   /**

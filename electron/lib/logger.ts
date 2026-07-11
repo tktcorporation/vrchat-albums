@@ -34,7 +34,7 @@ interface ErrorLogParams {
   details?: Record<string, unknown>;
   /**
    * Sentry の tags に追加するフィールド（フィルタ・グルーピングに使う低カーディナリティな値向け）。
-   * source / hasUserFacingWrapper は上書きさせない（下記マージ順）。
+   * source は常にこの関数側の値で上書きする（呼び出し元からは変更不可、下記マージ順）。
    */
   tags?: Record<string, string>;
 }
