@@ -187,7 +187,7 @@ export class RollbackService {
 
           logger.info(`Rollback completed successfully: ${backup.id}`);
           return { _tag: 'ok' as const };
-        })
+        }, 'rollbackService.rebuildFromBackup')
         .pipe(
           Effect.mapError(
             (dbQueueError): RollbackServiceError =>

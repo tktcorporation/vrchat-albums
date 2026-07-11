@@ -83,6 +83,50 @@ describe('logger Sentry consent integration', () => {
     );
   });
 
+  it('should merge custom tags into Sentry tags without overriding source', async () => {
+    mockGetSettingStore.mockReturnValue({
+      getTermsAccepted: () => true,
+    });
+
+    const { logger } = await import('./logger');
+
+    logger.error({
+      message: 'Test error with custom tags',
+      tags: { dbQueueName: 'write', sqliteErrorCode: 'SQLITE_IOERR' },
+    });
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: {
+          dbQueueName: 'write',
+          sqliteErrorCode: 'SQLITE_IOERR',
+          source: 'electron-main',
+        },
+      }),
+    );
+  });
+
+  it('should not let custom tags override the source tag', async () => {
+    mockGetSettingStore.mockReturnValue({
+      getTermsAccepted: () => true,
+    });
+
+    const { logger } = await import('./logger');
+
+    logger.error({
+      message: 'Test error with conflicting source tag',
+      tags: { source: 'malicious-override' },
+    });
+
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: { source: 'electron-main' },
+      }),
+    );
+  });
+
   describe('warnWithSentry', () => {
     it('should not send to Sentry when terms are not accepted', async () => {
       mockGetSettingStore.mockReturnValue({

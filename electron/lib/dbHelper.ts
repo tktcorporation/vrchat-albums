@@ -22,6 +22,7 @@ export type DBHelperError =
 const READ_QUEUE_CONFIG = {
   concurrency: 3, // 読み取り専用クエリなので並行実行可能
   timeout: 20000, // 20秒に短縮
+  label: 'read', // Sentry上で書き込みキューと区別するためのラベル
 };
 
 /**
