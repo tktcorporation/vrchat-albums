@@ -114,16 +114,6 @@ const buildDBQueueErrorInfo = (
   };
 };
 
-const QUERY_LABEL_MAX_LENGTH = 60;
-
-/** ログ用にクエリ文字列を1行・先頭 N 文字に要約する。 */
-const buildQueryTaskLabel = (query: string): string => {
-  const singleLine = query.replace(/\s+/g, ' ').trim();
-  return singleLine.length > QUERY_LABEL_MAX_LENGTH
-    ? `${singleLine.slice(0, QUERY_LABEL_MAX_LENGTH)}…`
-    : singleLine;
-};
-
 /**
  * データベースアクセスのためのキュー
  * - 同時実行数を制限してデータベースアクセスをキューイングする
@@ -280,7 +270,10 @@ class DBQueue {
    * @param query 実行するSQLクエリ
    * @returns クエリの実行結果
    *
-   * Note: 予期しないエラーはそのまま throw され Sentry に送信される
+   * Note: 予期しないエラーはそのまま throw され Sentry に送信される。
+   * query はデバッグ用SQLコンソール（electron/module/debug/debugController.ts）経由で
+   * 任意のユーザー入力になり得るため、taskLabel には含めない
+   * （クエリ文字列に含まれ得るプレイヤー名等の個人情報がSentryに送信されるのを防ぐ）。
    */
   async query(query: string): Promise<unknown[]> {
     return this.add(async () => {
@@ -289,7 +282,7 @@ class DBQueue {
         type: 'SELECT',
       });
       return result;
-    }, buildQueryTaskLabel(query));
+    });
   }
 
   /**
@@ -297,7 +290,8 @@ class DBQueue {
    * @param query 実行するSQLクエリ
    * @returns クエリの実行結果をEffect型でラップ
    *
-   * Note: 予期しないエラーは addWithResult 内で throw され Sentry に送信される
+   * Note: 予期しないエラーは addWithResult 内で throw され Sentry に送信される。
+   * query をtaskLabelに含めない理由は query() のコメントを参照。
    */
   queryWithResult(query: string): Effect.Effect<unknown[], DBQueueError> {
     return this.addWithResult(async () => {
@@ -306,7 +300,7 @@ class DBQueue {
         type: 'SELECT',
       });
       return result;
-    }, buildQueryTaskLabel(query));
+    });
   }
 
   /**

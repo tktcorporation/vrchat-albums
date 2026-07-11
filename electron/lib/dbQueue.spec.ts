@@ -412,6 +412,29 @@ describe('DBQueue', () => {
       expect(readQueueCall).toBeDefined();
     });
 
+    it('queryWithResultはクエリ文字列（デバッグコンソール経由のユーザー入力）をログに含めないこと', async () => {
+      const queue = getDBQueue();
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const sensitiveQuery =
+        "SELECT * FROM vrchat_world_join_logs WHERE player_name = 'SecretPlayerName'";
+
+      const originalClient = getRDBClient().__client;
+      getRDBClient().__client.query = vi
+        .fn()
+        .mockRejectedValue(new Error('syntax error'));
+
+      await expect(
+        Effect.runPromise(queue.queryWithResult(sensitiveQuery)),
+      ).rejects.toThrow('syntax error');
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const [params] = errorSpy.mock.calls[0];
+      expect(params.message).not.toContain('SecretPlayerName');
+      expect(JSON.stringify(params.details)).not.toContain('SecretPlayerName');
+
+      getRDBClient().__client = originalClient;
+    });
+
     it('SQLiteエラーコードを持たない予期しないエラーではsqliteErrorCodeを含めないこと', async () => {
       const queue = getDBQueue();
       const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
