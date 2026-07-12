@@ -32,6 +32,11 @@ interface ErrorLogParams {
   message: unknown;
   stack?: Error;
   details?: Record<string, unknown>;
+  /**
+   * Sentry の tags に追加するフィールド（フィルタ・グルーピングに使う低カーディナリティな値向け）。
+   * source は常にこの関数側の値で上書きする（呼び出し元からは変更不可、下記マージ順）。
+   */
+  tags?: Record<string, string>;
 }
 
 /**
@@ -149,7 +154,7 @@ const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
 /**
  * Sentry への送信も行うエラー出力用ラッパー関数。
  */
-const error = ({ message, stack, details }: ErrorLogParams): void => {
+const error = ({ message, stack, details, tags }: ErrorLogParams): void => {
   const normalizedError = normalizeError(message);
   const errorInfo = buildErrorInfo({ message, stack });
 
@@ -209,6 +214,7 @@ const error = ({ message, stack, details }: ErrorLogParams): void => {
               : {}),
           },
           tags: {
+            ...tags,
             source: 'electron-main',
             ...(userFacingError ? { hasUserFacingWrapper: 'true' } : {}),
           },

@@ -451,7 +451,7 @@ export function loadLogInfoIndexFromVRChatLog({
             details: { current, total: newLogs.length },
           });
         }
-      })
+      }, 'logInfo.batchInsert')
       .pipe(Effect.orDie);
     const batchProcessEndTime = performance.now();
     logger.info(

@@ -1,6 +1,7 @@
 import { Cause, Effect, Exit, Option } from 'effect';
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -10,6 +11,7 @@ import {
 } from 'vitest';
 
 import DBQueue, { getDBQueue, resetDBQueue } from './dbQueue';
+import { logger } from './logger';
 import {
   __cleanupTestRDBClient,
   __forceSyncRDBClient,
@@ -351,5 +353,155 @@ describe('DBQueue', () => {
     await queue.onIdle();
 
     expect(queue.isIdle).toBe(true);
+  });
+
+  describe('Sentryトリアージ用のエラー情報', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('addWithResultでSQLiteエラーコードを持つエラーの場合、コードとタスク名をログに含めること', async () => {
+      const queue = getDBQueue();
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      // SequelizeDatabaseError 相当: 生のドライバエラー（.code 付き）を cause に保持する
+      const driverError = Object.assign(new Error('disk I/O error'), {
+        code: 'SQLITE_IOERR',
+      });
+      const sequelizeLikeError = new Error('SQLITE_IOERR: disk I/O error', {
+        cause: driverError,
+      });
+      const task = vi.fn().mockRejectedValue(sequelizeLikeError);
+
+      await expect(
+        Effect.runPromise(queue.addWithResult(task, 'test.batchInsert')),
+      ).rejects.toThrow('SQLITE_IOERR: disk I/O error');
+
+      const taskLabeledCall = errorSpy.mock.calls.find(
+        ([params]) => params.details?.task === 'test.batchInsert',
+      );
+      expect(taskLabeledCall?.[0]).toMatchObject({
+        message: expect.stringContaining('SQLITE_IOERR'),
+        details: {
+          queue: 'write',
+          task: 'test.batchInsert',
+          sqliteErrorCode: 'SQLITE_IOERR',
+        },
+        tags: {
+          dbQueueName: 'write',
+          sqliteErrorCode: 'SQLITE_IOERR',
+        },
+      });
+    });
+
+    it('読み取り用キューではqueueラベルが read になること', async () => {
+      resetDBQueue();
+      const queue = getDBQueue({ concurrency: 3, label: 'read' });
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      const error = new Error('read query failed');
+      const task = vi.fn().mockRejectedValue(error);
+
+      await expect(
+        Effect.runPromise(queue.addWithResult(task)),
+      ).rejects.toThrow('read query failed');
+
+      const readQueueCall = errorSpy.mock.calls.find(
+        ([params]) => params.details?.queue === 'read',
+      );
+      expect(readQueueCall).toBeDefined();
+    });
+
+    it('queryWithResultはクエリ文字列（デバッグコンソール経由のユーザー入力）をログに含めないこと', async () => {
+      const queue = getDBQueue();
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const sensitiveQuery =
+        "SELECT * FROM vrchat_world_join_logs WHERE player_name = 'SecretPlayerName'";
+
+      const originalClient = getRDBClient().__client;
+      getRDBClient().__client.query = vi
+        .fn()
+        .mockRejectedValue(new Error('syntax error'));
+
+      await expect(
+        Effect.runPromise(queue.queryWithResult(sensitiveQuery)),
+      ).rejects.toThrow('syntax error');
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const [params] = errorSpy.mock.calls[0];
+      expect(params.message).not.toContain('SecretPlayerName');
+      expect(JSON.stringify(params.details)).not.toContain('SecretPlayerName');
+
+      getRDBClient().__client = originalClient;
+    });
+
+    it('SQLiteエラーコードを持たない予期しないエラーではsqliteErrorCodeを含めないこと', async () => {
+      const queue = getDBQueue();
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      const error = new Error('plain unexpected error');
+      const task = vi.fn().mockRejectedValue(error);
+
+      await expect(
+        Effect.runPromise(queue.addWithResult(task, 'test.plainError')),
+      ).rejects.toThrow('plain unexpected error');
+
+      const taskLabeledCall = errorSpy.mock.calls.find(
+        ([params]) => params.details?.task === 'test.plainError',
+      );
+      expect(taskLabeledCall?.[0].details).not.toHaveProperty(
+        'sqliteErrorCode',
+      );
+    });
+
+    it('cause を持たずエラー自身に code がある場合もSQLiteエラーコードを抽出すること', async () => {
+      const queue = getDBQueue();
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      const errorWithDirectCode = Object.assign(
+        new Error('SQLITE_BUSY: database is locked'),
+        { code: 'SQLITE_BUSY' },
+      );
+      const task = vi.fn().mockRejectedValue(errorWithDirectCode);
+
+      await expect(
+        Effect.runPromise(queue.addWithResult(task, 'test.directCode')),
+      ).rejects.toThrow('SQLITE_BUSY: database is locked');
+
+      const taskLabeledCall = errorSpy.mock.calls.find(
+        ([params]) => params.details?.task === 'test.directCode',
+      );
+      expect(taskLabeledCall?.[0].details).toMatchObject({
+        sqliteErrorCode: 'SQLITE_BUSY',
+      });
+    });
+
+    it('addではエラー発生時にキュー/タスクの情報を付与してログ出力すること', async () => {
+      const queue = getDBQueue();
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      const error = new Error('add() unexpected error');
+      const task = vi.fn().mockRejectedValue(error);
+
+      await expect(queue.add(task, 'test.addTask')).rejects.toThrow(
+        'add() unexpected error',
+      );
+
+      const taskLabeledCall = errorSpy.mock.calls.find(
+        ([params]) => params.details?.task === 'test.addTask',
+      );
+      expect(taskLabeledCall?.[0]).toMatchObject({
+        message: expect.stringContaining('test.addTask'),
+        details: { queue: 'write', task: 'test.addTask' },
+      });
+    });
+
+    it('label はインスタンスの同一性判定（getConfigHash）に影響しないこと', () => {
+      resetDBQueue();
+      const queueA = getDBQueue({ concurrency: 5, label: 'a' });
+      const queueB = getDBQueue({ concurrency: 5, label: 'b' });
+
+      expect(queueA).toBe(queueB);
+    });
   });
 });

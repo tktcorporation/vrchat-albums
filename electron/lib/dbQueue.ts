@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 import PQueue from 'p-queue';
 import { match, P } from 'ts-pattern';
 
+import { toError } from './errorMapping';
 import { logger } from './logger';
 import { getRDBClient } from './sequelize';
 
@@ -42,7 +43,76 @@ interface DBQueueOptions {
    * @default 'wait'
    */
   onFull?: 'throw' | 'wait';
+  /**
+   * ログ/Sentry上でこのキューを識別するためのラベル（例: 'write' / 'read'）。
+   * getConfigHash には含めない（含めると同一設定のキューがラベル違いで
+   * 複数インスタンスに分裂し、concurrency による直列化の保証が壊れるため）。
+   * @default 'write'
+   */
+  label?: string;
 }
+
+/**
+ * SequelizeDatabaseError は生のドライバエラー（sqlite3 の SQLITE_IOERR 等）を
+ * .cause に保持する。Sentry 上でエラー種別を判別できるよう、
+ * まず cause から、無ければ error 自身から SQLite のエラーコードを取り出す。
+ */
+const extractSqliteErrorCode = (error: unknown): string | undefined =>
+  match(error)
+    .with(
+      P.intersection(P.instanceOf(Error), { cause: { code: P.string } }),
+      (e) => e.cause.code,
+    )
+    .with(
+      P.intersection(P.instanceOf(Error), { code: P.string }),
+      (e) => e.code,
+    )
+    .otherwise(() => undefined);
+
+interface DBQueueLogContext {
+  queueLabel: string;
+  taskLabel?: string;
+}
+
+interface DBQueueErrorInfo {
+  normalizedError: Error;
+  sqliteErrorCode: string | undefined;
+  prefix: string;
+  details: Record<string, unknown>;
+  tags: Record<string, string>;
+}
+
+/**
+ * DBQueue 内のエラーログ呼び出しで共通利用する、Sentry トリアージ用の情報一式を組み立てる。
+ * message 文言は呼び出し元ごとに異なるため、ここでは details/tags と組み立て済みの
+ * prefix のみを返し、文言の最終形は各呼び出し元に委ねる。
+ */
+const buildDBQueueErrorInfo = (
+  error: unknown,
+  context: DBQueueLogContext,
+): DBQueueErrorInfo => {
+  const normalizedError = toError(error);
+  const sqliteErrorCode = extractSqliteErrorCode(error);
+  const prefix = `DBQueue[${context.queueLabel}${
+    context.taskLabel ? `:${context.taskLabel}` : ''
+  }]`;
+
+  return {
+    normalizedError,
+    sqliteErrorCode,
+    prefix,
+    details: {
+      queue: context.queueLabel,
+      ...(context.taskLabel ? { task: context.taskLabel } : {}),
+      errorName: normalizedError.name,
+      ...(sqliteErrorCode ? { sqliteErrorCode } : {}),
+    },
+    tags: {
+      dbQueueName: context.queueLabel,
+      ...(sqliteErrorCode ? { sqliteErrorCode } : {}),
+    },
+  };
+};
 
 /**
  * データベースアクセスのためのキュー
@@ -62,28 +132,22 @@ class DBQueue {
       maxSize: options.maxSize ?? Number.POSITIVE_INFINITY,
       timeout: options.timeout ?? 60000,
       onFull: options.onFull ?? 'wait',
+      label: options.label ?? 'write',
     };
 
     this.queue = new PQueue({
       concurrency: this.options.concurrency,
       timeout: this.options.timeout,
     });
-
-    // エラーが発生した場合のみログ出力
-    this.queue.on('error', (error) => {
-      logger.error({
-        message: 'DBQueue: エラーが発生しました',
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
-    });
   }
 
   /**
    * キューにタスクを追加して実行する
    * @param task 実行するタスク関数
+   * @param taskLabel ログ/Sentry上でタスクを識別するためのラベル（例: 'logInfo.batchInsert'）
    * @returns タスクの実行結果
    */
-  async add<T>(task: () => Promise<T>): Promise<T> {
+  async add<T>(task: () => Promise<T>, taskLabel?: string): Promise<T> {
     // キューが一杯かどうかをチェック（実行中＋待機中の合計）
     if (this.totalTasks >= this.options.maxSize) {
       if (this.options.onFull === 'throw') {
@@ -93,6 +157,11 @@ class DBQueue {
       await this.waitForSpace();
     }
 
+    const context: DBQueueLogContext = {
+      queueLabel: this.options.label,
+      taskLabel,
+    };
+
     // effect-lint-allow-try-catch: ts-pattern でエラー分類し予期しないエラーを再スローするパターン
     try {
       const result = await this.queue.add(task).then((r) => r);
@@ -101,13 +170,26 @@ class DBQueue {
       match(error)
         .with(
           P.intersection(P.instanceOf(Error), { name: 'TimeoutError' }),
-          () => {
+          (e) => {
+            const info = buildDBQueueErrorInfo(e, context);
             logger.error({
-              message: 'DBQueue: タスクがタイムアウトしました',
+              message: `${info.prefix}: タスクがタイムアウトしました: ${e.message}`,
+              details: info.details,
+              tags: info.tags,
             });
           },
         )
-        .otherwise(() => {});
+        .otherwise((e) => {
+          const info = buildDBQueueErrorInfo(e, context);
+          logger.error({
+            message: `${info.prefix}: タスク実行中にエラーが発生しました${
+              info.sqliteErrorCode ? ` (${info.sqliteErrorCode})` : ''
+            }: ${info.normalizedError.message}`,
+            stack: info.normalizedError,
+            details: info.details,
+            tags: info.tags,
+          });
+        });
       // すべてのエラーをre-throw
       throw error;
     }
@@ -116,9 +198,18 @@ class DBQueue {
   /**
    * キューにタスクを追加して実行する（Effect型を返す）
    * @param task 実行するタスク関数
+   * @param taskLabel ログ/Sentry上でタスクを識別するためのラベル（例: 'logInfo.batchInsert'）
    * @returns タスクの実行結果をEffect型でラップ
    */
-  addWithResult<T>(task: () => Promise<T>): Effect.Effect<T, DBQueueError> {
+  addWithResult<T>(
+    task: () => Promise<T>,
+    taskLabel?: string,
+  ): Effect.Effect<T, DBQueueError> {
+    const context: DBQueueLogContext = {
+      queueLabel: this.options.label,
+      taskLabel,
+    };
+
     return Effect.gen(this, function* () {
       if (this.totalTasks >= this.options.maxSize) {
         if (this.options.onFull === 'throw') {
@@ -143,21 +234,29 @@ class DBQueue {
             .with(
               P.intersection(P.instanceOf(Error), { name: 'TimeoutError' }),
               (e) => {
+                const info = buildDBQueueErrorInfo(e, context);
                 logger.error({
-                  message: 'DBQueue: タスクがタイムアウトしました',
+                  message: `${info.prefix}: タスクがタイムアウトしました: ${e.message}`,
                   stack: e,
+                  details: info.details,
+                  tags: info.tags,
                 });
                 return {
                   type: 'TASK_TIMEOUT' as const,
-                  message: `DBQueue: タスクがタイムアウトしました: ${e.message}`,
+                  message: `${info.prefix}: タスクがタイムアウトしました: ${e.message}`,
                 };
               },
             )
             .otherwise((e) => {
               // 予期せぬエラーの場合はログを出力して例外をスロー
+              const info = buildDBQueueErrorInfo(e, context);
               logger.error({
-                message: 'DBQueue: タスク実行中に予期せぬエラーが発生しました',
-                stack: e instanceof Error ? e : new Error(String(e)),
+                message: `${info.prefix}: タスク実行中に予期せぬエラーが発生しました${
+                  info.sqliteErrorCode ? ` (${info.sqliteErrorCode})` : ''
+                }: ${info.normalizedError.message}`,
+                stack: info.normalizedError,
+                details: info.details,
+                tags: info.tags,
               });
               throw e; // 予期せぬエラーはそのままスロー
             });
@@ -171,7 +270,10 @@ class DBQueue {
    * @param query 実行するSQLクエリ
    * @returns クエリの実行結果
    *
-   * Note: 予期しないエラーはそのまま throw され Sentry に送信される
+   * Note: 予期しないエラーはそのまま throw され Sentry に送信される。
+   * query はデバッグ用SQLコンソール（electron/module/debug/debugController.ts）経由で
+   * 任意のユーザー入力になり得るため、taskLabel には含めない
+   * （クエリ文字列に含まれ得るプレイヤー名等の個人情報がSentryに送信されるのを防ぐ）。
    */
   async query(query: string): Promise<unknown[]> {
     return this.add(async () => {
@@ -188,7 +290,8 @@ class DBQueue {
    * @param query 実行するSQLクエリ
    * @returns クエリの実行結果をEffect型でラップ
    *
-   * Note: 予期しないエラーは addWithResult 内で throw され Sentry に送信される
+   * Note: 予期しないエラーは addWithResult 内で throw され Sentry に送信される。
+   * query をtaskLabelに含めない理由は query() のコメントを参照。
    */
   queryWithResult(query: string): Effect.Effect<unknown[], DBQueueError> {
     return this.addWithResult(async () => {
@@ -209,11 +312,12 @@ class DBQueue {
    */
   transaction<T>(
     task: (transaction: Transaction) => Promise<T>,
+    taskLabel?: string,
   ): Effect.Effect<T, DBQueueError> {
     return this.addWithResult(async () => {
       const client = getRDBClient().__client;
       return client.transaction(task);
-    });
+    }, taskLabel);
   }
 
   /**
@@ -302,6 +406,11 @@ const instances = new Map<string, DBQueue>();
 
 /**
  * 設定からハッシュを生成する
+ *
+ * label は意図的に含めない（インスタンスの同一性はキューの実行特性
+ * concurrency/maxSize/timeout/onFull のみで決まる。label まで含めると
+ * 同一設定でラベルだけ異なる呼び出しがインスタンス分裂を起こし、
+ * concurrency による直列化の保証が壊れる）。
  */
 function getConfigHash(options: DBQueueOptions = {}): string {
   const normalizedOptions = {
