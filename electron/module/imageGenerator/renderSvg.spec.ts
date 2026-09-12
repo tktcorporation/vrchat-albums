@@ -1,14 +1,20 @@
 import { Cause, Effect, Exit, Option } from 'effect';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
-import { renderSvgToJpeg, renderSvgToPng } from './renderSvg';
+import { loadFonts, renderSvgToJpeg, renderSvgToPng } from './renderSvg';
+
+let fontFilePaths: string[];
+
+beforeAll(async () => {
+  fontFilePaths = await Effect.runPromise(loadFonts());
+});
 
 describe('renderSvgToPng', () => {
   it('should render a simple SVG to PNG buffer', async () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
       <rect width="100" height="100" fill="red"/>
     </svg>`;
-    const value = await Effect.runPromise(renderSvgToPng(svg));
+    const value = await Effect.runPromise(renderSvgToPng(svg, fontFilePaths));
     expect(value[0]).toBe(0x89); // PNG magic byte
     expect(value[1]).toBe(0x50);
     expect(value[2]).toBe(0x4e);
@@ -19,7 +25,7 @@ describe('renderSvgToPng', () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50">
       <text x="10" y="30" font-size="20" fill="black">Hello World</text>
     </svg>`;
-    const value = await Effect.runPromise(renderSvgToPng(svg));
+    const value = await Effect.runPromise(renderSvgToPng(svg, fontFilePaths));
     expect(value).toBeDefined();
   });
 
@@ -27,14 +33,16 @@ describe('renderSvgToPng', () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50">
       <text x="10" y="30" font-size="20" fill="black">テストワールド</text>
     </svg>`;
-    const value = await Effect.runPromise(renderSvgToPng(svg));
+    const value = await Effect.runPromise(renderSvgToPng(svg, fontFilePaths));
     expect(value).toBeDefined();
   });
 });
 
 describe('renderSvgToPng error handling', () => {
   it('should return SvgRenderFailed for invalid SVG', async () => {
-    const exit = await Effect.runPromiseExit(renderSvgToPng('not-valid-svg'));
+    const exit = await Effect.runPromiseExit(
+      renderSvgToPng('not-valid-svg', fontFilePaths),
+    );
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       const failOpt = Cause.failureOption(exit.cause);
@@ -46,7 +54,7 @@ describe('renderSvgToPng error handling', () => {
   });
 
   it('should return SvgRenderFailed for empty string', async () => {
-    const exit = await Effect.runPromiseExit(renderSvgToPng(''));
+    const exit = await Effect.runPromiseExit(renderSvgToPng('', fontFilePaths));
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       const failOpt = Cause.failureOption(exit.cause);
@@ -63,7 +71,9 @@ describe('renderSvgToJpeg', () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
       <rect width="100" height="100" fill="blue"/>
     </svg>`;
-    const value = await Effect.runPromise(renderSvgToJpeg(svg, 85));
+    const value = await Effect.runPromise(
+      renderSvgToJpeg(svg, fontFilePaths, 85),
+    );
     expect(value[0]).toBe(0xff); // JPEG magic byte
     expect(value[1]).toBe(0xd8);
   });

@@ -31,6 +31,8 @@ VRChat 写真をログファイルと自動関連付けする Electron デスク
 - 色の直接指定禁止 → セマンティックトークン使用 (`src/v2/constants/ui.ts`)
 - try-catch 禁止 → Effect TS 使用 (ADR-002)
 - テキストハードコード禁止 → `t()` 関数経由
+- Main プロセスでの同期 CPU バウンドなネイティブ処理（画像レンダリング等）の直接実行禁止 → worker_threads 必須 (ADR-005)
+- 副作用のない導出データ（決定的な入力→出力の計算）を tRPC の mutation として実装すること禁止 → query を使用 (ADR-006)
 
 ## ルール (`.claude/rules/`)
 

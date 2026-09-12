@@ -1,5 +1,5 @@
 import { Copy, Download, LoaderCircle } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { trpcReact } from '@/trpc';
 
@@ -58,8 +58,6 @@ export const ShareDialog = ({
   const { t } = useI18n();
   const { toast } = useToast();
   const [showAllPlayers, setShowAllPlayers] = useState(false);
-  const [previewBase64, setPreviewBase64] = useState<string | null>(null);
-  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
 
   // 画像のBase64変換をバックエンドに依頼
   const { data: base64Data, isLoading } =
@@ -69,58 +67,47 @@ export const ShareDialog = ({
       gcTime: 1000 * 60 * 30, // 30分間キャッシュを保持
     });
 
-  const generatePreviewMutation =
-    trpcReact.imageGenerator.generateSharePreview.useMutation();
-  const copyImageMutation =
-    trpcReact.electronUtil.copyImageDataByBase64.useMutation();
-  const downloadImageMutation =
-    trpcReact.electronUtil.downloadImageAsPhotoLogPng.useMutation();
-
   /**
-   * 共有用のプレビュー画像を Main プロセスで生成して state に保存する。
+   * 共有用のプレビュー画像を Main プロセスで生成する。
    *
-   * 背景: Canvas API への依存を排除するため、画像生成を tRPC 経由で
-   * Main プロセスの resvg-js ベースパイプラインに委譲する。
+   * 背景: 入力(worldName, base64Data, players, showAllPlayers)に対して
+   * 決定的な PNG を返す純粋な導出計算のため mutation ではなく query として扱う。
+   * react-query の queryKey は値の構造的ハッシュで比較されるため、
+   * `players` の配列参照が毎レンダー変わっても同じ内容なら再実行されない
+   * (ADR-006: docs/adr/006-derived-data-trpc-query-not-mutation.md)。
    */
-  const generatePreview = useCallback(async () => {
-    if (!base64Data || !worldName) {
-      return;
-    }
-    setIsGeneratingPreview(true);
-    // effect-lint-allow-try-catch: React フロントエンド境界
-    try {
-      const pngBase64 = await generatePreviewMutation.mutateAsync({
-        worldName,
-        imageBase64: base64Data,
-        players: players?.map((p) => ({ playerName: p.playerName })) ?? null,
-        showAllPlayers,
-      });
-      setPreviewBase64(pngBase64);
-    } catch {
+  const {
+    data: previewBase64,
+    isFetching: isGeneratingPreview,
+    error: previewError,
+  } = trpcReact.imageGenerator.generateSharePreview.useQuery(
+    {
+      worldName: worldName ?? '',
+      imageBase64: base64Data ?? '',
+      players: players?.map((p) => ({ playerName: p.playerName })) ?? null,
+      showAllPlayers,
+    },
+    {
+      enabled: Boolean(base64Data) && Boolean(worldName),
+      staleTime: Number.POSITIVE_INFINITY,
+      gcTime: 1000 * 60 * 30,
+    },
+  );
+
+  useEffect(() => {
+    if (previewError) {
       toast({
         title: t('locationHeader.share'),
         description: t('locationHeader.previewGenerationFailed'),
         variant: 'destructive',
       });
-    } finally {
-      setIsGeneratingPreview(false);
     }
-  }, [
-    base64Data,
-    worldName,
-    players,
-    showAllPlayers,
-    generatePreviewMutation,
-    toast,
-    t,
-  ]);
+  }, [previewError, toast, t]);
 
-  // base64Dataが変更されたら、プレビューを生成
-  useEffect(() => {
-    if (base64Data) {
-      void generatePreview();
-    }
-  }, [generatePreview, base64Data]);
+  const copyImageMutation =
+    trpcReact.electronUtil.copyImageDataByBase64.useMutation();
+  const downloadImageMutation =
+    trpcReact.electronUtil.downloadImageAsPhotoLogPng.useMutation();
 
   /** 生成済みの画像をクリップボードへコピーする */
   const handleCopyShareImageToClipboard = async () => {

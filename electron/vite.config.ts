@@ -64,7 +64,12 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'node20',
     lib: {
-      entry: { index: join(__dirname, 'index.ts') },
+      entry: {
+        index: join(__dirname, 'index.ts'),
+        // Main プロセスの応答性を保つため CPU バウンドな画像生成は
+        // worker_threads で実行する (ADR-005)。そのための独立エントリ。
+        renderWorker: join(__dirname, 'module/imageGenerator/renderWorker.ts'),
+      },
       formats: ['cjs'],
     },
     rolldownOptions: {

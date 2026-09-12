@@ -47,6 +47,17 @@ export class FileWriteFailed extends Data.TaggedError('FileWriteFailed')<{
   message: string;
 }> {}
 
+/**
+ * 画像生成 worker (worker_threads) が異常終了した
+ *
+ * 背景: 画像生成は Main プロセスの応答性を保つため worker_threads 上で実行する
+ * (ADR-005)。worker 側で予期しない Defect が発生した場合や worker プロセス自体が
+ * クラッシュした場合、worker の 'error'/'exit' イベントとしてのみ検知できる。
+ */
+export class WorkerCrashed extends Data.TaggedError('WorkerCrashed')<{
+  message: string;
+}> {}
+
 /** 画像生成エラーの Union 型 */
 export type ImageGenerationError =
   | WorldApiFailed
@@ -54,4 +65,5 @@ export type ImageGenerationError =
   | SvgRenderFailed
   | ImageConversionFailed
   | FontLoadFailed
-  | FileWriteFailed;
+  | FileWriteFailed
+  | WorkerCrashed;

@@ -14,7 +14,7 @@ import {
 } from './errors';
 
 let fontsLoaded = false;
-let fontFilePaths: string[] = [];
+let cachedFontFilePaths: string[] = [];
 
 /**
  * フォントファイルパスを解決する（初回のみ）
@@ -27,9 +27,9 @@ let fontFilePaths: string[] = [];
  * 2. 開発環境: electron/resources/fonts/ (__dirname からの相対パス)
  * 3. テスト環境: 同じ相対パスで解決（withElectronApp の fallback 経由）
  */
-const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
+export const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
   if (fontsLoaded) {
-    return Effect.succeed(fontFilePaths);
+    return Effect.succeed(cachedFontFilePaths);
   }
 
   const fontsDir = withElectronApp(
@@ -61,12 +61,12 @@ const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
 
   return Effect.try({
     try: () => {
-      fontFilePaths = fontFileNames
+      cachedFontFilePaths = fontFileNames
         .map((f) => path.join(fontsDir, f))
         .filter((p) => fs.existsSync(p));
       // フォントが0件でもスキャン済みとしてキャッシュし、毎回の再スキャンを防ぐ
       fontsLoaded = true;
-      return fontFilePaths;
+      return cachedFontFilePaths;
     },
     catch: (e): FontLoadFailed =>
       new FontLoadFailed({
@@ -83,31 +83,33 @@ const loadFonts = (): Effect.Effect<string[], ImageGenerationError> => {
  * resvg-js でラスタライズし、フォント埋め込み済みの PNG を出力する。
  * fitTo width=1600 は 800px SVG の 2x レンダリング用。
  *
- * 呼び出し元: renderSvgToJpeg(), imageGenerator service
+ * fontFilePaths は呼び出し元(Main プロセス)が loadFonts() で事前解決して渡す。
+ * resvg.render() は同期・CPU バウンドなネイティブ処理のため、この関数自体は
+ * worker_threads の中で呼ばれる想定で Electron API に依存させない
+ * (ADR-005: docs/adr/005-main-process-cpu-bound-worker-offload.md)。
+ *
+ * 呼び出し元: renderSvgToJpeg(), jobRunner.ts
  */
 export const renderSvgToPng = (
   svgString: string,
+  fontFilePaths: string[],
 ): Effect.Effect<Buffer, ImageGenerationError> =>
-  Effect.gen(function* () {
-    const fonts = yield* loadFonts();
-
-    return yield* Effect.try({
-      try: () => {
-        const resvg = new Resvg(svgString, {
-          font: {
-            fontFiles: fonts,
-            loadSystemFonts: false,
-          },
-          fitTo: { mode: 'width' as const, value: 1600 },
-        });
-        const pngData = resvg.render();
-        return Buffer.from(pngData.asPng());
-      },
-      catch: (e): SvgRenderFailed =>
-        new SvgRenderFailed({
-          message: e instanceof Error ? e.message : String(e),
-        }),
-    });
+  Effect.try({
+    try: () => {
+      const resvg = new Resvg(svgString, {
+        font: {
+          fontFiles: fontFilePaths,
+          loadSystemFonts: false,
+        },
+        fitTo: { mode: 'width' as const, value: 1600 },
+      });
+      const pngData = resvg.render();
+      return Buffer.from(pngData.asPng());
+    },
+    catch: (e): SvgRenderFailed =>
+      new SvgRenderFailed({
+        message: e instanceof Error ? e.message : String(e),
+      }),
   });
 
 /**
@@ -117,14 +119,16 @@ export const renderSvgToPng = (
  * PNG レンダリング後に @napi-rs/image で JPEG に変換する。
  *
  * @param svgString - 変換対象の SVG 文字列
+ * @param fontFilePaths - loadFonts() で事前解決したフォントファイルパス
  * @param quality - JPEG 品質 (1-100)。デフォルト 85
  */
 export const renderSvgToJpeg = (
   svgString: string,
+  fontFilePaths: string[],
   quality = 85,
 ): Effect.Effect<Buffer, ImageGenerationError> =>
   Effect.gen(function* () {
-    const pngBuffer = yield* renderSvgToPng(svgString);
+    const pngBuffer = yield* renderSvgToPng(svgString, fontFilePaths);
 
     return yield* Effect.tryPromise({
       try: () =>
