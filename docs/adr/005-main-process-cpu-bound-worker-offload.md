@@ -26,8 +26,9 @@ Main プロセスで同期的な CPU バウンドのネイティブ処理（画�
 - `workerClient.ts`: Main プロセス側の薄いディスパッチャ。Worker を spawn し、ジョブを送信して結果を Effect として受け取る。Worker のクラッシュ・異常終了・タイムアウトは `WorkerCrashed` エラーとして扱う。message/error/exit のいずれのイベントでも必ず一度は settle し、応答が一定時間（30秒）内に届かない場合はタイムアウトとして worker を強制終了する（`message` も `error` も届かないまま worker が終了した場合や、resvg が実際にハングした場合に Effect が永久に未解決になることを防ぐ）。
 - フォントパス解決（`loadFonts()`）など Electron API (`app.isPackaged` 等) に依存する処理は `fontPaths.ts` として Main プロセス側に分離し、解決済みの値のみを worker に渡す。worker 側の `renderSvg.ts`/`jobRunner.ts`/`renderWorker.ts` は Electron API を一切 import しない。
 - worker との通信で送るエラーは `Data.TaggedError` インスタンスではなく `{ _tag, message }` のプレーンオブジェクトに変換して送る。`Data.TaggedError` は `Error` のサブクラスであり、`postMessage` の構造化クローンは Error 系の値について `_tag` 等の独自プロパティを保持しない（name/message/stack のみ転送される）ため、変換を怠ると受信側で一切のエラーが再分類不能になる。
+- `renderWorkerProtocol.ts`: `renderWorker.ts` と `workerClient.ts` の双方が参照する `workerData` の目印（`RENDER_WORKER_KIND`）だけを持つ独立ファイル。Main プロセス側の `workerClient.ts` が `renderWorker.ts` を直接 import すると worker_threads 専用の副作用付きコードが Main のバンドルに巻き込まれるため、値の共有だけを目的に切り出している。この目印は、テストランナーが `pool: 'threads'` で動作した場合に `parentPort` の有無だけでは worker_threads の起動を判定できない（テストランナー自身のメッセージを誤って掴みうる）ことへの対策でもある。
 
-`electron/vite.config.ts` の `build.lib.entry` に `renderWorker` を独立エントリとして追加し、`main/renderWorker.cjs` としてビルドする。Main プロセスは常にビルド済み `main/index.cjs` から起動される（dev/packaged 共通）ため、`workerClient.ts` は自身の `__dirname`（= `main/`）からの相対パスで worker スクリプトを解決できる。
+`electron/vite.config.ts` の `build.lib.entry` に `renderWorker` を独立エントリとして追加し、`main/renderWorker.cjs` としてビルドする。Main プロセスは常にビルド済み `main/index.cjs` から起動される（dev/packaged 共通）ため、`workerClient.ts` は自身の `__dirname` からの相対パスで worker スクリプトを解決できる。ただしパッケージ済み (asar) 環境では `__dirname` が asar 内の仮想パスを指すため、`resolveWorkerScriptPath()` は `app.asar` を `app.asar.unpacked` に書き換えてから解決する（後述）。
 
 ## 根拠
 

@@ -22,7 +22,7 @@ Share プレビュー画像生成 `generateSharePreview` は `(worldName, imageB
 - 呼び出し元のオブジェクト参照が毎レンダー変わっても、内容が同じであれば再フェッチされない（例: `players.map(...)` が生成する新しい配列でも、要素の内容が同じなら同一の queryKey とみなされる）。
 - 「同じ入力に対しては1回しか計算しない」という不変条件が、`useEffect` の手動管理ではなく React Query のキャッシュ機構そのものによって構造的に保証される。
 
-これにより、`ShareDialog.tsx` から `useEffect` / `useCallback` / 生成結果を保持する `useState` が不要になり、コンポーネントは宣言的なデータフローのみで完結する。
+これにより、`ShareDialog.tsx` から手動オーケストレーション用の `useEffect` / `useCallback` / 生成結果を保持する `useState` が不要になる（エラー表示用の `useEffect` は残るが、これは `previewError` という安定した値の変化にのみ反応する単純なものであり、上記の壊れやすいパターンには該当しない）。
 
 ## 根拠
 
@@ -38,7 +38,7 @@ Share プレビュー画像生成 `generateSharePreview` は `(worldName, imageB
 ## 結果
 
 - `generateSharePreview` が `query` になったことで、`ShareDialog.tsx` から手動オーケストレーション用の `useEffect`/`useCallback`/`useState` が削除され、コードが単純になった。
-- `players` 配列の参照が毎レンダー変わっても、内容が同じであれば `generateSharePreview` は再実行されない（回帰テスト: `src/v2/components/LocationGroupHeader/ShareDialog.test.tsx`）。
+- `ShareDialog.test.tsx` は `trpcReact` をモックしているため React Query 自体の queryKey 比較は検証できないが、「`useMutation` ではなく `useQuery` を呼んでいること」と「`isOpen` に応じて `enabled` が正しく切り替わること」を回帰テストとして固定している。`players` 配列の参照が変わっても内容が同じなら再フェッチされないという性質自体は、React Query のドキュメント化された仕様（queryKey の構造的ハッシュ比較）に依拠している。
 
 ## 反証条件（ADR を見直すべき状況）
 

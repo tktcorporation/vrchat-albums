@@ -4,6 +4,7 @@ import { Worker } from 'node:worker_threads';
 import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 
+import { logger } from '../../lib/logger';
 import {
   ImageConversionFailed,
   SvgRenderFailed,
@@ -11,6 +12,7 @@ import {
 } from './errors';
 import type { ImageGenerationJob } from './jobRunner';
 import type { RenderWorkerResponse } from './renderWorker';
+import { RENDER_WORKER_KIND } from './renderWorkerProtocol';
 
 /**
  * renderWorker が応答しない場合に待つ上限時間。
@@ -27,11 +29,23 @@ const WORKER_RESPONSE_TIMEOUT_MILLIS = 30_000;
  *
  * Electron の Main プロセスは dev/packaged いずれも electron/vite.config.ts で
  * ビルドした main/index.cjs から起動される（`pnpm dev:electron` / `pnpm build:electron`
- * を参照）。renderWorker.cjs も同じ main/ 直下に出力されるため、
- * このモジュール自身の __dirname（= main/）からの単純な相対パスで解決できる。
+ * を参照）。renderWorker.cjs も同じ main/ 直下に出力される。
+ *
+ * パッケージ済み (asar) 環境では `__dirname` は asar 内の仮想パス
+ * （例: `.../resources/app.asar/main`）を指す。electron-builder.cjs の
+ * asarUnpack で `main/**` を実ファイルシステム側の `app.asar.unpacked/` にも
+ * 展開しているのは、worker_threads が asar 内スクリプトを読めるかどうかが
+ * 未検証のため (ADR-005)。この置換をせずに asar 内パスをそのまま渡すと、
+ * unpack した実体を一度も参照しない設定だけが残ってしまう。
  */
-const resolveWorkerScriptPath = (): string =>
-  path.join(__dirname, 'renderWorker.cjs');
+export const resolveWorkerScriptPath = (
+  dirname: string = __dirname,
+): string => {
+  const unpackedDirname = dirname.includes(`app.asar${path.sep}`)
+    ? dirname.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`)
+    : dirname;
+  return path.join(unpackedDirname, 'renderWorker.cjs');
+};
 
 type WorkerFailure = SvgRenderFailed | ImageConversionFailed | WorkerCrashed;
 
@@ -63,6 +77,24 @@ const reconstructError = (error: unknown): WorkerFailure =>
     );
 
 /**
+ * worker が予期せず異常終了・無応答になったことを WorkerCrashed として報告する。
+ *
+ * これは (SvgRenderFailed/ImageConversionFailed のような) worker 内で正しく
+ * 分類済みの期待されるエラーとは異なり、本来 Defect 相当の異常事態
+ * （native crash、ハング、ビルド不整合等）である。WorkerCrashed という
+ * 「予期されたエラー」型に変換してしまうと呼び出し元では通常のエラーとして
+ * 静かに扱われ、Sentry にも届かなくなる（.claude/rules/error-handling.md）。
+ * そのため変換前にここで明示的に Sentry へ送出する。
+ */
+const reportWorkerAnomaly = (message: string, cause?: Error): WorkerCrashed => {
+  logger.warnWithSentry({
+    message: `renderWorker anomaly: ${message}`,
+    stack: cause,
+  });
+  return new WorkerCrashed({ message });
+};
+
+/**
  * 画像生成ジョブを worker_threads 上で実行し、結果の Buffer を返す。
  *
  * 背景: resvg-js によるレンダリングは同期・CPU バウンドなネイティブ処理であり、
@@ -83,11 +115,22 @@ export const runInWorker = (
     // new Worker() が同期的に throw した場合（不正なパス・リソース枯渇等）は
     // Effect.async がそれを自動的に defect (予期しないエラー) として捕捉するため、
     // ここではラップしない (ADR-002: 予期しないエラーは再スロー/Sentry送信)
-    const worker = new Worker(workerScriptPath);
+    const worker = new Worker(workerScriptPath, {
+      workerData: { kind: RENDER_WORKER_KIND },
+    });
     let settled = false;
+    let cleanedUp = false;
 
     const cleanup = () => {
+      if (cleanedUp) {
+        return;
+      }
+      cleanedUp = true;
       worker.removeAllListeners();
+      // 上の removeAllListeners で 'error' リスナーも外れるため、
+      // cleanup 後に worker が 'error' を emit してもリスナー0件で
+      // 例外化しないよう空リスナーを残す
+      worker.on('error', () => {});
       void worker.terminate();
     };
 
@@ -101,21 +144,27 @@ export const runInWorker = (
     };
 
     worker.once('message', (message: RenderWorkerResponse) => {
-      if (message.ok) {
-        settle(Effect.succeed(Buffer.from(message.base64, 'base64')));
-      } else {
-        settle(Effect.fail(reconstructError(message.error)));
-      }
+      match(message)
+        .with({ ok: true, base64: P.string }, (m) =>
+          settle(Effect.succeed(Buffer.from(m.base64, 'base64'))),
+        )
+        .with({ ok: false }, (m) =>
+          settle(Effect.fail(reconstructError(m.error))),
+        )
+        .otherwise(() =>
+          settle(
+            Effect.fail(
+              reportWorkerAnomaly(
+                `renderWorker から不正な形式のメッセージを受信しました: ${JSON.stringify(message)}`,
+              ),
+            ),
+          ),
+        );
     });
 
     worker.once('error', (error) => {
-      settle(
-        Effect.fail(
-          new WorkerCrashed({
-            message: error instanceof Error ? error.message : String(error),
-          }),
-        ),
-      );
+      const cause = error instanceof Error ? error : new Error(String(error));
+      settle(Effect.fail(reportWorkerAnomaly(cause.message, cause)));
     });
 
     // message も 'error' も届かないまま終了した場合（code 0 を含む）も、
@@ -123,9 +172,9 @@ export const runInWorker = (
     worker.once('exit', (code) => {
       settle(
         Effect.fail(
-          new WorkerCrashed({
-            message: `renderWorker が応答を返さずに終了しました (exit code ${code})`,
-          }),
+          reportWorkerAnomaly(
+            `renderWorker が応答を返さずに終了しました (exit code ${code})`,
+          ),
         ),
       );
     });
@@ -137,8 +186,8 @@ export const runInWorker = (
     Effect.timeoutFail({
       duration: `${timeoutMillis} millis`,
       onTimeout: () =>
-        new WorkerCrashed({
-          message: `renderWorker が ${timeoutMillis}ms 以内に応答しませんでした`,
-        }),
+        reportWorkerAnomaly(
+          `renderWorker が ${timeoutMillis}ms 以内に応答しませんでした`,
+        ),
     }),
   );

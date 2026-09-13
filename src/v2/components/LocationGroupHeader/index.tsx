@@ -106,9 +106,9 @@ export const LocationGroupHeader = ({
   // Derived state
   const formattedDate = format(joinDateTime, 'yyyy年MM月dd日 HH:mm');
   // プレイヤーリストの重複を除去（rejoinしたプレイヤーが複数回表示されるのを防ぐ）
-  // useMemo: playersResult の内容が変わらない限り同じ配列参照を維持し、
-  // これを props で受け取る子コンポーネント（ShareDialog 等）の
-  // 不要な再計算・再フェッチの誘発源にならないようにする
+  // useMemo: findIndex を使った重複除去は O(n^2) のため、playersResult が
+  // 変わっていない毎レンダーで走らせない。また同じ配列参照を維持することで
+  // PlayerList 等の子コンポーネントの不要な再レンダーも防ぐ
   const players = useMemo(
     () =>
       Array.isArray(playersResult)

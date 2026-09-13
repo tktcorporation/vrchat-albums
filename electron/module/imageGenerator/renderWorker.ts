@@ -1,9 +1,10 @@
-import { parentPort } from 'node:worker_threads';
+import { parentPort, workerData } from 'node:worker_threads';
 
 import { Cause, Effect, Exit, Option } from 'effect';
 
 import type { ImageGenerationJob } from './jobRunner';
 import { runImageGenerationJob } from './jobRunner';
+import { RENDER_WORKER_KIND } from './renderWorkerProtocol';
 
 /**
  * worker_threads 経由でやり取りするレスポンス。
@@ -61,8 +62,9 @@ export const handleMessage = async (
 };
 
 // worker_threads の Worker としてロードされた場合のみ待ち受ける。
-// このモジュールをテストから import した場合は parentPort が無いため何もしない。
-if (parentPort) {
+// このモジュールをテストから import した場合は parentPort が無い（または
+// workerData が一致しない）ため何もしない。
+if (parentPort && workerData?.kind === RENDER_WORKER_KIND) {
   const port = parentPort;
   // worker は 1 ジョブごとに使い捨てる運用（workerClient.ts が毎回 new Worker() する）
   // ため once で受ける。on() の型は void を返すリスナーを期待するため、

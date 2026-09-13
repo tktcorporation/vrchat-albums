@@ -28,36 +28,84 @@ import { runInWorker } from './workerClient';
  */
 const projectRoot = path.resolve(import.meta.dirname, '../../..');
 const tmpBuildsRoot = path.join(projectRoot, '.vitest-tmp-builds');
-fs.mkdirSync(tmpBuildsRoot, { recursive: true });
-const testBuildDir = fs.mkdtempSync(path.join(tmpBuildsRoot, 'worker-'));
-const workerScriptPath = path.join(testBuildDir, 'renderWorker.cjs');
 
 // 1x1 の透明 PNG（テスト用の最小画像）
 const tinyPngBase64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
+/**
+ * renderWorker.cjs から到達可能な .cjs チャンクを再帰的に辿り、
+ * `require('electron')` が含まれていないことを検証する。
+ *
+ * 背景: ADR-005 は「worker からは Electron API を参照しない」という
+ * モジュール境界を主張しているが、これは rolldown のチャンク分割結果に
+ * 依存する。共有チャンクに Electron 依存のコードが1つ混ざるだけで
+ * 静かに壊れるため、実ビルド成果物に対してこの不変条件を固定する。
+ */
+function assertNoElectronDependency(entryPath: string): void {
+  const visited = new Set<string>();
+  const queue = [entryPath];
+
+  while (queue.length > 0) {
+    const currentPath = queue.pop();
+    if (!currentPath || visited.has(currentPath)) {
+      continue;
+    }
+    visited.add(currentPath);
+
+    const source = fs.readFileSync(currentPath, 'utf8');
+    if (/require\(["']electron["']\)/.test(source)) {
+      throw new Error(
+        `worker-safe であるべき ${currentPath} が require('electron') を含んでいます`,
+      );
+    }
+
+    const localRequirePattern = /require\(["'](\.\/[^"']+\.cjs)["']\)/g;
+    for (const match of source.matchAll(localRequirePattern)) {
+      queue.push(path.join(path.dirname(currentPath), match[1]));
+    }
+  }
+}
+
 describe('runInWorker (real worker_threads)', () => {
+  let testBuildDir: string;
+  let workerScriptPath: string;
+
   beforeAll(() => {
+    fs.mkdirSync(tmpBuildsRoot, { recursive: true });
+    testBuildDir = fs.mkdtempSync(path.join(tmpBuildsRoot, 'worker-'));
+    workerScriptPath = path.join(testBuildDir, 'renderWorker.cjs');
+
     // shell: true — Windows では pnpm は pnpm.cmd/.ps1 経由の実行になり、
-    // shell を介さない execFileSync は ENOENT になる（cross-platform CI 対応）
-    execFileSync(
-      'pnpm',
-      [
-        'exec',
-        'vite',
-        'build',
-        '-c',
-        'electron/vite.config.ts',
-        '--outDir',
-        testBuildDir,
-      ],
-      {
-        cwd: projectRoot,
-        stdio: 'pipe',
-        shell: true,
-        env: { ...process.env, SENTRY_DSN: '' },
-      },
-    );
+    // shell を介さない execFileSync は ENOENT になる（cross-platform CI 対応）。
+    // 引用符で囲むのは shell 経由でパスに空白が含まれても壊れないようにするため
+    try {
+      execFileSync(
+        'pnpm',
+        [
+          'exec',
+          'vite',
+          'build',
+          '-c',
+          'electron/vite.config.ts',
+          '--outDir',
+          `"${testBuildDir}"`,
+        ],
+        {
+          cwd: projectRoot,
+          shell: true,
+          env: { ...process.env, SENTRY_DSN: '' },
+        },
+      );
+    } catch (error) {
+      const stderr =
+        error && typeof error === 'object' && 'stderr' in error
+          ? String((error as { stderr: unknown }).stderr)
+          : '';
+      throw new Error(`worker のビルドに失敗しました:\n${stderr}`, {
+        cause: error,
+      });
+    }
     // expect() はテストブロック外では正しく機能しないため、ビルド成果物の
     // 欠落は beforeAll 自体を失敗させる明示的な throw で検知する
     if (!fs.existsSync(workerScriptPath)) {
@@ -65,7 +113,9 @@ describe('runInWorker (real worker_threads)', () => {
         `ビルド後も worker スクリプトが見つかりません: ${workerScriptPath}`,
       );
     }
-  }, 60_000);
+
+    assertNoElectronDependency(workerScriptPath);
+  }, 120_000);
 
   afterAll(() => {
     fs.rmSync(testBuildDir, { recursive: true, force: true });

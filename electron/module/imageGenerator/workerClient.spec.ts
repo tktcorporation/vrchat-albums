@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import * as path from 'node:path';
 
 import { Effect, Exit } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,7 +28,14 @@ vi.mock('node:worker_threads', () => ({
   },
 }));
 
-import { runInWorker } from './workerClient';
+const { warnWithSentrySpy } = vi.hoisted(() => ({
+  warnWithSentrySpy: vi.fn(),
+}));
+vi.mock('../../lib/logger', () => ({
+  logger: { warnWithSentry: warnWithSentrySpy },
+}));
+
+import { resolveWorkerScriptPath, runInWorker } from './workerClient';
 
 const job = {
   outputFormat: 'png' as const,
@@ -142,6 +150,41 @@ describe('runInWorker', () => {
     }
   });
 
+  it('should report worker error events to Sentry with the original stack (not silently swallowed as an expected error)', async () => {
+    // WorkerCrashed は ImageGenerationError の Union 型のメンバーであり
+    // 呼び出し元では「予期されたエラー」として扱われる。worker の 'error'
+    // (= 予期しない Defect 相当) をそのまま WorkerCrashed に変換するだけだと
+    // Sentry に届かなくなる
+    const exitPromise = Effect.runPromiseExit(
+      runInWorker(job, '/fake/worker.cjs'),
+    );
+    const worker = await waitForWorker();
+    const originalError = new Error('native crash');
+    worker.emit('error', originalError);
+
+    await exitPromise;
+    expect(warnWithSentrySpy).toHaveBeenCalledWith(
+      expect.objectContaining({ stack: originalError }),
+    );
+  });
+
+  it('should convert a malformed ok:true message without base64 into WorkerCrashed instead of crashing', async () => {
+    // ok: false 側は reconstructError で構造検証しているが、ok: true 側の
+    // base64 を無検証で Buffer.from に渡すと、欠落時に同期 throw して
+    // worker のメッセージハンドラ内で uncaught exception になりうる
+    const exitPromise = Effect.runPromiseExit(
+      runInWorker(job, '/fake/worker.cjs'),
+    );
+    const worker = await waitForWorker();
+    worker.emit('message', { ok: true });
+
+    const exit = await exitPromise;
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      expect(exit.cause.toString()).toContain('WorkerCrashed');
+    }
+  });
+
   it('should fail with WorkerCrashed when the worker exits with a non-zero code', async () => {
     const exitPromise = Effect.runPromiseExit(
       runInWorker(job, '/fake/worker.cjs'),
@@ -170,6 +213,7 @@ describe('runInWorker', () => {
     if (Exit.isFailure(exit)) {
       expect(exit.cause.toString()).toContain('WorkerCrashed');
     }
+    expect(warnWithSentrySpy).toHaveBeenCalled();
   });
 
   it('should fail with WorkerCrashed and terminate the worker when no response arrives within the timeout', async () => {
@@ -186,6 +230,7 @@ describe('runInWorker', () => {
       expect(exit.cause.toString()).toContain('WorkerCrashed');
     }
     expect(worker.terminate).toHaveBeenCalledTimes(1);
+    expect(warnWithSentrySpy).toHaveBeenCalled();
   });
 
   it('should not settle twice when exit fires after a successful message', async () => {
@@ -198,5 +243,30 @@ describe('runInWorker', () => {
 
     await resultPromise;
     expect(worker.terminate).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('resolveWorkerScriptPath', () => {
+  it('should resolve to a plain path unchanged in dev/test (no asar involved)', () => {
+    const dirname = path.join(path.sep, 'app', 'main');
+    expect(resolveWorkerScriptPath(dirname)).toBe(
+      path.join(dirname, 'renderWorker.cjs'),
+    );
+  });
+
+  it('should rewrite an asar-internal path to its unpacked counterpart', () => {
+    // asarUnpack で main/** を app.asar.unpacked/ 側にも展開しているが、
+    // Main プロセスの __dirname は asar 内の仮想パスを指すため、
+    // ここで書き換えないと unpack した実体が一度も参照されない
+    const dirname = path.join(path.sep, 'App', 'resources', 'app.asar', 'main');
+    const expected = path.join(
+      path.sep,
+      'App',
+      'resources',
+      'app.asar.unpacked',
+      'main',
+      'renderWorker.cjs',
+    );
+    expect(resolveWorkerScriptPath(dirname)).toBe(expected);
   });
 });
