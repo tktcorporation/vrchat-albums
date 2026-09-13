@@ -8,7 +8,7 @@ import {
   Share2,
   Users,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Badge } from '@/components/ui/badge';
@@ -106,12 +106,20 @@ export const LocationGroupHeader = ({
   // Derived state
   const formattedDate = format(joinDateTime, 'yyyy年MM月dd日 HH:mm');
   // プレイヤーリストの重複を除去（rejoinしたプレイヤーが複数回表示されるのを防ぐ）
-  const players = Array.isArray(playersResult)
-    ? playersResult.filter(
-        (player, index, arr) =>
-          arr.findIndex((p) => p.playerName === player.playerName) === index,
-      )
-    : null;
+  // useMemo: findIndex を使った重複除去は O(n^2) のため、playersResult が
+  // 変わっていない毎レンダーで走らせない。また同じ配列参照を維持することで
+  // PlayerList 等の子コンポーネントの不要な再レンダーも防ぐ
+  const players = useMemo(
+    () =>
+      Array.isArray(playersResult)
+        ? playersResult.filter(
+            (player, index, arr) =>
+              arr.findIndex((p) => p.playerName === player.playerName) ===
+              index,
+          )
+        : null,
+    [playersResult],
+  );
 
   // プレイヤーリスト表示のカスタムフック
   const {

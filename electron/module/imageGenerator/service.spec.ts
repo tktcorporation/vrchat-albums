@@ -1,39 +1,19 @@
 import { Effect } from 'effect';
-import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('./renderSvg', () => ({
-  renderSvgToPng: vi
-    .fn()
-    .mockReturnValue(Effect.succeed(Buffer.from('fake-png-data'))),
-  renderSvgToJpeg: vi
-    .fn()
-    .mockReturnValue(Effect.succeed(Buffer.from('fake-jpeg-data'))),
+vi.mock('./fontPaths', () => ({
+  loadFonts: vi.fn().mockReturnValue(Effect.succeed(['/fonts/Inter.ttf'])),
 }));
 
-vi.mock('./colorExtractor', () => ({
-  extractDominantColorsFromBuffer: vi.fn().mockResolvedValue({
-    primary: 'rgb(100, 50, 200)',
-    secondary: 'rgb(200, 210, 240)',
-    accent: 'rgb(180, 170, 220)',
-  }),
+vi.mock('./workerClient', () => ({
+  runInWorker: vi.fn().mockReturnValue(Effect.succeed(Buffer.from('rendered'))),
 }));
 
 import { generateSharePreview, generateWorldJoinImage } from './service';
+import { runInWorker } from './workerClient';
 
 describe('generateSharePreview', () => {
-  it('should return PNG base64 string on success', async () => {
-    const value = await Effect.runPromise(
-      generateSharePreview({
-        worldName: 'Test World',
-        imageBase64: 'dGVzdA==',
-        players: null,
-        showAllPlayers: false,
-      }),
-    );
-    expectTypeOf(value).toBeString();
-  });
-
-  it('should pass showAllPlayers to SVG template', async () => {
+  it('should resolve fonts on the Main process, then dispatch a PNG job to the worker', async () => {
     const value = await Effect.runPromise(
       generateSharePreview({
         worldName: 'Test World',
@@ -42,35 +22,39 @@ describe('generateSharePreview', () => {
         showAllPlayers: true,
       }),
     );
-    expect(value).toBeDefined();
+
+    expect(value).toBe(Buffer.from('rendered').toString('base64'));
+    expect(runInWorker).toHaveBeenCalledWith({
+      outputFormat: 'png',
+      worldName: 'Test World',
+      imageBase64: 'dGVzdA==',
+      players: [{ playerName: 'P1' }],
+      showAllPlayers: true,
+      fontFilePaths: ['/fonts/Inter.ttf'],
+    });
   });
 });
 
 describe('generateWorldJoinImage', () => {
-  it('should return JPEG buffer on success', async () => {
+  it('should always dispatch a JPEG job with showAllPlayers: true (world join records show every player)', async () => {
     const value = await Effect.runPromise(
       generateWorldJoinImage({
-        worldName: 'Test World',
+        worldName: 'Test',
         imageBase64: 'dGVzdA==',
         players: [{ playerName: 'Player1' }],
         joinDateTime: new Date('2024-01-15T12:00:00'),
       }),
     );
-    expect(Buffer.isBuffer(value)).toBe(true);
-  });
 
-  it('should always use showAllPlayers=true for world join images', async () => {
-    // This is an implicit test - generateWorldJoinImage always shows all players
-    const value = await Effect.runPromise(
-      generateWorldJoinImage({
-        worldName: 'Test',
-        imageBase64: 'dGVzdA==',
-        players: Array.from({ length: 100 }, (_, i) => ({
-          playerName: `P${i}`,
-        })),
-        joinDateTime: new Date(),
-      }),
-    );
-    expect(value).toBeDefined();
+    expect(Buffer.isBuffer(value)).toBe(true);
+    expect(runInWorker).toHaveBeenCalledWith({
+      outputFormat: 'jpeg',
+      worldName: 'Test',
+      imageBase64: 'dGVzdA==',
+      players: [{ playerName: 'Player1' }],
+      showAllPlayers: true,
+      fontFilePaths: ['/fonts/Inter.ttf'],
+      jpegQuality: 85,
+    });
   });
 });

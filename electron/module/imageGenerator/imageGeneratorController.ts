@@ -21,6 +21,12 @@ const mapImageGenerationError = mapToUnknownError(
  * 背景: Renderer 側の Canvas API ベース画像生成を Main プロセスに移行するため導入。
  * resvg-js を使い、Node.js 側で SVG → PNG 変換を行う。
  *
+ * generateSharePreview は入力に対して決定的な PNG を返す純粋な導出計算であり、
+ * サーバー側の状態変更を伴わない。mutation ではなく query として実装することで、
+ * react-query の queryKey（値の構造的ハッシュ）による重複排除・キャッシュが働き、
+ * 「同じ入力に対しては1回しか計算しない」という不変条件をライブラリ側に保証させる
+ * (ADR-006: docs/adr/006-derived-data-trpc-query-not-mutation.md)。
+ *
  * 呼び出し元: ShareDialog (src/v2/components/LocationGroupHeader/ShareDialog.tsx)
  */
 export const imageGeneratorRouter = trpcRouter({
@@ -34,7 +40,7 @@ export const imageGeneratorRouter = trpcRouter({
         showAllPlayers: z.boolean(),
       }),
     )
-    .mutation(({ input }) =>
+    .query(({ input }) =>
       runEffect(
         generateSharePreview(input).pipe(
           Effect.mapError(mapImageGenerationError),

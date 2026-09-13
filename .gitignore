@@ -47,3 +47,8 @@ worktrees/
 
 # Node compile cache
 node-compile-cache/
+
+# workerClient.integration.test.ts が一時ビルド出力に使う
+# (プロジェクト直下に置くのは @napi-rs/image 等の external native module を
+#  node_modules から解決させるため。os.tmpdir() だと解決チェーン外になる)
+.vitest-tmp-builds/

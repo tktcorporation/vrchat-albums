@@ -1,20 +1,21 @@
 import { Effect } from 'effect';
 
-import { extractDominantColorsFromBuffer } from './colorExtractor';
 import type { ImageGenerationError } from './errors';
-import { renderSvgToJpeg, renderSvgToPng } from './renderSvg';
-import { generatePreviewSvg } from './svgTemplate';
+import { loadFonts } from './fontPaths';
+import { runInWorker } from './workerClient';
 
 /**
  * Share プレビュー画像を生成する（PNG base64）
  *
- * 背景: 既存の Renderer ベース generatePreviewPng の置き換え。
- * Main プロセスで完結する画像生成パイプラインを構成し、
- * Canvas API への依存を排除する。
+ * 処理フロー: フォント解決(Main) → worker_threads へジョブ委譲
+ *   → 色抽出 → SVG テンプレート生成 → PNG レンダリング(worker) → base64 変換
  *
- * 処理フロー: 色抽出 → SVG テンプレート生成 → PNG レンダリング → base64 変換
+ * フォント解決は Electron API (`app.isPackaged` 等) に依存するため Main 側で行い、
+ * 解決済みパスのみを worker に渡す。それ以降の CPU バウンドな処理は
+ * Main プロセスの応答性を保つため worker_threads に完全にオフロードする
+ * (ADR-005: docs/adr/005-main-process-cpu-bound-worker-offload.md)。
  *
- * 呼び出し元: ShareDialog から tRPC 経由で呼ばれる
+ * 呼び出し元: ShareDialog から tRPC の query として呼ばれる
  */
 export const generateSharePreview = (params: {
   worldName: string;
@@ -23,17 +24,15 @@ export const generateSharePreview = (params: {
   showAllPlayers: boolean;
 }): Effect.Effect<string, ImageGenerationError> =>
   Effect.gen(function* () {
-    const imageBuffer = Buffer.from(params.imageBase64, 'base64');
-    const colors = yield* Effect.promise(() =>
-      extractDominantColorsFromBuffer(imageBuffer),
-    );
-
-    const { svg } = generatePreviewSvg({
-      ...params,
-      colors,
+    const fontFilePaths = yield* loadFonts();
+    const pngBuffer = yield* runInWorker({
+      outputFormat: 'png',
+      worldName: params.worldName,
+      imageBase64: params.imageBase64,
+      players: params.players,
+      showAllPlayers: params.showAllPlayers,
+      fontFilePaths,
     });
-
-    const pngBuffer = yield* renderSvgToPng(svg);
     return pngBuffer.toString('base64');
   });
 
@@ -43,8 +42,6 @@ export const generateSharePreview = (params: {
  * 背景: ワールド参加時に自動生成される記録用画像。
  * プレイヤーは全員表示（showAllPlayers 固定 true）で、
  * 省略表示なしの完全なプレイヤーリストを含む。
- *
- * 処理フロー: 色抽出 → SVG テンプレート生成 → JPEG レンダリング
  *
  * 呼び出し元: worldJoinImage/service.ts から呼ばれる
  */
@@ -56,18 +53,14 @@ export const generateWorldJoinImage = (params: {
   joinDateTime: Date;
 }): Effect.Effect<Buffer, ImageGenerationError> =>
   Effect.gen(function* () {
-    const imageBuffer = Buffer.from(params.imageBase64, 'base64');
-    const colors = yield* Effect.promise(() =>
-      extractDominantColorsFromBuffer(imageBuffer),
-    );
-
-    const { svg } = generatePreviewSvg({
+    const fontFilePaths = yield* loadFonts();
+    return yield* runInWorker({
+      outputFormat: 'jpeg',
       worldName: params.worldName,
       imageBase64: params.imageBase64,
       players: params.players,
       showAllPlayers: true,
-      colors,
+      fontFilePaths,
+      jpegQuality: 85,
     });
-
-    return yield* renderSvgToJpeg(svg, 85);
   });

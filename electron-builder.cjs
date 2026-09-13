@@ -24,6 +24,11 @@ const config = {
     'node_modules/sqlite3/**',
     'node_modules/clip-filepaths*/**',
     'node_modules/@vrchat-albums/exif-native*/**',
+    // renderWorker.cjs は worker_threads の Worker としてファイルパスから
+    // 読み込まれる (workerClient.ts)。asar 内スクリプトでの worker_threads 起動が
+    // 確実に動作する保証がないため、実ファイルシステムパスから読めるよう
+    // main/ ディレクトリ全体を unpack する (ADR-005)。
+    'main/**',
   ],
   publish: [
     {
