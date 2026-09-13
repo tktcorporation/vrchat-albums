@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.4
+
+### Patch Changes
+
+- [#835](https://github.com/tktcorporation/vrchat-albums/pull/835) [`824281c`](https://github.com/tktcorporation/vrchat-albums/commit/824281cf71745436f9f220ee88c0d584c9b7f706) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真一覧のグループヘッダーからシェアダイアログを開くとアプリ全体がフリーズして応答しなくなる不具合を修正しました。
+
 ## 0.30.3
 
 ### Patch Changes
