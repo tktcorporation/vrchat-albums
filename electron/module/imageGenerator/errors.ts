@@ -48,11 +48,12 @@ export class FileWriteFailed extends Data.TaggedError('FileWriteFailed')<{
 }> {}
 
 /**
- * 画像生成 worker (worker_threads) が異常終了した
+ * 画像生成 worker (worker_threads) が異常終了した、または応答しなかった
  *
  * 背景: 画像生成は Main プロセスの応答性を保つため worker_threads 上で実行する
- * (ADR-005)。worker 側で予期しない Defect が発生した場合や worker プロセス自体が
+ * (ADR-005)。worker 側で予期しない Defect が発生した場合や worker スレッド自体が
  * クラッシュした場合、worker の 'error'/'exit' イベントとしてのみ検知できる。
+ * また一定時間内に応答が届かない場合（ハング）もタイムアウトとしてこれに含める。
  */
 export class WorkerCrashed extends Data.TaggedError('WorkerCrashed')<{
   message: string;

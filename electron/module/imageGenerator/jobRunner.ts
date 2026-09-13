@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
 import { extractDominantColorsFromBuffer } from './colorExtractor';
-import type { ImageGenerationError } from './errors';
+import type { ImageConversionFailed, SvgRenderFailed } from './errors';
 import { renderSvgToJpeg, renderSvgToPng } from './renderSvg';
 import { generatePreviewSvg } from './svgTemplate';
 
@@ -28,6 +28,7 @@ export type ImageGenerationJob =
       worldName: string;
       imageBase64: string;
       players: { playerName: string }[] | null;
+      showAllPlayers: boolean;
       fontFilePaths: string[];
       jpegQuality: number;
     };
@@ -43,33 +44,27 @@ export type ImageGenerationJob =
  */
 export const runImageGenerationJob = (
   job: ImageGenerationJob,
-): Effect.Effect<Buffer, ImageGenerationError> =>
+): Effect.Effect<Buffer, SvgRenderFailed | ImageConversionFailed> =>
   Effect.gen(function* () {
     const imageBuffer = Buffer.from(job.imageBase64, 'base64');
     const colors = yield* Effect.promise(() =>
       extractDominantColorsFromBuffer(imageBuffer),
     );
 
+    const { svg } = generatePreviewSvg({
+      worldName: job.worldName,
+      imageBase64: job.imageBase64,
+      players: job.players,
+      showAllPlayers: job.showAllPlayers,
+      colors,
+    });
+
     return yield* match(job)
-      .with({ outputFormat: 'png' }, (pngJob) => {
-        const { svg } = generatePreviewSvg({
-          worldName: pngJob.worldName,
-          imageBase64: pngJob.imageBase64,
-          players: pngJob.players,
-          showAllPlayers: pngJob.showAllPlayers,
-          colors,
-        });
-        return renderSvgToPng(svg, pngJob.fontFilePaths);
-      })
-      .with({ outputFormat: 'jpeg' }, (jpegJob) => {
-        const { svg } = generatePreviewSvg({
-          worldName: jpegJob.worldName,
-          imageBase64: jpegJob.imageBase64,
-          players: jpegJob.players,
-          showAllPlayers: true,
-          colors,
-        });
-        return renderSvgToJpeg(svg, jpegJob.fontFilePaths, jpegJob.jpegQuality);
-      })
+      .with({ outputFormat: 'png' }, (pngJob) =>
+        renderSvgToPng(svg, pngJob.fontFilePaths),
+      )
+      .with({ outputFormat: 'jpeg' }, (jpegJob) =>
+        renderSvgToJpeg(svg, jpegJob.fontFilePaths, jpegJob.jpegQuality),
+      )
       .exhaustive();
   });

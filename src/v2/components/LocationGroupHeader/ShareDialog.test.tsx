@@ -63,19 +63,28 @@ describe('ShareDialog', () => {
     expect(generateSharePreviewUseQuery).toHaveBeenCalled();
   });
 
-  it('players が毎レンダー新しい配列参照でも、クエリ入力は内容が同じなら構造的に同一になる', () => {
-    const { rerender } = render(
-      <ShareDialog {...dialogProps} players={makePlayers()} />,
+  it('ダイアログが閉じている間はクエリを enabled にしない', () => {
+    // enabled に isOpen が抜けていると、閉じた後も base64Data がキャッシュされた
+    // ままになり、players の内容が変わるだけで誰も見ていないダイアログのために
+    // worker が起動されてしまう
+    render(
+      <ShareDialog {...dialogProps} isOpen={false} players={makePlayers()} />,
     );
-    const firstInput = generateSharePreviewUseQuery.mock.calls.at(-1)?.[0];
 
-    // LocationGroupHeader は players を毎レンダー新しい配列として生成しうる
-    // (内容が同じでも参照は変わる)。フリーズの原因だったのは、この不安定な参照が
-    // useEffect の依存配列に漏れ込み無限ループを起こしたことだった。
-    // ここではクエリ入力そのものが内容ベースで安定していることを確認する。
-    rerender(<ShareDialog {...dialogProps} players={makePlayers()} />);
-    const secondInput = generateSharePreviewUseQuery.mock.calls.at(-1)?.[0];
+    const [, options] = generateSharePreviewUseQuery.mock.calls.at(-1) as [
+      unknown,
+      { enabled: boolean },
+    ];
+    expect(options.enabled).toBe(false);
+  });
 
-    expect(secondInput).toStrictEqual(firstInput);
+  it('ダイアログが開いていて画像の base64 と worldName が揃っている間はクエリを enabled にする', () => {
+    render(<ShareDialog {...dialogProps} players={makePlayers()} />);
+
+    const [, options] = generateSharePreviewUseQuery.mock.calls.at(-1) as [
+      unknown,
+      { enabled: boolean },
+    ];
+    expect(options.enabled).toBe(true);
   });
 });

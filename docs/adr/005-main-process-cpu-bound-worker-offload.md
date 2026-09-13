@@ -23,8 +23,9 @@ Main プロセスで同期的な CPU バウンドのネイティブ処理（画�
 
 - `jobRunner.ts`: 色抽出・SVG テンプレート生成・レンダリングをまとめた、Electron API に依存しない純粋な入力→出力の関数。worker からもユニットテストからも同一ロジックとして呼び出せる。
 - `renderWorker.ts`: `worker_threads` の Worker エントリ。`parentPort` 経由でジョブを受け取り `jobRunner` を実行し、結果を `postMessage` で返す。Electron API には一切依存しない。
-- `workerClient.ts`: Main プロセス側の薄いディスパッチャ。Worker を spawn し、ジョブを送信して結果を Effect として受け取る。Worker のクラッシュ・異常終了は `WorkerCrashed` エラーとして扱う。
-- フォントパス解決（`loadFonts()`）など Electron API (`app.isPackaged` 等) に依存する処理は Main プロセス側で行い、解決済みの値のみを worker に渡す。worker 内で Electron API を参照しない。
+- `workerClient.ts`: Main プロセス側の薄いディスパッチャ。Worker を spawn し、ジョブを送信して結果を Effect として受け取る。Worker のクラッシュ・異常終了・タイムアウトは `WorkerCrashed` エラーとして扱う。message/error/exit のいずれのイベントでも必ず一度は settle し、応答が一定時間（30秒）内に届かない場合はタイムアウトとして worker を強制終了する（`message` も `error` も届かないまま worker が終了した場合や、resvg が実際にハングした場合に Effect が永久に未解決になることを防ぐ）。
+- フォントパス解決（`loadFonts()`）など Electron API (`app.isPackaged` 等) に依存する処理は `fontPaths.ts` として Main プロセス側に分離し、解決済みの値のみを worker に渡す。worker 側の `renderSvg.ts`/`jobRunner.ts`/`renderWorker.ts` は Electron API を一切 import しない。
+- worker との通信で送るエラーは `Data.TaggedError` インスタンスではなく `{ _tag, message }` のプレーンオブジェクトに変換して送る。`Data.TaggedError` は `Error` のサブクラスであり、`postMessage` の構造化クローンは Error 系の値について `_tag` 等の独自プロパティを保持しない（name/message/stack のみ転送される）ため、変換を怠ると受信側で一切のエラーが再分類不能になる。
 
 `electron/vite.config.ts` の `build.lib.entry` に `renderWorker` を独立エントリとして追加し、`main/renderWorker.cjs` としてビルドする。Main プロセスは常にビルド済み `main/index.cjs` から起動される（dev/packaged 共通）ため、`workerClient.ts` は自身の `__dirname`（= `main/`）からの相対パスで worker スクリプトを解決できる。
 
@@ -39,11 +40,14 @@ Main プロセスで同期的な CPU バウンドのネイティブ処理（画�
 - 数ミリ秒〜十数ミリ秒程度で完了する軽量な同期処理（例: 小さな JSON のパース、短い文字列操作）は対象外。「Main プロセスの応答性を体感的に損なうか」で判断する。
 - ネイティブモジュールの読み込み自体（`require`）はブロッキングだが一過性のコストであり対象外。
 
+パッケージ済み (asar) 環境では、`electron-builder.cjs` の `asarUnpack` に `main/**` を追加し、Main プロセスの全ビルド成果物（`renderWorker.cjs` を含む）を asar の外（`app.asar.unpacked/`）に展開する。worker_threads の Worker を asar 内のスクリプトパスから起動できるかは検証手段がなく未確認のため、そもそも asar 経由にしないことでこのリスクを構造的に排除する。
+
 ## 結果
 
 - Share プレビュー画像生成は worker_threads 上で実行され、レンダリング中も Main プロセス・ウィンドウは応答可能な状態を維持する。
 - 同じ画像生成パイプラインを使う `generateWorldJoinImage`（ワールド参加時の自動画像生成）も同じ経路に統一され、ログ同期処理中の Main プロセスブロックも解消される。
 - 今後 Main プロセスに重い処理を追加する際、同じ `jobRunner` / `renderWorker` / `workerClient` の構成パターンを踏襲することで再発を防止できる。
+- `pnpm pack`（electron-builder の `--dir` ビルド）で実際にパッケージし、`app.asar.unpacked/main/` に `renderWorker.cjs` を含む全ビルド成果物が展開されることを確認済み。実機での GUI 起動（インストーラ経由の起動確認）はこの開発環境に表示デバイスがないため未実施。
 
 ## 反証条件（ADR を見直すべき状況）
 

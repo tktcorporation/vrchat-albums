@@ -61,6 +61,7 @@ describe('runImageGenerationJob (jpeg)', () => {
         worldName: 'Test World',
         imageBase64: 'dGVzdA==',
         players: [{ playerName: 'Player1' }],
+        showAllPlayers: true,
         fontFilePaths: [],
         jpegQuality: 85,
       }),
@@ -68,7 +69,9 @@ describe('runImageGenerationJob (jpeg)', () => {
     expect(Buffer.isBuffer(value)).toBe(true);
   });
 
-  it('should always render with showAllPlayers=true for jpeg (world join) jobs', async () => {
+  it('should render the SVG with the showAllPlayers value the job specifies', async () => {
+    // showAllPlayers を true 固定にする判断は呼び出し元 (service.ts) の責務であり、
+    // jobRunner は job の値をそのまま SVG テンプレートへ渡すだけであることを確認する
     await Effect.runPromise(
       runImageGenerationJob({
         outputFormat: 'jpeg',
@@ -77,6 +80,7 @@ describe('runImageGenerationJob (jpeg)', () => {
         players: Array.from({ length: 100 }, (_, i) => ({
           playerName: `P${i}`,
         })),
+        showAllPlayers: true,
         fontFilePaths: [],
         jpegQuality: 85,
       }),

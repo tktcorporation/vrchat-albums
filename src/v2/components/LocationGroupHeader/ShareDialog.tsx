@@ -88,21 +88,25 @@ export const ShareDialog = ({
       showAllPlayers,
     },
     {
-      enabled: Boolean(base64Data) && Boolean(worldName),
+      // isOpen も条件に含める: ダイアログを閉じても base64Data はキャッシュに
+      // 残り続けるため、これが無いと閉じた後に players の内容が変わるだけで
+      // queryKey が変化し、誰も見ていないダイアログのために worker が
+      // 起動されてしまう
+      enabled: isOpen && Boolean(base64Data) && Boolean(worldName),
       staleTime: Number.POSITIVE_INFINITY,
       gcTime: 1000 * 60 * 30,
     },
   );
 
   useEffect(() => {
-    if (previewError) {
+    if (isOpen && previewError) {
       toast({
         title: t('locationHeader.share'),
         description: t('locationHeader.previewGenerationFailed'),
         variant: 'destructive',
       });
     }
-  }, [previewError, toast, t]);
+  }, [isOpen, previewError, toast, t]);
 
   const copyImageMutation =
     trpcReact.electronUtil.copyImageDataByBase64.useMutation();

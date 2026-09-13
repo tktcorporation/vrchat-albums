@@ -1,7 +1,8 @@
 import { Cause, Effect, Exit, Option } from 'effect';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { loadFonts, renderSvgToJpeg, renderSvgToPng } from './renderSvg';
+import { loadFonts } from './fontPaths';
+import { renderSvgToJpeg, renderSvgToPng } from './renderSvg';
 
 let fontFilePaths: string[];
 

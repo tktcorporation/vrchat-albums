@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('./renderSvg', () => ({
+vi.mock('./fontPaths', () => ({
   loadFonts: vi.fn().mockReturnValue(Effect.succeed(['/fonts/Inter.ttf'])),
 }));
 
@@ -36,7 +36,7 @@ describe('generateSharePreview', () => {
 });
 
 describe('generateWorldJoinImage', () => {
-  it('should always dispatch a JPEG job with showAllPlayers implied (worker enforces it)', async () => {
+  it('should always dispatch a JPEG job with showAllPlayers: true (world join records show every player)', async () => {
     const value = await Effect.runPromise(
       generateWorldJoinImage({
         worldName: 'Test',
@@ -52,6 +52,7 @@ describe('generateWorldJoinImage', () => {
       worldName: 'Test',
       imageBase64: 'dGVzdA==',
       players: [{ playerName: 'Player1' }],
+      showAllPlayers: true,
       fontFilePaths: ['/fonts/Inter.ttf'],
       jpegQuality: 85,
     });

@@ -10,39 +10,48 @@ import { runImageGenerationJob } from './jobRunner';
  *
  * Buffer は base64 文字列に変換して渡す（構造化クローンの transferable 管理を
  * 呼び出し側・worker 側の双方に持たせないための単純化）。
- * error は Data.TaggedError インスタンスではなく `_tag` を持つプレーンオブジェクトになる
- * (構造化クローンでプロトタイプチェーンは失われるが、Effect.catchTag は `_tag` の
- * 構造的一致で判定するため呼び出し側での再分類に支障はない)。
+ *
+ * error は `{ _tag, message }` のプレーンオブジェクトで明示的に組み立てる。
+ * `Data.TaggedError` は `Error` のサブクラスであり、構造化クローンの Error 経路は
+ * name/message/stack のみを転送して `_tag` 等の独自プロパティを破棄するため、
+ * TaggedError インスタンスをそのまま postMessage すると `_tag` が失われ
+ * workerClient.ts 側で一切のエラーが再分類不能になる。ここで先に安全な
+ * プレーンオブジェクトへ変換しておくことで、その罠を踏まない。
  */
 export type RenderWorkerResponse =
   | { ok: true; base64: string }
-  | { ok: false; error: unknown };
+  | {
+      ok: false;
+      error: {
+        _tag: 'SvgRenderFailed' | 'ImageConversionFailed';
+        message: string;
+      };
+    };
 
-if (!parentPort) {
-  throw new Error(
-    'renderWorker.ts は worker_threads の Worker としてのみ実行できます',
-  );
-}
-
-const port = parentPort;
-
-const handleMessage = async (job: ImageGenerationJob): Promise<void> => {
+/**
+ * ジョブを実行し、結果を `postMessage` 用のレスポンスへ変換して渡す。
+ *
+ * `postMessage` を引数として受け取ることで、実際の worker_threads の
+ * postMessage を経由せずにこの変換ロジック単体をユニットテストできる
+ * (renderWorker.spec.ts)。
+ */
+export const handleMessage = async (
+  job: ImageGenerationJob,
+  postMessage: (response: RenderWorkerResponse) => void,
+): Promise<void> => {
   const exit = await Effect.runPromiseExit(runImageGenerationJob(job));
 
   if (Exit.isSuccess(exit)) {
-    port.postMessage({
-      ok: true,
-      base64: exit.value.toString('base64'),
-    } satisfies RenderWorkerResponse);
+    postMessage({ ok: true, base64: exit.value.toString('base64') });
     return;
   }
 
   const failure = Cause.failureOption(exit.cause);
   if (Option.isSome(failure)) {
-    port.postMessage({
+    postMessage({
       ok: false,
-      error: failure.value,
-    } satisfies RenderWorkerResponse);
+      error: { _tag: failure.value._tag, message: failure.value.message },
+    });
     return;
   }
 
@@ -51,9 +60,16 @@ const handleMessage = async (job: ImageGenerationJob): Promise<void> => {
   throw Cause.squash(exit.cause);
 };
 
-// on() の型は void を返すリスナーを期待するため、Promise を明示的に void 化する。
-// handleMessage が reject した場合は意図的に catch せず、unhandledRejection として
-// worker を終了させ、Main 側の 'error' イベントに変換させる。
-port.on('message', (job: ImageGenerationJob) => {
-  void handleMessage(job);
-});
+// worker_threads の Worker としてロードされた場合のみ待ち受ける。
+// このモジュールをテストから import した場合は parentPort が無いため何もしない。
+if (parentPort) {
+  const port = parentPort;
+  // worker は 1 ジョブごとに使い捨てる運用（workerClient.ts が毎回 new Worker() する）
+  // ため once で受ける。on() の型は void を返すリスナーを期待するため、
+  // Promise を明示的に void 化する。handleMessage が reject した場合は意図的に
+  // catch せず、unhandledRejection として worker を終了させ、
+  // Main 側の 'error' イベントに変換させる。
+  port.once('message', (job: ImageGenerationJob) => {
+    void handleMessage(job, (response) => port.postMessage(response));
+  });
+}

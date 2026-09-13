@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 
 import type { ImageGenerationError } from './errors';
-import { loadFonts } from './renderSvg';
+import { loadFonts } from './fontPaths';
 import { runInWorker } from './workerClient';
 
 /**
@@ -59,6 +59,7 @@ export const generateWorldJoinImage = (params: {
       worldName: params.worldName,
       imageBase64: params.imageBase64,
       players: params.players,
+      showAllPlayers: true,
       fontFilePaths,
       jpegQuality: 85,
     });
