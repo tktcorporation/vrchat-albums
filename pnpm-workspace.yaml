@@ -89,7 +89,7 @@ overrides:
   shell-quote: '>=1.9.0'
   # nanoid は vite/postcss の transitive 依存で、複数箇所に別バージョンが混在していた。
   # 3.x 系の安定 API を保ったまま、非セキュアジェネレータのループ対策として 3.3.19 以上へ固定。
-  nanoid: '>=3.3.19'
+  nanoid: '>=3.3.19 <4'
   # fast-uri は electron-store > conf > ajv の深い transitive 依存 (ajv は ^3.0.1 の範囲で許容)。
   # ホスト混同・SSRF 系の複数 CVE 対策として 3.1.6 以上へ固定。ajv の宣言範囲を超えて
   # 4.x (major) まで解決されないよう明示的に上限を切る。
@@ -104,4 +104,6 @@ overrides:
   esbuild: '>=0.28.1'
   # @humanfs/node は eslint (pages ワークスペース) の transitive 依存。パッチ版の対応で
   # シンボリックリンク経由のディレクトリ外コピー対策として 0.16.8 以上へ固定。
-  '@humanfs/node': '>=0.16.8'
+  # 0.17.x は Node >=24 を要求し、このリポジトリの engines.node (22) と CI の Node バージョンを
+  # 超えるため、eslint@^0.16.6 が期待する 0.16.x 系に留める。
+  '@humanfs/node': '>=0.16.8 <0.17'
