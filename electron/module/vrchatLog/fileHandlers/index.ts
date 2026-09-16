@@ -7,18 +7,14 @@ export {
   getLogLinesByLogFilePathList,
   getLogLinesByLogFilePathListStreaming,
   getLogLinesByLogFilePathListWithPartialSuccess,
-  getLogLinesFromLogFile,
 } from './logFileReader';
-export type { DedupCache } from './logStorageManager';
 // ログストレージ管理
 export {
   appendLoglinesToFile,
   createDedupCache,
   getLegacyLogStoreFilePath,
-  getLogStoreDir,
   getLogStoreFilePathForDate,
   getLogStoreFilePathsInRange,
-  initLogStoreDir,
 } from './logStorageManager';
 
 // 写真からのログインポート

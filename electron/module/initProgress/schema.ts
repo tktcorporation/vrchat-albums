@@ -56,19 +56,3 @@ export type InitProgressPayload = z.infer<typeof InitProgressPayloadSchema>;
  * IPCチャンネル名（定数として型安全に管理）
  */
 export const INIT_PROGRESS_CHANNEL = 'init-progress' as const;
-
-/**
- * ステージの日本語ラベル
- */
-export const STAGE_LABELS: Record<InitStage, string> = {
-  ready: '接続完了',
-  database_sync: 'データベース初期化',
-  directory_check: 'ディレクトリ確認',
-  log_append: 'ログファイル読み込み',
-  log_load: 'ログデータ保存',
-  photo_index: '写真インデックス',
-  photo_metadata: '写真メタデータ抽出',
-  world_join_image: 'ワールド参加画像生成',
-  completed: '完了',
-  error: 'エラー',
-} as const;
