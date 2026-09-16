@@ -65,4 +65,45 @@ allowBuilds:
 # override を追加・変更するときは、まず直接依存のアップグレードで解消できないかを検討し、
 # できない場合のみ理由を添えてここに記載する。
 overrides:
-  tar: '>=7.5.16'
+  # GHSA-23hp-3jrh-7fpw (critical): unlimited input decompression DoS。7.5.19 未満が脆弱。
+  tar: '>=7.5.19'
+  # ip-address は sqlite3 のネイティブビルド時 (node-gyp > make-fetch-happen > socks) の
+  # 深い transitive 依存で、直接依存側からは制御できない。
+  # leading-zero octet 誤認識対策として 10.3.1 以上へ固定。
+  ip-address: '>=10.3.1'
+  # tmp は electron-builder > app-builder-lib > @malept/flatpak-bundler > tmp-promise の
+  # 深い transitive 依存。electron-builder を最新 (26.15.3) にしても上流未追従のため override。
+  # _assertPath 型混同によるパストラバーサル対策として 0.2.7 以上へ固定。
+  tmp: '>=0.2.7'
+  # form-data は electron-builder > app-builder-lib > electron-publish の深い transitive 依存。
+  # electron-builder を最新にしても上流未追従のため override。
+  # CRLF injection 対策として 4.0.6 以上へ固定。
+  form-data: '>=4.0.6'
+  # undici は @sentry/cli / node-gyp (electron-rebuild 経由) の複数箇所から異なる範囲で
+  # 引かれており、直接依存の更新だけでは 6.26.0 系に固定されたまま動かなかったため override。
+  # WebSocket DoS・CRLF injection 等の複数 CVE 対策として 6.28.1 以上へ固定。
+  # 7.x/8.x は Node >=22.19 要求等の破壊的変更があるため 6.x 系内に留める。
+  undici: '>=6.28.1 <7'
+  # shell-quote は npm-run-all2 の深い transitive 依存 (^1.7.3 の範囲内)。
+  # Quadratic DoS 対策として、直後の安定版である 1.9.0 以上へ固定。
+  shell-quote: '>=1.9.0'
+  # nanoid は vite/postcss の transitive 依存で、複数箇所に別バージョンが混在していた。
+  # 3.x 系の安定 API を保ったまま、非セキュアジェネレータのループ対策として 3.3.19 以上へ固定。
+  nanoid: '>=3.3.19 <4'
+  # fast-uri は electron-store > conf > ajv の深い transitive 依存 (ajv は ^3.0.1 の範囲で許容)。
+  # ホスト混同・SSRF 系の複数 CVE 対策として 3.1.6 以上へ固定。ajv の宣言範囲を超えて
+  # 4.x (major) まで解決されないよう明示的に上限を切る。
+  fast-uri: '>=3.1.6 <4'
+  # @tootallnate/once は sqlite3 のネイティブビルド時 (node-gyp > make-fetch-happen >
+  # http-proxy-agent) の深い transitive 依存で、ip-address と同じ経路。
+  # 制御フロー不整合対策として 2.0.1 以上へ固定。3.x は ESM-only化で http-proxy-agent@4 の
+  # require() が壊れるため、CJS 版最終リリースの 2.x 系に明示的に留める。
+  '@tootallnate/once': '>=2.0.1 <3'
+  # esbuild は vite/tsx の内部依存で、直接依存側からは制御できない。
+  # Windows dev server での任意ファイル読み取り対策として、パッチ版の 0.28.1 以上へ固定。
+  esbuild: '>=0.28.1'
+  # @humanfs/node は eslint (pages ワークスペース) の transitive 依存。パッチ版の対応で
+  # シンボリックリンク経由のディレクトリ外コピー対策として 0.16.8 以上へ固定。
+  # 0.17.x は Node >=24 を要求し、このリポジトリの engines.node (22) と CI の Node バージョンを
+  # 超えるため、eslint@^0.16.6 が期待する 0.16.x 系に留める。
+  '@humanfs/node': '>=0.16.8 <0.17'

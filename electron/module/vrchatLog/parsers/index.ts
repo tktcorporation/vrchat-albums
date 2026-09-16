@@ -334,19 +334,7 @@ export type {
   VRChatPlayerJoinLog,
   VRChatPlayerLeaveLog,
 } from './playerActionParser';
-export {
-  extractPlayerJoinInfoFromLog,
-  extractPlayerLeaveInfoFromLog,
-} from './playerActionParser';
+export { extractPlayerJoinInfoFromLog } from './playerActionParser';
 // 型定義の再エクスポート
-export type {
-  VRChatWorldJoinLog,
-  WorldJoinParseError,
-} from './worldJoinParser';
-// 個別のパーサー関数も再エクスポート
-export { extractWorldJoinInfoFromLogs } from './worldJoinParser';
+export type { VRChatWorldJoinLog } from './worldJoinParser';
 export type { VRChatWorldLeaveLog } from './worldLeaveParser';
-export {
-  extractWorldLeaveInfoFromLog,
-  inferWorldLeaveEvents,
-} from './worldLeaveParser';

@@ -5,18 +5,13 @@
  * 一貫したデザインとインターフェースを提供する。
  */
 
-export type { SettingsFieldProps } from './SettingsField';
 // フォームフィールド（ラベル + 入力 + 説明 + エラー）
 export { SettingsField } from './SettingsField';
-export type { SettingsInfoBoxProps } from './SettingsInfoBox';
 // 情報ボックス
-export { infoBoxVariants, SettingsInfoBox } from './SettingsInfoBox';
-export type { SettingsItemProps } from './SettingsItem';
+export { SettingsInfoBox } from './SettingsInfoBox';
 // 設定項目（トグル、セレクト等）
 export { SettingsItem } from './SettingsItem';
-export type { SettingsPathInputProps } from './SettingsPathInput';
 // パス入力
 export { SettingsPathInput } from './SettingsPathInput';
-export type { SettingsSectionProps } from './SettingsSection';
 // セクションコンテナ
 export { SettingsSection } from './SettingsSection';

@@ -190,8 +190,6 @@ export {
   getLogStoreFilePathsInRange,
   importLogLinesFromLogPhotoDirPath,
 };
-export type { DedupCache } from './fileHandlers';
-
 // 型定義の再エクスポート
 export type {
   VRChatWorldJoinLog,

@@ -1,15 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import {
-  type InitProgressPayload,
-  type InitStage,
-  STAGE_LABELS,
+import type {
+  InitProgressPayload,
+  InitStage,
 } from '../../../electron/module/initProgress/schema';
 import { trpcReact } from '../../trpc';
 
-// electronモジュールから型とラベルを再エクスポート
-export type { InitProgressPayload, InitStage };
-export { STAGE_LABELS };
+// electronモジュールから型を再エクスポート
+export type { InitProgressPayload };
 
 /**
  * ステージ設定（順序と重み付けを統合）
