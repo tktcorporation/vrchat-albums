@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.30.4
+
+### Patch Changes
+
+- [#837](https://github.com/tktcorporation/vrchat-albums/pull/837) [`f39c350`](https://github.com/tktcorporation/vrchat-albums/commit/f39c3509f1c767d7af4ac98c01c55237f2bec4ea) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 依存パッケージを脆弱性対応中心に更新しました（tar の Critical DoS、electron-builder / electron-updater 系の複数 High 脆弱性など）。electron-updater・@sentry/electron・@sentry/cli をパッチ更新しています。
+
+- [#835](https://github.com/tktcorporation/vrchat-albums/pull/835) [`824281c`](https://github.com/tktcorporation/vrchat-albums/commit/824281cf71745436f9f220ee88c0d584c9b7f706) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真一覧のグループヘッダーからシェアダイアログを開くとアプリ全体がフリーズして応答しなくなる不具合を修正しました。
+
 ## 0.30.3
 
 ### Patch Changes
