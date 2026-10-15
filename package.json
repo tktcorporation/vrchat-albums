@@ -184,7 +184,7 @@
     "pre-commit": "pnpm lint:oxlint && pnpm lint:fmt-check && pnpm lint:type-check"
   },
   "engines": {
-    "node": "^22.20.0",
+    "node": "^22.22.2",
     "pnpm": ">=11"
   },
   "packageManager": "pnpm@11.4.0",
