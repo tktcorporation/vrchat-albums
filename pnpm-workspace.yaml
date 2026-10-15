@@ -81,11 +81,13 @@ overrides:
   # electron-builder を最新にしても上流未追従のため override。
   # CRLF injection 対策として 4.0.6 以上へ固定。
   form-data: '>=4.0.6'
-  # undici は @sentry/cli / node-gyp (electron-rebuild 経由) の複数箇所から異なる範囲で
-  # 引かれており、直接依存の更新だけでは 6.26.0 系に固定されたまま動かなかったため override。
-  # WebSocket DoS・CRLF injection 等の複数 CVE 対策として 6.28.1 以上へ固定。
-  # 7.x/8.x は Node >=22.19 要求等の破壊的変更があるため 6.x 系内に留める。
-  undici: '>=6.28.1 <7'
+  # undici 6 系を宣言している @sentry/cli (^6.22.0) と node-gyp (^6.25.0、electron-rebuild 経由) は、
+  # 宣言範囲の下限のまま解決されうるため、WebSocket DoS・CRLF injection 等の複数 CVE 対策として
+  # 6.28.1 以上へ固定する。宣言どおり 6.x 内に留める。依存元を絞るのは、jsdom (^8) と
+  # @electron/get (^7) が自分の宣言した major を解決できるようにするため。
+  # 両依存元が 6.28.1 以上を要求するようになれば外せる。
+  '@sentry/cli>undici': '>=6.28.1 <7'
+  'node-gyp>undici': '>=6.28.1 <7'
   # shell-quote は npm-run-all2 の深い transitive 依存 (^1.7.3 の範囲内)。
   # Quadratic DoS 対策と、quote() の改行文字経由のコマンドインジェクション
   # (GHSA-pqg4-j6r4-53mv) 対策として 1.11.0 以上へ固定。
