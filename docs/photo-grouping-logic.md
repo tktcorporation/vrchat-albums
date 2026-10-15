@@ -1,191 +1,48 @@
-# 写真グルーピングロジック仕様書
+# 写真グルーピングロジック
 
-## 概要
+VRChat の写真を、撮影したときに居たワールドのセッション単位でまとめる仕組み。判定の実装は `shared/worldSession.ts` が持ち、このドキュメントはデータの出どころと、画面ごとの使い方の対応だけを書く。
 
-VRChat写真を撮影時のワールドセッション単位でグループ化する機能の詳細仕様。
+## セッションの決め方
 
-## データソース
+セッションは、時刻順に並べたワールド参加ログの隣り合う 2 件で区切る半開区間 `[join_i, join_{i+1})` とする。
 
-### 1. ログタイプ
-
-#### ワールド参加ログ (World Join Log)
-
-- **パターン**: `Joining wrld_`
-- **意味**: ユーザーがワールドに参加した
-- **グループ開始**: このログでセッショングループが開始される
-
-#### プレイヤー参加ログ (Player Join Log)
-
-- **パターン**: `[Behaviour] OnPlayerJoined`
-- **意味**: 他のプレイヤーが同じワールドに参加した
-- **グループ継続**: 現在のセッショングループに属する
-
-#### プレイヤー退出ログ (Player Leave Log)
-
-- **パターン**: `OnPlayerLeft` (※`OnPlayerLeftRoom`は除外)
-- **意味**: プレイヤーがワールドから退出した
-- **グループ継続**: 現在のセッショングループに属する
-
-#### ワールド退出・アプリ終了
-
-- **現状**: 明示的な処理なし
-- **問題点**: セッションの終了タイミングが不明確
-
-### 2. 写真ログ（旧アプリ互換）
-
-#### ファイル名パターン
-
-```
-VRChat_YYYY-MM-DD_HH-mm-ss.SSS_wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.ext
-```
-
-#### 処理フロー
-
-1. `photoLogImporter.ts`: ファイル名からワールドID・日時を抽出
-2. `vrchatWorldJoinLogFromPhoto`: 写真ログ専用テーブルに保存
-3. `mergeVRChatWorldJoinLogs`: 通常ログと統合（重複時は通常ログ優先）
-
-## 現在のグルーピングロジック
-
-### アルゴリズム（`useGroupPhotos.ts`）
-
-1. **前処理**
-   - 写真を新しい順にソート
-   - ワールド参加ログを新しい順にソート
-
-2. **グループ割り当て**
-
-   ```typescript
-   for (const photo of sortedPhotos) {
-     // 1. 写真撮影時刻以前で最も近いログを探す
-     let bestGroupIndex = findClosestLogIndexBefore(sortedLogs, photoTime);
-
-     // 2. 見つからない場合は、時間的に最も近いログに割り当て
-     if (bestGroupIndex === -1) {
-       bestGroupIndex = findClosestLogIndexAbsolute(sortedLogs, photoTime);
-     }
-
-     // 3. 該当グループに写真を追加
-     groupMap.get(bestGroupIndex)?.photos.push(photo);
-   }
-   ```
-
-3. **後処理**
-   - 各グループ内の写真を新しい順にソート
-
-## 問題点と課題
-
-### 1. セッション終了の判定不可
-
-- **現状**: ワールド退出・アプリ終了ログが処理されていない
-- **影響**: 異なるセッションの写真が同じグループに混在する可能性
-
-### 2. プレイヤー情報の未活用
-
-- **現状**: プレイヤー参加・退出ログは抽出されるが、グルーピングには使用されない
-- **影響**: 同じワールドでも異なるプレイヤー構成の写真が混在
-
-### 3. タイムライン的な処理の欠如
-
-- **現状**: 単純に「最も近いワールド参加ログ」に割り当て
-- **理想**: ワールド参加 → 滞在中 → 退出のライフサイクルを考慮
-
-### 4. 写真ログの優先順位
-
-- **現状**: `mergeVRChatWorldJoinLogs`で重複時は通常ログ優先
-- **確認必要**: この優先順位が正しく機能しているか
-
-## 実装された改善案
-
-### 1. ✅ セッションモデルの導入
-
-**実装ファイル**: `shared/worldSession.ts`
-
-```typescript
-interface WorldSession<J extends WorldSessionJoin> {
-  readonly join: J; // セッションを開始したワールド参加ログ
-  readonly nextJoinDateTime: Date | undefined; // 次の参加ログの日時。最新のセッションでは undefined
-}
-```
-
-- セッションは時刻順に並べた参加ログ `join_i` から次の参加ログ `join_{i+1}` の直前までの半開区間 `[join_i, join_{i+1})`
-- 終わりは次の参加ログの日時だけで決まり、退出時刻や写真の一覧は持たない
-- 判定の詳細は「3. セッション判定の共通化」を参照
-
-### 2. ✅ ワールド退出ログの処理追加
-
-**実装ファイル**: `electron/module/vrchatLog/parsers/worldLeaveParser.ts`
-
-退出ログはセッションの境界を決めない。セッションの終わりは常に次のワールド参加ログで決まり（1. を参照）、退出ログは境界の判定に使われない。
-
-1. **明示的な退出パターン**
-   - `OnApplicationPause`, `OnApplicationQuit`
-   - `Lost connection`, `Disconnected`
-   - `Left Room`, `Leaving room`
-
-2. **推測による退出検出**（`inferWorldLeaveEvents`）
-   - 次のワールド参加ログの直前で退出と判定
-   - ログファイル終了時にアプリ終了として判定
-
-### 3. ✅ セッション判定の共通化
-
-**実装ファイル**: `shared/worldSession.ts`
-
-時刻 t がどのセッションに属するかは、写真のグループ化（`src/v2/components/PhotoGallery/useGroupPhotos.ts`）、
-プレイヤー一覧（`getSessionInfoBatch`）、プレイヤー検索（`searchSessionsByPlayerName`）が同じ関数で判定する。
-
-- セッションは時刻順に並べた参加ログの半開区間 `[join_i, join_{i+1})`。最後のセッションは終わりを持たない
+- 最後のセッションは終わりを持たない
 - 境界ちょうどの時刻は後ろのセッションに属し、許容誤差は持たない
-- 入力は通常ログと写真由来ログを `mergeVRChatWorldJoinLogs` でマージした参加ログ
-- 最初の参加より前の時刻は「セッション無し」。ギャラリーだけは写真を最も古いセッションへ寄せて表示する
-- プレイヤー一覧はグループの開始日時で始まるセッションの区間からプレイヤーを引き、時刻から引き直さない
+- セッションの終わりは次のワールド参加ログだけで決まる。退出ログやプレイヤーの参加・退出ログは境界に使わない
 
-### 4. ✅ タイムゾーン処理の検証
+退出ログを境界に使わないのは、VRChat のログでは退出が常に記録されるとは限らず、記録の有無でグループの切れ目が変わってしまうため。次の参加ログは必ず残るので、それを区切りにすれば欠落の影響を受けない。
 
-**実装ファイル**: `electron/module/vrchatLog/parsers/timezone.test.ts`
+型と関数（`WorldSession`、`buildWorldSessions`、`resolveSessionIndex`、`findSessionStartingAt`）の仕様は `shared/worldSession.ts` の JSDoc を参照する。
 
-- VRChatログと写真ファイル名の日時はローカルタイムとして統一処理
-- `Date.getTime()`による数値比較でタイムゾーン問題を回避
-- 夏時間や境界ケースも考慮したテスト実装
+## 入力になる参加ログ
 
-### 5. ✅ 包括的なテスト戦略
+判定には、2 種類の参加ログを `mergeVRChatWorldJoinLogs`（`electron/module/vrchatWorldJoinLog/service.ts`）でマージしたものを渡す。
 
-1. **エッジケース** (`useGroupPhotos.v2.test.ts`)
-   - セッション境界外の写真処理
-   - 同じワールドの複数セッション
-   - 最新セッション（終了時刻なし）
+| 種類               | 出どころ                                                                                                                                 | 保存先                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 通常の参加ログ     | VRChat のログの `Joining wrld_` 行                                                                                                       | `electron/module/vrchatWorldJoinLog/VRChatWorldJoinLogModel/` |
+| 写真由来の参加ログ | 写真のファイル名 `VRChat_YYYY-MM-DD_HH-mm-ss.SSS_wrld_<id>.<ext>`（`electron/module/vrchatLog/fileHandlers/photoLogImporter.ts` が抽出） | `electron/module/vrchatWorldJoinLogFromPhoto/`                |
 
-2. **データ整合性** (`mergeLogic.test.ts`)
-   - 写真ログと通常ログの重複処理
-   - 優先順位の正確な適用
+写真由来の参加ログは、ログファイルが残っていない期間の写真をワールドへ結び付けるために使う。worldId と参加日時がどちらも一致する組は同じ参加とみなし、通常の参加ログの方を残す。
 
-3. **パフォーマンス**
-   - 1000枚の写真、100個のセッションでの動作確認
-   - 大量データでのソート処理検証
+日時はすべてローカルタイムとして扱い、`Date.getTime()` の数値で比較する（`.claude/rules/project/timezone.md`）。
 
-## 今後の発展可能性
+## 画面ごとの使い方
 
-### 1. プレイヤー情報の活用
+3 つの画面が同じ判定を使うので、同じ時刻の写真が画面によって別のワールドへ振り分けられることはない。
 
-```typescript
-interface EnhancedSession<J extends WorldSessionJoin> extends WorldSession<J> {
-  players: {
-    userId: string;
-    userName: string;
-    joinTime: Date;
-    leaveTime?: Date;
-  }[];
-}
-```
+| 画面                     | 実装                                                                     | 判定の使い方                                                                                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ギャラリーのグループ分け | `src/v2/components/PhotoGallery/useGroupPhotos.ts`                       | 撮影時刻が属するセッションへ写真を入れる。最初の参加ログより前の写真は、最も古いセッションへ寄せて表示する                                                          |
+| グループのプレイヤー一覧 | `getSessionInfoBatch`（`electron/module/logInfo/logInfoCointroller.ts`） | グループの開始日時で始まるセッションを `findSessionStartingAt` で引き、その区間 `[join, nextJoin)` に参加したプレイヤーを返す。開始日時に当たらない日時には空を返す |
+| プレイヤー検索           | `searchSessionsByPlayerName`（`electron/module/logInfo/service.ts`）     | プレイヤーの参加時刻が属するセッションの開始日時を返す。最初の参加ログより前の参加は対象外                                                                          |
 
-### 2. より高度な退出検出
+## テスト
 
-- VRChatアプリのログレベル向上による明示的な退出ログ
-- ネットワーク接続状態の監視
-- ユーザー行動パターンの学習
-
-### 3. UIの改善
-
-- セッション情報の可視化
-- デバッグ情報の表示
-- グルーピング精度の指標表示
+| 対象                                                 | テスト                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------ |
+| 判定そのもの（境界、同時刻の参加、線形探索との一致） | `shared/worldSession.test.ts`                                            |
+| ギャラリーのグループ分け                             | `src/v2/components/PhotoGallery/__tests__/useGroupPhotos.test.ts`        |
+| プレイヤー一覧の区間                                 | `electron/module/logInfo/sessionInfoBatch.integration.test.ts`           |
+| プレイヤー検索                                       | `electron/module/logInfo/searchSessionsByPlayerName.integration.test.ts` |
+| 参加ログのマージと重複除去                           | `electron/module/vrchatWorldJoinLog/mergeLogic.test.ts`                  |
