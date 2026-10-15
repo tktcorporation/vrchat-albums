@@ -5,7 +5,7 @@
     "path": "node_modules/@chenglou/pretext",
     "licenseFile": "node_modules/@chenglou/pretext/LICENSE"
   },
-  "@napi-rs/image@1.12.0": {
+  "@napi-rs/image@1.15.0": {
     "licenses": "MIT",
     "repository": "https://github.com/Brooooooklyn/Image",
     "publisher": "LongYinan",
@@ -26,25 +26,25 @@
     "path": "node_modules/@radix-ui/react-context-menu",
     "licenseFile": "node_modules/@radix-ui/react-context-menu/LICENSE"
   },
-  "@radix-ui/react-dialog@1.1.15": {
+  "@radix-ui/react-dialog@1.1.23": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-dialog",
     "licenseFile": "node_modules/@radix-ui/react-dialog/LICENSE"
   },
-  "@radix-ui/react-label@2.1.8": {
+  "@radix-ui/react-label@2.1.17": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-label",
     "licenseFile": "node_modules/@radix-ui/react-label/LICENSE"
   },
-  "@radix-ui/react-scroll-area@1.2.10": {
+  "@radix-ui/react-scroll-area@1.2.18": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-scroll-area",
     "licenseFile": "node_modules/@radix-ui/react-scroll-area/LICENSE"
   },
-  "@radix-ui/react-slot@1.2.4": {
+  "@radix-ui/react-slot@1.2.5": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-slot",
@@ -56,7 +56,7 @@
     "path": "node_modules/@radix-ui/react-switch",
     "licenseFile": "node_modules/@radix-ui/react-switch/LICENSE"
   },
-  "@radix-ui/react-toast@1.2.15": {
+  "@radix-ui/react-toast@1.2.24": {
     "licenses": "MIT",
     "repository": "https://github.com/radix-ui/primitives",
     "path": "node_modules/@radix-ui/react-toast",
@@ -82,7 +82,7 @@
     "path": "node_modules/@sentry/electron",
     "licenseFile": "node_modules/@sentry/electron/LICENSE"
   },
-  "@sentry/vite-plugin@5.4.0": {
+  "@sentry/vite-plugin@5.4.1": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-javascript-bundler-plugins",
     "publisher": "Sentry",
@@ -101,7 +101,7 @@
     "path": "node_modules/@sequelize/sqlite3",
     "licenseFile": "node_modules/@sequelize/sqlite3/LICENSE"
   },
-  "@tanstack/react-query@5.100.14": {
+  "@tanstack/react-query@5.104.2": {
     "licenses": "MIT",
     "repository": "https://github.com/TanStack/query",
     "publisher": "tannerlinsley",
@@ -115,21 +115,21 @@
     "path": "node_modules/@tanstack/react-virtual",
     "licenseFile": "node_modules/@tanstack/react-virtual/LICENSE"
   },
-  "@trpc/client@11.17.0": {
+  "@trpc/client@11.19.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/client",
     "licenseFile": "node_modules/@trpc/client/LICENSE"
   },
-  "@trpc/react-query@11.17.0": {
+  "@trpc/react-query@11.19.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
     "path": "node_modules/@trpc/react-query",
     "licenseFile": "node_modules/@trpc/react-query/LICENSE"
   },
-  "@trpc/server@11.17.0": {
+  "@trpc/server@11.19.0": {
     "licenses": "MIT",
     "repository": "https://github.com/trpc/trpc",
     "publisher": "KATT",
@@ -169,13 +169,13 @@
     "path": "node_modules/consola",
     "licenseFile": "node_modules/consola/LICENSE"
   },
-  "date-fns@4.3.0": {
+  "date-fns@4.4.0": {
     "licenses": "MIT",
     "repository": "https://github.com/date-fns/date-fns",
     "path": "node_modules/date-fns",
     "licenseFile": "node_modules/date-fns/LICENSE.md"
   },
-  "effect@3.21.2": {
+  "effect@3.22.2": {
     "licenses": "MIT",
     "repository": "https://github.com/Effect-TS/effect",
     "path": "node_modules/effect",
@@ -213,7 +213,7 @@
     "path": "node_modules/electron-updater",
     "licenseFile": "node_modules/electron-updater/LICENSE"
   },
-  "exiftool-vendored@36.0.0": {
+  "exiftool-vendored@36.1.0": {
     "licenses": "MIT",
     "repository": "https://github.com/photostructure/exiftool-vendored.js",
     "publisher": "Matthew McEachen",
@@ -239,14 +239,14 @@
     "path": "node_modules/hash-wasm",
     "licenseFile": "node_modules/hash-wasm/LICENSE"
   },
-  "jotai@2.20.0": {
+  "jotai@2.20.3": {
     "licenses": "MIT",
     "repository": "https://github.com/pmndrs/jotai",
     "publisher": "Daishi Kato",
     "path": "node_modules/jotai",
     "licenseFile": "node_modules/jotai/LICENSE"
   },
-  "lucide-react@1.16.0": {
+  "lucide-react@1.55.0": {
     "licenses": "ISC",
     "repository": "https://github.com/lucide-icons/lucide",
     "publisher": "Eric Fennis",
@@ -259,7 +259,7 @@
     "path": "node_modules/ofetch",
     "licenseFile": "node_modules/ofetch/LICENSE"
   },
-  "p-queue@9.3.0": {
+  "p-queue@9.3.5": {
     "licenses": "MIT",
     "repository": "https://github.com/sindresorhus/p-queue",
     "path": "node_modules/p-queue",
@@ -280,13 +280,13 @@
     "path": "node_modules/pony-cause",
     "licenseFile": "node_modules/pony-cause/LICENSE"
   },
-  "react-dom@19.2.6": {
+  "react-dom@19.3.0": {
     "licenses": "MIT",
-    "repository": "https://github.com/facebook/react",
+    "repository": "https://github.com/react/react",
     "path": "node_modules/react-dom",
     "licenseFile": "node_modules/react-dom/LICENSE"
   },
-  "react-error-boundary@6.1.2": {
+  "react-error-boundary@6.1.6": {
     "licenses": "MIT",
     "repository": "https://github.com/bvaughn/react-error-boundary",
     "publisher": "Brian Vaughn",
@@ -302,9 +302,9 @@
     "path": "node_modules/react-markdown",
     "licenseFile": "node_modules/react-markdown/license"
   },
-  "react@19.2.6": {
+  "react@19.3.0": {
     "licenses": "MIT",
-    "repository": "https://github.com/facebook/react",
+    "repository": "https://github.com/react/react",
     "path": "node_modules/react",
     "licenseFile": "node_modules/react/LICENSE"
   },
@@ -341,7 +341,7 @@
     "path": "node_modules/tailwind-merge",
     "licenseFile": "node_modules/tailwind-merge/LICENSE.md"
   },
-  "tailwindcss@4.3.0": {
+  "tailwindcss@4.3.3": {
     "licenses": "MIT",
     "repository": "https://github.com/tailwindlabs/tailwindcss",
     "path": "node_modules/tailwindcss",
@@ -382,7 +382,7 @@
     "path": "node_modules/uuidv7",
     "licenseFile": "node_modules/uuidv7/LICENSE"
   },
-  "vrchat-albums@0.30.3": {
+  "vrchat-albums@0.30.4": {
     "licenses": "Custom: https://github.com/tktcorporation/vrchat-albums/releases",
     "repository": "https://github.com/tktcorporation/vrchat-albums",
     "publisher": "tktcorporation",
