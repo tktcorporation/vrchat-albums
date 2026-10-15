@@ -168,7 +168,7 @@ interface WorldSession<J extends WorldSessionJoin> {
 ### 1. プレイヤー情報の活用
 
 ```typescript
-interface EnhancedSession extends Session {
+interface EnhancedSession<J extends WorldSessionJoin> extends WorldSession<J> {
   players: {
     userId: string;
     userName: string;
