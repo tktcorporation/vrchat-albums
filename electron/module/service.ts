@@ -35,11 +35,6 @@ export const getVRChatLogFilesDir = (): Effect.Effect<
   );
 };
 
-/** すべての設定値をクリアする */
-export const clearAllStoredSettings = () => {
-  const settingStore = getSettingStore();
-  return settingStore.clearAllStoredSettings();
-};
 /** 指定したキーの設定を削除する */
 export const clearStoredSetting = (
   key: Parameters<ReturnType<typeof getSettingStore>['clearStoredSetting']>[0],

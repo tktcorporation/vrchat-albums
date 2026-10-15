@@ -130,7 +130,6 @@ await mutation.mutateAsync({ mode: 'FULL' });
 ```typescript
 // 個別エンドポイント（可能な限り使用を避ける）
 trpcReact.vrchatLog.appendLoglinesToFileFromLogFilePathList.useMutation();
-trpcReact.logInfo.loadLogInfoIndex.useMutation();
 ```
 
 ## クエリ無効化

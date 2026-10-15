@@ -124,14 +124,6 @@ vi.mock('../useGroupPhotos', () => ({
 
 vi.mock('./../../../../trpc', () => ({
   trpcReact: {
-    useQueries: (cb: (t: Record<string, unknown>) => unknown[]) => {
-      const opts = cb({
-        logInfo: {
-          getPlayerListInSameWorld: (_dt: Date) => ({}),
-        },
-      });
-      return opts.map(() => ({ data: mockPlayers, isLoading: false }));
-    },
     vrchatPhoto: {
       getVrchatPhotoPathModelList: {
         useQuery: () => mockState.getState(),
@@ -152,12 +144,6 @@ vi.mock('./../../../../trpc', () => ({
       },
     },
     logInfo: {
-      getPlayerListInSameWorld: {
-        useQuery: () => ({
-          data: [],
-          isLoading: false,
-        }),
-      },
       getSessionInfoBatch: {
         useQuery: (joinDates: Date[]) => {
           // 検索クエリが存在する場合のみプレイヤーデータを返す

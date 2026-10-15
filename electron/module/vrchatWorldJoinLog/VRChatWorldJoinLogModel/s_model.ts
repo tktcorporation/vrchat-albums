@@ -135,40 +135,6 @@ export const findVRChatWorldJoinLogList = async (query?: {
   return vrcWorldJoinLogModelList;
 };
 
-/**
- * 指定した日時から計算して直前にjoinしたワールドの情報を取得する
- */
-export const findRecentVRChatWorldJoinLog = async (props: {
-  dateTime: Date;
-}) => {
-  const vrchatWorldJoinLog = await VRChatWorldJoinLogModel.findOne({
-    where: {
-      joinDateTime: {
-        [Op.lte]: props.dateTime,
-      },
-    },
-    order: [['joinDateTime', 'DESC']],
-  });
-
-  return vrchatWorldJoinLog;
-};
-
-/**
- * 指定した日時から計算して直後にjoinしたワールドの情報を取得する
- */
-export const findNextVRChatWorldJoinLog = async (dateTime: Date) => {
-  const vrchatWorldJoinLog = await VRChatWorldJoinLogModel.findOne({
-    where: {
-      joinDateTime: {
-        [Op.gt]: dateTime,
-      },
-    },
-    order: [['joinDateTime', 'ASC']],
-  });
-
-  return vrchatWorldJoinLog;
-};
-
 /** 最新のワールド参加ログを取得する */
 export const findLatestWorldJoinLog = async () => {
   return VRChatWorldJoinLogModel.findOne({
