@@ -97,7 +97,7 @@ overrides:
   # 超えて 4.x (major) まで解決されないよう明示的に上限を切る。ajv が 3.1.8 以上を要求するようになれば外せる。
   fast-uri: '>=3.1.8 <4'
   # tinypool は oxfmt (開発時のフォーマッタ) が 2.1.0 に完全固定している transitive 依存。
-  # GHSA-5gmw-xhrv-c9v3 / GHSA-85c8-ppgw-ccpr (critical) 対策として、同じ 2.x 内の patch 版
+  # GHSA-5gmw-xhrv-c9v3 / GHSA-85c8-ppgw-ccpr (critical) 対策として、同じ 2.x 内の
   # 2.1.2 以上へ固定する。oxfmt が 2.1.2 以上を要求するようになれば外せる。
   tinypool: '>=2.1.2 <3'
   # @tootallnate/once は sqlite3 のネイティブビルド時 (node-gyp > make-fetch-happen >
