@@ -86,4 +86,14 @@ export async function ensureBashParserDeps(hooksDir: string): Promise<void> {
     throw new Error(
       '.claude/hooks の @ast-grep 初回インストールに失敗しました（ネットワーク接続を確認してください）',
     );
+  // 同じプロセスでは、モジュール解決が「node_modules が無い」状態を覚えたままで、入れたばかりの依存を
+  // 読めない。hook が失敗すると多くのホストはコマンドを止めずに通すため、初回の 1 回だけ防御が外れる。
+  // 同じ引数で起動し直し、その結果を自分の結果として返す。import は stdin を読む前に走るので、
+  // 入力はまだ消費されておらず子プロセスへそのまま渡る。次の起動では依存があるので再起動しない。
+  const rerun = Bun.spawnSync([process.execPath, ...process.argv.slice(1)], {
+    stdin: 'inherit',
+    stdout: 'inherit',
+    stderr: 'inherit',
+  });
+  process.exit(rerun.exitCode ?? 1);
 }

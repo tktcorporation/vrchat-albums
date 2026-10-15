@@ -184,7 +184,9 @@ export async function ownershipFingerprint(path: string): Promise<string | null>
   return `${hash}:${executable ? 'x' : '-'}`;
 }
 export async function hasMiseTask(name: string): Promise<boolean> {
-  const found = await $`mise tasks ls --no-header`.quiet().nothrow();
+  // --local: ユーザー global のタスクを除く。このリポジトリが定義していない名前で、
+  // 同名の global タスクが hook から実行されるのを防ぐ。
+  const found = await $`mise tasks ls --local --no-header`.quiet().nothrow();
   return (
     found.exitCode === 0 &&
     found
