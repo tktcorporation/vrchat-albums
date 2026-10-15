@@ -123,36 +123,18 @@ interface Session {
    - 次のワールド参加ログの直前で退出と判定
    - ログファイル終了時にアプリ終了として判定
 
-### 3. ✅ 改善されたグルーピングアルゴリズム
+### 3. ✅ セッション判定の共通化
 
-**実装ファイル**: `src/v2/components/PhotoGallery/useGroupPhotos.v2.ts`
+**実装ファイル**: `shared/worldSession.ts`
 
-```typescript
-function assignPhotoToSession(
-  photo: Photo,
-  sessions: Session[],
-): Session | null {
-  // 1. セッション期間内の写真を正確に検出
-  const activeSession = sessions.find((session) => {
-    const photoTime = photo.takenAt.getTime();
-    const joinTime = session.joinTime.getTime();
-    const leaveTime = session.leaveTime?.getTime();
+時刻 t がどのセッションに属するかは、写真のグループ化（`src/v2/components/PhotoGallery/useGroupPhotos.ts`）、
+プレイヤー一覧（`getSessionInfoBatch`）、プレイヤー検索（`searchSessionsByPlayerName`）が同じ関数で判定する。
 
-    if (leaveTime) {
-      return photoTime >= joinTime && photoTime < leaveTime;
-    } else {
-      return photoTime >= joinTime; // 最新セッション
-    }
-  });
-
-  // 2. フォールバック: 最も近いセッションを探す
-  if (!activeSession) {
-    return findClosestSession(photo, sessions);
-  }
-
-  return activeSession;
-}
-```
+- セッションは時刻順に並べた参加ログの半開区間 `[join_i, join_{i+1})`。最後のセッションは終わりを持たない
+- 境界ちょうどの時刻は後ろのセッションに属し、許容誤差は持たない
+- 入力は通常ログと写真由来ログを `mergeVRChatWorldJoinLogs` でマージした参加ログ
+- 最初の参加より前の時刻は「セッション無し」。ギャラリーだけは写真を最も古いセッションへ寄せて表示する
+- プレイヤー一覧はグループの開始日時で始まるセッションの区間からプレイヤーを引き、時刻から引き直さない
 
 ### 4. ✅ タイムゾーン処理の検証
 

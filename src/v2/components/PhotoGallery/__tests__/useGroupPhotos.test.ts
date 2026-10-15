@@ -172,6 +172,60 @@ describe('groupPhotosBySession', () => {
     expect(groups[1].photos.map((p) => p.id).toSorted()).toEqual(['3', '4']); // 古いセッションに2枚
   });
 
+  it('最初のワールド参加より前の写真は、最も近い（最も古い）セッションに割り当てられる', () => {
+    const photos = [
+      createPhoto(1, new Date('2024-01-01T09:00:00')),
+      createPhoto(2, new Date('2024-01-01T10:30:00')),
+    ];
+    const joinLogs = [
+      createWorldJoinLog('newer', new Date('2024-01-01T11:00:00')),
+      createWorldJoinLog('older', new Date('2024-01-01T10:00:00')),
+    ];
+
+    const groups = groupPhotosBySession(photos, joinLogs);
+
+    expect(groups.map((g) => g.worldInfo?.worldId)).toEqual(['newer', 'older']);
+    expect(groups[0].photos).toHaveLength(0);
+    expect(groups[1].photos.map((p) => p.id).toSorted()).toEqual(['1', '2']);
+  });
+
+  it('次のワールド参加と同時刻の写真は次のセッションに属する', () => {
+    const boundary = new Date('2024-01-01T11:00:00');
+    const photos = [
+      createPhoto(1, new Date(boundary.getTime() - 1)),
+      createPhoto(2, boundary),
+    ];
+    const joinLogs = [
+      createWorldJoinLog('next', boundary),
+      createWorldJoinLog('prev', new Date('2024-01-01T10:00:00')),
+    ];
+
+    const groups = groupPhotosBySession(photos, joinLogs);
+
+    expect(groups[0].worldInfo?.worldId).toBe('next');
+    expect(groups[0].photos.map((p) => p.id)).toEqual(['2']);
+    expect(groups[1].worldInfo?.worldId).toBe('prev');
+    expect(groups[1].photos.map((p) => p.id)).toEqual(['1']);
+  });
+
+  it('参加ログの並び順に関係なく同じグループになる', () => {
+    const photos = [
+      createPhoto(1, new Date('2024-01-01T10:15:00')),
+      createPhoto(2, new Date('2024-01-01T10:45:00')),
+    ];
+    const desc = [
+      createWorldJoinLog('b', new Date('2024-01-01T10:30:00')),
+      createWorldJoinLog('a', new Date('2024-01-01T10:00:00')),
+    ];
+
+    const fromDesc = groupPhotosBySession(photos, desc);
+    const fromAsc = groupPhotosBySession(photos, desc.toReversed());
+
+    expect(fromAsc).toEqual(fromDesc);
+    expect(fromDesc[0].photos.map((p) => p.id)).toEqual(['2']);
+    expect(fromDesc[1].photos.map((p) => p.id)).toEqual(['1']);
+  });
+
   it('大量の写真を正しく処理できる', () => {
     const now = new Date();
     const photos = Array.from({ length: 100 }, (_, i) =>

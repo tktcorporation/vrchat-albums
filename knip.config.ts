@@ -19,7 +19,7 @@ const config: KnipConfig = {
     // tRPC controllers are used dynamically
     'electron/module/**/*Controller.ts',
   ],
-  project: ['src/**/*.{ts,tsx}', 'electron/**/*.ts'],
+  project: ['src/**/*.{ts,tsx}', 'electron/**/*.ts', 'shared/**/*.ts'],
   ignoreBinaries: [
     'only-allow',
     // grit binary comes from @getgrit/cli package

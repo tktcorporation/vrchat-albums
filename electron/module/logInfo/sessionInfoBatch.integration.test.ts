@@ -14,7 +14,50 @@ import {
 } from '../vrchatLog/model';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
+import { createVRChatWorldJoinLogFromPhoto } from '../vrchatWorldJoinLogFromPhoto/service';
 import { logInfoRouter } from './logInfoCointroller';
+
+/** テスト用にワールド参加ログを 1 件作る */
+const createWorldJoin = (
+  worldSuffix: string,
+  worldName: string,
+  joinDate: Date,
+) =>
+  Effect.runPromise(
+    worldJoinLogService.createVRChatWorldJoinLogModel([
+      {
+        logType: 'worldJoin' as const,
+        worldId: VRChatWorldIdSchema.parse(
+          `wrld_${worldSuffix}-0000-0000-0000-000000000000`,
+        ),
+        worldName: VRChatWorldNameSchema.parse(worldName),
+        worldInstanceId: VRChatWorldInstanceIdSchema.parse('12345'),
+        joinDate,
+      },
+    ]),
+  );
+
+/** テスト用にプレイヤー参加ログを 1 件作る */
+const createPlayerJoin = (playerName: string, joinDate: Date) =>
+  Effect.runPromise(
+    playerJoinLogService.createVRChatPlayerJoinLogModel([
+      {
+        logType: 'playerJoin' as const,
+        playerId: OptionalVRChatPlayerIdSchema.parse(null),
+        playerName: VRChatPlayerNameSchema.parse(playerName),
+        joinDate,
+      },
+    ]),
+  );
+
+/** getSessionInfoBatch を呼び出す */
+const callBatch = (joinDateTimes: Date[]) => {
+  // oxlint-disable-next-line unicorn/prefer-event-target -- tRPC context requires EventEmitter for emit() support
+  const eventEmitter = new EventEmitter();
+  return logInfoRouter()
+    .createCaller({ eventEmitter })
+    .getSessionInfoBatch(joinDateTimes);
+};
 
 describe('SessionInfoBatch world change behavior', () => {
   beforeAll(async () => {
@@ -262,6 +305,77 @@ describe('SessionInfoBatch world change behavior', () => {
     // World Z には PlayerZ のみ（PlayerX, PlayerY は含まれない）
     expect(worldZSession.players).toHaveLength(1);
     expect(worldZSession.players[0].playerName).toBe('PlayerZ');
+  });
+
+  it('500ms 差で参加した 2 つのワールドは、それぞれ自分の区間のプレイヤーだけを返す', async () => {
+    const w1 = parseISO('2024-01-03T10:00:00.000');
+    const w2 = parseISO('2024-01-03T10:00:00.500');
+    await createWorldJoin('11111111', 'World 1', w1);
+    await createWorldJoin('22222222', 'World 2', w2);
+    await createPlayerJoin('InW1', parseISO('2024-01-03T10:00:00.200'));
+    await createPlayerJoin('InW2', parseISO('2024-01-03T10:00:00.700'));
+
+    const result = await callBatch([w1, w2]);
+
+    expect(result[w1.toISOString()].worldName).toBe('World 1');
+    expect(result[w1.toISOString()].players.map((p) => p.playerName)).toEqual([
+      'InW1',
+    ]);
+    expect(result[w2.toISOString()].worldName).toBe('World 2');
+    expect(result[w2.toISOString()].players.map((p) => p.playerName)).toEqual([
+      'InW2',
+    ]);
+  });
+
+  it('次のワールドへの参加ちょうどに入ったプレイヤーは次のワールドに属する', async () => {
+    const w1 = parseISO('2024-01-04T10:00:00');
+    const w2 = parseISO('2024-01-04T11:00:00');
+    await createWorldJoin('33333333', 'World 1', w1);
+    await createWorldJoin('44444444', 'World 2', w2);
+    await createPlayerJoin('JustBefore', parseISO('2024-01-04T10:59:59.999'));
+    await createPlayerJoin('AtBoundary', w2);
+
+    const result = await callBatch([w1, w2]);
+
+    expect(result[w1.toISOString()].players.map((p) => p.playerName)).toEqual([
+      'JustBefore',
+    ]);
+    expect(result[w2.toISOString()].players.map((p) => p.playerName)).toEqual([
+      'AtBoundary',
+    ]);
+  });
+
+  it('写真由来の参加ログもセッションの区切りとして扱う', async () => {
+    const normalJoin = parseISO('2024-01-05T10:00:00');
+    const photoJoin = parseISO('2024-01-05T10:30:00');
+    await createWorldJoin('55555555', 'Normal World', normalJoin);
+    await createVRChatWorldJoinLogFromPhoto([
+      { worldId: 'wrld_photo', joinDate: photoJoin },
+    ]);
+    await createPlayerJoin('BeforePhoto', parseISO('2024-01-05T10:10:00'));
+    await createPlayerJoin('AfterPhoto', parseISO('2024-01-05T10:45:00'));
+
+    const result = await callBatch([normalJoin, photoJoin]);
+
+    expect(
+      result[normalJoin.toISOString()].players.map((p) => p.playerName),
+    ).toEqual(['BeforePhoto']);
+    expect(result[photoJoin.toISOString()].worldId).toBe('wrld_photo');
+    expect(
+      result[photoJoin.toISOString()].players.map((p) => p.playerName),
+    ).toEqual(['AfterPhoto']);
+  });
+
+  it('セッションの開始日時ではない日時には空のセッションを返す', async () => {
+    const w1 = parseISO('2024-01-06T10:00:00');
+    await createWorldJoin('66666666', 'World 1', w1);
+    await createPlayerJoin('Someone', parseISO('2024-01-06T10:10:00'));
+    const insideSession = parseISO('2024-01-06T10:05:00');
+
+    const result = await callBatch([insideSession]);
+
+    expect(result[insideSession.toISOString()].worldId).toBeNull();
+    expect(result[insideSession.toISOString()].players).toEqual([]);
   });
 
   it('returns an empty session when no world join log precedes the time', async () => {

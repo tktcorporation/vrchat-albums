@@ -15,9 +15,4 @@ export const BATCH_CONFIG = {
    * 高速スクロール時のIPC負荷を軽減するため、スクロールが安定するまで待機。
    */
   BATCH_DELAY_MS: 300,
-
-  /**
-   * 重複リクエストとみなす時間閾値（ミリ秒）。フロント専用。
-   */
-  DUPLICATE_THRESHOLD_MS: 1000,
 } as const;

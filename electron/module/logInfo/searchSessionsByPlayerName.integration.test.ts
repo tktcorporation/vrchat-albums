@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as client from '../../lib/sequelize';
 import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
+import { createVRChatWorldJoinLogFromPhoto } from '../vrchatWorldJoinLogFromPhoto/service';
 import { searchSessionsByPlayerName } from './service';
 
 describe('searchSessionsByPlayerName integration test', () => {
@@ -109,6 +110,57 @@ describe('searchSessionsByPlayerName integration test', () => {
       // 1つのセッションのみ返される
       expect(results).toHaveLength(1);
       expect(results[0]).toEqual(worldJoin.joinDateTime);
+    });
+
+    it('写真由来の参加ログで区切られたセッションの開始日時を返す', async () => {
+      // 通常ログ: 10:00 World A。写真由来ログ: 10:30 World B。
+      // 10:45 のプレイヤー参加は、ギャラリーと同じく写真由来ログのセッションに属する
+      await VRChatWorldJoinLogModel.create({
+        worldId: 'wrld_normal',
+        worldName: 'Normal World',
+        worldInstanceId: '33333',
+        joinDateTime: parseISO('2024-01-05T10:00:00'),
+      });
+      const photoJoinTime = parseISO('2024-01-05T10:30:00');
+      await createVRChatWorldJoinLogFromPhoto([
+        { worldId: 'wrld_photo', joinDate: photoJoinTime },
+      ]);
+
+      await VRChatPlayerJoinLogModel.create({
+        playerName: 'PhotoSessionPlayer',
+        joinDateTime: parseISO('2024-01-05T10:45:00'),
+      });
+
+      const results = await Effect.runPromise(
+        searchSessionsByPlayerName('PhotoSessionPlayer'),
+      );
+
+      expect(results).toEqual([photoJoinTime]);
+    });
+
+    it('次の参加ちょうどに入ったプレイヤーは次のセッションに属する', async () => {
+      await VRChatWorldJoinLogModel.create({
+        worldId: 'wrld_before',
+        worldName: 'Before World',
+        worldInstanceId: '44444',
+        joinDateTime: parseISO('2024-01-06T10:00:00'),
+      });
+      const nextJoin = await VRChatWorldJoinLogModel.create({
+        worldId: 'wrld_after',
+        worldName: 'After World',
+        worldInstanceId: '55555',
+        joinDateTime: parseISO('2024-01-06T11:00:00'),
+      });
+      await VRChatPlayerJoinLogModel.create({
+        playerName: 'BoundaryPlayer',
+        joinDateTime: parseISO('2024-01-06T11:00:00'),
+      });
+
+      const results = await Effect.runPromise(
+        searchSessionsByPlayerName('BoundaryPlayer'),
+      );
+
+      expect(results).toEqual([nextJoin.joinDateTime]);
     });
 
     it('該当するプレイヤーが存在しない場合、空の配列を返す', async () => {
