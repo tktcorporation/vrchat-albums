@@ -263,4 +263,18 @@ describe('SessionInfoBatch world change behavior', () => {
     expect(worldZSession.players).toHaveLength(1);
     expect(worldZSession.players[0].playerName).toBe('PlayerZ');
   });
+
+  it('returns an empty session when no world join log precedes the time', async () => {
+    const router = logInfoRouter();
+    // oxlint-disable-next-line unicorn/prefer-event-target -- tRPC context requires EventEmitter for emit() support
+    const eventEmitter = new EventEmitter();
+    const time = parseISO('2024-01-01T10:00:00');
+
+    const result = await router
+      .createCaller({ eventEmitter })
+      .getSessionInfoBatch([time]);
+
+    expect(result[time.toISOString()]?.worldId).toBeNull();
+    expect(result[time.toISOString()]?.players).toEqual([]);
+  });
 });

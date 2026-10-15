@@ -163,32 +163,6 @@ const { sync } = useLogSync({
 3. **バックグラウンド処理**: 6時間間隔で自動的に差分同期を実行
 4. **キャッシュ無効化**: 必要なクエリのみを無効化し、不要なリクエストを避ける
 
-## 移行ガイド
-
-### 従来のパターンから新しいパターンへの移行
-
-```typescript
-// ❌ 従来のパターン
-const appendMutation =
-  trpcReact.vrchatLog.appendLoglinesToFileFromLogFilePathList.useMutation({
-    onSuccess: () => {
-      loadInfoMutation.mutate({ excludeOldLogLoad: true });
-    },
-  });
-const loadInfoMutation = trpcReact.logInfo.loadLogInfoIndex.useMutation({
-  onSuccess: () => {
-    invalidatePhotoGalleryQueries(utils);
-  },
-});
-
-// ✅ 新しいパターン
-const { sync } = useLogSync({
-  onSuccess: () => {
-    // キャッシュ無効化は自動実行されるため不要
-  },
-});
-```
-
 ## 初回起動判定ロジック
 
 ### 判定基準
