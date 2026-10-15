@@ -163,6 +163,38 @@ describe('searchSessionsByPlayerName integration test', () => {
       expect(results).toEqual([nextJoin.joinDateTime]);
     });
 
+    it('プレイヤー参加より前の履歴が長くても、直前の参加ログをセッションの開始として返す', async () => {
+      await VRChatWorldJoinLogModel.create({
+        worldId: 'wrld_old1',
+        worldName: 'Old World 1',
+        worldInstanceId: '10001',
+        joinDateTime: parseISO('2024-02-01T08:00:00'),
+      });
+      await VRChatWorldJoinLogModel.create({
+        worldId: 'wrld_old2',
+        worldName: 'Old World 2',
+        worldInstanceId: '10002',
+        joinDateTime: parseISO('2024-02-01T09:00:00'),
+      });
+      // 通常ログより新しい写真由来の参加ログが、プレイヤー参加の直前の区切りになる
+      await createVRChatWorldJoinLogFromPhoto([
+        {
+          worldId: 'wrld_photo-before',
+          joinDate: parseISO('2024-02-01T09:30:00'),
+        },
+      ]);
+      await VRChatPlayerJoinLogModel.create({
+        playerName: 'LateJoiner',
+        joinDateTime: parseISO('2024-02-01T10:00:00'),
+      });
+
+      const results = await Effect.runPromise(
+        searchSessionsByPlayerName('LateJoiner'),
+      );
+
+      expect(results).toStrictEqual([parseISO('2024-02-01T09:30:00')]);
+    });
+
     it('該当するプレイヤーが存在しない場合、空の配列を返す', async () => {
       const results = await Effect.runPromise(
         searchSessionsByPlayerName('NonExistentPlayer'),

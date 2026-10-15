@@ -717,18 +717,39 @@ export const searchSessionsByPlayerName = (
       return [];
     }
 
-    // DESC 順なので先頭が最新。セッションの開始はプレイヤー参加日時以前にあるため、
-    // それより後の参加ログは判定に不要
+    // DESC 順なので先頭が最新、末尾が最古。判定に要る参加ログは、プレイヤー参加日時の
+    // 範囲 [最古, 最新] にあるものと、最古より前で最も新しいもの（最古の参加日時が属する
+    // セッションの開始）だけなので、履歴全体を読まずにこの 2 つだけを取得する。
+    // gt / lt は境界を含まないため、1ms 広げて範囲の端ちょうどの参加ログを含める
     const playerJoinDates = playerJoinLogs.map((log) => log.joinDateTime);
     const maxPlayerJoinDate = playerJoinDates[0];
+    const minPlayerJoinDate = playerJoinDates[playerJoinDates.length - 1];
 
-    const worldJoinLogs = yield* fetchAndMergeSortedWorldJoinLogs(
-      {
-        ltJoinDateTime: new Date(maxPlayerJoinDate.getTime() + 1),
-        orderByJoinDateTime: 'asc',
-      },
-      'asc',
+    const [logsInRange, logsBeforeRange] = yield* Effect.all([
+      fetchAndMergeSortedWorldJoinLogs(
+        {
+          gtJoinDateTime: new Date(minPlayerJoinDate.getTime() - 1),
+          ltJoinDateTime: new Date(maxPlayerJoinDate.getTime() + 1),
+          orderByJoinDateTime: 'asc',
+        },
+        'asc',
+      ),
+      fetchAndMergeSortedWorldJoinLogs(
+        {
+          ltJoinDateTime: minPlayerJoinDate,
+          orderByJoinDateTime: 'desc',
+          limit: 1,
+        },
+        'desc',
+      ),
+    ]);
+    // 直前の参加ログは通常ログと写真由来ログから 1 件ずつ取るため最大 2 件になる。
+    // 同時刻の参加ログは worldId で並びが決まるので、最新の日時のものはすべて残す
+    const latestBeforeRange = logsBeforeRange[0]?.joinDateTime.getTime();
+    const precedingJoins = logsBeforeRange.filter(
+      (log) => log.joinDateTime.getTime() === latestBeforeRange,
     );
+    const worldJoinLogs = [...precedingJoins, ...logsInRange];
     const sessions = buildWorldSessions(worldJoinLogs);
 
     const sessionJoinDates: Date[] = [];
