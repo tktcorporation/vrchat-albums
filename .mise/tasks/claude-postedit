@@ -12,8 +12,14 @@ case "$file" in
   *.ts | *.tsx) ;;
   *) exit 0 ;;
 esac
+# ルートは呼び出し元の cwd（post-lint.ts が作業ツリーへ移動済み）から決める。ファイル側から求めると、
+# 別リポジトリのファイルを渡されたときにそのリポジトリの node_modules/.bin を実行してしまう。
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 file="$(realpath "$file")"
-root="$(git -C "$(dirname "$file")" rev-parse --show-toplevel 2>/dev/null)" || exit 0
+case "$file" in
+  "$root"/*) ;;
+  *) exit 0 ;;
+esac
 oxfmt="$root/node_modules/.bin/oxfmt"
 oxlint="$root/node_modules/.bin/oxlint"
 [ -x "$oxfmt" ] && [ -x "$oxlint" ] || exit 0 # 依存未インストール環境では検査不能なので no-op
