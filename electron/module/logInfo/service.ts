@@ -622,7 +622,9 @@ export const getFrequentPlayerNames = (
  * 予期しないエラーのみ発生するため、Effect の defect として伝播する。
  * E チャネルは never（型付きエラーなし）。
  *
- * @param searchParams - ログ検索パラメーター（gt / lt はどちらも境界を含まない）
+ * @param searchParams - ログ検索パラメーター（gt / lt はどちらも境界を含まない）。
+ *   limit は通常ログと写真由来ログのそれぞれに orderByJoinDateTime の順で適用するため、
+ *   マージ後の件数は最大で limit の 2 倍になる
  * @param sortOrder - ソート順序（'desc' = 降順、'asc' = 昇順）
  * @returns ソート済みの統合ログ配列
  */
@@ -631,6 +633,7 @@ export const fetchAndMergeSortedWorldJoinLogs = (
     ltJoinDateTime?: Date;
     gtJoinDateTime?: Date;
     orderByJoinDateTime: 'asc' | 'desc';
+    limit?: number;
   },
   sortOrder: 'desc' | 'asc' = 'desc',
 ): Effect.Effect<

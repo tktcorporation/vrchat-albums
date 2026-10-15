@@ -121,6 +121,8 @@ export const findVRChatWorldJoinLogList = async (query?: {
   gtJoinDateTime?: Date;
   ltJoinDateTime?: Date;
   orderByJoinDateTime: 'asc' | 'desc';
+  /** 取得する最大件数。orderByJoinDateTime の順で先頭から数える。省略時は全件 */
+  limit?: number;
 }): Promise<VRChatWorldJoinLogModel[]> => {
   const vrcWorldJoinLogModelList = await VRChatWorldJoinLogModel.findAll({
     where: {
@@ -130,6 +132,7 @@ export const findVRChatWorldJoinLogList = async (query?: {
       },
     },
     order: [['joinDateTime', query?.orderByJoinDateTime ?? 'asc']],
+    ...(query?.limit !== undefined && { limit: query.limit }),
   });
 
   return vrcWorldJoinLogModelList;

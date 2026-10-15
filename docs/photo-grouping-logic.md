@@ -99,27 +99,31 @@ VRChat_YYYY-MM-DD_HH-mm-ss.SSS_wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.ext
 
 ### 1. ✅ セッションモデルの導入
 
+**実装ファイル**: `shared/worldSession.ts`
+
 ```typescript
-interface Session {
-  worldId: string;
-  worldName: string;
-  worldInstanceId: string;
-  joinTime: Date;
-  leaveTime?: Date; // 退出時刻（退出ログまたは推測による）
-  photos: Photo[];
+interface WorldSession<J extends WorldSessionJoin> {
+  readonly join: J; // セッションを開始したワールド参加ログ
+  readonly nextJoinDateTime: Date | undefined; // 次の参加ログの日時。最新のセッションでは undefined
 }
 ```
+
+- セッションは時刻順に並べた参加ログ `join_i` から次の参加ログ `join_{i+1}` の直前までの半開区間 `[join_i, join_{i+1})`
+- 終わりは次の参加ログの日時だけで決まり、退出時刻や写真の一覧は持たない
+- 判定の詳細は「3. セッション判定の共通化」を参照
 
 ### 2. ✅ ワールド退出ログの処理追加
 
 **実装ファイル**: `electron/module/vrchatLog/parsers/worldLeaveParser.ts`
+
+退出ログはセッションの境界を決めない。セッションの終わりは常に次のワールド参加ログで決まり（1. を参照）、退出ログは境界の判定に使われない。
 
 1. **明示的な退出パターン**
    - `OnApplicationPause`, `OnApplicationQuit`
    - `Lost connection`, `Disconnected`
    - `Left Room`, `Leaving room`
 
-2. **推測による退出検出**
+2. **推測による退出検出**（`inferWorldLeaveEvents`）
    - 次のワールド参加ログの直前で退出と判定
    - ログファイル終了時にアプリ終了として判定
 

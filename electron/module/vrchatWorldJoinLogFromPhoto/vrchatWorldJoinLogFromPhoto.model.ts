@@ -113,6 +113,8 @@ export const findVRChatWorldJoinLogFromPhotoList = async (query?: {
   gtJoinDateTime?: Date;
   ltJoinDateTime?: Date;
   orderByJoinDateTime: 'asc' | 'desc';
+  /** 取得する最大件数。orderByJoinDateTime の順で先頭から数える。省略時は全件 */
+  limit?: number;
 }): Promise<VRChatWorldJoinLogFromPhotoModel[]> => {
   const logs = await VRChatWorldJoinLogFromPhotoModel.findAll({
     where: {
@@ -122,6 +124,7 @@ export const findVRChatWorldJoinLogFromPhotoList = async (query?: {
       },
     },
     order: [['joinDateTime', query?.orderByJoinDateTime ?? 'asc']],
+    ...(query?.limit !== undefined && { limit: query.limit }),
   });
 
   return logs;

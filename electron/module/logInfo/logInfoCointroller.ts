@@ -208,9 +208,10 @@ export const logInfoRouter = () =>
             `[SessionInfoBatch] Processing batch request for ${ctx.input.length} sessions`,
           );
 
-          // 要求された開始日時を含む範囲の参加ログと、その直後の参加ログ 1 件を取得する
-          // （直後の 1 件は最後に要求されたセッションの終端になる）。gt / lt は境界を
-          // 含まないため、1ms 広げて要求日時ちょうどの参加ログを含める
+          // 要求された開始日時を含む範囲の参加ログと、範囲より後で最も早い参加ログ 1 件を
+          // 取得する（その 1 件は最後に要求されたセッションの終端になる）。後者は通常ログと
+          // 写真由来ログからそれぞれ最も早い 1 件だけを取り、マージ後の先頭を使う。
+          // gt / lt は境界を含まないため、1ms 広げて要求日時ちょうどの参加ログを含める
           const worldLogStartTime = performance.now();
           const requestedTimes = ctx.input.map((d) => d.getTime());
           const minRequestedTime = Math.min(...requestedTimes);
@@ -230,6 +231,7 @@ export const logInfoRouter = () =>
                 {
                   gtJoinDateTime: new Date(maxRequestedTime),
                   orderByJoinDateTime: 'asc',
+                  limit: 1,
                 },
                 'asc',
               ),

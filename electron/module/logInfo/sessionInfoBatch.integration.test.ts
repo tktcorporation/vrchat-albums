@@ -366,6 +366,40 @@ describe('SessionInfoBatch world change behavior', () => {
     ).toEqual(['AfterPhoto']);
   });
 
+  it('前のセッションだけを要求しても、後の参加ログで区間が閉じる', async () => {
+    const w1 = parseISO('2024-01-07T10:00:00');
+    const w2 = parseISO('2024-01-07T11:00:00');
+    await createWorldJoin('77777777', 'World 1', w1);
+    await createWorldJoin('88888888', 'World 2', w2);
+    await createPlayerJoin('InW1', parseISO('2024-01-07T10:30:00'));
+    await createPlayerJoin('InW2', parseISO('2024-01-07T11:30:00'));
+
+    const result = await callBatch([w1]);
+
+    expect(result[w1.toISOString()].worldName).toBe('World 1');
+    expect(result[w1.toISOString()].players.map((p) => p.playerName)).toEqual([
+      'InW1',
+    ]);
+  });
+
+  it('前のセッションだけを要求しても、後の写真由来の参加ログで区間が閉じる', async () => {
+    const w1 = parseISO('2024-01-08T10:00:00');
+    const photoJoin = parseISO('2024-01-08T11:00:00');
+    await createWorldJoin('99999999', 'World 1', w1);
+    await createVRChatWorldJoinLogFromPhoto([
+      { worldId: 'wrld_photo_after', joinDate: photoJoin },
+    ]);
+    await createPlayerJoin('InW1', parseISO('2024-01-08T10:30:00'));
+    await createPlayerJoin('AfterPhoto', parseISO('2024-01-08T11:30:00'));
+
+    const result = await callBatch([w1]);
+
+    expect(result[w1.toISOString()].worldName).toBe('World 1');
+    expect(result[w1.toISOString()].players.map((p) => p.playerName)).toEqual([
+      'InW1',
+    ]);
+  });
+
   it('セッションの開始日時ではない日時には空のセッションを返す', async () => {
     const w1 = parseISO('2024-01-06T10:00:00');
     await createWorldJoin('66666666', 'World 1', w1);

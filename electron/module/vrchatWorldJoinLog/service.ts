@@ -51,15 +51,18 @@ export const findVRChatWorldJoinLogList = async ({
   gtJoinDateTime,
   ltJoinDateTime,
   orderByJoinDateTime,
+  limit,
 }: {
   gtJoinDateTime?: Date;
   ltJoinDateTime?: Date;
   orderByJoinDateTime: 'asc' | 'desc';
+  limit?: number;
 }) => {
   const modelList = await model.findVRChatWorldJoinLogList({
     gtJoinDateTime,
     ltJoinDateTime,
     orderByJoinDateTime,
+    limit,
   });
   return modelList.map((m) => {
     return {
@@ -125,14 +128,19 @@ export const mergeVRChatWorldJoinLogs = ({
     }),
   );
 
-  // 写真から取得したログから、通常のログと重複するものを除外
-  const uniquePhotoLogs = convertedPhotoLogs.filter((photoLog) => {
-    return !normalLogs.some(
-      (normalLog) =>
-        normalLog.worldId === photoLog.worldId &&
-        normalLog.joinDateTime.getTime() === photoLog.joinDateTime.getTime(),
-    );
-  });
+  // 写真から取得したログから、通常のログと重複するもの（worldId と参加日時が一致）を除外する。
+  // 件数が多くても線形時間で済むよう、通常ログの識別キーを Set に入れて照合する
+  const identityKey = (worldId: string, joinDateTime: Date) =>
+    `${worldId}\u0000${joinDateTime.getTime()}`;
+  const normalLogKeys = new Set(
+    normalLogs.map((normalLog) =>
+      identityKey(normalLog.worldId, normalLog.joinDateTime),
+    ),
+  );
+  const uniquePhotoLogs = convertedPhotoLogs.filter(
+    (photoLog) =>
+      !normalLogKeys.has(identityKey(photoLog.worldId, photoLog.joinDateTime)),
+  );
 
   return [...normalLogs, ...uniquePhotoLogs];
 };
