@@ -15,7 +15,10 @@
   // 1Password agent ソケットを見せる必要があるため。
   "containerEnv": {
     "PATH": "/home/vscode/.local/share/mise/shims:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-    "SSH_AUTH_SOCK": "/tmp/1password-agent/agent.sock"
+    "SSH_AUTH_SOCK": "/tmp/1password-agent/agent.sock",
+    // desktop-lite の画面サイズと、GUI アプリの描画先
+    "VNC_RESOLUTION": "1920x1080x24",
+    "DISPLAY": ":1"
   },
 
   // Volume name must start with [a-zA-Z0-9] to comply with Docker naming rules
@@ -59,6 +62,11 @@
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers-extra/features/mise:1": {
       "version": "2026.8.14"
+    },
+    // Electron の GUI をブラウザ越しに見るための VNC デスクトップ（scripts/dev.sh と CONTRIBUTING.md が前提にする）
+    "ghcr.io/devcontainers/features/desktop-lite:1": {
+      "webPort": "6080",
+      "vncPort": "5901"
     }
   },
   "forwardPorts": [6080],
@@ -68,10 +76,6 @@
     }
   },
   "runArgs": ["--shm-size=2g", "--env-file", ".devcontainer/.env.devcontainer"],
-  "containerEnv": {
-    "VNC_RESOLUTION": "1920x1080x24",
-    "DISPLAY": ":1"
-  },
   "customizations": {
     "vscode": {
       "extensions": [

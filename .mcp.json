@@ -5,17 +5,6 @@
       "command": "bun",
       "args": [".devcontainer/run-chrome-devtools-mcp.ts"],
       "env": {}
-    },
-    "lapras-dev": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "--use-system-ca",
-        "/workspaces/workspace-tkt/repo/lapras-mcp-server-internal/dist/index.js"
-      ],
-      "env": {
-        "LAPRAS_API_KEY": "${LAPRAS_API_KEY}"
-      }
     }
   }
 }
