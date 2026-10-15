@@ -4,11 +4,13 @@ import * as path from 'node:path';
 
 import { writeClipboardFilePaths } from 'clip-filepaths';
 import { Effect } from 'effect';
+import type { NativeImage } from 'electron';
 import { match, P } from 'ts-pattern';
 
 import {
   getApp,
   getClipboard,
+  getClipboardItem,
   getDialog,
   getNativeImage,
   getShell,
@@ -109,6 +111,17 @@ const openPhotoPathWithPhotoApp = openPathWithShell;
 const openPathWithAssociatedApp = openPathWithShell;
 
 /**
+ * NativeImage を PNG としてクリップボードへ書き込む。
+ * Electron の clipboard は W3C Clipboard API と同じ MIME 型付きの ClipboardItem を受け取るため、
+ * 元画像の形式に関わらず PNG へ変換して `image/png` として渡す。
+ */
+const writeImageToClipboard = (image: NativeImage): Promise<void> => {
+  const ClipboardItem = getClipboardItem();
+  const png = new Blob([new Uint8Array(image.toPNG())], { type: 'image/png' });
+  return getClipboard().write([new ClipboardItem({ 'image/png': png })]);
+};
+
+/**
  * 画像ファイルを読み込み、クリップボードへ転送する。
  * ShareDialog からのコピー処理で利用される。
  */
@@ -118,7 +131,7 @@ const copyImageDataByPath = (filePath: string): Effect.Effect<void> => {
   return Effect.promise(async () => {
     const photoBuf = await fs.readFile(filePath);
     const image = getNativeImage().createFromBuffer(photoBuf);
-    getClipboard().writeImage(image);
+    await writeImageToClipboard(image);
     // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
   });
 };
@@ -137,7 +150,7 @@ const copyImageByBase64 = (options: {
     },
     async (tempPngPath) => {
       const image = getNativeImage().createFromPath(tempPngPath);
-      getClipboard().writeImage(image);
+      await writeImageToClipboard(image);
       // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
     },
   );

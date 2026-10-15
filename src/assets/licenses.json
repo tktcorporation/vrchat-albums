@@ -75,7 +75,7 @@
     "path": "node_modules/@sentry/cli",
     "licenseFile": "node_modules/@sentry/cli/LICENSE"
   },
-  "@sentry/electron@7.18.0": {
+  "@sentry/electron@8.1.0": {
     "licenses": "MIT",
     "repository": "https://github.com/getsentry/sentry-electron",
     "publisher": "Sentry",
@@ -197,7 +197,7 @@
     "path": "node_modules/electron-store",
     "licenseFile": "node_modules/electron-store/license"
   },
-  "electron-unhandled@4.0.1": {
+  "electron-unhandled@6.0.0": {
     "licenses": "MIT",
     "repository": "https://github.com/sindresorhus/electron-unhandled",
     "publisher": "Sindre Sorhus",

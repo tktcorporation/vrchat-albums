@@ -60,6 +60,8 @@ function AppContent() {
           debug: isDev,
           // Sentryプラグインが注入するリリース識別子
           release: __SENTRY_RELEASE__,
+          // IP アドレス等のユーザー情報を自動付与しない（main プロセスと同じ方針）
+          dataCollection: { userInfo: false },
           tags: {
             source: 'electron-renderer',
           },
