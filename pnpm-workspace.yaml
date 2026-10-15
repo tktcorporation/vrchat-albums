@@ -94,8 +94,12 @@ overrides:
   # fast-uri は electron-store > conf > ajv の深い transitive 依存 (ajv は ^3.0.1 の範囲で許容)。
   # ホスト混同・SSRF 系の複数 CVE と、パーセントエンコードされたホスト名の大文字小文字
   # 正規化の不整合 (GHSA-hrr3-gc8f-f4qj) 対策として 3.1.8 以上へ固定。ajv の宣言範囲を
-  # 超えて 4.x (major) まで解決されないよう明示的に上限を切る。
+  # 超えて 4.x (major) まで解決されないよう明示的に上限を切る。ajv が 3.1.8 以上を要求するようになれば外せる。
   fast-uri: '>=3.1.8 <4'
+  # tinypool は oxfmt (開発時のフォーマッタ) が 2.1.0 に完全固定している transitive 依存。
+  # GHSA-5gmw-xhrv-c9v3 / GHSA-85c8-ppgw-ccpr (critical) 対策として、同じ 2.x 内の patch 版
+  # 2.1.2 以上へ固定する。oxfmt が 2.1.2 以上を要求するようになれば外せる。
+  tinypool: '>=2.1.2 <3'
   # @tootallnate/once は sqlite3 のネイティブビルド時 (node-gyp > make-fetch-happen >
   # http-proxy-agent) の深い transitive 依存で、ip-address と同じ経路。
   # 制御フロー不整合対策として 2.0.1 以上へ固定。3.x は ESM-only化で http-proxy-agent@4 の
