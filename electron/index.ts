@@ -16,6 +16,7 @@ import { createIPCHandler } from 'trpc-electron/main';
 
 import { scrubEventData } from '../src/lib/utils/masking';
 import { router } from './api';
+import { SENTRY_DATA_COLLECTION } from './constants/sentryDataCollection';
 import * as electronUtil from './electronUtil';
 import { initializeSettingStoreForUtil } from './electronUtil';
 import { logger } from './lib/logger';
@@ -56,9 +57,7 @@ export const initializeMainSentry = () => {
     // __SENTRY_RELEASE__ はビルド時に Sentry プラグインによって置換される
     // リリースバージョンを表す定数
     release: __SENTRY_RELEASE__,
-    // SDK は既定で IP アドレス等のユーザー情報を自動付与する。利用者の特定につながる情報は
-    // 送らない方針のため無効化する。
-    dataCollection: { userInfo: false },
+    dataCollection: SENTRY_DATA_COLLECTION,
     beforeSend: (event: ErrorEvent, _hint: EventHint) => {
       // 開発環境でも規約同意をチェックする
       if (!settingStore.getTermsAccepted()) {

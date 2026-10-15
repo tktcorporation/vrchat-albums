@@ -14,6 +14,7 @@ import { ERROR_CATEGORIES, parseErrorFromTRPC } from './types/errors';
 // Electron レンダラープロセスでの開発環境検出
 const isDev = process.env.NODE_ENV === 'development';
 
+import { SENTRY_DATA_COLLECTION } from '../../electron/constants/sentryDataCollection';
 import { AppHeader } from './components/AppHeader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import PhotoGallery from './components/PhotoGallery';
@@ -60,8 +61,7 @@ function AppContent() {
           debug: isDev,
           // Sentryプラグインが注入するリリース識別子
           release: __SENTRY_RELEASE__,
-          // IP アドレス等のユーザー情報を自動付与しない（main プロセスと同じ方針）
-          dataCollection: { userInfo: false },
+          dataCollection: SENTRY_DATA_COLLECTION,
           tags: {
             source: 'electron-renderer',
           },
