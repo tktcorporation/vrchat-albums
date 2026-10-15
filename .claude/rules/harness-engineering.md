@@ -8,7 +8,7 @@
 
 | 層           | タイミング | 仕組み                                      | 対象                       |
 | ------------ | ---------- | ------------------------------------------- | -------------------------- |
-| PostToolUse  | ミリ秒     | `.mise.toml` の `claude-postedit` タスク    | フォーマット、静的解析     |
+| PostToolUse  | ミリ秒     | `.mise/tasks/claude-postedit`               | フォーマット、静的解析     |
 | PreToolUse   | ミリ秒     | `.claude/hooks/pre-bash-guard.ts`           | 危険コマンドのブロック     |
 | タスク完了時 | 秒         | `pnpm lint:fix` → `pnpm lint` → `pnpm test` | 全プロジェクトのlint/test  |
 | CI           | 分         | `.github/workflows/lint-test-cross.yml`     | クロスプラットフォーム検証 |

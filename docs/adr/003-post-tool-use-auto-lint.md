@@ -2,7 +2,9 @@
 
 - **ステータス**: accepted
 - **日付**: 2026-04-14
-- **関連フック**: `.claude/hooks/post-lint.ts`（委譲先は `.mise.toml` の `claude-postedit` タスク）
+- **関連フック**: `.claude/hooks/post-lint.ts`（委譲先は `.mise/tasks/claude-postedit`）
+
+> **実装の変更**: フックは bun で動く `.claude/hooks/post-lint.ts` が `mise run claude-postedit -- <file>` を呼ぶ形になった。対象は Write/Edit、出力の JSON 化は `post-lint.ts` が担い、`jq` は不要。bun と mise が無い環境では lint は走らない。以下の「結果」は決定時点の記録。
 
 ## コンテキスト
 

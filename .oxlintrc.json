@@ -199,7 +199,6 @@
     ".cursor",
     ".devcontainer",
     "scripts/docs-lifecycle",
-    "scripts/docs-lifecycle.ts",
     "scripts/generate-agent-adapters.ts",
     "tools/agent-fleet"
   ]

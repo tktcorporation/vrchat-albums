@@ -36,6 +36,8 @@ return match(error)
 
 `../error-handling.md` の 2 ケースに加え、Electron 環境の検出（`require('electron')` を try-catch で包む）を許容する。`finally` でのリソース解放は、先に `Effect.acquireRelease` を検討する。
 
+`../error-handling.md` の「try-catch ガードは呼び出し箇所ごとに書く」は、このリポジトリでは「呼び出し箇所ごとに `Effect.try` / `Effect.tryPromise` で包む」と読む。生の try-catch を書いてよいことにはならない。
+
 ## レイヤー別の責務
 
 | レイヤー | 責務                               | パターン                       |
