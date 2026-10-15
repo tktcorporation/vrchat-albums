@@ -1,0 +1,9 @@
+{
+  "pid": 1003,
+  "sessionId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  "cwd": "/workspaces/ws",
+  "startedAt": 1788401400849,
+  "kind": "interactive",
+  "name": "dead one",
+  "status": "idle"
+}

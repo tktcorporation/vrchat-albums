@@ -1,0 +1,15 @@
+{
+  "state": "done",
+  "detail": "PR #100 のレビュー指摘を解消した",
+  "intent": "ダミーの元の指示: レビュー指摘を直して",
+  "name": null,
+  "cwd": "/workspaces/ws",
+  "worktreePath": null,
+  "worktreeBranch": null,
+  "createdAt": "2026-09-03T00:00:00.000Z",
+  "updatedAt": "2026-09-03T01:00:00.000Z",
+  "sessionId": "22222222-2222-4222-8222-222222222222",
+  "children": null,
+  "output": { "result": "PR #100 のレビュー指摘を解消した" },
+  "linkScanPath": "/home/u/.claude/projects/-workspaces-ws/22222222-2222-4222-8222-222222222222.jsonl"
+}

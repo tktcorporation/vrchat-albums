@@ -474,7 +474,7 @@ Phase 1 では `lint-custom.ts` の tasks 配列に入れず、単独実行の�
 
 ### PostToolUse フック (Phase 2)
 
-`.claude/hooks/post-edit-lint.sh` で `.tsx` 編集時に `pnpm lint:contrast --glob <path>` を走らせる対応は Phase 2。
+`.mise.toml` の `claude-postedit` タスクで `.tsx` 編集時に `pnpm lint:contrast --glob <path>` を走らせる対応は Phase 2。
 
 ## テスト戦略
 

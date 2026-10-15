@@ -1,0 +1,31 @@
+{
+  "scan": ["docs/**/*.md"],
+  "ignore": [],
+  "staleDays": {
+    "ephemeral": 7,
+    "durable": 60
+  },
+  "defaultLifecycle": "durable",
+  "policies": [
+    {
+      "paths": [
+        "docs/plans/**/*.md",
+        "docs/superpowers/plans/**/*.md",
+        "docs/superpowers/specs/**/*.md"
+      ],
+      "lifecycle": "ephemeral",
+      "why": "実装が完了した時点で価値を失う使い捨ての設計メモ。1 週間触られていないなら、実装が終わっているか設計が実態とズレているかのどちらかなので見直す"
+    },
+    {
+      "paths": ["docs/design/**/*.md"],
+      "lifecycle": "durable",
+      "why": "複数コンポーネントが依存する横断的な設計判断の置き場。長期保持するが、実装との乖離を防ぐため定期的な棚卸しは要る"
+    }
+  ],
+  "referencePrefixes": ["docs/"],
+  "referenceIgnoreFrom": [
+    "scripts/docs-lifecycle/__tests__/**",
+    ".changeset/*.md",
+    "**/CHANGELOG.md"
+  ]
+}

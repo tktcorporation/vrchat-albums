@@ -1,0 +1,8 @@
+{"type":"user","isMeta":true,"origin":null,"timestamp":"2026-09-05T04:25:03.000Z","isSidechain":false,"message":{"role":"user","content":"<command-message>skill</command-message>"}}
+{"type":"user","origin":{"kind":"human"},"timestamp":"2026-09-05T04:25:04.000Z","isSidechain":false,"message":{"role":"user","content":"ダミーの元の指示: feature-b を実装して"}}
+{"type":"assistant","timestamp":"2026-09-05T04:25:10.000Z","isSidechain":false,"message":{"role":"assistant","model":"claude-fable-5-1","content":[{"type":"text","text":"まず既存コードを読みます。\n二行目"},{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"ls"}}]}}
+{"type":"user","origin":null,"timestamp":"2026-09-05T04:25:11.000Z","isSidechain":false,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"}]}}
+{"type":"user","origin":{"kind":"human"},"timestamp":"2026-09-05T04:30:00.000Z","isSidechain":false,"message":{"role":"user","content":[{"type":"text","text":"進めて"}]}}
+{"type":"assistant","timestamp":"2026-09-05T04:30:05.000Z","isSidechain":true,"message":{"role":"assistant","model":"claude-fable-5-1","content":[{"type":"text","text":"サブエージェントの発話。無視される"}]}}
+{"type":"assistant","timestamp":"2026-09-05T04:31:00.000Z","isSidechain":false,"message":{"role":"assistant","model":"claude-fable-5-1","content":[{"type":"text","text":"テストを書いています。"}]}}
+{"type":"last-prompt","lastPrompt":"進めて"}

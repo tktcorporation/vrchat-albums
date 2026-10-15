@@ -1,12 +1,19 @@
 name: Labeler
-on: [pull_request]
+
+# 実行ごとに最低 1 分が課金されるため、PR への push（synchronize）では起動しない。
+# PR の途中で追加されたファイルにはラベルが付かないが、ラベルは表示用で判定には使わない。
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
 
 jobs:
   label:
     runs-on: ubuntu-latest
+    # GitHub API を数回叩くだけの action。
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write
 
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v7

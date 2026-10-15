@@ -2,7 +2,7 @@
 
 - **ステータス**: accepted
 - **日付**: 2026-04-14
-- **関連フック**: `.claude/hooks/post-edit-lint.sh`
+- **関連フック**: `.claude/hooks/post-lint.ts`（委譲先は `.mise.toml` の `claude-postedit` タスク）
 
 ## コンテキスト
 

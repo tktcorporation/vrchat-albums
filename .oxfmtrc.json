@@ -27,6 +27,19 @@
     "src/assets/licenses.json",
     "CHANGELOG.md",
     ".github/workflows",
-    "*.d.ts"
+    "*.d.ts",
+    ".claude/hooks",
+    ".claude/skills",
+    ".claude/output-styles",
+    ".claude/guides",
+    ".claude/rules/*.md",
+    ".codex",
+    ".cursor",
+    ".devcontainer",
+    ".ziku",
+    "scripts/docs-lifecycle",
+    "scripts/docs-lifecycle.ts",
+    "scripts/generate-agent-adapters.ts",
+    "tools/agent-fleet"
   ]
 }

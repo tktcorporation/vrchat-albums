@@ -65,6 +65,8 @@ export default defineConfig({
           name: 'scripts',
           environment: 'node',
           include: ['scripts/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+          // テンプレートから同期される docs-lifecycle は bun:test で書かれ、bun で実行する
+          exclude: [...defaultExclude, 'scripts/docs-lifecycle/**'],
         },
       },
     ],

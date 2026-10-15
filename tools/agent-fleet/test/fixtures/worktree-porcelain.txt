@@ -1,0 +1,11 @@
+worktree /workspaces/ws
+HEAD 9be25c6484e1c47070fe191bf487ec71019da22d
+branch refs/heads/main
+
+worktree /workspaces/ws/.claude/worktrees/feature-b
+HEAD a5258aaeeb06ce50c7ac50e5c3284f9076a0d036
+branch refs/heads/feature/b
+
+worktree /workspaces/ws/.claude/worktrees/detached-one
+HEAD 535f5ae75000000000000000000000000000000
+detached

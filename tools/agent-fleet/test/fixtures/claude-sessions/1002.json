@@ -1,0 +1,10 @@
+{
+  "pid": 1002,
+  "sessionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  "cwd": "/workspaces/ws",
+  "startedAt": 1788501400849,
+  "kind": "bg",
+  "name": "bg job",
+  "status": "busy",
+  "jobId": "job1"
+}

@@ -1,0 +1,214 @@
+{
+  "description": "SSOT for shared agent hooks. Edit this file, then run `pnpm agent-adapters:generate`. Do not hand-edit .claude/settings.json hooks, .cursor/hooks.json, or .codex/hooks.json.",
+  "hooks": [
+    {
+      "id": "prompt-router",
+      "script": ".claude/hooks/prompt-router.ts",
+      "claude": {
+        "event": "UserPromptSubmit",
+        "matcher": ""
+      },
+      "cursor": {
+        "event": "beforeSubmitPrompt"
+      },
+      "codex": {
+        "event": "UserPromptSubmit"
+      }
+    },
+    {
+      "id": "pre-bash-guard",
+      "script": ".claude/hooks/pre-bash-guard.ts",
+      "claude": {
+        "event": "PreToolUse",
+        "matcher": "Bash"
+      },
+      "cursor": {
+        "event": "preToolUse",
+        "matcher": "Shell"
+      },
+      "codex": {
+        "event": "PreToolUse",
+        "matcher": "^Bash$"
+      }
+    },
+    {
+      "id": "pre-bash-timing",
+      "script": ".claude/hooks/pre-bash-timing.ts",
+      "claude": {
+        "event": "PreToolUse",
+        "matcher": "Bash"
+      },
+      "cursor": {
+        "event": "preToolUse",
+        "matcher": "Shell"
+      },
+      "codex": {
+        "event": "PreToolUse",
+        "matcher": "^Bash$"
+      }
+    },
+    {
+      "id": "protect-config",
+      "script": ".claude/hooks/protect-config.ts",
+      "statusMessage": "Checking if file is a protected config...",
+      "claude": {
+        "event": "PreToolUse",
+        "matcher": "Write|Edit"
+      },
+      "cursor": {
+        "event": "preToolUse",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      "codex": {
+        "event": "PreToolUse",
+        "matcher": "Edit|Write|apply_patch"
+      }
+    },
+    {
+      "id": "track-edits-pre",
+      "script": ".claude/hooks/track-edits.ts",
+      "claude": {
+        "event": "PreToolUse",
+        "matcher": "Write|Edit"
+      },
+      "cursor": {
+        "event": "preToolUse",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      "codex": {
+        "event": "PreToolUse",
+        "matcher": "Edit|Write|apply_patch"
+      }
+    },
+    {
+      "id": "post-bash-pr",
+      "script": ".claude/hooks/post-bash-pr.ts",
+      "claude": {
+        "event": "PostToolUse",
+        "matcher": "Bash"
+      },
+      "cursor": {
+        "event": "postToolUse",
+        "matcher": "Shell"
+      },
+      "codex": {
+        "event": "PostToolUse",
+        "matcher": "^Bash$"
+      }
+    },
+    {
+      "id": "post-bash-timing",
+      "script": ".claude/hooks/post-bash-timing.ts",
+      "claude": {
+        "event": "PostToolUse",
+        "matcher": "Bash"
+      },
+      "cursor": {
+        "event": "postToolUse",
+        "matcher": "Shell"
+      },
+      "codex": {
+        "event": "PostToolUse",
+        "matcher": "^Bash$"
+      }
+    },
+    {
+      "id": "post-bash-guard",
+      "script": ".claude/hooks/post-bash-guard.ts",
+      "claude": {
+        "event": "PostToolUse",
+        "matcher": "Bash"
+      },
+      "cursor": {
+        "event": "postToolUse",
+        "matcher": "Shell"
+      },
+      "codex": {
+        "event": "PostToolUse",
+        "matcher": "^Bash$"
+      }
+    },
+    {
+      "id": "track-edits-post",
+      "script": ".claude/hooks/track-edits.ts",
+      "claude": {
+        "event": "PostToolUse",
+        "matcher": "Write|Edit"
+      },
+      "cursor": {
+        "event": "postToolUse",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      "codex": {
+        "event": "PostToolUse",
+        "matcher": "Edit|Write|apply_patch"
+      }
+    },
+    {
+      "id": "docs-lifecycle-guard",
+      "script": ".claude/hooks/docs-lifecycle-guard.ts",
+      "statusMessage": "Checking doc placement...",
+      "claude": {
+        "event": "PostToolUse",
+        "matcher": "Write|Edit"
+      },
+      "cursor": {
+        "event": "postToolUse",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      "codex": {
+        "event": "PostToolUse",
+        "matcher": "Edit|Write|apply_patch"
+      }
+    },
+    {
+      "id": "post-lint",
+      "script": ".claude/hooks/post-lint.ts",
+      "statusMessage": "Running lint on edited file...",
+      "claude": {
+        "event": "PostToolUse",
+        "matcher": "Write|Edit"
+      },
+      "cursor": {
+        "event": "postToolUse",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      "codex": {
+        "event": "PostToolUse",
+        "matcher": "Edit|Write|apply_patch"
+      }
+    },
+    {
+      "id": "stop-verify",
+      "script": ".claude/hooks/stop-verify.ts",
+      "statusMessage": "Running lint + test verification before completion...",
+      "claude": {
+        "event": "Stop",
+        "matcher": ""
+      },
+      "cursor": {
+        "event": "stop",
+        "loopLimit": null
+      },
+      "codex": {
+        "event": "Stop"
+      }
+    },
+    {
+      "id": "stop-pr-comments",
+      "script": ".claude/hooks/stop-pr-comments.ts",
+      "statusMessage": "Checking unresolved PR review threads...",
+      "claude": {
+        "event": "Stop",
+        "matcher": ""
+      },
+      "cursor": {
+        "event": "stop",
+        "loopLimit": null
+      },
+      "codex": {
+        "event": "Stop"
+      }
+    }
+  ]
+}

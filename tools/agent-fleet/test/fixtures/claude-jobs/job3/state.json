@@ -1,0 +1,15 @@
+{
+  "state": "working",
+  "detail": "ダミーの詳細",
+  "intent": "ダミーの元の指示: children に不正な要素が混じっているケース",
+  "name": null,
+  "cwd": "/workspaces/ws",
+  "worktreePath": null,
+  "worktreeBranch": null,
+  "createdAt": "2026-09-04T00:00:00.000Z",
+  "updatedAt": "2026-09-04T00:30:00.000Z",
+  "sessionId": "33333333-3333-4333-8333-333333333333",
+  "children": [null, { "id": "1", "href": "https://x/pull/1", "kind": "pr" }],
+  "output": null,
+  "linkScanPath": "/home/u/.claude/projects/-workspaces-ws/33333333-3333-4333-8333-333333333333.jsonl"
+}

@@ -1,71 +1,102 @@
 {
-  "effortLevel": "xhigh",
-  "ultracode": true,
   "enableWorkflows": true,
+  "workflowSizeGuideline": "medium",
+  "outputStyle": "workspace-default",
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "30000",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+    "BASH_MAX_OUTPUT_LENGTH": "30000"
+  },
   "permissions": {
-    "allow": ["Bash(find:*)", "Bash(rg:*)", "Bash(grep:*)", "Bash(ls:*)"],
     "deny": [
       "Read(./secrets/**)",
       "Write(./secrets/**)",
+      "Edit(./secrets/**)",
       "Read(./*/**/.env)",
       "Read(./*/**/.env.*)",
       "Write(./*/**/.env)",
-      "Write(./*/**/.env.*)"
-    ]
+      "Write(./*/**/.env.*)",
+      "Edit(./*/**/.env)",
+      "Edit(./*/**/.env.*)"
+    ],
+    "allow": ["Bash(find:*)", "Bash(rg:*)", "Bash(grep:*)", "Bash(ls:*)"]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["chrome-devtools"],
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/prompt-router.ts"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre-bash-guard.sh"
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/pre-bash-guard.ts"
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require-pr-self-review.sh"
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/pre-bash-timing.ts"
           }
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-config.sh",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/protect-config.ts",
             "statusMessage": "Checking if file is a protected config..."
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/track-edits.ts"
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-edit-lint.sh"
-          },
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-lint.sh",
-            "statusMessage": "Running lint on edited file..."
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/reset-pr-review-count.sh"
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/post-bash-pr.ts"
           },
           {
             "type": "command",
-            "command": "input=\"${CLAUDE_TOOL_INPUT:-$(cat)}\"; if echo \"$input\" | grep -qE 'gh\\s+pr\\s+create'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"PR を作成した。続けて必ず次の2つを実行し、指摘があれば直すこと: (1) pr-first-reader-check スキルで、PRタイトル・本文・コミットメッセージ・差分のコメント/識別子に、初見のレビュアーへ通じない語（issue/PR 限定の呼び名・PR外参照・未定義略語・暗黙の前提）が無いか検査。 (2) evergreen-comment チェック（.claude/rules/code-intent-documentation.md）で、差分のコメントが現在のWHYだけか（履歴・WHAT重複・コードに無いものへの言及が無いか）検査。\"}}'; fi"
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/post-bash-timing.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/post-bash-guard.ts"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/track-edits.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/docs-lifecycle-guard.ts",
+            "statusMessage": "Checking doc placement..."
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/post-lint.ts",
+            "statusMessage": "Running lint on edited file..."
           }
         ]
       }
@@ -76,8 +107,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop-verify.sh",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/stop-verify.ts",
             "statusMessage": "Running lint + test verification before completion..."
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/stop-pr-comments.ts",
+            "statusMessage": "Checking unresolved PR review threads..."
           }
         ]
       }
@@ -89,7 +125,7 @@
     "agent-sdk-dev@claude-plugins-official": false,
     "code-review@claude-plugins-official": true,
     "explanatory-output-style@claude-plugins-official": false,
-    "learning-output-style@claude-plugins-official": true,
+    "learning-output-style@claude-plugins-official": false,
     "plugin-dev@claude-plugins-official": false,
     "security-guidance@claude-plugins-official": true,
     "frontend-design@claude-plugins-official": true,
@@ -146,6 +182,8 @@
     "sp-global@financial-services-plugins": false,
     "sentry@claude-plugins-official": true,
     "intercom@claude-plugins-official": false,
+    "notion@claude-plugins-official": false,
+    "chrome-devtools-mcp@claude-plugins-official": false,
     "slack@claude-plugins-official": true,
     "datadog@claude-plugins-official": true
   },

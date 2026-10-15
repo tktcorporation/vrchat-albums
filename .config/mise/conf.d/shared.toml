@@ -1,0 +1,70 @@
+# Project 横断で共有する mise 設定。
+# project 固有の version pin (node / python / pnpm / rust) と、各 project 固有の
+# 依存 infra に紐付く tool は .mise.toml に置く。
+# このファイルは ziku で全 project に sync される (.ziku/ziku.jsonc 参照)。
+#
+# mise は同一ディレクトリ内で `.mise.toml` と `.config/mise/conf.d/*.toml`
+# を両方読み込み、`.mise.toml` が `conf.d/*.toml` を override する。tool /
+# setting / task の名前が衝突しなければ単純 merge される。
+
+[tools]
+# Python の polyglot pkg manager。`pipx.uvx` 経由でも使う。
+uv = "latest"
+# `.claude/hooks/*.ts` の実行ランタイム。hook はツール呼び出しのたびに走るので、
+# この設定を同期しているリポジトリでは常に必要になる。
+bun = "latest"
+# npm / yarn / pnpm を抽象化する pkg manager wrapper (`ni` / `nr` / `nx`)。
+"npm:@antfu/ni" = "latest"
+# AI CLI 群。
+"aqua:anthropics/claude-code" = "latest"
+"npm:@openai/codex" = "latest"
+"npm:@google/gemini-cli" = "latest"
+"npm:chrome-devtools-mcp" = "latest"
+# `.devcontainer/setup-chrome-devtools-mcp.ts` が `playwright install(-deps) chromium`
+# を叩いて chrome-devtools-mcp 用の Chromium を用意する。npm-backed tool は自分の
+# パッケージの bin だけを shim するため、playwright CLI は別の mise tool として
+# 宣言しないと PATH に出てこない。
+"npm:playwright" = "latest"
+"github:herdrdev/herdr" = "latest"
+# Vite / Vitest / Oxlint / Oxfmt / Rolldown / tsdown を束ねた開発ツールチェーン (`vp`)。
+# GitHub リリースのスタンドアロンバイナリを取る。npm 版は Node スクリプトから
+# optionalDependencies のネイティブアドオンを読む形で、optional を既定で入れない npm
+# backend では動かない。アーカイブ内の実行ファイル名が repo 名と違うので exe で示す。
+"github:voidzero-dev/vite-plus[exe=vp]" = "latest"
+
+[settings]
+experimental = true
+# .nvmrc ファイルを自動的に読み込む
+legacy_version_file = true
+# ディレクトリ移動時に自動的にツールをインストール
+auto_install = true
+# pipx バックエンドで uvx を使う
+pipx.uvx = true
+# 公開から 6 時間未満のリリースは `latest` の解決対象から外す。公開直後に
+# 差し替えられた・取り下げられたリリースを踏むのを避けつつ、更新の反映を遅らせすぎない。
+minimum_release_age = "6h"
+
+[tasks.ziku]
+run = "npx ziku@latest"
+description = "Run ziku CLI"
+
+# docs の鮮度とリンク切れを検査する。引数は `mise run lint-docs -- --list` の
+# ように `--` の後ろへ渡す (--list で違反していない doc も含む一覧、--json で
+# 機械可読な出力)。設定 `.config/docs-lifecycle.json` が無いリポジトリでは
+# スクリプト側が警告を出して何もしない。
+#
+# 検査の実体と依存は scripts/docs-lifecycle パッケージが持つ。このタスクの役目は
+# bun ランタイムを用意することと、同期先が叩くコマンド名を一定に保つこと。
+[tasks.lint-docs]
+run = "mise exec bun@1.4.0 -- bun run scripts/docs-lifecycle/run.ts"
+description = "docs の鮮度とリンク切れを検査する"
+
+[tasks.fleet]
+dir = "tools/agent-fleet"
+description = "agent-fleet を起動する（並列エージェント俯瞰 TUI。--json / --once も可）"
+run = """
+# lockfile と node_modules の不整合（テンプレート更新途中の依存、失敗した install を含む）を
+# 残さない。bun は一致していれば実質 no-op なので、起動ごとに lockfile を検証する。
+mise exec bun@1.4.0 -- bun install --frozen-lockfile
+exec mise exec bun@1.4.0 -- bun src/cli.tsx "$@"
+"""

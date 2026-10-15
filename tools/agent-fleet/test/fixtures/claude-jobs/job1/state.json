@@ -1,0 +1,18 @@
+{
+  "state": "blocked",
+  "detail": "design review complete; awaiting confirmation before doc commit",
+  "tempo": "idle",
+  "intent": "ダミーの元の指示: 設計を見直して doc にまとめてほしい",
+  "name": "design review",
+  "cwd": "/workspaces/ws/.claude/worktrees/feature-a",
+  "worktreePath": "/workspaces/ws/.claude/worktrees/feature-a",
+  "worktreeBranch": "feature-a",
+  "createdAt": "2026-09-04T02:37:16.702Z",
+  "updatedAt": "2026-09-04T11:37:32.084Z",
+  "sessionId": "11111111-1111-4111-8111-111111111111",
+  "children": [{ "id": "100", "href": "https://github.com/org/repo/pull/100", "kind": "pr" }],
+  "output": null,
+  "linkScanPath": "/home/u/.claude/projects/-workspaces-ws/11111111-1111-4111-8111-111111111111.jsonl",
+  "respawnFlags": ["--agent", "claude", "--permission-mode", "auto", "--model", "claude-fable-5-1[1m]"],
+  "extraFieldFromNewerVersion": { "ignored": true }
+}

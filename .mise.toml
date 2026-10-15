@@ -15,7 +15,7 @@ direnv = "latest"
 sops = "latest"
 age = "latest"
 
-"npm:@anthropic-ai/claude-code" = "latest"
+"npm:@anthropic-ai/claude-code" = { version = "latest", npm_args = "--ignore-scripts=false --include=optional" }
 "npm:@openai/codex" = "latest"
 "npm:@google/gemini-cli" = "latest"
 
@@ -44,3 +44,39 @@ description = "Get Playwright Chromium executable path"
 [tasks.ziku]
 run = "npx ziku@latest"
 description = "Run ziku CLI"
+
+# `.claude/hooks/post-lint.ts`（PostToolUse の Write/Edit）が編集ファイル 1 件を渡して呼ぶ。
+# ADR-003 の自動 lint の実体。TS/TSX だけを oxfmt で整形し、oxlint の違反を返す。
+# 整形した事実も返す: 黙って書き換えると、エージェントが手元の古い内容で次の Edit を試みて失敗するため。
+# 違反・整形が無ければ exit 0 で何も出さない（post-lint.ts は exit 0 を「報告なし」として扱う）。
+[tasks.claude-postedit]
+description = "Claude post-edit hook 委譲先: 編集した TS/TSX を oxfmt で整形し oxlint の違反を報告する。CLAUDE_SKIP_HOOKS=1 で無効化"
+run = '''
+[ "${CLAUDE_SKIP_HOOKS:-0}" = 1 ] && exit 0
+set +e  # mise は task を errexit 付きで実行する。下で exit code を分岐するため無効化する。
+file="{{arg(name="file")}}"
+[ -f "$file" ] || exit 0
+case "$file" in
+  *.ts|*.tsx) ;;
+  *) exit 0 ;;
+esac
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+oxfmt="$root/node_modules/.bin/oxfmt"
+oxlint="$root/node_modules/.bin/oxlint"
+[ -x "$oxfmt" ] && [ -x "$oxlint" ] || exit 0  # 依存未インストール環境では検査不能なので no-op
+report=""
+if ! "$oxfmt" --check "$file" >/dev/null 2>&1 && "$oxfmt" --write "$file" >/dev/null 2>&1; then
+  report="[auto-fixed] oxfmt が $file を整形した。編集を続ける前にファイルを読み直すこと。"
+fi
+# 診断は "path:line:col: error|warning rule: message" の 1 行ずつで出る。warning も返すのは、
+# 型情報付きルール（no-unsafe-*）の多くが warning 扱いで、放置すると CI の lint で積み上がるため。
+diagnostics="$(cd "$root" && "$oxlint" "$file" 2>&1 | grep -E ': (error|warning) ' | head -10)"
+if [ -n "$diagnostics" ]; then
+  report="${report}
+[要修正] oxlint 違反:
+${diagnostics}"
+fi
+[ -z "$report" ] && exit 0
+printf '%s\n' "$report"
+exit 1
+'''

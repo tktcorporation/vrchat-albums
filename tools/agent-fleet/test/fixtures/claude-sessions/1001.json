@@ -1,0 +1,13 @@
+{
+  "pid": 1001,
+  "sessionId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "cwd": "/workspaces/ws/.claude/worktrees/feature-b",
+  "startedAt": 1788501400849,
+  "version": "2.1.261",
+  "kind": "interactive",
+  "entrypoint": "cli",
+  "name": "feature-b work",
+  "status": "busy",
+  "updatedAt": 1788582337975,
+  "nameSource": "auto"
+}
