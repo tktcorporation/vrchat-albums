@@ -744,7 +744,7 @@ export const searchSessionsByPlayerName = (
       ),
     ]);
     // 直前の参加ログは通常ログと写真由来ログから 1 件ずつ取るため最大 2 件になる。
-    // 同時刻の参加ログは worldId で並びが決まるので、最新の日時のものはすべて残す
+    // 返すのはセッションの開始日時だけなので、最も新しい日時を持つものを残せば足りる
     const latestBeforeRange = logsBeforeRange[0]?.joinDateTime.getTime();
     const precedingJoins = logsBeforeRange.filter(
       (log) => log.joinDateTime.getTime() === latestBeforeRange,
