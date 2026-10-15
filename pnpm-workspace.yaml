@@ -110,6 +110,6 @@ overrides:
   esbuild: '>=0.28.1'
   # @humanfs/node は eslint (pages ワークスペース) の transitive 依存。パッチ版の対応で
   # シンボリックリンク経由のディレクトリ外コピー対策として 0.16.8 以上へ固定。
-  # 0.17.x は Node >=24 を要求し、このリポジトリの engines.node (22) と CI の Node バージョンを
+  # 0.17.x は Node >=24 を要求し、このリポジトリの engines.node (Node 22 系) と CI の Node バージョンを
   # 超えるため、eslint@^0.16.6 が期待する 0.16.x 系に留める。
   '@humanfs/node': '>=0.16.8 <0.17'
