@@ -34,7 +34,14 @@
     "node_modules",
     "vite.config.ts",
     "electron/vite.config.ts",
-    "worktrees"
+    "worktrees",
+    ".claude",
+    ".codex",
+    ".cursor",
+    ".devcontainer",
+    "scripts/docs-lifecycle",
+    "scripts/generate-agent-adapters.ts",
+    "tools/agent-fleet"
   ],
   "include": ["**/*.ts", "**/*.tsx", "**/*.js"]
 }

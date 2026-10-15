@@ -2,8 +2,8 @@
   "mcpServers": {
     "chrome-devtools": {
       "type": "stdio",
-      "command": "bash",
-      "args": [".devcontainer/run-chrome-devtools-mcp.sh"],
+      "command": "bun",
+      "args": [".devcontainer/run-chrome-devtools-mcp.ts"],
       "env": {}
     }
   }

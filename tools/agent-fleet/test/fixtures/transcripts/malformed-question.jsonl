@@ -1,0 +1,1 @@
+{"type":"assistant","timestamp":"2026-09-05T06:00:00.000Z","isSidechain":false,"message":{"role":"assistant","model":"claude-fable-5-1","content":[{"type":"text","text":"確認します。"},{"type":"tool_use","id":"toolu_bad1","name":"AskUserQuestion","input":{"questions":{}}}]}}

@@ -56,6 +56,8 @@ const config: KnipConfig = {
     'packages/exif-native/**',
     // lint-contrast テストフィクスチャは vitest が動的 glob で読み込むため未使用誤検出される
     'packages/lint-contrast/test-fixtures/**',
+    // ziku でテンプレートから同期される bun 実行ツール。依存はツール自身の package.json が持つ
+    'tools/agent-fleet/**',
   ],
   // Don't report unused exports in entry files (tRPC routers)
   includeEntryExports: false,

@@ -1,0 +1,13 @@
+onboarding = false
+
+[terminal]
+# DevContainer の起動フックでは SHELL が未設定になることがある。
+# Herdr の /bin/sh fallback では bashrc と readline 履歴が有効にならないため、
+# 新しい対話 pane は DevContainer の既定 shell に明示的に揃える。
+default_shell = "/bin/bash"
+
+[session]
+resume_agents_on_restore = true
+
+[ui]
+agent_panel_sort = "priority"

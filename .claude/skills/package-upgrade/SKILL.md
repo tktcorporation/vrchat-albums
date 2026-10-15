@@ -91,7 +91,7 @@ git diff pnpm-lock.yaml          # 何が追加/変更されたか (Rust なら 
 - **build script を持つ新規 dep が入っていないか** — `strictDepBuilds` が `[ERR_PNPM_IGNORED_BUILDS]` で止めてくれる。**止まったら「許可リストに足して通す」前に、その script が何をするか確認する。** native binary の正当なビルド (sharp / esbuild 等) でなければ疑う。
 - **registry 外 (git / tarball) の subdep が増えていないか** — `blockExoticSubdeps` が効いていればエラーで止まる。出たら歓迎すべきサイン。
 
-少しでも怪しければ更新を取り消す。`pnpm add` は対象 workspace の `package.json` も書き換えるため、lockfile だけ戻すと次の install で疑わしい version が再解決される（frozen lockfile では失敗する）。**この更新が触れたファイルだけ**を名指しで戻す — `**/package.json` のような repo 全体グロブは dirty worktree / 並列エージェント環境で無関係な workspace の編集を巻き込んで消す（[`.claude/rules/worktree.md`](../../rules/worktree.md) / [`.claude/rules/parallel-work.md`](../../rules/parallel-work.md)）。
+少しでも怪しければ更新を取り消す。`pnpm add` は対象 workspace の `package.json` も書き換えるため、lockfile だけ戻すと次の install で疑わしい version が再解決される（frozen lockfile では失敗する）。**この更新が触れたファイルだけ**を名指しで戻す — `**/package.json` のような repo 全体グロブは dirty worktree / 並列エージェント環境で無関係な workspace の編集を巻き込んで消す（[`.claude/rules/worktree.md`](../../rules/worktree.md)）。
 
 ```bash
 # --filter <ws> で更新したなら <ws>/package.json、root 更新なら ./package.json を名指しする
@@ -159,14 +159,14 @@ changeset を使うリポジトリでは、依存更新が **runtime artifact（
 判断基準:
 
 - ランタイムに乗る依存の更新 → **bump 付き**。security fix は通常 `patch`。
-- devDependencies のみ・CI / lint / 型チェックツールだけの更新で runtime artifact が一切変わらない → changeset 不要。
+- devDependencies のみ・CI / lint / 型チェックツールだけの更新で runtime artifact が一切変わらない → **bump 無し**。全 PR に新規 changeset ファイルを要求する CI なら、frontmatter を空にしたファイルを追加して bump 無しを表明する（`ci-workflow.md` の changeset 節）。要求しない CI なら changeset 自体を省略できる。
 
 迷ったら bump 付きに倒す（release が止まる事故の方が痛い）。
 
 ## Phase 5: セルフレビュー & CI
 
 - [`.claude/rules/ci-workflow.md`](../../rules/ci-workflow.md): push 前に `.github/workflows/` の push/PR トリガーの run コマンドをローカルで通す（lint / test / knip / build）。
-- [`.claude/rules/pr-self-review.md`](../../rules/pr-self-review.md): PR 作成前にセルフレビュー 2 回。lockfile 差分・override の追加/削除・受容記録の編集は特に丁寧に見る。
+- [`.claude/rules/pr-self-review.md`](../../rules/pr-self-review.md): PR 作成前にレビューループを収束まで回す。lockfile 差分・override の追加/削除・受容記録の編集は特に丁寧に見る。
 - [`.claude/rules/codex-pairing.md`](../../rules/codex-pairing.md): push 前に `codex review` でセカンドオピニオンを取る（サンドボックスフラグ要件もここ）。
 
 ## Phase 6: 報告
@@ -176,7 +176,7 @@ changeset を使うリポジトリでは、依存更新が **runtime artifact（
 - 上げた package と version（脆弱性対応なら GHSA / RUSTSEC 番号）。
 - lockfile 差分で確認した安全性（想定外の dep 増加・新規 build script の有無）。
 - **override / 受容に対して行ったこと** — 新規に足したなら理由と外す条件、外せたなら何を返したか。「今回は触る余地が無かった」もそう書く。
-- changeset を bump 付き / 不要のどちらにしたか、その理由。
+- changeset を bump 付き / bump 無しのどちらにしたか、その理由。
 - 残した宿題（上流待ちの受容アドバイザリ等）。
 
 ## アンチパターン
@@ -190,3 +190,4 @@ changeset を使うリポジトリでは、依存更新が **runtime artifact（
 | 既存 override / 受容を見ない                            | 負債が溜まる一方。外せるのに残り続ける                                          | 毎回棚卸しして外せないか確認 (Phase 3-2)                  |
 | cooldown が邪魔で `minimumReleaseAgeExclude` 常用       | hardening が骨抜き。汚染版を掴むリスクが戻る                                    | hotfix の明確な理由があるときだけ、掃除前提で (Phase 2-1) |
 | runtime 依存更新で changeset を省く                     | release が発火せず変更がユーザーに届かない                                      | runtime artifact が変わるなら bump 付き (Phase 4)         |
+

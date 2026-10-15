@@ -1,0 +1,21 @@
+{
+  "name": "agent-fleet",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/cli.tsx",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ink": "^7.1.1",
+    "react": "^19.2.0",
+    "ts-pattern": "^5.9.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "^5"
+  }
+}

@@ -193,6 +193,13 @@
     "*.json",
     "*.yaml",
     "*.yml",
-    "*.d.ts"
+    "*.d.ts",
+    ".claude",
+    ".codex",
+    ".cursor",
+    ".devcontainer",
+    "scripts/docs-lifecycle",
+    "scripts/generate-agent-adapters.ts",
+    "tools/agent-fleet"
   ]
 }

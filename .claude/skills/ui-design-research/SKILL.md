@@ -56,7 +56,10 @@ Present as an Insight block before proposing changes.
 
 ### 5. Verify
 
-Take browser screenshots after implementation. Compare before/after.
+Inspect the UI in the form the product actually draws. Converting a cell/character UI into a bitmap drops information and costs tokens.
+
+- Cell/character UIs (terminal, TUI): dump the rendered cell buffer as text with whatever the project provides (e.g. a test backend) and judge from that. Do not screenshot or screen-record. Follow the project's dump command if it has one.
+- Pixel UIs: take screenshots after implementation and compare before/after.
 
 ## Quick Reference
 

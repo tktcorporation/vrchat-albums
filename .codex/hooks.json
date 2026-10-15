@@ -1,0 +1,98 @@
+{
+  "description": "Codex adapters for the shared hooks maintained under .claude/hooks.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/prompt-router.ts"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/pre-bash-guard.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/pre-bash-timing.ts"
+          }
+        ],
+        "matcher": "^Bash$"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/protect-config.ts",
+            "statusMessage": "Checking if file is a protected config..."
+          },
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/track-edits.ts"
+          }
+        ],
+        "matcher": "Edit|Write|apply_patch"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-bash-pr.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-bash-timing.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-bash-guard.ts"
+          }
+        ],
+        "matcher": "^Bash$"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/track-edits.ts"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/docs-lifecycle-guard.ts",
+            "statusMessage": "Checking doc placement..."
+          },
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-lint.ts",
+            "statusMessage": "Running lint on edited file..."
+          }
+        ],
+        "matcher": "Edit|Write|apply_patch"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/stop-verify.ts",
+            "statusMessage": "Running lint + test verification before completion..."
+          },
+          {
+            "type": "command",
+            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/stop-pr-comments.ts",
+            "statusMessage": "Checking unresolved PR review threads..."
+          }
+        ]
+      }
+    ]
+  }
+}

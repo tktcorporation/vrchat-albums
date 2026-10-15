@@ -1,0 +1,17 @@
+{
+  "name": "@workspace-template/docs-lifecycle",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "bun run run.ts",
+    "test": "bun run run.ts test"
+  },
+  "dependencies": {
+    "luxon": "3.7.2",
+    "mdast-util-from-markdown": "2.0.3",
+    "unist-util-visit": "5.1.0",
+    "yaml": "2.9.0",
+    "zod": "4.5.4"
+  },
+  "packageManager": "bun@1.4.0"
+}

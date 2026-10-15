@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+#MISE description="Claude post-edit hook 委譲先: 編集した TS/TSX を oxfmt で整形し oxlint の違反を報告する。CLAUDE_SKIP_HOOKS=1 で無効化"
+#USAGE arg "<file>"
+#
+# `.claude/hooks/post-lint.ts`（PostToolUse の Write/Edit）が編集ファイル 1 件を渡して呼ぶ。
+# ADR-003 の自動 lint の実体。exit 0 は「報告なし」、非ゼロは stdout をエージェントへ返す。
+# 整形した事実も返す: 黙って書き換えると、エージェントが手元の古い内容で次の Edit を試みて失敗するため。
+[ "${CLAUDE_SKIP_HOOKS:-0}" = 1 ] && exit 0
+file="$1"
+[ -f "$file" ] || exit 0
+case "$file" in
+  *.ts | *.tsx) ;;
+  *) exit 0 ;;
+esac
+# ルートは呼び出し元の cwd（post-lint.ts が作業ツリーへ移動済み）から決める。ファイル側から求めると、
+# 別リポジトリのファイルを渡されたときにそのリポジトリの node_modules/.bin を実行してしまう。
+root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+file="$(realpath "$file")"
+case "$file" in
+  "$root"/*) ;;
+  *) exit 0 ;;
+esac
+oxfmt="$root/node_modules/.bin/oxfmt"
+oxlint="$root/node_modules/.bin/oxlint"
+[ -x "$oxfmt" ] && [ -x "$oxlint" ] || exit 0 # 依存未インストール環境では検査不能なので no-op
+
+report=""
+if ! "$oxfmt" --check "$file" >/dev/null 2>&1 && "$oxfmt" --write "$file" >/dev/null 2>&1; then
+  report="[auto-fixed] oxfmt が $file を整形した。編集を続ける前にファイルを読み直すこと。"
+fi
+
+# oxlint は .oxlintrc.json を cwd から探すため root で実行する。この設定では違反が無いと何も出力しない。
+# 診断は "path:line:col: error|warning ..." の 1 行ずつ。warning も返すのは、型情報付きルール
+# （no-unsafe-*）の多くが warning 扱いで、放置すると CI の lint で積み上がるため。
+output="$(cd "$root" && "$oxlint" "$file" 2>&1)"
+status=$?
+diagnostics="$(printf '%s\n' "$output" | grep -E ': (error|warning)[: ]')"
+if [ -n "$diagnostics" ]; then
+  total="$(printf '%s\n' "$diagnostics" | wc -l | tr -d ' ')"
+  shown="$(printf '%s\n' "$diagnostics" | head -10)"
+  [ "$total" -gt 10 ] && shown="$shown
+(${total} 件中 10 件を表示)"
+  report="${report}
+[要修正] oxlint 違反:
+${shown}"
+elif [ "$status" -ne 0 ]; then
+  # 設定の読み込み失敗やクラッシュは診断行を出さない。黙って通すと lint が止まったことに気づけない。
+  report="${report}
+[要確認] oxlint が異常終了した (exit ${status}):
+$(printf '%s\n' "$output" | tail -5)"
+fi
+
+[ -z "$report" ] && exit 0
+printf '%s\n' "$report"
+exit 1

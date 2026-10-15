@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/prompt-router.ts"
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/pre-bash-guard.ts",
+        "matcher": "Shell"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/pre-bash-timing.ts",
+        "matcher": "Shell"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/protect-config.ts",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/track-edits.ts",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-bash-pr.ts",
+        "matcher": "Shell"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-bash-timing.ts",
+        "matcher": "Shell"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-bash-guard.ts",
+        "matcher": "Shell"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/track-edits.ts",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/docs-lifecycle-guard.ts",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-lint.ts",
+        "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      }
+    ],
+    "stop": [
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/stop-verify.ts",
+        "loop_limit": null
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/stop-pr-comments.ts",
+        "loop_limit": null
+      }
+    ]
+  }
+}

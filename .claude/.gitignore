@@ -1,3 +1,9 @@
 plans/
 *.local.json
-.pr-review-count
+!settings.local.json
+.session/
+plans/
+pr-review/
+hooks/package.json
+hooks/bun.lock
+

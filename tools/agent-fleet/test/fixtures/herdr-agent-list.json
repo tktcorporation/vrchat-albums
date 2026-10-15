@@ -1,0 +1,5 @@
+{"id":"cli:agent:list","result":{"type":"agent_list","agents":[
+  {"agent":"claude","agent_session":{"agent":"claude","kind":"id","source":"herdr:claude","value":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"},"agent_status":"working","cwd":"/workspaces/ws/.claude/worktrees/feature-b","focused":true,"pane_id":"w1:p1","revision":3,"state_change_seq":543,"tab_id":"w1:t1","terminal_id":"term_1","terminal_title":"◐ feature-b work","terminal_title_stripped":"feature-b work","workspace_id":"w1"},
+  {"agent":"codex","agent_session":{"agent":"codex","kind":"id","source":"herdr:codex","value":"thread-child"},"agent_status":"idle","cwd":"/home/u/.herdr/worktrees/ws/worktree-x","focused":false,"pane_id":"w2:p1","revision":1,"state_change_seq":536,"tab_id":"w2:t1","terminal_id":"term_2","terminal_title":"worktree-x","terminal_title_stripped":"worktree-x","workspace_id":"w2"},
+  {"agent":"claude","agent_status":"done","cwd":"/workspaces/ws","focused":false,"name":"writer","pane_id":"w3:p1","revision":2,"state_change_seq":488,"tab_id":"w3:t1","terminal_id":"term_3","terminal_title":"✳ 9月目標の執筆","terminal_title_stripped":"9月目標の執筆","workspace_id":"w3"}
+]}}

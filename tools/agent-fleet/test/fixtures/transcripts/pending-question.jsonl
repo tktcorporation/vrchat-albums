@@ -1,0 +1,2 @@
+{"type":"user","origin":{"kind":"human"},"timestamp":"2026-09-05T05:00:00.000Z","isSidechain":false,"message":{"role":"user","content":"ダミー: 期間を決めて集計して"}}
+{"type":"assistant","timestamp":"2026-09-05T05:00:05.000Z","isSidechain":false,"message":{"role":"assistant","content":[{"type":"text","text":"期間を確認します。"},{"type":"tool_use","id":"toolu_q1","name":"AskUserQuestion","input":{"questions":[{"question":"対象期間はどれですか？","header":"期間","options":[{"label":"直近31日","description":"a"}]}]}}]}}

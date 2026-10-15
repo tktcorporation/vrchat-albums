@@ -1,0 +1,5 @@
+[
+  { "pid": 1001, "cwd": "/workspaces/ws/.claude/worktrees/feature-b", "kind": "interactive", "startedAt": 1788501400849, "sessionId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "name": "feature-b work", "status": "busy" },
+  { "pid": 2001, "cwd": "/workspaces/ws/.claude/worktrees/feature-a", "kind": "background", "startedAt": 1788581981634, "sessionId": "11111111-1111-4111-8111-111111111111", "name": "design review", "status": "waiting", "id": "job1", "state": "blocked", "waitingFor": "input needed" },
+  { "cwd": "/workspaces/ws", "kind": "background", "startedAt": 1788481981634, "sessionId": "22222222-2222-4222-8222-222222222222", "name": "done one", "id": "job2", "state": "done" }
+]

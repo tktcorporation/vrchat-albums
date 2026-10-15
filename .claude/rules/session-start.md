@@ -33,7 +33,7 @@ pnpm lint                    # lint が通る状態か確認
 ### 4. 未コミットの変更の判断
 
 - 自分の変更 → コミットまたは stash して作業開始
-- 他プロセスの変更 → `.claude/rules/parallel-work.md` に従い worktree を作成
+- 他プロセスの変更 → `.claude/rules/worktree.md` に従い worktree を作成
 
 ## コミットメッセージの規約（セッション橋渡し）
 

@@ -4,6 +4,23 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=cached",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
 
+  // containerEnv は 1 つのオブジェクトに集約する。JSON はキーが重複すると後勝ちになり、
+  // 分けて書くと先に書いたほうが丸ごと無視される。
+  //
+  // PATH: mise shims resolve the tool version from the nearest .mise.toml, for every process in the container, including IDEs and hook runners.
+  // containerEnv cannot expand ${containerEnv:PATH}; keep the image's standard executable paths explicitly.
+  //
+  // SSH_AUTH_SOCK: remoteEnv ではなく containerEnv に置く。VS Code のターミナル以外
+  // （バックグラウンドプロセスや postCreateCommand 等）からの SSH 接続にも
+  // 1Password agent ソケットを見せる必要があるため。
+  "containerEnv": {
+    "PATH": "/home/vscode/.local/share/mise/shims:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "SSH_AUTH_SOCK": "/tmp/1password-agent/agent.sock",
+    // desktop-lite の画面サイズと、GUI アプリの描画先
+    "VNC_RESOLUTION": "1920x1080x24",
+    "DISPLAY": ":1"
+  },
+
   // Volume name must start with [a-zA-Z0-9] to comply with Docker naming rules
   // Using 'devcontainer-' prefix so ${localWorkspaceFolderBasename} ('.github') doesn't start the name
   "mounts": [
@@ -19,19 +36,34 @@
     // mise インストール済みツールを DevContainer 間で共有
     // 全コンテナが Linux なのでバイナリ互換性あり。ワークスペース名を含めず共有 volume にする
     // ホスト (macOS) とは OS が異なるためバインドマウントではなく named volume を使う
-    "source=devcontainer-shared-mise-data,target=/home/vscode/.local/share/mise,type=volume"
+    "source=devcontainer-shared-mise-data,target=/home/vscode/.local/share/mise,type=volume",
+
+    // EC2 への SSH 公開鍵認証を 1Password SSH Agent に委譲する。
+    // VS Code がコンテナへ転送する SSH agent ソケットには 1Password の鍵が乗らないため、
+    // ホストの 1Password agent ソケットを直接 bind mount して参照する。
+    // ソケットファイル単体ではなく親ディレクトリを mount する: 1Password がソケットを
+    // 再生成 (unlink して同名で作り直す) しても、ディレクトリ越しの参照なら新しい実体に追随する。
+    // また bind mount は source がホストに実在しないと docker create ごと失敗するため、
+    // 1Password 未導入のホストでも initializeCommand が事前に空ディレクトリを用意しておくことで
+    // devcontainer 自体は起動できるようにしている (agent が使えないだけで済む)。
+    // パスに空白 (Group Containers) を含むため、他要素と異なりオブジェクト形式で記述する。
+    {
+      "source": "${localEnv:HOME}/Library/Group Containers/2BUA8C4S2C.com.1password/t",
+      "target": "/tmp/1password-agent",
+      "type": "bind"
+    }
   ],
   "features": {
-    // "ghcr.io/devcontainers/features/docker-in-docker:2": {
-    //   "version": "latest",
-    //   "enableNonRootDocker": "true",
-    //   "moby": "true"
-    // },
-    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": "true",
+      "moby": "true"
+    },
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers-extra/features/mise:1": {
-      "version": "2026.4.10"
+      "version": "2026.8.14"
     },
+    // Electron の GUI をブラウザ越しに見るための VNC デスクトップ（scripts/dev.sh と CONTRIBUTING.md が前提にする）
     "ghcr.io/devcontainers/features/desktop-lite:1": {
       "webPort": "6080",
       "vncPort": "5901"
@@ -44,10 +76,6 @@
     }
   },
   "runArgs": ["--shm-size=2g", "--env-file", ".devcontainer/.env.devcontainer"],
-  "containerEnv": {
-    "VNC_RESOLUTION": "1920x1080x24",
-    "DISPLAY": ":1"
-  },
   "customizations": {
     "vscode": {
       "extensions": [
@@ -103,20 +131,17 @@
       "-c",
       "set -e; sudo apt-get update && sudo apt-get install -y build-essential fzf ripgrep bc gpg ca-certificates curl tmux libgtk-3-0 dbus-x11"
     ],
-    // named volume は root 所有で作成されるため、vscode ユーザーに権限を付与する
-    // 対象:
-    //   .pnpm-store: pnpm のパッケージキャッシュ (named volume)
-    //   ~/.local/share: mise volume マウント時に Docker が root 所有で作成する親ディレクトリ。
-    //                   pnpm が ~/.local/share/pnpm/.tools/ にツールを配置するため書き込み権限が必要
-    //   ~/.local/share/mise: mise のインストール済みツール (named volume)
-    //   ~/.local/share/pnpm: pnpm のツールキャッシュ（oxfmt 等）
-    //   ~/.local/state/mise: mise trust の trusted-configs 保存先
-    //   ~/.cache/mise: mise のダウンロードキャッシュ
-    //   ~/.claude: Claude Code データ全体 (named volume)
+    // Docker は深いパスへ volume を mount すると、存在しない親ディレクトリも root 所有で作る。
+    // ~/.local/share/mise の兄弟へツールを追加できるよう、XDG の親ディレクトリ自体を
+    // vscode ユーザー所有にした上で、named volume の中身だけを再帰的に補正する。
+    // 対象の named volume:
+    //   .pnpm-store: pnpm のパッケージキャッシュ
+    //   ~/.local/share/mise: mise のインストール済みツール
+    //   ~/.claude: Claude Code データ全体
     "fix-volume-permissions": [
       "bash",
       "-c",
-      "set -e; sudo mkdir -p ~/.local/state/mise ~/.cache/mise ~/.local/share/pnpm && sudo chown -R $(whoami) .pnpm-store ~/.local/share/mise ~/.local/share/pnpm ~/.local/state/mise ~/.cache/mise ~/.claude"
+      "set -e; uid=$(id -u); gid=$(id -g); sudo install -d -o \"$uid\" -g \"$gid\" \"$HOME/.local\" \"$HOME/.local/share\" \"$HOME/.local/state\" \"$HOME/.cache\" \"$HOME/.local/share/pnpm\" \"$HOME/.local/state/mise\" \"$HOME/.cache/mise\"; sudo chown -R \"$uid:$gid\" \"$PWD/.pnpm-store\" \"$HOME/.local/share/mise\" \"$HOME/.claude\""
     ]
   },
   "updateContentCommand": {
@@ -125,34 +150,50 @@
       "-c",
       "set -e; curl -fsSL https://raw.githubusercontent.com/nodejs/release-keys/b362bd15f2ac7ce350d7563fc03e0c625e455e5f/cli.sh | bash -s import"
     ],
-    "setup-mise-bash": [
+    "setup-mise-shell": [
       "bash",
       "-c",
-      "echo 'eval \"$(mise activate bash)\"' >> ~/.bashrc"
-    ],
-    "trust-mise": ["bash", "-lc", "mise trust"],
-    "setup-git-user": ["bash", "-l", ".devcontainer/setup-git-user.sh"],
-    // vite-plus (vp) CLI: Vite, Vitest, Oxlint, Oxfmt, Rolldown, tsdown を統合した開発ツールチェーン
-    // Node.js のバージョン管理は mise に一任するため vp に shim (node/npm/npx) を作らせない。
-    // VP_NODE_MANAGER=no は CI/devcontainer 自動有効化より優先されるオプトアウト。
-    // CI=true は失敗時にインストールログを標準出力にインライン出力させるため (devcontainer ビルドログで追跡しやすくする)。
-    // export してから pipe する: `VAR=x curl | bash` だと env はパイプ左の curl にしか効かず、
-    // インストーラ本体を実行するパイプ右の bash に伝播しない。export で子プロセス全体に効かせる。
-    "install-vite-plus": [
-      "bash",
-      "-c",
-      "export VP_NODE_MANAGER=no CI=true && curl -fsSL https://vite.plus | bash"
+      "grep -qxF 'eval \"$(mise activate bash --shims)\"' ~/.bash_profile 2>/dev/null || echo 'eval \"$(mise activate bash --shims)\"' >> ~/.bash_profile; grep -qxF 'eval \"$(mise activate bash)\"' ~/.bashrc 2>/dev/null || echo 'eval \"$(mise activate bash)\"' >> ~/.bashrc"
     ]
+    // Bun を使うセットアップは、mise install の完了後に実行する必要があるため postCreateCommand に置く。
+    // updateContentCommand の object 内は並列実行されるので、ここから起動すると setup-mise-shell と競合する。
   },
   "postCreateCommand": {
-    "fix-pnpm-store-permissions": [
+    "fix-pnpm-store-permissions": ["bash", "-lc", "sudo chown -R $(whoami) .pnpm-store"],
+    // .devcontainer/project/ はテンプレート同期対象外 (プロジェクト固有スクリプト置き場) のため、
+    // 個別ファイル名をここに直接書くと同期先の他プロジェクトでファイル不在エラーになる。
+    // setup-*.sh を存在する分だけファイル名順に実行することで、このエントリ自体は同期しても安全にする。
+    // 1本の失敗が他を止めないよう各実行を `|| true` で受け、ループ全体が確実に成功終了するようにする。
+    "run-project-setup-scripts": [
       "bash",
       "-lc",
-      "sudo chown -R $(whoami) .pnpm-store"
+      "for f in .devcontainer/project/setup-*.sh; do [ -e \"$f\" ] || continue; bash \"$f\" || true; done"
     ],
+    // vp の Node マネージャを system-first モードにする（Node/グローバルツールは mise に一任する方針）。
+    // mise を shadow し得るのは vp の node/npm/npx shim（= Node マネージャ管轄）で、vp は既定で pnpm の
+    // shim を作らないため pnpm 自体は mise のまま奪われない。
+    // `vp env off` を入れておくと、shim が存在しても system(mise) の Node を優先し、無い時だけ vp 管理版へ fallback する。
+    // スコープ注意: `vp env off` が効くのは node/npm/npx shim の解決のみで、vp 自身のサブコマンド内部の
+    // Node 解決には及ばない（upstream の既知の制約）。`vp dev`/`build`/`test`/`lint`/`fmt` 用途では実害なし。
+    // 実行 Node が mise に切り替わるには mise install 完了が前提。
+    // 注意: 再生成の主因である `vp install -g <pkg>` は使わず、グローバル CLI は .mise.toml に集約すること。
     "git-performance": "git config status.submoduleSummary false && git config diff.ignoreSubmodules all && git config fetch.recurseSubmodules false && git config submodule.recurse false",
     "install-gh-extensions": "gh extension install agbiotech/gh-sub-issue 2>/dev/null || true",
-    "mise-install": ["bash", "-lc", "mise install"],
+    // postCreateCommand の object 内は並列実行される。mise の trust/install/upgrade、Bun を使う初期設定、
+    // Vite+ の切り替えを同一コマンドにまとめ、fresh container でも依存順を保証する。
+    // lifecycle command では login shell を使わず、構築途中の .bash_profile を読み込まない。
+    //
+    // gh auth setup-git は git の credential helper を gh へ向け、https 越しの git 操作に
+    // GH_TOKEN を使わせる。これが無いと credential helper はホストの認証を借りる VS Code のものだけになり、
+    // ターミナル以外のプロセス（バックグラウンドで動くエージェント等）からの fetch / push が
+    // "could not read Username for https://github.com" で失敗する。
+    // setup-git-user.ts と同じ ~/.gitconfig を書き換えるため、並列キーに分けず直列に並べる。
+    // token が無い環境でも以降の初期設定を止めないよう、失敗は警告に留める。
+    "mise-and-project-setup": [
+      "bash",
+      "-c",
+      "mise trust && mise install && mise upgrade && { gh auth setup-git || echo 'Warning: gh auth setup-git failed; git over https will not use GH_TOKEN'; } && mise exec -- bun .devcontainer/setup-git-user.ts && mise exec -- bun .devcontainer/setup-herdr.ts && vp env off"
+    ],
     // ~/.claude.json は volume 外（ホームディレクトリ直下）のため、rebuild で消える
     // volume 内のバックアップからリストアする（postStartCommand で毎回バックアップされる）
     // 初回（バックアップなし）は onboarding 済みの最小ファイルを作成
@@ -163,6 +204,15 @@
     ]
   },
   "postStartCommand": {
+    // .devcontainer/project/ の setup-*.sh を postCreateCommand と同じ内容で再実行する。
+    // VS Code がホストの SSH agent をコンテナへ転送するソケットのパスは接続のたびに変わるため、
+    // コンテナ作成時 (postCreateCommand) に一度書くだけでは追随できない。setup-*.sh は全て
+    // 冪等なので、起動のたびに走らせても問題ない。
+    "run-project-setup-scripts-on-start": [
+      "bash",
+      "-lc",
+      "for f in .devcontainer/project/setup-*.sh; do [ -e \"$f\" ] || continue; bash \"$f\" || true; done"
+    ],
     // ~/.claude.json を volume 内にバックアップ（認証情報の永続化）
     // コンテナ内で claude login した後の OAuth セッションを rebuild 後も保持するため
     // 有効な認証（oauthAccount）が含まれている場合のみバックアップする
@@ -172,18 +222,25 @@
       "grep -q 'oauthAccount' ~/.claude.json 2>/dev/null && cp ~/.claude.json ~/.claude/.claude.json.bak || true"
     ],
     "setup-chrome-devtools-mcp": [
-      "bash",
-      "-lc",
-      ".devcontainer/setup-chrome-devtools-mcp.sh"
+      "mise",
+      "exec",
+      "--",
+      "bun",
+      ".devcontainer/setup-chrome-devtools-mcp.ts"
     ],
-    "mise-upgrade": ["mise", "upgrade"],
+    // mise のツール更新は postCreateCommand の mise install/upgrade に集約する。
+    // postStartCommand で upgrade すると、並列実行中の mise exec とインストール先が競合する。
     "check-env-file": [
       "bash",
       "-c",
       "[ -s .devcontainer/.env.devcontainer ] || echo 'WARNING: .devcontainer/.env.devcontainer is empty or missing. Secrets are not loaded.'"
     ]
   },
-  // initializeCommand はホスト側で実行される
-  // .env.devcontainer が無ければ空ファイルを作成（runArgs --env-file の失敗防止）
-  "initializeCommand": "touch .devcontainer/.env.devcontainer"
+  // initializeCommand はホスト側で実行される。
+  // mkdir: 1Password の Group Containers ディレクトリをホスト側に用意する。mounts の bind mount は
+  // source がホストに実在しないと docker create ごと失敗するため、1Password 未導入のホストでも
+  // ここで空ディレクトリを作っておけば devcontainer 自体は起動できる。`|| true` でこの失敗を
+  // 吸収し、後続の touch を必ず実行させる。
+  // touch: .env.devcontainer が無ければ空ファイルを作成する（runArgs --env-file の失敗防止）。
+  "initializeCommand": "mkdir -p \"${localEnv:HOME}/Library/Group Containers/2BUA8C4S2C.com.1password/t\" || true && touch .devcontainer/.env.devcontainer"
 }
