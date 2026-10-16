@@ -69,8 +69,13 @@ const hardenWebContents = (
 ): void => {
   const { webContents } = browserWindow;
 
-  // リンクのクリックやフォーム送信による遷移。アプリ外の https は既定のブラウザへ回す
-  webContents.on('will-navigate', (event) => {
+  // ウィンドウのページ遷移。リンクのクリックやファイルのドロップによる遷移（will-navigate）に加え、
+  // 許可した遷移や loadURL の読み込み先がサーバー側でリダイレクトされた場合（will-redirect）も
+  // 同じ判定にかける。アプリ外の https は既定のブラウザへ回す
+  const guardNavigation = (event: {
+    url: string;
+    preventDefault: () => void;
+  }) => {
     match(decideNavigation(event.url, appEntry))
       .with({ action: 'allow' }, () => {
         // アプリ本体への遷移は preventDefault せずそのまま通す
@@ -86,7 +91,9 @@ const hardenWebContents = (
         });
       })
       .exhaustive();
-  });
+  };
+  webContents.on('will-navigate', guardNavigation);
+  webContents.on('will-redirect', guardNavigation);
 
   // target="_blank" や window.open。アプリ内に新しいウィンドウは作らない
   webContents.setWindowOpenHandler(({ url }) => {
