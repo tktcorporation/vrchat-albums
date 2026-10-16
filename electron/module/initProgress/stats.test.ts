@@ -317,6 +317,32 @@ describe('統計の集計', () => {
     expect(countDistinctPlayerNames).toHaveBeenCalledTimes(2);
   });
 
+  it('ワールド数・人数の数え直しに失敗したら、次の集計で改めて数え直す', async () => {
+    vi.mocked(getActiveInitProgressRun).mockReturnValue({
+      id: 6,
+      kind: 'startup',
+    });
+    const waitForThrottle = async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
+      await settle();
+    };
+
+    await flushInitStats();
+    vi.mocked(countDistinctVisitedWorlds).mockRejectedValueOnce(
+      new Error('busy'),
+    );
+    vi.mocked(countDistinctVisitedWorlds).mockResolvedValue(9);
+    requestInitStats({ logsChanged: true });
+    await waitForThrottle();
+    requestInitStats();
+    await waitForThrottle();
+
+    expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(3);
+    expect(emitInitStats).toHaveBeenLastCalledWith(
+      expect.objectContaining({ worlds: 9 }),
+    );
+  });
+
   it('集計の失敗は実行ごとに 1 回だけ error で報告し、同じ実行の 2 回目以降は warn にする', async () => {
     vi.mocked(getPhotoCountPerLocalMonth).mockRejectedValue(
       new Error('database is locked'),

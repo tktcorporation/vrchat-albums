@@ -1202,7 +1202,7 @@ export const createVRChatPhotoPathIndex = async (
       folderPathStr: string;
       currentDigest: FolderDigest;
       newFiles: string[];
-      /** このフォルダのファイル一覧を取る直前の時刻。lastScannedAt として保存する */
+      /** このフォルダを含むディレクトリ（配下のフォルダを含む）の一覧を取り始める直前の時刻。lastScannedAt として保存する */
       scannedAt: Date;
     }[] = [];
 

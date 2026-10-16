@@ -1,8 +1,10 @@
 /**
  * 起動画面の統計（写真枚数・ワールド数・人数・月別枚数）を DB から集計し、進捗ストリームへ送る。
  *
- * 統計は毎回 DB から数え直す。インデックス中の写真を手元で足し込む方式だと、
+ * 月別の写真枚数は毎回 DB から数え直す。インデックス中の写真を手元で足し込む方式だと、
  * 全件再スキャンで既存の写真を上書きしたときに二重に数えてしまうため。
+ * ワールド数・人数はログの登録でしか変わらないので、実行ごとに保持して必要なときだけ数え直す
+ * （`logCounts` を参照）。
  * 写真のバッチ登録ごとに集計を求められるので、前回の集計が終わってから INTERVAL_MS 空けるまで
  * 次の集計を始めない。
  *
@@ -158,6 +160,14 @@ const reportStatsFailure = (
 };
 
 /**
+ * ワールド数・人数はログの登録でしか変わらないため、写真の登録中は再集計しない。
+ * ログを登録したとき（`requestInitStats({ logsChanged: true })`）と実行の区切り
+ * （`flushInitStats`）でだけ数え直す。
+ */
+let logCounts: { runId: number; worlds: number; people: number } | null = null;
+let logCountsStale = true;
+
+/**
  * 統計を集計して送る。集計の失敗は起動処理を止めない（統計は表示のためだけの値で、
  * 失敗しても写真の登録やログ同期の結果は変わらない）。失敗は実行ごとに 1 回 Sentry へ送り、
  * 次の要求で再集計する。
@@ -198,20 +208,14 @@ const collectAndEmitStats = (): Promise<void> => {
           emitInitStats(stats);
         },
         onFailure: (error) => {
+          // 数え直しに失敗したら古いワールド数・人数を使い続けないよう、次の集計で数え直す
+          logCountsStale = true;
           reportStatsFailure(run.id, error);
         },
       }),
     ),
   );
 };
-
-/**
- * ワールド数・人数はログの登録でしか変わらないため、写真の登録中は再集計しない。
- * ログを登録したとき（`requestInitStats({ logsChanged: true })`）と実行の区切り
- * （`flushInitStats`）でだけ数え直す。
- */
-let logCounts: { runId: number; worlds: number; people: number } | null = null;
-let logCountsStale = true;
 
 const statsRunner = createThrottledRunner(collectAndEmitStats, INTERVAL_MS);
 
