@@ -88,7 +88,7 @@ overrides:
   # 両依存元が 6.28.1 以上を要求するようになれば外せる。
   '@sentry/cli>undici': '>=6.28.1 <7'
   'node-gyp>undici': '>=6.28.1 <7'
-  # shell-quote は npm-run-all2 の深い transitive 依存 (^1.7.3 の範囲内)。
+  # shell-quote は npm-run-all2 の深い transitive 依存 (^1.8.4 の範囲内)。
   # Quadratic DoS 対策と、quote() の改行文字経由のコマンドインジェクション
   # (GHSA-pqg4-j6r4-53mv) 対策として 1.11.0 以上へ固定。
   # npm-run-all2 が 1.11.0 以上を要求するようになれば外せる。
