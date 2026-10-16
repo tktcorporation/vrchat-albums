@@ -152,21 +152,6 @@ export const router = trpcRouter({
       error: null,
     };
   }),
-  getStatusToUseVRChatLogFilesDir: procedure.query(async () => {
-    // runEffectExit が Defect/Interrupt を自動で re-throw（Sentry 送信）
-    const result = await runEffectExit(service.getVRChatLogFilesDir());
-    if (!result.success) {
-      return result.error;
-    }
-    if (result.value.path === null) {
-      return 'logFilesDirNotSet';
-    }
-    return 'ready';
-  }),
-  clearAllStoredSettings: procedure.mutation(async () => {
-    service.clearAllStoredSettings();
-    ee.emit('toast', '設定をすべて削除しました');
-  }),
   clearStoredSetting: procedure
     .input(z.union([z.literal('logFilesDir'), z.literal('vrchatPhotoDir')]))
     .mutation(async (ctx) => {

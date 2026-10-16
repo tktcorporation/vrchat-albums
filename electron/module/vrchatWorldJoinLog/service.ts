@@ -74,22 +74,6 @@ export const findVRChatWorldJoinLogList = async ({
   });
 };
 
-export const findRecentVRChatWorldJoinLog = (
-  joinDateTime: Date,
-): Effect.Effect<model.VRChatWorldJoinLogModel | null, DBHelperError> => {
-  return enqueueTask(() =>
-    model.findRecentVRChatWorldJoinLog({
-      dateTime: joinDateTime,
-    }),
-  );
-};
-
-export const findNextVRChatWorldJoinLog = (
-  joinDateTime: Date,
-): Effect.Effect<model.VRChatWorldJoinLogModel | null, DBHelperError> => {
-  return enqueueTask(() => model.findNextVRChatWorldJoinLog(joinDateTime));
-};
-
 /**
  * 最も新しいワールド参加ログを取得する
  * ログ同期処理で基準日時を求める際に使用

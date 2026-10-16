@@ -638,8 +638,7 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
 });
 
 // getFrequentPlayerNames のテストは実際のデータベース接続が必要なため、
-// 統合テストとして logInfoCointroller.test.ts に移動しました。
-// ここではコメントアウトしておきます。
+// 統合テストとして logInfoCointroller.integration.test.ts にある。
 
 // describe('getFrequentPlayerNames', () => {
 //   beforeEach(async () => {
