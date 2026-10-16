@@ -154,6 +154,34 @@ const en: Translations = {
       completed: 'Loading complete',
       error: 'Loading failed',
     },
+    timeline: {
+      eyebrow: {
+        pending: 'Starting up',
+        firstLaunch: 'First load',
+        fullResync: 'Reloading everything',
+        incremental: 'Picking up where you left off',
+      },
+      headline: {
+        pending: 'Preparing your album',
+        firstLaunch: 'Gathering your VRChat history,\nall the way back',
+        fullResync: 'Reloading your photos and logs\nfrom the beginning',
+        incremental: 'Bringing in new photos and logs',
+      },
+      counters: {
+        photos: 'photos',
+        worlds: 'worlds',
+        people: 'people met',
+      },
+      ready: 'Ready',
+      progressLabel: 'Loading progress',
+      chartLabel: 'Photos per month',
+      detail: {
+        photosInMonth: '{month} · {current} / {total} photos',
+        photos: '{current} / {total} photos',
+        files: '{current} / {total} files',
+        logs: '{current} / {total} records',
+      },
+    },
   },
   pullToRefresh: {
     pull: 'Pull to refresh',

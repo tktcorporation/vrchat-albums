@@ -9,7 +9,6 @@ import {
   useInitProgress,
 } from '../hooks/useInitProgress';
 import { useStartupStage } from '../hooks/useStartUpStage';
-import { useI18n } from '../i18n/store';
 
 type Stage = 'idle' | 'syncing' | 'ready' | 'error';
 
@@ -21,8 +20,6 @@ interface StartupContextValue {
   retry: () => void;
   /** 初期化進捗情報 */
   progress: InitRunPayload | null;
-  /** 現在のステージの表示名（まだ進捗が届いていなければ空文字） */
-  progressMessage: string;
   /** 進捗パーセント (0-100)。同じ実行の中では減らない */
   progressPercent: number;
   /** 現在のステージの実件数 */
@@ -48,11 +45,9 @@ interface StartupProviderProps {
 export const StartupProvider: React.FC<StartupProviderProps> = ({
   children,
 }) => {
-  const { t } = useI18n();
   const {
     isSubscriptionReady,
     progress,
-    stage: progressStage,
     overallProgress,
     details,
     syncMode,
@@ -60,9 +55,6 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
     stats,
     reset: resetProgress,
   } = useInitProgress();
-  const progressMessage = progressStage
-    ? t(`initProgress.stage.${progressStage}`)
-    : '';
 
   const { stages, errorMessage, originalError, retryProcess, completed } =
     useStartupStage({ isSubscriptionReady });
@@ -99,7 +91,6 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       isReady: completed,
       retry: handleRetry,
       progress,
-      progressMessage,
       progressPercent: overallProgress,
       progressDetails: details,
       syncMode,
@@ -113,7 +104,6 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       completed,
       handleRetry,
       progress,
-      progressMessage,
       overallProgress,
       details,
       syncMode,

@@ -37,6 +37,9 @@ const WINDOW_CONFIG = {
   MIN_HEIGHT: 600,
 } as const;
 
+/** ready-to-show が届かないときに、ウィンドウを強制的に表示するまでの待ち時間 */
+const WINDOW_SHOW_FALLBACK_MS = 5000;
+
 type DisplayMetricsError =
   | { code: 'WINDOW_DESTROYED'; message: string }
   | { code: 'BOUNDS_ADJUSTMENT_FAILED'; message: string };
@@ -189,7 +192,9 @@ function createWindow(): BrowserWindow {
     minHeight: WINDOW_CONFIG.MIN_HEIGHT,
     frame: false,
     titleBarStyle: 'hidden',
-    show: true,
+    // 透過ウィンドウ（vibrancy とガラス調の背景のため）は、ページが描画されるまで中身が無く
+    // デスクトップが透けて見える。最初の描画が済んでから表示する（下の ready-to-show）。
+    show: false,
     fullscreenable: true,
     transparent: true,
     vibrancy: 'under-window',
@@ -221,6 +226,18 @@ function createWindow(): BrowserWindow {
         filePath: indexHtmlPath,
         windows: process.platform === 'win32',
       };
+
+  // 描画が終わらないまま（レンダラーのクラッシュ等）ウィンドウが見えなくならないよう、
+  // ready-to-show が来なくても一定時間で表示する。
+  const showFallbackTimer = setTimeout(() => {
+    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  }, WINDOW_SHOW_FALLBACK_MS);
+  mainWindow.once('ready-to-show', () => {
+    clearTimeout(showFallbackTimer);
+    mainWindow.show();
+  });
 
   // ガードは読み込み開始より前に登録し、最初のページからナビゲーションを制限する
   hardenWebContents(mainWindow, appEntry);

@@ -154,6 +154,34 @@ const ja: Translations = {
       completed: '読み込みが完了しました',
       error: '読み込みに失敗しました',
     },
+    timeline: {
+      eyebrow: {
+        pending: '起動しています',
+        firstLaunch: 'はじめての読み込み',
+        fullResync: 'すべて読み込み直し',
+        incremental: '前回からの続き',
+      },
+      headline: {
+        pending: 'アルバムを準備しています',
+        firstLaunch: 'あなたの VRChat の記録を、\nさかのぼって集めています',
+        fullResync: '写真とログを、\nはじめから読み込み直しています',
+        incremental: '新しい写真とログを取り込んでいます',
+      },
+      counters: {
+        photos: '枚の写真',
+        worlds: 'のワールド',
+        people: '人と一緒に',
+      },
+      ready: '準備ができました',
+      progressLabel: '読み込みの進み具合',
+      chartLabel: '撮影月ごとの写真の枚数',
+      detail: {
+        photosInMonth: '{month}の写真 · {current} / {total} 枚',
+        photos: '{current} / {total} 枚',
+        files: '{current} / {total} ファイル',
+        logs: '{current} / {total} 件',
+      },
+    },
   },
   pullToRefresh: {
     pull: '引っ張って更新',
