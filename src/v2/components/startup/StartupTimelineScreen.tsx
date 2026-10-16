@@ -14,47 +14,44 @@ import { useI18n } from '../../i18n/store';
 import type { StartupLaunchVariant } from '../../i18n/types';
 import { AppHeader } from '../AppHeader';
 import {
-  type BarTone,
+  centerYearOf,
   chartMonthOf,
-  fillMonthRange,
-  toMonthBars,
+  RING_CENTER,
+  RING_VIEWBOX,
+  ringGeometry,
+  type RingSector,
+  sectorPath,
+  toYearRings,
   yearMonthOf,
-  yearSpans,
-} from './monthlyBars';
-import { formatCount, formatProgressDetail } from './progressDetail';
+} from './photoRings';
+import {
+  formatMonthName,
+  formatProgressDetail,
+  formatStatsSummary,
+} from './progressDetail';
 
 /**
- * 棒 1 本の最大幅。撮影期間が数か月しか無いときに棒が画面幅いっぱいに太らないよう、
- * グラフ全体の幅を「月数 × この値」で頭打ちにする。
+ * 区画の塗り。写真の多さは色相を変えずにアクセント色の濃さ（段階 1〜5）だけで表し、
+ * 写真の無い月と今月より後の月は輪の位置が分かる程度の薄い下地だけを残す。
  */
-const MAX_BAR_WIDTH_PX = 32;
+const STEP_FILL = [
+  'fill-muted-foreground/10',
+  'fill-[color-mix(in_oklab,hsl(var(--primary))_30%,hsl(var(--density-base)))]',
+  'fill-[color-mix(in_oklab,hsl(var(--primary))_47%,hsl(var(--density-base)))]',
+  'fill-[color-mix(in_oklab,hsl(var(--primary))_63%,hsl(var(--density-base)))]',
+  'fill-[color-mix(in_oklab,hsl(var(--primary))_80%,hsl(var(--density-base)))]',
+  'fill-primary',
+] as const;
 
-/** 写真が無い月や枚数の少ない月でも、月の位置が見えるように残す最低の高さ */
-const MIN_BAR_HEIGHT_PX = 3;
+/** 処理中の区画の縁取り線と区画の間隔（viewBox 上の長さ） */
+const CURRENT_OUTLINE_OFFSET = 2.5;
 
-/**
- * 年ラベルを出すのに要る最低の月数。撮影期間の端の年が 1〜2 か月しか無いと、
- * 隣の年のラベルと重なって読めなくなるため、その年はラベルを出さない。
- */
-const MIN_LABEL_SPAN = 3;
-
-const COUNTER_KEYS = ['photos', 'worlds', 'people'] as const;
-
-const BAR_TONE_CLASS = {
-  current: 'bg-primary',
-  counted: 'bg-primary/60',
-  empty: 'bg-muted-foreground/20',
-} as const satisfies Record<BarTone, string>;
-
-/**
- * 月数が増えて棒が細くなっても、隙間が棒より太くならないように隙間（px）を詰める。
- */
-const barGapPx = (monthCount: number): number => {
-  if (monthCount > 96) {
-    return 1;
-  }
-  return monthCount > 48 ? 2 : 4;
-};
+const sectorFillClass = (sector: RingSector): string =>
+  match(sector.tone)
+    .with('current', () => 'fill-primary')
+    .with(P.union('empty', 'future'), () => STEP_FILL[0])
+    .with('counted', () => STEP_FILL[sector.step] ?? STEP_FILL[0])
+    .exhaustive();
 
 const launchVariantOf = (
   syncMode: InitLaunch['syncMode'] | null,
@@ -83,15 +80,16 @@ interface StartupTimelineScreenProps {
   syncMode: InitLaunch['syncMode'] | null;
   isFirstLaunch: boolean | null;
   stats: InitStats | null;
-  /** 横軸の右端にする月（`YYYY-MM`）。省略時はローカルタイムの今月 */
+  /** 最も外側の輪の年と、それより後を空けておく月（`YYYY-MM`）。省略時はローカルタイムの今月 */
   currentMonth?: string;
 }
 
 /**
  * 起動時の読み込み画面。初回起動も 2 回目以降の差分読み込みも同じ画面で見せる。
  *
- * メインプロセスから届く累計（`stats`）を撮影月ごとの棒グラフにするので、
- * 初回は棒が古い月から順に伸び、差分読み込みでは既存の棒が並んだ状態から新しい月だけが伸びる。
+ * メインプロセスから届く累計（`stats`）を、1 年を 1 周、1 か月を 1 区画にした輪（年輪）に並べる。
+ * 初回は写真が数えられるにつれて内側（古い年）から輪が埋まり、差分読み込みでは埋まった輪の
+ * 新しい区画だけが濃くなる。
  */
 export const StartupTimelineScreen = ({
   runStage,
@@ -106,7 +104,7 @@ export const StartupTimelineScreen = ({
   const variant = launchVariantOf(syncMode, isFirstLaunch);
   const month = currentMonth ?? yearMonthOf(new Date());
 
-  // 範囲外の撮影月の写真を処理している間は、その枚数を足している端の棒を強調する
+  // 範囲外の撮影月の写真を処理している間は、その枚数を足している端の区画を強調する
   const highlightMonth =
     runStage === 'photo_index' &&
     details?.unit === 'photos' &&
@@ -114,12 +112,12 @@ export const StartupTimelineScreen = ({
       ? chartMonthOf(details.currentItem, month)
       : null;
 
-  const bars = useMemo(
-    () =>
-      toMonthBars(fillMonthRange(stats?.months ?? [], month), highlightMonth),
+  const rings = useMemo(
+    () => toYearRings(stats?.months ?? [], month, highlightMonth),
     [stats, month, highlightMonth],
   );
-  const years = useMemo(() => yearSpans(bars.map((b) => b.month)), [bars]);
+  const geometry = useMemo(() => ringGeometry(rings.length), [rings.length]);
+  const centerYear = centerYearOf(rings, highlightMonth);
 
   const phaseLabel = match(runStage)
     .with(null, () => t('common.loading'))
@@ -148,13 +146,11 @@ export const StartupTimelineScreen = ({
           logs: t('initProgress.timeline.detail.logs'),
         });
 
-  // 月が 0 件のときは幅を頭打ちにせず、空の横軸を全幅で見せる
-  const gridStyle = {
-    gridTemplateColumns: `repeat(${bars.length}, minmax(0, 1fr))`,
-    maxWidth:
-      bars.length > 0 ? `${bars.length * MAX_BAR_WIDTH_PX}px` : undefined,
-    columnGap: `${barGapPx(bars.length)}px`,
-  };
+  const summary = formatStatsSummary(
+    stats,
+    language,
+    t('initProgress.timeline.summary'),
+  );
 
   return (
     <div
@@ -162,147 +158,171 @@ export const StartupTimelineScreen = ({
       data-testid="loading-screen"
     >
       <AppHeader showGalleryControls={false} />
-      <main className="flex-1 min-h-0 flex flex-col gap-8 px-8 pt-10 pb-8 md:px-16 md:pt-12 md:pb-10">
-        <div className="flex flex-col gap-3 max-w-2xl">
-          {/* 小さな文字をアクセント色で塗るとライトテーマで読める濃さが足りないため、
-              アクセント色は文字の前の短い線に持たせ、文字は本文の補助色で書く */}
-          <span
-            className={cn(
-              'flex items-center gap-2',
-              TYPOGRAPHY.overline,
-              TEXT_COLOR.secondary,
+      <main className="flex-1 min-h-0 overflow-y-auto grid grid-rows-[minmax(20rem,1fr)_auto] gap-8 px-6 py-8 min-[720px]:grid-rows-1 min-[720px]:grid-cols-[11fr_9fr] min-[720px]:gap-12 min-[720px]:px-12 min-[720px]:py-10">
+        <svg
+          role="img"
+          aria-label={t('initProgress.timeline.chartLabel')}
+          viewBox={`0 0 ${RING_VIEWBOX} ${RING_VIEWBOX}`}
+          className="size-full min-h-80"
+          data-testid="startup-rings"
+        >
+          {rings.map((ring, ringIndex) => {
+            const g = geometry[ringIndex];
+            return (
+              <g key={ring.year} data-year={ring.year}>
+                {ring.sectors.map((sector, monthIndex) => (
+                  <path
+                    key={sector.month}
+                    d={sectorPath(g, monthIndex)}
+                    className={cn(
+                      'transition-colors duration-500 ease-out motion-reduce:transition-none',
+                      sectorFillClass(sector),
+                    )}
+                    data-month={sector.month}
+                    data-tone={sector.tone}
+                    data-step={sector.step}
+                  />
+                ))}
+                {g.labelled && (
+                  <text
+                    x={RING_CENTER}
+                    y={g.labelY}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    className={cn('fill-current', TYPOGRAPHY.caption.figure)}
+                    aria-hidden="true"
+                  >
+                    {ring.year}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+          {/* 処理中の区画は塗りを最も濃くした上で、隙間を挟んだ外側に細い線を引く。
+              濃さだけでは最も写真の多い月（段階 5）と見分けにくく、点滅させずに区別するため。
+              外側の輪に隠れないよう、すべての輪を描いた後に重ねる */}
+          {rings.flatMap((ring, ringIndex) =>
+            ring.sectors.flatMap((sector, monthIndex) =>
+              sector.tone === 'current'
+                ? [
+                    <path
+                      key={`${sector.month}-outline`}
+                      d={sectorPath(
+                        geometry[ringIndex],
+                        monthIndex,
+                        CURRENT_OUTLINE_OFFSET,
+                      )}
+                      fill="none"
+                      strokeWidth={1.25}
+                      className="stroke-primary"
+                      data-testid="startup-current-outline"
+                    />,
+                  ]
+                : [],
+            ),
+          )}
+          <g aria-hidden="true">
+            <text
+              x={RING_CENTER}
+              y={highlightMonth === null ? RING_CENTER : RING_CENTER - 8}
+              textAnchor="middle"
+              dominantBaseline="central"
+              className={cn(
+                'fill-current',
+                TYPOGRAPHY.display.numeral,
+                TEXT_COLOR.primary,
+              )}
+              data-testid="startup-center-year"
+            >
+              {centerYear}
+            </text>
+            {highlightMonth !== null && (
+              <text
+                x={RING_CENTER}
+                y={RING_CENTER + 34}
+                textAnchor="middle"
+                dominantBaseline="central"
+                className={cn(
+                  'fill-current',
+                  TYPOGRAPHY.body.primary,
+                  TEXT_COLOR.secondary,
+                )}
+                data-testid="startup-center-month"
+              >
+                {formatMonthName(highlightMonth, language)}
+              </text>
             )}
-            data-testid="startup-eyebrow"
-          >
-            <span
-              aria-hidden="true"
-              className="h-0.5 w-4 rounded-full bg-primary"
-            />
-            {t(`initProgress.timeline.eyebrow.${variant}`)}
-          </span>
+          </g>
+        </svg>
+
+        <div className="mx-auto flex w-full max-w-sm flex-col justify-center gap-6 min-[720px]:mx-0">
           <h1
-            className={cn(
-              TYPOGRAPHY.display.page,
-              'tracking-tight whitespace-pre-line',
-              TEXT_COLOR.primary,
-            )}
+            className={cn(TYPOGRAPHY.heading.primary, TEXT_COLOR.primary)}
             data-testid="startup-headline"
           >
             {t(`initProgress.timeline.headline.${variant}`)}
           </h1>
-        </div>
-
-        <div className="flex-1 min-h-0 flex flex-col justify-end gap-2">
-          <div
-            role="img"
-            aria-label={t('initProgress.timeline.chartLabel')}
-            className="grid w-full flex-1 min-h-16 max-h-60"
-            style={{ ...gridStyle, gridTemplateRows: '100%' }}
-            data-testid="startup-month-chart"
-          >
-            {bars.map((bar) => (
-              <div
-                key={bar.month}
-                aria-hidden="true"
-                className={cn(
-                  'self-end rounded-t-sm transition-[height] duration-500 ease-out motion-reduce:transition-none',
-                  BAR_TONE_CLASS[bar.tone],
-                )}
-                style={{
-                  height: `max(${MIN_BAR_HEIGHT_PX}px, ${bar.ratio * 100}%)`,
-                }}
-                data-month={bar.month}
-                data-tone={bar.tone}
-              />
-            ))}
-          </div>
-          <div
-            className="grid w-full border-t border-border pt-2"
-            style={gridStyle}
-            aria-hidden="true"
-          >
-            {years.map((y) => (
-              <span
-                key={y.year}
-                className={cn(
-                  'overflow-hidden whitespace-nowrap tabular-nums',
-                  TYPOGRAPHY.caption.default,
-                )}
-                style={{ gridColumn: `${y.start + 1} / span ${y.span}` }}
-              >
-                {y.span >= MIN_LABEL_SPAN || years.length === 1 ? y.year : ''}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-end justify-between gap-8">
-          {/* 数と単位を DOM でもこの順に並べ、読み上げを「1,234 枚の写真」のように 1 続きにする */}
-          <ul className="flex gap-10">
-            {COUNTER_KEYS.map((key) => (
-              <li
-                key={key}
-                className="flex flex-col gap-0.5"
-                data-testid={`startup-counter-item-${key}`}
-              >
-                <span
-                  className={cn(TYPOGRAPHY.display.metric, TEXT_COLOR.primary)}
-                  data-testid={`startup-counter-${key}`}
-                >
-                  {formatCount(stats?.[key] ?? 0, language)}
-                </span>
-                {/* 縦に並べるので見た目には出ない。英語で数と単位が 1 語として読まれないための区切り */}{' '}
-                <span className={TYPOGRAPHY.caption.default}>
-                  {t(`initProgress.timeline.counters.${key}`)}
-                </span>
-              </li>
-            ))}
-          </ul>
 
           {/* 読み上げはフェーズの切り替わりだけに絞る。割合と件数は 1 秒に何度も変わるため、
               ライブリージョンに含めると読み上げが途切れなく続く。割合は progressbar の aria-valuenow が持つ */}
-          <div className="flex w-80 max-w-full flex-col gap-2 lg:w-96">
-            <div className="flex items-baseline justify-between gap-3">
-              <span
-                role="status"
-                aria-live="polite"
-                className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}
-                data-testid="progress-message"
+          <div className="flex flex-col gap-2">
+            <span
+              role="status"
+              aria-live="polite"
+              className={cn(TYPOGRAPHY.body.primary, TEXT_COLOR.primary)}
+              data-testid="progress-message"
+            >
+              {phaseLabel}
+            </span>
+            <div className="flex items-center gap-2">
+              <div
+                role="progressbar"
+                aria-label={t('initProgress.timeline.progressLabel')}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={overallProgress}
+                className="h-0.5 flex-1 overflow-hidden rounded-full bg-muted-foreground/20"
               >
-                {phaseLabel}
-              </span>
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none"
+                  style={{ width: `${overallProgress}%` }}
+                  data-testid="progress-bar"
+                  data-progress={overallProgress}
+                />
+              </div>
               <span
-                className={cn('tabular-nums', TYPOGRAPHY.caption.default)}
+                className={cn(
+                  'w-10 tabular-nums',
+                  TYPOGRAPHY.body.primary,
+                  TEXT_COLOR.secondary,
+                )}
                 data-testid="progress-percent"
               >
                 {`${overallProgress}%`}
               </span>
             </div>
-            <div
-              role="progressbar"
-              aria-label={t('initProgress.timeline.progressLabel')}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={overallProgress}
-              className="h-1 overflow-hidden rounded-full bg-muted-foreground/20"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none"
-                style={{ width: `${overallProgress}%` }}
-                data-testid="progress-bar"
-                data-progress={overallProgress}
-              />
-            </div>
             <span
               className={cn(
                 'min-h-[1lh] tabular-nums',
-                TYPOGRAPHY.caption.default,
+                TYPOGRAPHY.body.primary,
+                TEXT_COLOR.secondary,
               )}
               data-testid="progress-detail"
             >
               {detailLine}
             </span>
           </div>
+
+          <p
+            className={cn(
+              'min-h-[1lh]',
+              TYPOGRAPHY.body.secondary,
+              TEXT_COLOR.secondary,
+            )}
+            data-testid="startup-summary"
+          >
+            {summary}
+          </p>
         </div>
       </main>
     </div>

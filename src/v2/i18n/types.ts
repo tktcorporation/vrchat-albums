@@ -184,22 +184,17 @@ export interface Translations {
   initProgress: {
     /** 起動・同期処理の各ステージの表示名 */
     stage: Record<RunStage, string>;
-    /** 起動画面（月別の写真の棒グラフと件数で読み込みの進み具合を見せる画面） */
+    /** 起動画面（撮影月ごとの写真を年ごとの輪に並べた図と件数で、読み込みの進み具合を見せる画面） */
     timeline: {
-      /** 見出しの上の小さなラベル。起動種別ごと（`pending` は起動種別の判定前） */
-      eyebrow: Record<StartupLaunchVariant, string>;
-      /** 見出し。`\n` の位置で改行して表示する */
+      /** 見出し。起動種別ごと（`pending` は起動種別の判定前） */
       headline: Record<StartupLaunchVariant, string>;
-      counters: {
-        photos: string;
-        worlds: string;
-        people: string;
-      };
+      /** 累計を 1 文にしたもの。`{photos}` `{worlds}` `{people}` に件数が入る */
+      summary: string;
       /** 読み込みが完了したときの表示 */
       ready: string;
       /** 進捗バーの読み上げ名 */
       progressLabel: string;
-      /** 月別の棒グラフの読み上げ名 */
+      /** 年ごとの輪の図の読み上げ名 */
       chartLabel: string;
       /** 件数の説明。`{current}` `{total}` `{month}` に値が入る */
       detail: {

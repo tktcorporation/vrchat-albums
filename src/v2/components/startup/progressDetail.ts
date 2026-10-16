@@ -6,7 +6,10 @@
  */
 import { match, P } from 'ts-pattern';
 
-import type { InitProgressDetails } from '../../hooks/useInitProgress';
+import type {
+  InitProgressDetails,
+  InitStats,
+} from '../../hooks/useInitProgress';
 import type { Language, Translations } from '../../i18n/types';
 
 type DetailTemplates = Translations['initProgress']['timeline']['detail'];
@@ -39,6 +42,14 @@ export const formatYearMonthLabel = (
   }).format(date);
 };
 
+/**
+ * `YYYY-MM` の月だけを表示言語で書く（ja: 8月、en: Aug）。年は図の中央に別に出すので含めない。
+ */
+export const formatMonthName = (month: string, language: Language): string =>
+  new Intl.DateTimeFormat(LOCALE_OF[language], {
+    month: language === 'ja' ? 'long' : 'short',
+  }).format(new Date(2000, Number(month.slice(5, 7)) - 1, 1));
+
 /** 撮影月として扱える `currentItem`。それ以外の値は月を添えずに件数だけ出す */
 const YEAR_MONTH_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])$/u;
 
@@ -52,7 +63,7 @@ const fillTemplate = (
 
 /**
  * ステージ内の実件数を 1 行の説明にする。件数が無いステージでは空文字を返す。
- * 写真インデックス中は処理中の撮影月も添える（「2024年8月の写真 · 3,412 / 8,900 枚」）。
+ * 写真インデックス中は処理中の撮影月も添える（「2024年8月の写真　3,412 / 8,900 枚」）。
  */
 export const formatProgressDetail = (
   details: InitProgressDetails | null,
@@ -79,4 +90,24 @@ export const formatProgressDetail = (
     .with({ unit: 'files' }, () => fillTemplate(templates.files, values))
     .with({ unit: 'logs' }, () => fillTemplate(templates.logs, values))
     .exhaustive();
+};
+
+/**
+ * 累計を 1 文にする（「312 のワールドで、1,204 人と撮った 8,900 枚」）。
+ * 統計が届く前と、写真がまだ 1 枚も数えられていない間は空文字を返す。
+ * 0 を並べた文は「何も無い」と読めてしまい、読み込み中であることと食い違うため。
+ */
+export const formatStatsSummary = (
+  stats: Pick<InitStats, 'photos' | 'worlds' | 'people'> | null,
+  language: Language,
+  template: string,
+): string => {
+  if (stats === null || stats.photos === 0) {
+    return '';
+  }
+  return fillTemplate(template, {
+    photos: formatCount(stats.photos, language),
+    worlds: formatCount(stats.worlds, language),
+    people: formatCount(stats.people, language),
+  });
 };

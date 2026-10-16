@@ -25,6 +25,8 @@
     --muted: 0 0% 96%;
     /* 38% は白背景で約 6.6:1。/60 〜 /80 のアルファ付きでも AA (4.5:1) を維持する。 */
     --muted-foreground: 0 0% 38%;
+    /* 年輪グラフの淡い段の混ぜ相手。primary を不透明に薄めるための色（ガラス背景に透けて濁らないよう不透明にする） */
+    --density-base: 0 0% 100%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 9%;
@@ -93,6 +95,7 @@
 
     --muted: 220 27% 12% / 0.4;
     --muted-foreground: 220 10% 65%; /* Increased contrast from 60% */
+    --density-base: 30 6% 46%;
 
     --accent: 220 27% 18% / 0.6;
     --accent-foreground: 220 15% 85%;

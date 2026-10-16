@@ -19,12 +19,24 @@ const stats = {
   ],
 };
 
+const sectorTones = (): [string | undefined, string | undefined][] =>
+  [
+    ...screen
+      .getByTestId('startup-rings')
+      .querySelectorAll<SVGPathElement>('path[data-month]'),
+  ].map((path) => [path.dataset.month, path.dataset.tone]);
+
+const monthsWithTone = (tone: string): (string | undefined)[] =>
+  sectorTones()
+    .filter(([, t]) => t === tone)
+    .map(([month]) => month);
+
 describe('StartupTimelineScreen', () => {
   beforeEach(() => {
     useI18n.setState({ language: 'ja' });
   });
 
-  it('初回起動では記録をさかのぼる見出しを出す', () => {
+  it('初回起動では写真を年ごとに並べる見出しを出し、統計が届く前は累計の文を出さない', () => {
     render(
       <StartupTimelineScreen
         runStage="photo_index"
@@ -36,17 +48,13 @@ describe('StartupTimelineScreen', () => {
         currentMonth="2025-04"
       />,
     );
-    expect(screen.getByTestId('startup-eyebrow').textContent).toBe(
-      'はじめての読み込み',
-    );
     expect(screen.getByTestId('startup-headline').textContent).toBe(
-      'あなたの VRChat の記録を、\nさかのぼって集めています',
+      'これまでの写真を、年ごとに並べています',
     );
-    // 統計が届く前は 0 を出す
-    expect(screen.getByTestId('startup-counter-photos').textContent).toBe('0');
+    expect(screen.getByTestId('startup-summary').textContent).toBe('');
   });
 
-  it('差分読み込みでは新しいものを取り込む見出しを出す', () => {
+  it('差分読み込みでは前回からの写真を足す見出しと、累計の文を出す', () => {
     render(
       <StartupTimelineScreen
         runStage="log_append"
@@ -59,17 +67,37 @@ describe('StartupTimelineScreen', () => {
       />,
     );
     expect(screen.getByTestId('startup-headline').textContent).toBe(
-      '新しい写真とログを取り込んでいます',
+      '前回からの写真を足しています',
     );
-    expect(screen.getByTestId('startup-counter-photos').textContent).toBe(
-      '8,900',
+    expect(screen.getByTestId('startup-summary').textContent).toBe(
+      '312 のワールドで、1,204 人と撮った 8,900 枚',
     );
     expect(screen.getByTestId('progress-detail').textContent).toBe(
       '12 / 128 ファイル',
     );
+    // 処理中の撮影月が無いときは、写真がある最も新しい年を中央に出し、月は出さない
+    expect(screen.getByTestId('startup-center-year').textContent).toBe('2025');
+    expect(screen.queryByTestId('startup-center-month')).toBeNull();
   });
 
-  it('起動種別が分かる前は中立の見出しを出す', () => {
+  it('全件の読み直しでは読み直しの見出しを出す', () => {
+    render(
+      <StartupTimelineScreen
+        runStage="log_load"
+        overallProgress={30}
+        details={null}
+        syncMode="full"
+        isFirstLaunch={false}
+        stats={stats}
+        currentMonth="2025-04"
+      />,
+    );
+    expect(screen.getByTestId('startup-headline').textContent).toBe(
+      '写真とログを読み直しています',
+    );
+  });
+
+  it('起動種別が分かる前は中立の見出しと、今年の空の輪を 1 周だけ出す', () => {
     render(
       <StartupTimelineScreen
         runStage="database_sync"
@@ -84,15 +112,14 @@ describe('StartupTimelineScreen', () => {
     expect(screen.getByTestId('startup-headline').textContent).toBe(
       'アルバムを準備しています',
     );
-    // 月が無くても棒グラフの枠だけは出る
-    expect(
-      screen
-        .getByTestId('startup-month-chart')
-        .querySelectorAll('[data-month]'),
-    ).toHaveLength(0);
+    const tones = sectorTones();
+    expect(tones).toHaveLength(12);
+    expect(tones.slice(0, 4).every(([, t]) => t === 'empty')).toBe(true);
+    expect(tones.slice(4).every(([, t]) => t === 'future')).toBe(true);
+    expect(screen.getByTestId('startup-center-year').textContent).toBe('2025');
   });
 
-  it('写真インデックス中は処理中の撮影月の棒を強調する', () => {
+  it('写真インデックス中は処理中の撮影月の区画を強調し、中央にその年と月を出す', () => {
     render(
       <StartupTimelineScreen
         runStage="photo_index"
@@ -109,30 +136,30 @@ describe('StartupTimelineScreen', () => {
         currentMonth="2025-04"
       />,
     );
-    const chart = screen.getByTestId('startup-month-chart');
-    const tones = [...chart.querySelectorAll<HTMLElement>('[data-month]')].map(
-      (bar) => [bar.dataset.month, bar.dataset.tone],
-    );
-    expect(tones).toEqual([
-      ['2025-01', 'counted'],
-      ['2025-02', 'empty'],
-      ['2025-03', 'current'],
-      ['2025-04', 'empty'],
-    ]);
+    expect(monthsWithTone('current')).toEqual(['2025-03']);
+    expect(monthsWithTone('counted')).toEqual(['2025-01']);
+    expect(screen.getAllByTestId('startup-current-outline')).toHaveLength(1);
+    expect(screen.getByTestId('startup-center-year').textContent).toBe('2025');
+    expect(screen.getByTestId('startup-center-month').textContent).toBe('3月');
     expect(screen.getByTestId('progress-detail').textContent).toBe(
-      '2025年3月の写真 · 160 / 400 枚',
+      '2025年3月の写真　160 / 400 枚',
     );
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe(
       '60',
     );
   });
 
-  it('完了したら準備ができた旨を出し、件数の説明は消す', () => {
+  it('完了したら準備ができた旨を出し、件数の説明と強調は消す', () => {
     render(
       <StartupTimelineScreen
         runStage="completed"
         overallProgress={100}
-        details={{ current: 400, total: 400, unit: 'photos' }}
+        details={{
+          current: 400,
+          total: 400,
+          unit: 'photos',
+          currentItem: '2025-03',
+        }}
         syncMode="incremental"
         isFirstLaunch={false}
         stats={stats}
@@ -143,9 +170,10 @@ describe('StartupTimelineScreen', () => {
       '準備ができました',
     );
     expect(screen.getByTestId('progress-detail').textContent).toBe('');
+    expect(monthsWithTone('current')).toEqual([]);
   });
 
-  it('読み上げ対象はフェーズ名だけで、割合と件数はライブリージョンに含めない', () => {
+  it('読み上げ対象はフェーズ名だけで、割合・件数・累計はライブリージョンに含めない', () => {
     render(
       <StartupTimelineScreen
         runStage="photo_index"
@@ -162,29 +190,41 @@ describe('StartupTimelineScreen', () => {
     expect(status.getAttribute('aria-live')).toBe('polite');
     expect(status.contains(screen.getByTestId('progress-percent'))).toBe(false);
     expect(status.contains(screen.getByTestId('progress-detail'))).toBe(false);
+    expect(status.contains(screen.getByTestId('startup-summary'))).toBe(false);
+    // 図は 1 枚の画像として名前だけを読み上げる
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
+      '年ごとの輪に並べた、撮影月ごとの写真の枚数',
+    );
   });
 
-  it('件数は数・単位の順で 1 続きに読み上げられる', () => {
+  it('英語では文の順序を英語に合わせる', () => {
+    useI18n.setState({ language: 'en' });
     render(
       <StartupTimelineScreen
         runStage="photo_index"
         overallProgress={60}
-        details={null}
-        syncMode="incremental"
-        isFirstLaunch={false}
+        details={{
+          current: 160,
+          total: 400,
+          unit: 'photos',
+          currentItem: '2025-03',
+        }}
+        syncMode="full"
+        isFirstLaunch
         stats={stats}
         currentMonth="2025-04"
       />,
     );
-    expect(screen.getByTestId('startup-counter-item-photos').textContent).toBe(
-      '8,900 枚の写真',
+    expect(screen.getByTestId('startup-headline').textContent).toBe(
+      'Arranging your photos year by year',
     );
-    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual(
-      ['8,900 枚の写真', '312 のワールド', '1,204 人と一緒に'],
+    expect(screen.getByTestId('startup-summary').textContent).toBe(
+      '8,900 photos taken with 1,204 people across 312 worlds',
     );
+    expect(screen.getByTestId('startup-center-month').textContent).toBe('Mar');
   });
 
-  it('今月より後の撮影月を処理している間は今月の棒を強調する', () => {
+  it('今月より後の撮影月を処理している間は今月の区画を強調する', () => {
     render(
       <StartupTimelineScreen
         runStage="photo_index"
@@ -204,14 +244,11 @@ describe('StartupTimelineScreen', () => {
         currentMonth="2025-04"
       />,
     );
-    const chart = screen.getByTestId('startup-month-chart');
-    const current = [
-      ...chart.querySelectorAll<HTMLElement>('[data-tone="current"]'),
-    ].map((bar) => bar.dataset.month);
-    expect(current).toEqual(['2025-04']);
+    expect(monthsWithTone('current')).toEqual(['2025-04']);
+    expect(screen.getByTestId('startup-center-year').textContent).toBe('2025');
   });
 
-  it('2017-01 より前の撮影月を処理している間は左端の棒を強調する', () => {
+  it('2017-01 より前の撮影月を処理している間は最も内側の輪の 1 月を強調する', () => {
     render(
       <StartupTimelineScreen
         runStage="photo_index"
@@ -231,15 +268,9 @@ describe('StartupTimelineScreen', () => {
         currentMonth="2025-04"
       />,
     );
-    const bars = [
-      ...screen
-        .getByTestId('startup-month-chart')
-        .querySelectorAll<HTMLElement>('[data-month]'),
-    ];
-    expect(bars.at(0)?.dataset).toMatchObject({
-      month: '2017-01',
-      tone: 'current',
-    });
-    expect(bars).toHaveLength(100);
+    const tones = sectorTones();
+    expect(tones.at(0)).toEqual(['2017-01', 'current']);
+    // 2017 年から 2025 年までの 9 周
+    expect(tones).toHaveLength(9 * 12);
   });
 });

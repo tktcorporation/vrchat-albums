@@ -120,10 +120,10 @@ export const TYPOGRAPHY = {
     /** セクションタイトル（24px, bold, snug line-height） */
     section: 'text-2xl font-bold leading-snug',
     /**
-     * 大きな数値（30px, bold, 等幅数字） - 起動画面の累計カウンターなど、見出しと同じ大きさで見せる値。
-     * 等幅数字にするのは、値が増えるたびに桁の幅が揺れて隣の要素が動かないようにするため
+     * 大きな数字（60px, light, 等幅数字） - 起動画面の年輪の中央の年など、図の主役として置く数字。
+     * 大きさで目立たせるので太さは細くし、等幅数字にして値が変わっても幅が揺れないようにする
      */
-    metric: 'text-3xl font-bold leading-tight tracking-tight tabular-nums',
+    numeral: 'text-6xl font-light leading-none tracking-tight tabular-nums',
   },
 
   // =========================================================================
@@ -174,6 +174,8 @@ export const TYPOGRAPHY = {
     default: 'text-xs text-muted-foreground',
     /** Muted キャプション（12px, more muted） - 二次メタ情報 */
     muted: 'text-xs text-muted-foreground/60',
+    /** 図のラベル（11px, muted, 等幅数字） - 図の中で区画の間に置く年などの短い数字 */
+    figure: 'text-[11px] leading-none tabular-nums text-muted-foreground',
     /** @deprecated Use caption.muted instead */
     meta: 'text-xs text-muted-foreground/60',
   },
