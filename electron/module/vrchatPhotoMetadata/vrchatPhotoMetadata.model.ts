@@ -104,46 +104,6 @@ export const createOrUpdatePhotoMetadataBatch = async (
 };
 
 /**
- * 写真パスからメタデータを取得する
- */
-export const getPhotoMetadataByPhotoPath = async (
-  photoPath: string,
-): Promise<VRChatPhotoMetadataModel | null> => {
-  return VRChatPhotoMetadataModel.findOne({
-    where: { photoPath },
-  });
-};
-
-/**
- * 複数の写真パスからメタデータをバッチ取得する
- */
-export const getPhotoMetadataByPhotoPaths = async (
-  photoPaths: string[],
-): Promise<VRChatPhotoMetadataModel[]> => {
-  if (photoPaths.length === 0) {
-    return [];
-  }
-
-  return VRChatPhotoMetadataModel.findAll({
-    where: {
-      photoPath: { [Op.in]: photoPaths },
-    },
-  });
-};
-
-/**
- * ワールドIDからメタデータを取得する (ワールド紐付け用)
- */
-export const getPhotoMetadataByWorldId = async (
-  worldId: string,
-): Promise<VRChatPhotoMetadataModel[]> => {
-  return VRChatPhotoMetadataModel.findAll({
-    where: { worldId },
-    order: [['createdAt', 'ASC']],
-  });
-};
-
-/**
  * 入力パスのうち、まだメタデータが存在しないパスだけを返す
  *
  * SQL の NOT IN でフィルタするため、全件をメモリにロードしない。

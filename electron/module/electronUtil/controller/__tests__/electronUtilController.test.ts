@@ -1,13 +1,13 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 
-import { dialog } from 'electron';
+import { Effect } from 'effect';
 import * as path from 'pathe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { eventEmitter } from '../../../../trpc';
 import { electronUtilRouter } from '../electronUtilController';
 
-// パスの正規化のためのヘルパー関数を追加
 const normalizePath = (p: string) => p.replaceAll('\\', '/');
 
 vi.mock('node:fs/promises');
@@ -16,17 +16,13 @@ const mockElectron = vi.hoisted(() => ({
   app: {
     isPackaged: false,
   },
-  clipboard: {
-    writeText: vi.fn(),
-    write: vi.fn(),
-  },
-  nativeImage: {
-    createFromPath: vi.fn(),
-    createFromBuffer: vi.fn(),
-  },
   dialog: {
     showSaveDialog: vi.fn(),
   },
+}));
+
+const mockExifTool = vi.hoisted(() => ({
+  writeDateTimeWithTimezone: vi.fn(),
 }));
 
 vi.mock('electron', () => mockElectron);
@@ -34,137 +30,111 @@ vi.mock('../../../../lib/electronModules', () => ({
   getApp: () => mockElectron.app,
   getShell: () => ({}),
   getDialog: () => mockElectron.dialog,
-  getClipboard: () => mockElectron.clipboard,
+  getClipboard: () => ({}),
   getClipboardItem: () => class {},
-  getNativeImage: () => mockElectron.nativeImage,
+  getNativeImage: () => ({}),
 }));
+vi.mock('../../../../lib/wrappedExifTool', () => mockExifTool);
 
-describe('electronUtilController', () => {
-  const router = electronUtilRouter();
+const tempDir = path.join(os.tmpdir(), 'test-dir');
+const joinDateTime = new Date(2024, 7, 15, 21, 30, 5, 123);
+const filename = 'VRChat_2024-08-15_21-30-05.123_wrld_test';
+const input = {
+  worldId: 'wrld_test',
+  joinDateTime,
+  imageBase64: 'test-base64',
+};
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (fs.mkdtemp as ReturnType<typeof vi.fn>).mockResolvedValue(
-      path.join(os.tmpdir(), 'test-dir'),
-    );
-    (fs.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (fs.copyFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    (fs.rm as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+const callDownload = () =>
+  electronUtilRouter().downloadImageAsPhotoLogPng({
+    ctx: {} as unknown,
+    input,
+    path: '',
+    type: 'mutation',
+    getRawInput: async () => input,
+    signal: new AbortController().signal,
+    batchIndex: 0,
   });
 
-  describe('downloadImageAsPng', () => {
-    it('should download image as png', async () => {
-      const mockPath = path.join(os.homedir(), 'Downloads', 'test.png');
-      (dialog.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
+describe('electronUtilController', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(fs.mkdtemp).mockResolvedValue(tempDir);
+    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+    vi.mocked(fs.copyFile).mockResolvedValue(undefined);
+    vi.mocked(fs.rm).mockResolvedValue(undefined);
+    mockExifTool.writeDateTimeWithTimezone.mockReturnValue(Effect.void);
+    vi.spyOn(eventEmitter, 'emit');
+  });
+
+  describe('downloadImageAsPhotoLogPng', () => {
+    it('一時ファイルに EXIF を書き込み、選ばれた保存先へコピーする', async () => {
+      const savePath = path.join(os.homedir(), 'Downloads', `${filename}.png`);
+      mockElectron.dialog.showSaveDialog.mockResolvedValue({
         canceled: false,
-        filePath: mockPath,
+        filePath: savePath,
       });
 
-      await router.downloadImageAsPng({
-        ctx: {} as unknown,
-        input: {
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        },
-        path: '',
-        type: 'mutation',
-        getRawInput: async () => ({
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
+      await callDownload();
+
+      const expectedTempPath = path.join(tempDir, `${filename}.png`);
+      const [writePath, writeData] = vi.mocked(fs.writeFile).mock.calls[0];
+      expect(normalizePath(writePath.toString())).toBe(
+        normalizePath(expectedTempPath),
+      );
+      expect(writeData).toBeInstanceOf(Uint8Array);
+
+      expect(mockExifTool.writeDateTimeWithTimezone).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'wrld_test',
+          dateTimeOriginal: '2024-08-15 21:30:05',
         }),
-        signal: new AbortController().signal,
-        batchIndex: 0,
-      });
+      );
 
-      const expectedTempPath = path.join(os.tmpdir(), 'test-dir', 'test.png');
-
-      // 一時ファイルの作成を確認
-      const writeFilePath = vi.mocked(fs.writeFile).mock.calls[0][0];
-      expect(normalizePath(writeFilePath.toString())).toBe(
+      const [copySrc, copyDest] = vi.mocked(fs.copyFile).mock.calls[0];
+      expect(normalizePath(copySrc.toString())).toBe(
         normalizePath(expectedTempPath),
       );
-      expect(vi.mocked(fs.writeFile).mock.calls[0][1]).toBeInstanceOf(
-        Uint8Array,
-      );
+      expect(normalizePath(copyDest.toString())).toBe(normalizePath(savePath));
+      expect(
+        mockExifTool.writeDateTimeWithTimezone.mock.invocationCallOrder[0],
+      ).toBeLessThan(vi.mocked(fs.copyFile).mock.invocationCallOrder[0]);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('toast', 'downloaded');
 
-      // 一時ファイルから保存先へのコピーを確認
-      const copyFileSrcPath = vi.mocked(fs.copyFile).mock.calls[0][0];
-      const copyFileDestPath = vi.mocked(fs.copyFile).mock.calls[0][1];
-      expect(normalizePath(copyFileSrcPath.toString())).toBe(
-        normalizePath(expectedTempPath),
-      );
-      expect(normalizePath(copyFileDestPath.toString())).toBe(
-        normalizePath(mockPath),
-      );
-
-      // 一時ディレクトリの削除を確認
-      expect(fs.rm).toHaveBeenCalledWith(path.join(os.tmpdir(), 'test-dir'), {
+      expect(fs.rm).toHaveBeenCalledWith(tempDir, {
         recursive: true,
         force: true,
       });
     });
 
-    it('should handle dialog cancel', async () => {
-      (dialog.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
-        canceled: true,
-      });
+    it('保存ダイアログをキャンセルしたらコピーせず一時ディレクトリを消す', async () => {
+      mockElectron.dialog.showSaveDialog.mockResolvedValue({ canceled: true });
 
-      await router.downloadImageAsPng({
-        ctx: {} as unknown,
-        input: {
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        },
-        path: '',
-        type: 'mutation',
-        getRawInput: async () => ({
-          pngBase64: 'test-base64',
-          filenameWithoutExt: 'test',
-        }),
-        signal: new AbortController().signal,
-        batchIndex: 0,
-      });
+      await callDownload();
 
-      // 一時ファイルの作成は行われる
-      expect(fs.writeFile).toHaveBeenCalled();
-      // コピーは行われない
+      expect(fs.writeFile).toHaveBeenCalledOnce();
+      expect(mockExifTool.writeDateTimeWithTimezone).not.toHaveBeenCalled();
       expect(fs.copyFile).not.toHaveBeenCalled();
-      // 一時ディレクトリは削除される
-      expect(fs.rm).toHaveBeenCalledWith(path.join(os.tmpdir(), 'test-dir'), {
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('toast', 'downloaded');
+      expect(fs.rm).toHaveBeenCalledWith(tempDir, {
         recursive: true,
         force: true,
       });
     });
 
-    it('should handle write error', async () => {
-      const mockPath = path.join(os.homedir(), 'Downloads', 'test.png');
-      (dialog.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
+    it('保存先へのコピーに失敗しても一時ディレクトリを消して失敗を返す', async () => {
+      mockElectron.dialog.showSaveDialog.mockResolvedValue({
         canceled: false,
-        filePath: mockPath,
+        filePath: path.join(os.homedir(), 'Downloads', `${filename}.png`),
       });
-      const mockError = new Error('Write error');
-      (fs.copyFile as ReturnType<typeof vi.fn>).mockRejectedValue(mockError);
+      vi.mocked(fs.copyFile).mockRejectedValue(new Error('Write error'));
 
-      await expect(
-        router.downloadImageAsPng({
-          ctx: {} as unknown,
-          input: {
-            pngBase64: 'test-base64',
-            filenameWithoutExt: 'test',
-          },
-          path: '',
-          type: 'mutation',
-          getRawInput: async () => ({
-            pngBase64: 'test-base64',
-            filenameWithoutExt: 'test',
-          }),
-          signal: new AbortController().signal,
-          batchIndex: 0,
-        }),
-      ).rejects.toThrow('ファイル操作中にエラーが発生しました。');
+      await expect(callDownload()).rejects.toThrow('Write error');
 
-      // エラー後も一時ディレクトリは削除される
-      expect(fs.rm).toHaveBeenCalledWith(path.join(os.tmpdir(), 'test-dir'), {
+      expect(fs.copyFile).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('toast', 'downloaded');
+
+      expect(fs.rm).toHaveBeenCalledWith(tempDir, {
         recursive: true,
         force: true,
       });

@@ -1,7 +1,6 @@
-import { Data, Effect } from 'effect';
 import type { Rectangle } from 'electron';
 import Store from 'electron-store';
-import { match, P } from 'ts-pattern';
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 
 import { FolderDigestSchema } from '../lib/brandedTypes';
@@ -45,16 +44,6 @@ export const PhotoFolderScanStatesSchema = z.record(
 );
 
 export type PhotoFolderScanStates = z.infer<typeof PhotoFolderScanStatesSchema>;
-
-/**
- * 設定の読み書きに失敗
- */
-export class SettingStorageError extends Data.TaggedError(
-  'SettingStorageError',
-)<{
-  message: string;
-  key: string;
-}> {}
 
 const getValue =
   (settingsStore: Store) =>
@@ -238,28 +227,6 @@ const setAutoStartEnabled =
     set('autoStartEnabled', flag);
   };
 
-/**
- * Clear stored setting by key
- */
-const clearStoredSetting =
-  (settingsStore: Store) =>
-  (key: SettingStoreKey): Effect.Effect<void, SettingStorageError> => {
-    return Effect.try({
-      try: () => settingsStore.delete(key),
-      catch: (error): SettingStorageError => {
-        return match(error)
-          .with(
-            P.instanceOf(Error),
-            (e) => new SettingStorageError({ message: e.message, key }),
-          )
-          .otherwise((e) => {
-            // 予期しないエラーはre-throw（Sentry通知）
-            throw e;
-          });
-      },
-    });
-  };
-
 import path from 'node:path';
 
 import { logger } from './../lib/logger';
@@ -310,7 +277,6 @@ const setSettingStore = (name: StoreName) => {
       setRemoveAdjacentDuplicateWorldEntriesFlag(set),
     getBackgroundFileCreateFlag: getBackgroundFileCreateFlag(getB),
     setBackgroundFileCreateFlag: setBackgroundFileCreateFlag(set),
-    clearStoredSetting: clearStoredSetting(store),
     setWindowBounds: (bounds: Rectangle) => {
       store.set('windowBounds', bounds);
     },
@@ -419,9 +385,6 @@ export interface SettingStore {
   setRemoveAdjacentDuplicateWorldEntriesFlag: (flag: boolean) => void;
   getBackgroundFileCreateFlag: () => boolean | null;
   setBackgroundFileCreateFlag: (flag: boolean) => void;
-  clearStoredSetting: (
-    key: SettingStoreKey,
-  ) => Effect.Effect<void, SettingStorageError>;
   getWindowBounds: () => Rectangle | undefined;
   setWindowBounds: (bounds: Rectangle) => void;
   getTermsAccepted: () => boolean;

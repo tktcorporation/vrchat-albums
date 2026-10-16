@@ -26,7 +26,6 @@ import { updaterRouter } from './module/updater/router';
 import { vrchatApiRouter } from './module/vrchatApi/vrchatApiController';
 import { vrchatLogRouter } from './module/vrchatLog/vrchatLogController';
 import { vrchatPhotoRouter } from './module/vrchatPhoto/vrchatPhoto.controller';
-import { vrchatPhotoMetadataRouter } from './module/vrchatPhotoMetadata/vrchatPhotoMetadata.controller';
 import { vrchatWorldJoinLogRouter } from './module/vrchatWorldJoinLog/vrchatWorldJoinLog.controller';
 import { eventEmitter as ee, procedure, router as trpcRouter } from './trpc';
 
@@ -67,7 +66,6 @@ export const router = trpcRouter({
   electronUtil: electronUtilRouter(),
   imageGenerator: imageGeneratorRouter,
   vrchatPhoto: vrchatPhotoRouter(),
-  vrchatPhotoMetadata: vrchatPhotoMetadataRouter(),
   vrchatLog: vrchatLogRouter(),
   vrchatWorldJoinLog: vrchatWorldJoinLogRouter(),
   logInfo: logInfoRouter(),
@@ -155,26 +153,6 @@ export const router = trpcRouter({
       ...result.value,
       error: null,
     };
-  }),
-  clearStoredSetting: procedure
-    .input(z.union([z.literal('logFilesDir'), z.literal('vrchatPhotoDir')]))
-    .mutation(async (ctx) => {
-      const clearEffect = service.clearStoredSetting(ctx.input);
-      await runEffect(
-        clearEffect.pipe(
-          // SettingStoreError は silent（設定削除失敗は致命的ではない）
-          Effect.catchAll(() => Effect.void),
-        ),
-      );
-      ee.emit('toast', '設定を削除しました');
-    }),
-  openPathOnExplorer: procedure.input(z.string()).mutation(async (ctx) => {
-    await runEffect(
-      service
-        .openPathOnExplorer(ctx.input)
-        .pipe(Effect.mapError(mapToFileOperationError)),
-    );
-    return true;
   }),
   openElectronLogOnExplorer: procedure.mutation(async () => {
     await runEffect(
