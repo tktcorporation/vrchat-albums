@@ -120,6 +120,7 @@ describe('settingsController.initializeAppData', () => {
 
     // getSettingStoreのモック
     mockSettingStore.getSettingStore = vi.fn().mockReturnValue({
+      getTermsAccepted: vi.fn().mockReturnValue(true),
       getVRChatPhotoDir: vi.fn().mockReturnValue('/path/to/photos'),
       getAutoStartEnabled: vi.fn().mockReturnValue(null),
       setAutoStartEnabled: vi.fn(),
@@ -162,6 +163,21 @@ describe('settingsController.initializeAppData', () => {
     expect(mockLogger.info).toHaveBeenCalledWith(
       '=== Application data initialization completed ===',
     );
+  });
+
+  it('利用規約に未同意なら初期化を始めずに拒む', async () => {
+    if (!initializeAppData) {
+      throw new Error('initializeAppData not initialized');
+    }
+    mockSettingStore.getSettingStore = vi.fn().mockReturnValue({
+      getTermsAccepted: vi.fn().mockReturnValue(false),
+    });
+
+    await expect(initializeAppData()).rejects.toThrow(
+      '利用規約に同意してから読み込みを始めてください',
+    );
+    expect(mockSequelizeClient.syncRDBClient).not.toHaveBeenCalled();
+    expect(beginInitProgressRun).not.toHaveBeenCalled();
   });
 
   it('初回起動時は FULL モードでログ同期が実行される', async () => {

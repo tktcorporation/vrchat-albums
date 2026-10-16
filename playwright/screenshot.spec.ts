@@ -241,11 +241,16 @@ test('各画面でスクショ', async () => {
     consola.log('「同意する」ボタンが表示されていません');
   }
 
-  // 初期セットアップ画面または既にセットアップ済みの画面を待つ
+  // 同意すると読み込みが始まり、終わると初期セットアップ画面かギャラリーが出る
   console.log('Waiting for setup or main screen...');
-
-  // Wait for content to load
-  await page.waitForTimeout(2000);
+  await page
+    .waitForSelector(
+      'input[type="text"], [data-testid="location-group-header"], .photo-card',
+      { timeout: 60_000 },
+    )
+    .catch(() => {
+      console.log('Neither setup nor main screen appeared within the timeout');
+    });
   await screenshot(page, title, 'debug-current-state');
 
   // 入力フィールドがあるか確認

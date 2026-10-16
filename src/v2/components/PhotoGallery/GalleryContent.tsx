@@ -1,5 +1,4 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { LoaderCircle } from 'lucide-react';
 import type React from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { match } from 'ts-pattern';
@@ -26,7 +25,7 @@ import type { GroupedPhoto, GroupedPhotos } from './useGroupPhotos';
  */
 interface GalleryContentProps extends Pick<
   UseLoadingStateResult,
-  'isLoadingStartupSync' | 'isLoadingGrouping'
+  'isLoadingGrouping'
 > {
   /** グループ化された写真データ（親から渡される） */
   groupedPhotos: GroupedPhotos;
@@ -98,7 +97,6 @@ interface VirtualizedGalleryProps {
   ) => void;
   isMultiSelectMode: boolean;
   setIsMultiSelectMode: (value: boolean) => void;
-  isLoading: boolean;
   galleryData?: PhotoGalleryData;
 }
 
@@ -116,7 +114,6 @@ const VirtualizedGallery = memo(
     setSelectedPhotos,
     isMultiSelectMode,
     setIsMultiSelectMode,
-    isLoading,
     galleryData,
   }: VirtualizedGalleryProps) => {
     const [currentGroupIndex, setCurrentGroupIndex] = useState<
@@ -343,12 +340,6 @@ const VirtualizedGallery = memo(
               );
             })}
           </div>
-          {isLoading && (
-            <div className="fixed bottom-4 right-6 flex items-center space-x-2 bg-background/80 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
-              <LoaderCircle className="w-4 h-4 animate-spin text-muted-foreground" />
-              <div className="text-sm text-muted-foreground">読み込み中...</div>
-            </div>
-          )}
         </div>
         <DateJumpSidebar
           groups={groupsArray}
@@ -388,7 +379,6 @@ VirtualizedGallery.displayName = 'VirtualizedGallery';
  */
 const GalleryContent = memo(
   ({
-    isLoadingStartupSync,
     isLoadingGrouping,
     groupedPhotos,
     selectedPhotos,
@@ -411,8 +401,6 @@ const GalleryContent = memo(
     const groupsArray = useMemo<GroupedPhoto[]>(() => {
       return filteredGroups.map(([_, group]) => group);
     }, [filteredGroups]);
-
-    const isLoading = isLoadingGrouping || isLoadingStartupSync;
 
     // グルーピング中はスケルトンを表示
     if (isLoadingGrouping) {
@@ -447,7 +435,6 @@ const GalleryContent = memo(
                 setSelectedPhotos={setSelectedPhotos}
                 isMultiSelectMode={isMultiSelectMode}
                 setIsMultiSelectMode={setIsMultiSelectMode}
-                isLoading={isLoading}
                 galleryData={galleryData}
               />
             ))

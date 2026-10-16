@@ -216,6 +216,9 @@ export interface Translations {
     title: string;
     updateTitle: string;
     accept: string;
+    saveFailed: string;
+    loadFailed: string;
+    retry: string;
   };
   migration: {
     title: string;

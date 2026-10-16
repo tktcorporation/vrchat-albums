@@ -142,14 +142,12 @@ export const useInitProgress = ({ runKind }: UseInitProgressOptions = {}) => {
     initialInitProgressState,
   );
   const [error, setError] = useState<Error | null>(null);
-  const [isSubscriptionReady, setIsSubscriptionReady] = useState(false);
 
   // tRPC subscriptionで進捗を購読
   trpcReact.subscribeInitProgress.useSubscription(undefined, {
     onData: (data) => {
-      // readyイベントはsubscription接続完了の通知として扱う
+      // ready は接続完了の通知で、実行の進捗ではない
       if (data.stage === 'ready') {
-        setIsSubscriptionReady(true);
         return;
       }
       setState((prev) => applyInitProgressEvent(prev, data, runKind));
@@ -165,12 +163,9 @@ export const useInitProgress = ({ runKind }: UseInitProgressOptions = {}) => {
   const reset = useCallback(() => {
     setState(initialInitProgressState);
     setError(null);
-    setIsSubscriptionReady(false);
   }, []);
 
   return {
-    /** subscription接続完了フラグ */
-    isSubscriptionReady,
     /** 最後に届いた進捗イベント（stage, progress, details など） */
     progress: state.latest,
     /** 現在のステージ。まだ何も届いていなければ null */

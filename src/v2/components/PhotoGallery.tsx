@@ -158,7 +158,6 @@ const PhotoGallery = memo((props: PhotoGalleryProps) => {
     <div className="flex flex-col h-full">
       <MigrationDialog />
       <GalleryContent
-        isLoadingStartupSync={props.isLoadingStartupSync}
         isLoadingGrouping={props.isLoadingGrouping}
         groupedPhotos={groupedPhotos}
         selectedPhotos={selectedPhotos}
