@@ -15,8 +15,10 @@ import {
   getNativeImage,
   getShell,
 } from '../../lib/electronModules';
+import { checkExternalUrl } from '../../lib/externalUrl';
 import type { DownloadImageError, FileIOError } from './errors';
 import {
+  ExternalUrlNotAllowed,
   FileCopyFailed,
   FileCreateFailed,
   OpenPathFailed,
@@ -91,11 +93,26 @@ const openElectronDialog = (
 };
 
 /**
- * 既定のブラウザで URL を開くシンプルなヘルパー。
- * ShareDialog などからリンクを開く際に使用される。
+ * 既定のブラウザで URL を開く。ShareDialog などからリンクを開く際に使用される。
+ *
+ * `shell.openExternal` はスキームに関連付けられた OS のハンドラを起動するため、
+ * checkExternalUrl が許可した URL だけを渡す。拒否した URL は呼び出し元が
+ * ユーザーに伝えられるよう ExternalUrlNotAllowed で返す。
  */
-const openUrlInDefaultBrowser = (url: string) => {
-  return getShell().openExternal(url);
+const openUrlInDefaultBrowser = (
+  url: string,
+): Effect.Effect<void, ExternalUrlNotAllowed> => {
+  const checked = checkExternalUrl(url);
+  if (!checked.ok) {
+    return Effect.fail(
+      new ExternalUrlNotAllowed({
+        message: `External URL rejected: ${checked.rejection.type}`,
+        url,
+      }),
+    );
+  }
+  // openExternal の reject は OS 側の想定外の失敗なので defect として Sentry へ届ける
+  return Effect.promise(() => getShell().openExternal(checked.url));
 };
 
 /**

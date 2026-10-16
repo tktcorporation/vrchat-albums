@@ -11,11 +11,20 @@ import { getClipboard } from '../../../lib/electronModules';
 import {
   mapToFileOperationError,
   mapToOpenPathError,
+  toUserFacing,
 } from '../../../lib/errorMapping';
+import { ERROR_CATEGORIES, ERROR_CODES } from '../../../lib/errors';
 import * as exiftool from '../../../lib/wrappedExifTool';
 import { eventEmitter, procedure, router as trpcRouter } from './../../../trpc';
 import { DirectoryPathSchema } from './../../../valueObjects/index';
 import * as utilsService from './../service';
+
+/** 許可していないスキームの URL を外部で開こうとしたときのユーザー向けエラー */
+const mapToExternalUrlNotAllowedError = toUserFacing<{ message: string }>({
+  code: ERROR_CODES.VALIDATION_ERROR,
+  category: ERROR_CATEGORIES.VALIDATION_ERROR,
+  userMessage: 'このリンクは開けません。',
+});
 
 export const electronUtilRouter = () =>
   trpcRouter({
@@ -23,8 +32,12 @@ export const electronUtilRouter = () =>
       .input(z.string())
       .mutation(async (ctx) => {
         consola.log('openUrlInDefaultBrowser', ctx.input);
-        await utilsService.openUrlInDefaultBrowser(ctx.input);
-        return true;
+        return runEffect(
+          utilsService.openUrlInDefaultBrowser(ctx.input).pipe(
+            Effect.map(() => true as const),
+            Effect.mapError(mapToExternalUrlNotAllowedError),
+          ),
+        );
       }),
     reloadWindow: procedure.mutation(async () => {
       consola.log('reloadWindow');
