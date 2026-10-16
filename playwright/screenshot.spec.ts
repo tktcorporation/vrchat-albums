@@ -246,7 +246,7 @@ test('各画面でスクショ', async () => {
   await page
     .waitForSelector(
       'input[type="text"], [data-testid="location-group-header"], .photo-card',
-      { timeout: 60_000 },
+      { timeout: 30_000 },
     )
     .catch(() => {
       console.log('Neither setup nor main screen appeared within the timeout');
