@@ -34,57 +34,12 @@ const exposeElectronTRPC = () => {
   };
   contextBridge.exposeInMainWorld('electronTRPC', electronTRPC);
 };
-process.once('loaded', () => {
-  exposeElectronTRPC();
-  // If you expose something here, you get window.something in the React app
-  // type it in types/exposedInMainWorld.d.ts to add it to the window type
-  // contextBridge.exposeInMainWorld("something", {
-  //   exposedThing: "this value was exposed via the preload file",
-  // });
-});
-declare global {
-  interface Window {
-    Main: typeof api;
-    // MyOn は src/v2/types/electron.d.ts で型定義されているため、ここでは省略
-    ipcRenderer: typeof ipcRenderer;
-  }
-}
-
-const api = {
-  /**
-   * Here you can expose functions to the renderer process
-   * so they can interact with the main (electron) side
-   * without security problems.
-   *
-   * The function below can accessed using `window.Main.sayHello`
-   */
-  sendErrorMessage: (message: string) => {
-    ipcRenderer.send('error-message', message);
-  },
-  setLogFilePath: (path: string) => {
-    ipcRenderer.send('set-log-file-path', path);
-  },
-  openDialogAndSetLogFilesDir: () => {
-    ipcRenderer.send('open-dialog-and-set-log-files-dir');
-  },
-  getLogFilesDir: () => {
-    ipcRenderer.send('get-log-files-dir');
-  },
-  openDialogAndSetVRChatPhotoDir: () => {
-    ipcRenderer.send('open-dialog-and-set-vrchat-photo-dir');
-  },
-  getVRChatPhotoDir: () => {
-    ipcRenderer.send('get-vrchat-photo-dir');
-  },
-  getStatusToUseVRChatLogFilesDir: () => {
-    ipcRenderer.send('get-status-to-use-vrchat-log-files-dir');
-  },
-  createFiles: () => {
-    ipcRenderer.send('create-files');
-  },
-  /**
-    Here function for AppBar
-   */
+/**
+ * ウィンドウ操作ボタン（AppHeader）用の API。
+ * レンダラに任意の IPC 送受信を許さないよう、送信先チャンネルを固定した関数だけを公開する。
+ * 受け手は electron/electronUtil.ts の ipcMain.on('minimize' | 'maximize' | 'close')。
+ */
+const windowControls = {
   Minimize: () => {
     ipcRenderer.send('minimize');
   },
@@ -94,72 +49,16 @@ const api = {
   Close: () => {
     ipcRenderer.send('close');
   },
-  /**
-   * Provide an easier way to listen to events
-   */
-  on: (channel: string, callback: (data: unknown) => void) => {
-    ipcRenderer.on(channel, (_, data) => callback(data));
-  },
-  removeAllListeners: (channel: string) => {
-    ipcRenderer.removeAllListeners(channel);
-  },
 };
-contextBridge.exposeInMainWorld('Main', api);
+contextBridge.exposeInMainWorld('Main', windowControls);
 
-const myOn = {
-  receiveStatusToUseVRChatLogFilesDir: (
-    callback: (
-      data:
-        | 'ready'
-        | 'logFilesDirNotSet'
-        | 'logFilesNotFound'
-        | 'logFileDirNotFound',
-    ) => void,
-  ) => {
-    const key = 'status-to-use-vrchat-log-files-dir';
-    ipcRenderer.on(
-      key,
-      (
-        _,
-        data:
-          | 'ready'
-          | 'logFilesDirNotSet'
-          | 'logFilesNotFound'
-          | 'logFileDirNotFound',
-      ) => callback(data),
-    );
-    return () => {
-      ipcRenderer.removeAllListeners(key);
-    };
-  },
-  receiveVRChatPhotoDirWithError: (
-    callback: (data: {
-      storedPath: string | null;
-      path: string;
-      error: null | 'photoYearMonthDirsNotFound' | 'photoDirReadError';
-    }) => void,
-  ) => {
-    const key = 'vrchat-photo-dir-with-error';
-    ipcRenderer.on(
-      key,
-      (
-        _,
-        data: {
-          storedPath: string | null;
-          path: string;
-          error: null | 'photoYearMonthDirsNotFound' | 'photoDirReadError';
-        },
-      ) => callback(data),
-    );
-    return () => {
-      ipcRenderer.removeAllListeners(key);
-    };
-  },
-};
-contextBridge.exposeInMainWorld('MyOn', myOn);
+declare global {
+  interface Window {
+    /** preload が無いブラウザ実行時は未定義になる */
+    Main?: typeof windowControls;
+  }
+}
 
-/**
- * Using the ipcRenderer directly in the browser through the contextBridge ist not really secure.
- * I advise using the Main/api way !!
- */
-contextBridge.exposeInMainWorld('ipcRenderer', ipcRenderer);
+process.once('loaded', () => {
+  exposeElectronTRPC();
+});

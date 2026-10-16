@@ -5,7 +5,7 @@ import {
   type EventHint,
   init as initSentry,
 } from '@sentry/electron/main';
-import { app, type BrowserWindow, ipcMain } from 'electron';
+import { app, type BrowserWindow } from 'electron';
 
 // electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
 // Electron ネイティブの app.isPackaged を使用
@@ -91,47 +91,6 @@ export const initializeMainSentry = () => {
 // アプリ起動時に初期化試行
 initializeMainSentry();
 
-const CHANNELS = {
-  ERROR_MESSAGE: 'error-message',
-  TOAST: 'toast',
-};
-
-/**
- * ipcMain ハンドラを登録し、設定の取得や保存、エラー通知を受け付ける。
- * レンダラープロセスからの通信窓口として初期化時に呼び出される。
- */
-const registerIpcMainListeners = () => {
-  ipcMain.on(CHANNELS.ERROR_MESSAGE, (_, message) => {
-    logger.error({
-      message,
-    });
-  });
-
-  // 設定の取得
-  ipcMain.handle('get-setting', (_, key: string) => {
-    switch (key) {
-      case 'termsAccepted':
-        return settingStore.getTermsAccepted();
-      case 'termsVersion':
-        return settingStore.getTermsVersion();
-      default:
-        return null;
-    }
-  });
-
-  // 設定の保存
-  ipcMain.handle('set-setting', (_, key: string, value: unknown) => {
-    switch (key) {
-      case 'termsAccepted':
-        settingStore.setTermsAccepted(value as boolean);
-        break;
-      case 'termsVersion':
-        settingStore.setTermsVersion(value as string);
-        break;
-    }
-  });
-};
-
 const backgroundUsecase = getBackgroundUsecase(settingStore);
 
 /**
@@ -175,7 +134,6 @@ const initializeApp = async () => {
   // データベースクライアント初期化
   await initializeRDBClient();
 
-  registerIpcMainListeners();
   const mainWindow = await createOrGetMainWindow();
 
   createIPCHandler({

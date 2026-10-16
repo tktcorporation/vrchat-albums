@@ -1,34 +1,10 @@
 /**
- * Electron IPC型定義
+ * ビルド時に注入されるグローバル定数の型定義。
  *
- * Note: 初期化進捗(initProgress)はtRPC subscriptionに移行したため、
- * ここでは定義していない。
- *
- * @see src/v2/hooks/useInitProgress.ts - tRPC subscription使用
+ * preload が公開する `window.Main` / `window.electronTRPC` の型は electron/preload.ts にある。
  */
 export type {};
 
 declare global {
   const __SENTRY_RELEASE__: string;
-
-  interface Window {
-    MyOn?: {
-      receiveStatusToUseVRChatLogFilesDir: (
-        callback: (
-          data:
-            | 'ready'
-            | 'logFilesDirNotSet'
-            | 'logFilesNotFound'
-            | 'logFileDirNotFound',
-        ) => void,
-      ) => () => void;
-      receiveVRChatPhotoDirWithError: (
-        callback: (data: {
-          storedPath: string | null;
-          path: string;
-          error: null | 'photoYearMonthDirsNotFound' | 'photoDirReadError';
-        }) => void,
-      ) => () => void;
-    };
-  }
 }
