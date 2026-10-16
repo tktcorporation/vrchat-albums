@@ -10,6 +10,7 @@ import type {
   ProgressStage,
   RunStage,
 } from '../../../electron/module/initProgress/schema';
+import { InitProgressPayloadSchema } from '../../../electron/module/initProgress/schema';
 import { trpcReact } from '../../trpc';
 
 export type { InitLaunch, InitProgressDetails, InitRunPayload, InitStats };
@@ -145,7 +146,14 @@ export const useInitProgress = ({ runKind }: UseInitProgressOptions = {}) => {
 
   // tRPC subscriptionで進捗を購読
   trpcReact.subscribeInitProgress.useSubscription(undefined, {
-    onData: (data) => {
+    onData: (raw) => {
+      // trpc-electron の IPC では、同時に走る query や mutation の応答が subscription に漏れて届くことがある
+      // （https://github.com/tktcorporation/vrchat-albums/issues/570）。進捗の形をしていないものは捨てる
+      const parsed = InitProgressPayloadSchema.safeParse(raw);
+      if (!parsed.success) {
+        return;
+      }
+      const data = parsed.data;
       // ready は接続完了の通知で、実行の進捗ではない
       if (data.stage === 'ready') {
         return;
