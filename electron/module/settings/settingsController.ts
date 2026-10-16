@@ -2,8 +2,6 @@ import { Cause, Effect, Exit, Option } from 'effect';
 import type { UpdateCheckResult } from 'electron-updater';
 import { match, P } from 'ts-pattern';
 
-import { runEffect } from '../../lib/effectTRPC';
-import { toUserFacing } from '../../lib/errorMapping';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -11,23 +9,12 @@ import {
 } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
-import type { OpenPathFailed } from '../electronUtil/errors';
-import * as electronUtilService from '../electronUtil/service';
 import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
 import { procedure, router as trpcRouter } from './../../trpc';
 import * as settingService from './service';
-
-/**
- * OpenPathFailed → UserFacingError 変換ヘルパー（ログフォルダ専用メッセージ）。
- */
-const mapOpenPathErrorForSettings = toUserFacing<OpenPathFailed>({
-  code: ERROR_CODES.FILE_NOT_FOUND,
-  category: ERROR_CATEGORIES.FILE_NOT_FOUND,
-  userMessage: (e) => `ログフォルダを開けませんでした: ${e.message}`,
-});
 
 // 初期化処理の重複実行を防ぐためのフラグ
 let isInitializing = false;
@@ -66,10 +53,6 @@ export const settingsRouter = () =>
       const version = settingService.getAppVersion();
       return version;
     }),
-    isDatabaseReady: procedure.query(() => {
-      const appVersion = settingService.getAppVersion();
-      return sequelizeClient.checkMigrationRDBClient(appVersion);
-    }),
     checkForUpdatesAndReturnResult: procedure.query(
       async (): Promise<{
         isUpdateAvailable: boolean;
@@ -87,15 +70,6 @@ export const settingsRouter = () =>
         };
       },
     ),
-    openApplicationLogInExploler: procedure.mutation(() => {
-      const logPath = electronUtilService.getApplicationLogPath();
-      logger.debug('openApplicationLogInExploler', logPath);
-      return runEffect(
-        electronUtilService
-          .openPathInExplorer(logPath)
-          .pipe(Effect.mapError(mapOpenPathErrorForSettings)),
-      );
-    }),
     throwErrorForSentryTest: procedure.mutation(async () => {
       logger.debug('Throwing test error for Sentry integration');
       const sentryTestError = new Error(

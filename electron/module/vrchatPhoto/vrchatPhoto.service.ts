@@ -598,19 +598,6 @@ export const setVRChatPhotoDirPathToSettingStore = (
 };
 
 /**
- * VRChat の写真が保存されている場所をクリアする
- */
-export const clearVRChatPhotoDirPathInSettingStore = () => {
-  const settingStore = getSettingStore();
-  const either = Effect.runSync(
-    Effect.either(settingStore.clearStoredSetting('vrchatPhotoDir')),
-  );
-  if (either._tag === 'Left') {
-    throw either.left;
-  }
-};
-
-/**
  * VRChat の写真の保存場所を取得する（デフォルトフォールバック付き）
  *
  * ユーザーが明示的に設定していない場合は ~/Pictures/VRChat をデフォルトとして返す。
@@ -1398,24 +1385,6 @@ export const getVRChatPhotoPathList = async (query?: {
   offset?: number;
 }) => {
   return model.getVRChatPhotoPathList(query);
-};
-
-/**
- * 写真の総件数を取得する（ページネーション用）
- */
-export const getVRChatPhotoPathCount = async (query?: {
-  gtPhotoTakenAt?: Date;
-  ltPhotoTakenAt?: Date;
-}) => {
-  return model.getVRChatPhotoPathCount(query);
-};
-
-/**
- * 月別の写真枚数を取得する
- * 統計情報としてフロントエンドへ返す
- */
-export const getCountByYearMonthList = async () => {
-  return model.getCountByYearMonthList();
 };
 
 /**

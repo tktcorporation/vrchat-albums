@@ -1,11 +1,8 @@
 import {
   type CreationOptional,
-  col,
   DataTypes,
-  fn,
   type InferAttributes,
   type InferCreationAttributes,
-  literal,
   Model,
   Op,
 } from '@sequelize/core';
@@ -129,23 +126,6 @@ export const getVRChatPhotoPathList = async (query?: {
 };
 
 /**
- * 写真の総件数を取得する（ページネーション用）
- */
-export const getVRChatPhotoPathCount = async (query?: {
-  gtPhotoTakenAt?: Date;
-  ltPhotoTakenAt?: Date;
-}): Promise<number> => {
-  return VRChatPhotoPathModel.count({
-    where: {
-      photoTakenAt: {
-        ...(query?.gtPhotoTakenAt && { [Op.gt]: query.gtPhotoTakenAt }),
-        ...(query?.ltPhotoTakenAt && { [Op.lt]: query.ltPhotoTakenAt }),
-      },
-    },
-  });
-};
-
-/**
  * photoPath の完全一致でレコードを取得する
  */
 export const getVRChatPhotoPathByPhotoPath = async (
@@ -164,43 +144,6 @@ export const deleteVRChatPhotoPathModel = async (
   photoPathModel: VRChatPhotoPathModel,
 ): Promise<void> => {
   await photoPathModel.destroy();
-};
-
-/**
- * 写真枚数を年月単位で集計する
- * vrchatPhotoRouter から統計情報として提供
- */
-export const getCountByYearMonthList = async (): Promise<
-  {
-    photoTakenYear: number;
-    photoTakenMonth: number;
-    photoCount: number;
-  }[]
-> => {
-  const countResult = await VRChatPhotoPathModel.findAll({
-    attributes: [
-      [fn('strftime', '%Y-%m', col('photoTakenAt')), 'yearMonth'],
-      [fn('COUNT', col('id')), 'photoCount'],
-    ],
-    group: [literal('yearMonth')],
-    order: [[literal('yearMonth'), 'DESC']],
-  });
-
-  const converted = countResult.map((record) => ({
-    yearMonth: record.get('yearMonth'),
-    photoCount: record.get('photoCount'),
-  }));
-
-  return converted.map(({ yearMonth, photoCount }) => {
-    if (typeof yearMonth !== 'string') {
-      throw new TypeError(`assertion error: ${String(yearMonth)}`);
-    }
-    const [year, month] = yearMonth.split('-').map(Number);
-    if (typeof photoCount !== 'number') {
-      throw new TypeError(`assertion error: ${String(photoCount)}`);
-    }
-    return { photoTakenYear: year, photoTakenMonth: month, photoCount };
-  });
 };
 
 /** 最新の写真レコードを取得する */

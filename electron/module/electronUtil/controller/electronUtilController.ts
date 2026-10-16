@@ -1,8 +1,6 @@
-import { Transformer } from '@napi-rs/image';
 import consola from 'consola';
 import * as datefns from 'date-fns';
 import { Effect, Exit } from 'effect';
-import * as path from 'pathe';
 import z from 'zod';
 
 import { reloadMainWindow } from '../../../electronUtil';
@@ -44,21 +42,9 @@ export const electronUtilRouter = () =>
       consola.log('reloadWindow');
       reloadMainWindow();
     }),
-    getVRChatPhotoItemData: procedure.input(z.string()).query(async (ctx) => {
-      const { readFile } = await import('node:fs/promises');
-      const fileData = await readFile(ctx.input);
-      const photoBuf = await new Transformer(fileData).resize(256).png();
-      return `data:image/${path
-        .extname(ctx.input)
-        .replace('.', '')};base64,${Buffer.from(photoBuf).toString('base64')}`;
-    }),
     copyTextToClipboard: procedure.input(z.string()).mutation(async (ctx) => {
       await getClipboard().writeText(ctx.input);
       eventEmitter.emit('toast', 'copied');
-    }),
-    copyImageDataByPath: procedure.input(z.string()).mutation(async (ctx) => {
-      await Effect.runPromise(utilsService.copyImageDataByPath(ctx.input));
-      return true;
     }),
     /**
      * 単一の画像ファイルパスをクリップボードにコピーする
@@ -70,25 +56,6 @@ export const electronUtilRouter = () =>
       );
       return true;
     }),
-    downloadImageAsPng: procedure
-      .input(
-        z.object({
-          pngBase64: z.string(),
-          filenameWithoutExt: z.string(),
-        }),
-      )
-      .mutation(({ input }) =>
-        runEffect(
-          utilsService.downloadImageAsPng(input).pipe(
-            Effect.map(() => true as const),
-            // ユーザーキャンセルは silent → false を返す
-            Effect.catchTag('OperationCanceled', () =>
-              Effect.succeed(false as const),
-            ),
-            Effect.mapError(mapToFileOperationError),
-          ),
-        ),
-      ),
     downloadImageAsPhotoLogPng: procedure
       .input(
         z.object({
@@ -180,16 +147,6 @@ export const electronUtilRouter = () =>
     getDownloadsPath: procedure.query(async () => {
       return utilsService.getDownloadsPath();
     }),
-    openPathWithAssociatedApp: procedure
-      .input(z.string())
-      .mutation(({ input }) =>
-        runEffect(
-          utilsService.openPathWithAssociatedApp(input).pipe(
-            Effect.map(() => true as const),
-            Effect.mapError(mapToOpenPathError),
-          ),
-        ),
-      ),
     /**
      * 複数の画像ファイルパスをクリップボードにコピーする
      * 画像データではなく、ファイルパスそのものをコピーします

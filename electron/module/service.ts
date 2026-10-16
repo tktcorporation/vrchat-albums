@@ -35,20 +35,6 @@ export const getVRChatLogFilesDir = (): Effect.Effect<
   );
 };
 
-/** 指定したキーの設定を削除する */
-export const clearStoredSetting = (
-  key: Parameters<ReturnType<typeof getSettingStore>['clearStoredSetting']>[0],
-) => {
-  const settingStore = getSettingStore();
-  return settingStore.clearStoredSetting(key);
-};
-
-/** OS のエクスプローラーでファイルを開く */
-export const openPathOnExplorer = (filePath: string) => {
-  logger.debug(`openPathOnExplorer ${filePath}`);
-  return openPathInExplorer(filePath);
-};
-
 /** アプリのログフォルダをエクスプローラーで開く */
 export const openElectronLogOnExplorer = () => {
   const electronLogPath = logger.electronLogFilePath;

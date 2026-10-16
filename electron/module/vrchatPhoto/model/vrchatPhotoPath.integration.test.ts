@@ -6,7 +6,6 @@ import * as client from '../../../lib/sequelize';
 import {
   createOrUpdateListVRChatPhotoPath,
   getVRChatPhotoMetadataList,
-  getVRChatPhotoPathCount,
   getVRChatPhotoPathList,
   getVRChatPhotoPathsByIds,
 } from './vrchatPhotoPath.model';
@@ -15,7 +14,6 @@ import {
  * VRChatPhotoPath モデル関数のインテグレーションテスト
  *
  * ハイブリッドローディングに必要なモデル関数のテスト:
- * - getVRChatPhotoPathCount: ページネーション用のカウント
  * - getVRChatPhotoMetadataList: 軽量メタデータ取得（初回クエリ）
  * - getVRChatPhotoPathsByIds: IDでオンデマンドバッチ取得
  */
@@ -45,50 +43,6 @@ describe('VRChatPhotoPath Model Integration Tests', () => {
     }));
     return createOrUpdateListVRChatPhotoPath(photos);
   };
-
-  describe('getVRChatPhotoPathCount', () => {
-    it('テーブルが空の場合は0を返す', async () => {
-      const count = await getVRChatPhotoPathCount();
-      expect(count).toBe(0);
-    });
-
-    it('写真の総件数を正しく返す', async () => {
-      await createTestPhotos(5);
-      const count = await getVRChatPhotoPathCount();
-      expect(count).toBe(5);
-    });
-
-    it('gtPhotoTakenAt フィルタで件数を正しく返す', async () => {
-      const baseDate = new Date('2024-01-15T10:00:00');
-      await createTestPhotos(5, baseDate); // 10:00, 11:00, 12:00, 13:00, 14:00
-
-      const count = await getVRChatPhotoPathCount({
-        gtPhotoTakenAt: new Date('2024-01-15T11:30:00'), // 12:00, 13:00, 14:00 が対象
-      });
-      expect(count).toBe(3);
-    });
-
-    it('ltPhotoTakenAt フィルタで件数を正しく返す', async () => {
-      const baseDate = new Date('2024-01-15T10:00:00');
-      await createTestPhotos(5, baseDate);
-
-      const count = await getVRChatPhotoPathCount({
-        ltPhotoTakenAt: new Date('2024-01-15T12:30:00'), // 10:00, 11:00, 12:00 が対象
-      });
-      expect(count).toBe(3);
-    });
-
-    it('両方のフィルタを組み合わせて件数を正しく返す', async () => {
-      const baseDate = new Date('2024-01-15T10:00:00');
-      await createTestPhotos(5, baseDate);
-
-      const count = await getVRChatPhotoPathCount({
-        gtPhotoTakenAt: new Date('2024-01-15T10:30:00'),
-        ltPhotoTakenAt: new Date('2024-01-15T13:30:00'), // 11:00, 12:00, 13:00 が対象
-      });
-      expect(count).toBe(3);
-    });
-  });
 
   describe('getVRChatPhotoMetadataList', () => {
     it('テーブルが空の場合は空配列を返す', async () => {
