@@ -39,6 +39,9 @@ export type RunStage = z.infer<typeof RunStageSchema>;
  */
 const ProgressUnitSchema = z.enum(['files', 'logs', 'photos']);
 
+/** ローカルタイム基準の撮影月 `YYYY-MM` */
+const YearMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
+
 /**
  * ステージ内の実件数。`current` は `total` を超えない。
  */
@@ -50,20 +53,14 @@ export const InitProgressDetailsSchema = z
     total: z.number().int().min(0),
     /** 数えている対象 */
     unit: ProgressUnitSchema,
-    /**
-     * 処理中の対象を表す翻訳不要のデータ。
-     * photo_index では処理中の写真の撮影月（`YYYY-MM`）を入れる。
-     */
-    currentItem: z.string().min(1).optional(),
+    /** photo_index で処理中の写真の撮影月（`YYYY-MM`）。画面はこの月を強調する */
+    currentItem: YearMonthSchema.optional(),
   })
   .strict()
   .refine((d) => d.current <= d.total, {
     message: 'current must not exceed total',
   });
 export type InitProgressDetails = z.infer<typeof InitProgressDetailsSchema>;
-
-/** `YYYY-MM`（ローカルタイム基準の撮影月） */
-const YearMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 /**
  * DB に登録済みのデータから数えた累計。インデックス中に登録された写真も含む。

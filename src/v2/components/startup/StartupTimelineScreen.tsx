@@ -303,7 +303,8 @@ export const StartupTimelineScreen = ({
             </div>
             <span
               className={cn(
-                'min-h-[1lh] tabular-nums',
+                // 区切りの空白を詰めずに表示する（文言側で項目の間を空白で区切っている）
+                'min-h-[1lh] whitespace-pre tabular-nums',
                 TYPOGRAPHY.body.primary,
                 TEXT_COLOR.secondary,
               )}
@@ -315,7 +316,7 @@ export const StartupTimelineScreen = ({
 
           <p
             className={cn(
-              'min-h-[1lh]',
+              'min-h-[1lh] whitespace-pre tabular-nums',
               TYPOGRAPHY.body.secondary,
               TEXT_COLOR.secondary,
             )}

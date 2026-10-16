@@ -117,7 +117,7 @@ export const reduceInitProgress = (
  *
  * 起動画面は `startup` だけを見る。起動画面の表示中に単独のログ同期がロックを持っていると、
  * subscription の接続時にその同期の現在地が再送されるが、それで起動画面の進捗や
- * 「準備ができました」を動かさないため。起動後の同期で起動画面の状態が更新され続けることも防ぐ。
+ * 「完了」を動かさないため。起動後の同期で起動画面の状態が更新され続けることも防ぐ。
  */
 export const applyInitProgressEvent = (
   state: InitProgressState,

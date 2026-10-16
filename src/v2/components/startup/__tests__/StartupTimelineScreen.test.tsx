@@ -36,7 +36,7 @@ describe('StartupTimelineScreen', () => {
     useI18n.setState({ language: 'ja' });
   });
 
-  it('初回起動では写真を年ごとに並べる見出しを出し、統計が届く前は累計の文を出さない', () => {
+  it('初回起動では初回の読み込みと分かる見出しを出し、統計が届く前は累計の文を出さない', () => {
     render(
       <StartupTimelineScreen
         runStage="photo_index"
@@ -49,12 +49,12 @@ describe('StartupTimelineScreen', () => {
       />,
     );
     expect(screen.getByTestId('startup-headline').textContent).toBe(
-      'これまでの写真を、年ごとに並べています',
+      'はじめての読み込み',
     );
     expect(screen.getByTestId('startup-summary').textContent).toBe('');
   });
 
-  it('差分読み込みでは前回からの写真を足す見出しと、累計の文を出す', () => {
+  it('差分読み込みでは新しい写真を読み込む見出しと、累計の文を出す', () => {
     render(
       <StartupTimelineScreen
         runStage="log_append"
@@ -67,10 +67,10 @@ describe('StartupTimelineScreen', () => {
       />,
     );
     expect(screen.getByTestId('startup-headline').textContent).toBe(
-      '前回からの写真を足しています',
+      '新しい写真を読み込んでいます',
     );
     expect(screen.getByTestId('startup-summary').textContent).toBe(
-      '312 のワールドで、1,204 人と撮った 8,900 枚',
+      '写真 8,900枚　ワールド 312　プレイヤー 1,204人',
     );
     expect(screen.getByTestId('progress-detail').textContent).toBe(
       '12 / 128 ファイル',
@@ -93,7 +93,7 @@ describe('StartupTimelineScreen', () => {
       />,
     );
     expect(screen.getByTestId('startup-headline').textContent).toBe(
-      '写真とログを読み直しています',
+      'すべて読み込み直しています',
     );
   });
 
@@ -109,9 +109,7 @@ describe('StartupTimelineScreen', () => {
         currentMonth="2025-04"
       />,
     );
-    expect(screen.getByTestId('startup-headline').textContent).toBe(
-      'アルバムを準備しています',
-    );
+    expect(screen.getByTestId('startup-headline').textContent).toBe('起動中');
     const tones = sectorTones();
     expect(tones).toHaveLength(12);
     expect(tones.slice(0, 4).every(([, t]) => t === 'empty')).toBe(true);
@@ -142,7 +140,7 @@ describe('StartupTimelineScreen', () => {
     expect(screen.getByTestId('startup-center-year').textContent).toBe('2025');
     expect(screen.getByTestId('startup-center-month').textContent).toBe('3月');
     expect(screen.getByTestId('progress-detail').textContent).toBe(
-      '2025年3月の写真　160 / 400 枚',
+      '2025年3月　160 / 400枚',
     );
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe(
       '60',
@@ -166,9 +164,7 @@ describe('StartupTimelineScreen', () => {
         currentMonth="2025-04"
       />,
     );
-    expect(screen.getByTestId('progress-message').textContent).toBe(
-      '準備ができました',
-    );
+    expect(screen.getByTestId('progress-message').textContent).toBe('完了');
     expect(screen.getByTestId('progress-detail').textContent).toBe('');
     expect(monthsWithTone('current')).toEqual([]);
   });
@@ -193,7 +189,7 @@ describe('StartupTimelineScreen', () => {
     expect(status.contains(screen.getByTestId('startup-summary'))).toBe(false);
     // 図は 1 枚の画像として名前だけを読み上げる
     expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
-      '年ごとの輪に並べた、撮影月ごとの写真の枚数',
+      '撮影月ごとの写真の枚数（1 年ごとに 1 つの輪）',
     );
   });
 
@@ -216,10 +212,10 @@ describe('StartupTimelineScreen', () => {
       />,
     );
     expect(screen.getByTestId('startup-headline').textContent).toBe(
-      'Arranging your photos year by year',
+      'First-time load',
     );
     expect(screen.getByTestId('startup-summary').textContent).toBe(
-      '8,900 photos taken with 1,204 people across 312 worlds',
+      '8,900 photos   312 worlds   1,204 players',
     );
     expect(screen.getByTestId('startup-center-month').textContent).toBe('Mar');
   });

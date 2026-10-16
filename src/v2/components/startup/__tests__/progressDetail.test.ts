@@ -21,20 +21,20 @@ describe('formatProgressDetail', () => {
       currentItem: '2024-08',
     } as const;
     expect(formatProgressDetail(details, 'ja', jaTemplates)).toBe(
-      '2024年8月の写真　3,412 / 8,900 枚',
+      '2024年8月　3,412 / 8,900枚',
     );
     expect(formatProgressDetail(details, 'en', enTemplates)).toBe(
-      'Aug 2024: 3,412 of 8,900 photos',
+      'Aug 2024   3,412 / 8,900',
     );
   });
 
   it('撮影月が無ければ枚数だけを出す', () => {
     const details = { current: 3412, total: 8900, unit: 'photos' } as const;
     expect(formatProgressDetail(details, 'ja', jaTemplates)).toBe(
-      '3,412 / 8,900 枚',
+      '3,412 / 8,900枚',
     );
     expect(formatProgressDetail(details, 'en', enTemplates)).toBe(
-      '3,412 of 8,900 photos',
+      '3,412 / 8,900 photos',
     );
   });
 
@@ -45,7 +45,7 @@ describe('formatProgressDetail', () => {
       unit: 'photos',
       currentItem: 'unknown',
     } as const;
-    expect(formatProgressDetail(details, 'ja', jaTemplates)).toBe('1 / 2 枚');
+    expect(formatProgressDetail(details, 'ja', jaTemplates)).toBe('1 / 2枚');
   });
 
   it('ログファイルはファイル数で出す', () => {
@@ -54,7 +54,7 @@ describe('formatProgressDetail', () => {
       '12 / 128 ファイル',
     );
     expect(formatProgressDetail(details, 'en', enTemplates)).toBe(
-      '12 of 128 files',
+      '12 / 128 files',
     );
   });
 
@@ -64,7 +64,7 @@ describe('formatProgressDetail', () => {
       '1,500 / 20,000 件',
     );
     expect(formatProgressDetail(details, 'en', enTemplates)).toBe(
-      '1,500 of 20,000 records',
+      '1,500 / 20,000 records',
     );
   });
 
@@ -94,10 +94,10 @@ describe('formatStatsSummary', () => {
   it('累計を桁区切り付きの 1 文にする', () => {
     expect(
       formatStatsSummary(stats, 'ja', ja.initProgress.timeline.summary),
-    ).toBe('312 のワールドで、1,204 人と撮った 8,900 枚');
+    ).toBe('写真 8,900枚　ワールド 312　プレイヤー 1,204人');
     expect(
       formatStatsSummary(stats, 'en', en.initProgress.timeline.summary),
-    ).toBe('8,900 photos taken with 1,204 people across 312 worlds');
+    ).toBe('8,900 photos   312 worlds   1,204 players');
   });
 
   it('統計が届く前と、写真がまだ 0 枚の間は何も出さない', () => {
