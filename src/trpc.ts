@@ -1,4 +1,4 @@
-import { createTRPCProxyClient } from '@trpc/client';
+import { createTRPCClient } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
 import superjson from 'superjson';
 import { ipcLink } from 'trpc-electron/renderer';
@@ -14,14 +14,13 @@ import type { AppRouter } from '../electron/api';
 export const trpcReact = createTRPCReact<AppRouter>();
 
 /**
- * Reactのライフサイクル外 (例: イベントハンドラ、コールバック関数、Sentryの`beforeSend`のような純粋なJS関数内)で
- * tRPCプロシージャを命令的に呼び出すためのプレーンなクライアント。
- * Reactフックを使用せず、直接 `.query()` や `.mutate()` メソッドを呼び出してデータを操作します。
- * バックグラウンド処理や特定のタイミングでのデータ操作が主目的の場合に適しています。
+ * メインプロセスと IPC で通信する唯一の tRPC クライアント。`TrpcWrapper` が `trpcReact` の Provider にも
+ * この同じインスタンスを渡す。
  *
- * `trpcReact` と `trpcClient` は同じ `AppRouter` と `transformer` (`superjson`) を共有し、
- * `ipcLink` を通じてメインプロセスと通信します。
+ * trpc-electron は応答をリクエスト ID で呼び出し元へ振り分け、ID はクライアントごとに 1 から数える。
+ * クライアントを 2 つ作ると、同時に走ったリクエストの ID が重なり、別のリクエストの応答（失敗が成功に見えるものを含む）が
+ * 届いてしまう。React の外（Sentry の `beforeSend` など）から命令的に呼ぶときも、このインスタンスを使う。
  */
-export const trpcClient = createTRPCProxyClient<AppRouter>({
+export const trpcClient = createTRPCClient<AppRouter>({
   links: [ipcLink({ transformer: superjson })],
 });
