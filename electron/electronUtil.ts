@@ -93,7 +93,18 @@ const hardenWebContents = (
       .exhaustive();
   };
   webContents.on('will-navigate', guardNavigation);
-  webContents.on('will-redirect', guardNavigation);
+  webContents.on('will-redirect', (event) => {
+    // will-redirect はサブフレームでも発火する。アプリは iframe を持たないため、
+    // サブフレームのリダイレクトは外部ブラウザへも回さずに止める
+    if (!event.isMainFrame) {
+      event.preventDefault();
+      logger.warn({
+        message: `Blocked subframe redirect: ${event.url}`,
+      });
+      return;
+    }
+    guardNavigation(event);
+  });
 
   // target="_blank" や window.open。アプリ内に新しいウィンドウは作らない
   webContents.setWindowOpenHandler(({ url }) => {
