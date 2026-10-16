@@ -42,15 +42,6 @@ type DisplayMetricsError =
   | { code: 'BOUNDS_ADJUSTMENT_FAILED'; message: string };
 
 /**
- * ウィンドウの webContents に、アプリ外への遷移・ウィンドウ生成・権限要求を
- * 塞ぐガードを登録する。
- *
- * レンダラーに外部由来の文字列（VRChat のログから読んだワールド名やプレイヤー名など）が入り込んでも、
- * ウィンドウがアプリ外のページを読み込んだり、OS のスキームハンドラを起動したりしない
- * ようにする。許可するのは、アプリ本体への遷移と、checkExternalUrl が許可した URL を
- * 既定のブラウザで開くことだけ。
- */
-/**
  * 許可済みの URL を既定のブラウザで開く。開けなかった場合（スキームに対応するアプリが無い等）は
  * ナビゲーションのイベントハンドラ内で拾える呼び出し元が無いため、ログに残す。
  */
@@ -63,6 +54,15 @@ const openAllowedExternalUrl = (url: string): void => {
   });
 };
 
+/**
+ * ウィンドウの webContents に、アプリ外への遷移・ウィンドウ生成・権限要求を
+ * 塞ぐガードを登録する。
+ *
+ * レンダラーに外部由来の文字列（VRChat のログから読んだワールド名やプレイヤー名など）が入り込んでも、
+ * ウィンドウがアプリ外のページを読み込んだり、OS のスキームハンドラを起動したりしない
+ * ようにする。許可するのは、アプリ本体への遷移と、checkExternalUrl が許可した URL を
+ * 既定のブラウザで開くことだけ。
+ */
 const hardenWebContents = (
   browserWindow: BrowserWindow,
   appEntry: AppEntry,
