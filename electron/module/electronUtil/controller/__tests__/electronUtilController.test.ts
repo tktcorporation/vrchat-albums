@@ -5,6 +5,7 @@ import { Effect } from 'effect';
 import * as path from 'pathe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { eventEmitter } from '../../../../trpc';
 import { electronUtilRouter } from '../electronUtilController';
 
 const normalizePath = (p: string) => p.replaceAll('\\', '/');
@@ -63,6 +64,7 @@ describe('electronUtilController', () => {
     vi.mocked(fs.copyFile).mockResolvedValue(undefined);
     vi.mocked(fs.rm).mockResolvedValue(undefined);
     mockExifTool.writeDateTimeWithTimezone.mockReturnValue(Effect.void);
+    vi.spyOn(eventEmitter, 'emit');
   });
 
   describe('downloadImageAsPhotoLogPng', () => {
@@ -94,6 +96,10 @@ describe('electronUtilController', () => {
         normalizePath(expectedTempPath),
       );
       expect(normalizePath(copyDest.toString())).toBe(normalizePath(savePath));
+      expect(
+        mockExifTool.writeDateTimeWithTimezone.mock.invocationCallOrder[0],
+      ).toBeLessThan(vi.mocked(fs.copyFile).mock.invocationCallOrder[0]);
+      expect(eventEmitter.emit).toHaveBeenCalledWith('toast', 'downloaded');
 
       expect(fs.rm).toHaveBeenCalledWith(tempDir, {
         recursive: true,
@@ -109,6 +115,7 @@ describe('electronUtilController', () => {
       expect(fs.writeFile).toHaveBeenCalledOnce();
       expect(mockExifTool.writeDateTimeWithTimezone).not.toHaveBeenCalled();
       expect(fs.copyFile).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('toast', 'downloaded');
       expect(fs.rm).toHaveBeenCalledWith(tempDir, {
         recursive: true,
         force: true,
@@ -122,7 +129,10 @@ describe('electronUtilController', () => {
       });
       vi.mocked(fs.copyFile).mockRejectedValue(new Error('Write error'));
 
-      await expect(callDownload()).rejects.toThrow();
+      await expect(callDownload()).rejects.toThrow('Write error');
+
+      expect(fs.copyFile).toHaveBeenCalledOnce();
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('toast', 'downloaded');
 
       expect(fs.rm).toHaveBeenCalledWith(tempDir, {
         recursive: true,

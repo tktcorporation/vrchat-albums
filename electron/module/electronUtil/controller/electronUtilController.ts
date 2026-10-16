@@ -1,8 +1,6 @@
-import { Transformer } from '@napi-rs/image';
 import consola from 'consola';
 import * as datefns from 'date-fns';
 import { Effect, Exit } from 'effect';
-import * as path from 'pathe';
 import z from 'zod';
 
 import { reloadMainWindow } from '../../../electronUtil';
@@ -43,14 +41,6 @@ export const electronUtilRouter = () =>
     reloadWindow: procedure.mutation(async () => {
       consola.log('reloadWindow');
       reloadMainWindow();
-    }),
-    getVRChatPhotoItemData: procedure.input(z.string()).query(async (ctx) => {
-      const { readFile } = await import('node:fs/promises');
-      const fileData = await readFile(ctx.input);
-      const photoBuf = await new Transformer(fileData).resize(256).png();
-      return `data:image/${path
-        .extname(ctx.input)
-        .replace('.', '')};base64,${Buffer.from(photoBuf).toString('base64')}`;
     }),
     copyTextToClipboard: procedure.input(z.string()).mutation(async (ctx) => {
       await getClipboard().writeText(ctx.input);

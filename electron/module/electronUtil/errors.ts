@@ -19,23 +19,6 @@ export class FileCopyFailed extends Data.TaggedError('FileCopyFailed')<{
   message: string;
 }> {}
 
-/** ファイル削除に失敗 */
-export class FileDeleteFailed extends Data.TaggedError('FileDeleteFailed')<{
-  message: string;
-}> {}
-
-/** ファイル書き込みに失敗 */
-export class FileWriteFailed extends Data.TaggedError('FileWriteFailed')<{
-  message: string;
-}> {}
-
-/** 一時ディレクトリ作成に失敗 */
-export class TempDirCreateFailed extends Data.TaggedError(
-  'TempDirCreateFailed',
-)<{
-  message: string;
-}> {}
-
 /** 権限不足 */
 export class PermissionDenied extends Data.TaggedError('PermissionDenied')<{
   message: string;
@@ -63,10 +46,4 @@ export class ExternalUrlNotAllowed extends Data.TaggedError(
 }> {}
 
 /** ファイルI/Oエラーの Union 型 */
-export type FileIOError =
-  | FileCreateFailed
-  | FileCopyFailed
-  | FileDeleteFailed
-  | FileWriteFailed
-  | TempDirCreateFailed
-  | PermissionDenied;
+export type FileIOError = FileCreateFailed | FileCopyFailed | PermissionDenied;
