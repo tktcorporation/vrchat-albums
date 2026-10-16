@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.31.0
+
+### Minor Changes
+
+- [#842](https://github.com/tktcorporation/vrchat-albums/pull/842) [`7846576`](https://github.com/tktcorporation/vrchat-albums/commit/78465766f30ac136074f5626e25437eb4338bfb7) Thanks [@tktcorporation](https://github.com/tktcorporation)! - アプリに同梱する Electron を 44 系へ更新し、Chromium 152・Node.js 24 で動作するようにした。旧版の Electron に残っていた既知の脆弱性が解消される。エラー監視（Sentry）の SDK も新しい版へ更新し、IP アドレス等のユーザー情報を送らない設定を明示した。Electron 44 は macOS 13 以降が必要で、macOS 12 以前では起動できなくなる。
+
+### Patch Changes
+
+- [#839](https://github.com/tktcorporation/vrchat-albums/pull/839) [`e223fb0`](https://github.com/tktcorporation/vrchat-albums/commit/e223fb0139e84267293167a2c089a5128d4f2e7a) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 依存パッケージを semver 互換の範囲で更新し、既知の脆弱性を解消した。アプリに同梱される依存では、自動更新が読む YAML のパーサー（js-yaml）と、設定ファイル検証が使う URI パーサー（fast-uri）の脆弱性を解消した。開発・ビルド用の依存では、shell-quote・brace-expansion・@xmldom/xmldom・browserslist などの脆弱性を解消した。
+
+- [#844](https://github.com/tktcorporation/vrchat-albums/pull/844) [`f1d2626`](https://github.com/tktcorporation/vrchat-albums/commit/f1d26266dc8cf0c10dde76ba8d19caf962647ea1) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真のワールドグループに表示されるプレイヤー一覧とプレイヤー検索の結果が、ギャラリーのワールドの区切りと一致するようになりました。参加時刻が近い別ワールドのプレイヤーが混ざったり、写真から推定したワールド参加で区切られたグループが検索に出なかったりする問題を解消します。
+
 ## 0.30.4
 
 ### Patch Changes
