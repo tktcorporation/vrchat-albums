@@ -1,6 +1,11 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  beginInitProgressRun,
+  endInitProgressRun,
+  hasActiveInitProgressRun,
+} from '../initProgress/emitter';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
 import { LOG_SYNC_MODE, syncLogs } from './service';
@@ -14,8 +19,14 @@ vi.mock('../vrchatLog/vrchatLogController', () => ({
 }));
 
 vi.mock('../initProgress/emitter', () => ({
-  emitProgress: vi.fn(),
-  emitStageStart: vi.fn(),
+  beginInitProgressRun: vi.fn(),
+  emitStageProgress: vi.fn(),
+  endInitProgressRun: vi.fn(),
+  hasActiveInitProgressRun: vi.fn(() => false),
+}));
+
+vi.mock('../initProgress/stats', () => ({
+  flushInitStats: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../worldJoinImage/service', () => ({
@@ -85,5 +96,52 @@ describe('syncLogs', () => {
     ]);
 
     expect(callOrder).toEqual(['append', 'load', 'append', 'load']);
+  });
+
+  describe('進捗ストリームの実行', () => {
+    const succeedLoad = () =>
+      mockLoadLogInfo.mockReturnValue(
+        Effect.succeed([]) as unknown as ReturnType<
+          typeof loadLogInfoIndexFromVRChatLog
+        >,
+      );
+
+    it('単独で呼ばれたときは実行を開始し、成功で completed として終える', async () => {
+      vi.mocked(hasActiveInitProgressRun).mockReturnValue(false);
+      mockAppend.mockResolvedValue(appendResult);
+      succeedLoad();
+
+      await Effect.runPromise(syncLogs(LOG_SYNC_MODE.FULL));
+
+      expect(beginInitProgressRun).toHaveBeenCalledWith({
+        syncMode: 'full',
+        isFirstLaunch: false,
+      });
+      expect(endInitProgressRun).toHaveBeenCalledWith('completed');
+    });
+
+    it('単独で呼ばれて失敗したときは error として終える', async () => {
+      vi.mocked(hasActiveInitProgressRun).mockReturnValue(false);
+      mockAppend.mockRejectedValue(new Error('read failed'));
+
+      await Effect.runPromiseExit(syncLogs(LOG_SYNC_MODE.INCREMENTAL));
+
+      expect(beginInitProgressRun).toHaveBeenCalledWith({
+        syncMode: 'incremental',
+        isFirstLaunch: false,
+      });
+      expect(endInitProgressRun).toHaveBeenCalledWith('error');
+    });
+
+    it('初期化の実行中に呼ばれたときは実行を開始も終了もしない', async () => {
+      vi.mocked(hasActiveInitProgressRun).mockReturnValue(true);
+      mockAppend.mockResolvedValue(appendResult);
+      succeedLoad();
+
+      await Effect.runPromise(syncLogs(LOG_SYNC_MODE.INCREMENTAL));
+
+      expect(beginInitProgressRun).not.toHaveBeenCalled();
+      expect(endInitProgressRun).not.toHaveBeenCalled();
+    });
   });
 });

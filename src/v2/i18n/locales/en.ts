@@ -143,6 +143,18 @@ const en: Translations = {
     lastVisited: 'Last visited',
     recommendedSeason: 'Best season',
   },
+  initProgress: {
+    stage: {
+      database_sync: 'Preparing the database',
+      log_append: 'Reading VRChat log files',
+      log_load: 'Saving log data',
+      photo_index: 'Registering photos',
+      photo_metadata: 'Reading photo details',
+      photo_log_import: 'Reading world visits from photos',
+      completed: 'Loading complete',
+      error: 'Loading failed',
+    },
+  },
   pullToRefresh: {
     pull: 'Pull to refresh',
     release: 'Release to refresh',

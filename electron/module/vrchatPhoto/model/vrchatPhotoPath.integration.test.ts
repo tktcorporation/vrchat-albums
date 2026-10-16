@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import * as client from '../../../lib/sequelize';
 import {
   createOrUpdateListVRChatPhotoPath,
+  getPhotoCountPerLocalMonth,
   getVRChatPhotoMetadataList,
   getVRChatPhotoPathCount,
   getVRChatPhotoPathList,
@@ -259,6 +260,44 @@ describe('VRChatPhotoPath Model Integration Tests', () => {
       });
 
       expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getPhotoCountPerLocalMonth', () => {
+    it('テーブルが空の場合は空配列を返す', async () => {
+      expect(await getPhotoCountPerLocalMonth()).toEqual([]);
+    });
+
+    it('ローカルタイムの撮影月ごとに数え、月の昇順で返す', async () => {
+      // 月末深夜・月初未明の写真は、UTC に直すとタイムゾーンによって隣の月にずれる
+      const takenAtList = [
+        new Date(2024, 7, 31, 23, 30),
+        new Date(2024, 7, 1, 0, 15),
+        new Date(2024, 8, 1, 0, 10),
+        new Date(2023, 11, 15, 12, 0),
+      ];
+      await createOrUpdateListVRChatPhotoPath(
+        takenAtList.map((takenAt) => ({
+          photoPath: `/photos/VRChat_${datefns.format(takenAt, 'yyyy-MM-dd_HH-mm-ss')}.000_1920x1080.png`,
+          photoTakenAt: takenAt,
+          width: 1920,
+          height: 1080,
+        })),
+      );
+
+      expect(await getPhotoCountPerLocalMonth()).toEqual([
+        { month: '2023-12', count: 1 },
+        { month: '2024-08', count: 2 },
+        { month: '2024-09', count: 1 },
+      ]);
+    });
+
+    it('同じ写真を登録し直しても二重に数えない', async () => {
+      await createTestPhotos(3, new Date(2024, 0, 15));
+      await createTestPhotos(3, new Date(2024, 0, 15));
+      expect(await getPhotoCountPerLocalMonth()).toEqual([
+        { month: '2024-01', count: 3 },
+      ]);
     });
   });
 });

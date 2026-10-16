@@ -51,6 +51,13 @@ export const extractMetadataFromPhoto = (
 const PROGRESS_LOG_INTERVAL = 100;
 
 /**
+ * readXmpTagsBatch に 1 回で渡すファイル数。
+ * 1 回の呼び出しの中では進捗を受け取れないため、この単位に分けて呼び、呼び出しごとに進捗を報告する。
+ * Rust 側は呼び出し内で全コア並列に処理するので、数百件あれば並列度は十分に出る。
+ */
+const XMP_READ_CHUNK_SIZE = 500;
+
+/**
  * 複数の写真からメタデータを抽出してDBに保存する
  *
  * 差分処理: 既にメタデータ抽出済みの写真はスキップする。
@@ -60,15 +67,23 @@ const PROGRESS_LOG_INTERVAL = 100;
  * readXmpTagsBatch で Rust 側の Rayon 全コア並列 + 部分読み込みを一発呼びに変更。
  * N-API 境界の往復を N 回→1 回に削減し、I/O もファイルヘッダーだけ読む。
  *
+ * @param options.onProgress 処理済み件数と総件数（= photoPaths.length）を受け取る。
+ *        抽出対象から外した写真（抽出済み・対象外の日付や形式）は処理済みに数える
  * @returns 新たに抽出・保存したメタデータの件数
  */
 export const extractAndSaveMetadataBatch = (
   photoPaths: string[],
+  options?: {
+    onProgress?: (processed: number, total: number) => void;
+  },
 ): Effect.Effect<number, MetadataDbError> =>
   Effect.gen(function* () {
     if (photoPaths.length === 0) {
       return 0;
     }
+    const reportProgress = (processed: number) => {
+      options?.onProgress?.(processed, photoPaths.length);
+    };
 
     // 既にメタデータがある写真をスキップ（SQL側でフィルタ、全件メモリロードを回避）
     const newPaths = yield* Effect.tryPromise({
@@ -109,6 +124,9 @@ export const extractAndSaveMetadataBatch = (
       `Photo metadata: ${targetPaths.length} to extract (${skippedByDb} already in DB, ${skippedByDate} before ${METADATA_CUTOFF_DATE}, ${skippedByExt} unsupported format)`,
     );
 
+    const skippedCount = photoPaths.length - targetPaths.length;
+    reportProgress(skippedCount);
+
     if (targetPaths.length === 0) {
       return 0;
     }
@@ -116,13 +134,26 @@ export const extractAndSaveMetadataBatch = (
     // Rust バッチ呼び出し: Rayon 全コア並列 + 部分読み込みで XMP を抽出。
     // AsyncTask で libuv スレッドプール上で実行するため、メインスレッドをブロックしない。
     logger.info(`Metadata extraction starting: ${targetPaths.length} files`);
-    const batchResults = yield* Effect.tryPromise({
-      try: () => readXmpTagsBatch(targetPaths),
-      catch: (e): MetadataDbError =>
-        new MetadataDbError({
-          message: `readXmpTagsBatch failed: ${e instanceof Error ? e.message : String(e)}`,
-        }),
-    });
+    const batchResults: (
+      | Awaited<ReturnType<typeof readXmpTagsBatch>>[number]
+      | undefined
+    )[] = [];
+    for (let i = 0; i < targetPaths.length; i += XMP_READ_CHUNK_SIZE) {
+      const chunk = targetPaths.slice(i, i + XMP_READ_CHUNK_SIZE);
+      const chunkResults = yield* Effect.tryPromise({
+        try: () => readXmpTagsBatch(chunk),
+        catch: (e): MetadataDbError =>
+          new MetadataDbError({
+            message: `readXmpTagsBatch failed: ${e instanceof Error ? e.message : String(e)}`,
+          }),
+      });
+      // 結果は入力と同じ順序・同じ長さで返る前提で、targetPaths の添字と対応させる。
+      // 欠落したエントリは下のループで「予期しないエラー」として数える
+      for (let j = 0; j < chunk.length; j++) {
+        batchResults.push(chunkResults[j]);
+      }
+      reportProgress(skippedCount + i + chunk.length);
+    }
 
     // Rust の結果を Zod バリデーション付きでパース。
     // JsVrcXmpBatchResult でエラーと「XMP なし」を区別する:

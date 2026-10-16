@@ -8,7 +8,8 @@ import { match } from 'ts-pattern';
 
 import { getDBQueue } from '../../lib/dbQueue';
 import { logger } from '../../lib/logger';
-import { emitProgress, emitStageStart } from '../initProgress/emitter';
+import { emitStageProgress } from '../initProgress/emitter';
+import { requestInitStats } from '../initProgress/stats';
 import type { VRChatLogFileError } from '../vrchatLog/error';
 import type { VRChatLogError } from '../vrchatLog/errors';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../vrchatLog/model';
@@ -30,6 +31,13 @@ import { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLo
 import { findVRChatWorldJoinLogFromPhotoList } from '../vrchatWorldJoinLogFromPhoto/service';
 import { LogInfoError } from './error';
 import { type LogInfoServiceError, LogInfoUnknownError } from './errors';
+
+/**
+ * log_load ステージの進捗のうち、ログストアファイルの読み込みに割り当てる割合（%）。
+ * 残りを DB 書き込みに割り当てる。全件同期では読み込みと書き込みがどちらも件数に比例して時間がかかり、
+ * 書き込みの方が重いため、書き込みに多く割り当てる。
+ */
+const LOG_LOAD_READ_SHARE_PERCENT = 40;
 
 interface LogProcessingResults {
   createdWorldJoinLogModelList: VRChatWorldJoinLogModel[];
@@ -216,6 +224,10 @@ export function loadLogInfoIndexFromVRChatLog({
     const totalStartTime = performance.now();
     logger.info('loadLogInfoIndexFromVRChatLog start');
 
+    // log_load の進捗のうち、DB 書き込みが始まる位置。ログストアの読み込みがあれば
+    // その分（LOG_LOAD_READ_SHARE_PERCENT）を先に使い、無ければ 0 から書き込みに充てる
+    let insertProgressBase = 0;
+
     let logInfoList: ReturnType<
       typeof vrchatLogService.convertLogLinesToWorldAndPlayerJoinLogInfos
     >['logInfos'];
@@ -230,12 +242,7 @@ export function loadLogInfoIndexFromVRChatLog({
       logger.info(
         `Using ${preLoadedLogLines.length} pre-loaded log lines (skipping file read)`,
       );
-      emitProgress({
-        stage: 'log_load',
-        progress: 10,
-        message: 'ログデータを解析しています...',
-        details: { current: 0, total: preLoadedLogLines.length },
-      });
+      emitStageProgress('log_load', 0);
       const parseResult =
         vrchatLogService.convertLogLinesToWorldAndPlayerJoinLogInfos(
           preLoadedLogLines,
@@ -261,18 +268,24 @@ export function loadLogInfoIndexFromVRChatLog({
 
       // 3. ログファイルからログ情報を取得（部分的な成功を許容）
       logger.info(`start log file read: ${logStoreFilePaths.length} files`);
-      emitProgress({
-        stage: 'log_load',
-        progress: 10,
-        message: 'ログストアファイルを読み込んでいます...',
-        details: { current: 0, total: logStoreFilePaths.length },
-      });
+      const reportFilesRead = (filesRead: number, totalFiles: number) => {
+        emitStageProgress(
+          'log_load',
+          totalFiles > 0
+            ? (filesRead / totalFiles) * LOG_LOAD_READ_SHARE_PERCENT
+            : LOG_LOAD_READ_SHARE_PERCENT,
+          { current: filesRead, total: totalFiles, unit: 'files' },
+        );
+      };
+      reportFilesRead(0, logStoreFilePaths.length);
       const getLogInfoStartTime = performance.now();
       // この関数は never エラーなので常に成功
       const logInfoListFromLogFile =
         yield* vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess(
           logStoreFilePaths,
+          { onFilesRead: reportFilesRead },
         );
+      insertProgressBase = LOG_LOAD_READ_SHARE_PERCENT;
       const getLogInfoEndTime = performance.now();
       logger.info(
         `done log file read: ${(getLogInfoEndTime - getLogInfoStartTime).toFixed(0)} ms`,
@@ -394,7 +407,17 @@ export function loadLogInfoIndexFromVRChatLog({
     logger.info(
       `start DB batch insert: ${newLogs.length} logs (${totalBatches} batches)`,
     );
-    emitStageStart('log_load', 'ログデータをDBに書き込み中...', newLogs.length);
+    const reportLogsInserted = (inserted: number) => {
+      emitStageProgress(
+        'log_load',
+        newLogs.length > 0
+          ? insertProgressBase +
+              (inserted / newLogs.length) * (100 - insertProgressBase)
+          : 100,
+        { current: inserted, total: newLogs.length, unit: 'logs' },
+      );
+    };
+    reportLogsInserted(0);
 
     // DB Queue の transaction() を使い、書き込みをキュー経由でシリアライズする。
     // Sequelize の managed transaction により自動 commit/rollback される。
@@ -442,16 +465,8 @@ export function loadLogInfoIndexFromVRChatLog({
           results.createdPlayerLeaveLogModelList.push(...playerLeaveResults);
 
           // 進捗をUIプログレスバーに反映（毎バッチ）
-          const current = i + batch.length;
-          emitProgress({
-            stage: 'log_load',
-            progress:
-              newLogs.length > 0
-                ? Math.round((current / newLogs.length) * 100)
-                : 0,
-            message: `ログデータを処理中... (${batchNumber}/${totalBatches})`,
-            details: { current, total: newLogs.length },
-          });
+          reportLogsInserted(i + batch.length);
+          logger.debug(`log batch inserted: ${batchNumber}/${totalBatches}`);
         }
       }, 'logInfo.batchInsert')
       .pipe(Effect.orDie);
@@ -459,22 +474,39 @@ export function loadLogInfoIndexFromVRChatLog({
     logger.info(
       `done DB batch insert: ${(batchProcessEndTime - batchProcessStartTime).toFixed(0)} ms`,
     );
+    // 書き込みが 0 件でもステージを完了させる（コミット後なのでワールド数・人数も更新できる）
+    reportLogsInserted(newLogs.length);
+    requestInitStats();
 
     // 6. 写真のインデックス処理
     // excludeOldLogLoad=true → 差分スキャン（ダイジェスト・mtime使用）
     // excludeOldLogLoad=false → フルスキャン
     logger.info('start photo index creation');
-    emitStageStart('photo_index', '写真をインデックス中...');
+    emitStageProgress('photo_index', 0);
     const photoIndexStartTime = performance.now();
     const photoResults = yield* Effect.promise(() =>
-      vrchatPhotoService.createVRChatPhotoPathIndex(excludeOldLogLoad),
+      vrchatPhotoService.createVRChatPhotoPathIndex(
+        excludeOldLogLoad,
+        ({ handled, total, currentMonth }) => {
+          emitStageProgress(
+            'photo_index',
+            total > 0 ? (handled / total) * 100 : 100,
+            {
+              current: handled,
+              total,
+              unit: 'photos',
+              ...(currentMonth === undefined
+                ? {}
+                : { currentItem: currentMonth }),
+            },
+          );
+          // バッチを登録するたびに月別グラフを伸ばす（送信は stats 側で間引かれる）
+          requestInitStats();
+        },
+      ),
     );
     results.createdVRChatPhotoPathModelList = photoResults ?? [];
-    emitProgress({
-      stage: 'photo_index',
-      progress: 100,
-      message: '写真インデックスが完了しました',
-    });
+    emitStageProgress('photo_index', 100);
     const photoIndexEndTime = performance.now();
     logger.info(
       `done photo index creation: ${photoResults?.length ?? 0} photos (${(photoIndexEndTime - photoIndexStartTime).toFixed(0)} ms)`,
@@ -485,12 +517,23 @@ export function loadLogInfoIndexFromVRChatLog({
       logger.info(
         `start photo metadata extraction: ${photoResults.length} photos`,
       );
-      emitStageStart('photo_metadata', '写真メタデータを抽出中...');
       const metadataStartTime = performance.now();
       const photoPaths = photoResults.map((p) => p.photoPath);
+      const reportMetadataProgress = (processed: number, total: number) => {
+        emitStageProgress(
+          'photo_metadata',
+          total > 0 ? (processed / total) * 100 : 100,
+          { current: processed, total, unit: 'photos' },
+        );
+      };
+      reportMetadataProgress(0, photoPaths.length);
       const metadataResult = yield* Effect.either(
-        metadataService.extractAndSaveMetadataBatch(photoPaths),
+        metadataService.extractAndSaveMetadataBatch(photoPaths, {
+          onProgress: reportMetadataProgress,
+        }),
       );
+      // DB エラーで途中終了した場合も、このステージの処理は終わっているので完了にする
+      reportMetadataProgress(photoPaths.length, photoPaths.length);
       if (metadataResult._tag === 'Right') {
         logger.info(
           `Photo metadata extracted: ${metadataResult.right} new records`,
@@ -510,6 +553,7 @@ export function loadLogInfoIndexFromVRChatLog({
 
     // 7. 写真フォルダからのログインポート（通常ログ処理後に実行）
     logger.info('start photo dir log import');
+    emitStageProgress('photo_log_import', 0);
     const importLogPhotoStartTime = performance.now();
     const vrChatPhotoDirPath = vrchatPhotoService.getVRChatPhotoDirPath();
     if (vrChatPhotoDirPath) {
@@ -519,6 +563,7 @@ export function loadLogInfoIndexFromVRChatLog({
         }),
       );
     }
+    emitStageProgress('photo_log_import', 100);
     const importLogPhotoEndTime = performance.now();
     logger.info(
       `done photo dir log import: ${(importLogPhotoEndTime - importLogPhotoStartTime).toFixed(0)} ms`,

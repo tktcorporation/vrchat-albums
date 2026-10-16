@@ -1,7 +1,15 @@
 import { Effect } from 'effect';
+import { match } from 'ts-pattern';
 
 import { logger } from '../../lib/logger';
-import { emitProgress, emitStageStart } from '../initProgress/emitter';
+import {
+  beginInitProgressRun,
+  emitStageProgress,
+  endInitProgressRun,
+  hasActiveInitProgressRun,
+} from '../initProgress/emitter';
+import type { InitLaunch } from '../initProgress/schema';
+import { flushInitStats } from '../initProgress/stats';
 import type { LogInfoError } from '../logInfo/error';
 import type { LogInfoServiceError } from '../logInfo/errors';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
@@ -45,6 +53,15 @@ export const LOG_SYNC_MODE = {
 export type LogSyncMode = (typeof LOG_SYNC_MODE)[keyof typeof LOG_SYNC_MODE];
 
 /**
+ * ログ同期モードを進捗ストリームの起動種別の表記に変換する。
+ */
+export const toInitSyncMode = (mode: LogSyncMode): InitLaunch['syncMode'] =>
+  match(mode)
+    .with(LOG_SYNC_MODE.FULL, () => 'full' as const)
+    .with(LOG_SYNC_MODE.INCREMENTAL, () => 'incremental' as const)
+    .exhaustive();
+
+/**
  * ログ同期の並行実行を直列化するセマフォ (permit=1)。
  *
  * logSyncController の定期バックグラウンド同期と、ユーザー操作による FULL/INCREMENTAL 同期が
@@ -76,62 +93,83 @@ export function syncLogs(
   VRChatLogFileError | VRChatLogError | LogInfoError | LogInfoServiceError
 > {
   return syncMutex.withPermits(1)(
-    Effect.gen(function* () {
-      const isFullSync = mode === LOG_SYNC_MODE.FULL;
+    withInitProgressRun(
+      mode,
+      Effect.gen(function* () {
+        const isFullSync = mode === LOG_SYNC_MODE.FULL;
 
-      logger.info(`Starting log sync with mode: ${mode}`);
+        logger.info(`Starting log sync with mode: ${mode}`);
 
-      // Step 1: VRChatログファイルから新しいログ行を抽出・保存
-      emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
-      const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
-        try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
-        catch: (error) => {
-          logger.error({
-            message: 'Failed to append log lines',
-            details: {
-              error: error instanceof Error ? error.message : String(error),
-            },
-          });
-          if (error instanceof VRChatLogFileError) {
-            return error;
-          }
-          return new VRChatLogFileError({
-            code: 'UNKNOWN',
-            message: error instanceof Error ? error.message : String(error),
-          });
-        },
-      });
-      emitProgress({
-        stage: 'log_append',
-        progress: 100,
-        message: 'VRChatログファイルの読み込みが完了しました',
-      });
+        // Step 1: VRChatログファイルから新しいログ行を抽出・保存
+        // ファイル単位の進捗は appendLoglinesToFileFromLogFilePathList 内で送られる
+        emitStageProgress('log_append', 0);
+        const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
+          try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
+          catch: (error) => {
+            logger.error({
+              message: 'Failed to append log lines',
+              details: {
+                error: error instanceof Error ? error.message : String(error),
+              },
+            });
+            if (error instanceof VRChatLogFileError) {
+              return error;
+            }
+            return new VRChatLogFileError({
+              code: 'UNKNOWN',
+              message: error instanceof Error ? error.message : String(error),
+            });
+          },
+        });
+        emitStageProgress('log_append', 100);
 
-      // Step 2: 保存されたログをデータベースに読み込む
-      // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
-      // logStore ファイルの再読み込みをスキップする
-      emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
-      const loadResult = yield* loadLogInfoIndexFromVRChatLog({
-        excludeOldLogLoad: !isFullSync,
-        preLoadedLogLines: isFullSync
-          ? undefined
-          : appendResult.processedLogLines,
-      });
-      emitProgress({
-        stage: 'log_load',
-        progress: 100,
-        message: 'ログデータの保存が完了しました',
-      });
+        // Step 2: 保存されたログをデータベースに読み込む
+        // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
+        // logStore ファイルの再読み込みをスキップする
+        // log_load 以降（写真インデックスまで）の進捗は loadLogInfoIndexFromVRChatLog 内で送られる
+        const loadResult = yield* loadLogInfoIndexFromVRChatLog({
+          excludeOldLogLoad: !isFullSync,
+          preLoadedLogLines: isFullSync
+            ? undefined
+            : appendResult.processedLogLines,
+        });
 
-      logger.info(`Log sync completed successfully with mode: ${mode}`);
+        logger.info(`Log sync completed successfully with mode: ${mode}`);
 
-      // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
-      triggerWorldJoinImageGeneration();
+        // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
+        triggerWorldJoinImageGeneration();
 
-      return loadResult;
-    }),
+        return loadResult;
+      }),
+    ),
   );
 }
+
+/**
+ * syncLogs が単独で呼ばれたとき（手動更新・バックグラウンド同期）に、進捗ストリームの実行を開始・終了する。
+ * 起動時の初期化の一部として呼ばれたときは、初期化側が実行を持っているので何もしない。
+ */
+const withInitProgressRun = <A, E>(
+  mode: LogSyncMode,
+  effect: Effect.Effect<A, E>,
+): Effect.Effect<A, E> =>
+  Effect.suspend(() => {
+    if (hasActiveInitProgressRun()) {
+      return effect;
+    }
+    beginInitProgressRun({
+      syncMode: toInitSyncMode(mode),
+      isFirstLaunch: false,
+    });
+    return effect.pipe(
+      Effect.tap(() => Effect.promise(() => flushInitStats())),
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          endInitProgressRun(exit._tag === 'Success' ? 'completed' : 'error');
+        }),
+      ),
+    );
+  });
 
 /**
  * 設定が有効な場合、未生成の World Join 画像を生成する

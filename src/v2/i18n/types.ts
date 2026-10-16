@@ -1,3 +1,5 @@
+import type { RunStage } from '../../../electron/module/initProgress/schema';
+
 export type Language = 'en' | 'ja';
 
 // 翻訳キーのパスを生成するための型
@@ -167,6 +169,10 @@ export interface Translations {
     resolution: string;
     lastVisited: string;
     recommendedSeason: string;
+  };
+  initProgress: {
+    /** 起動・同期処理の各ステージの表示名 */
+    stage: Record<RunStage, string>;
   };
   pullToRefresh: {
     pull: string;

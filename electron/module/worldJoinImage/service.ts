@@ -10,7 +10,6 @@ import { logger } from '../../lib/logger';
 import { setExifToBuffer } from '../../lib/wrappedExifTool';
 import type { ImageGenerationError } from '../imageGenerator/errors';
 import { generateWorldJoinImage } from '../imageGenerator/service';
-import { emitProgress, emitStageStart } from '../initProgress/emitter';
 import { getVrcWorldInfoByWorldId } from '../vrchatApi/service';
 import { findVRChatWorldJoinLogList } from '../vrchatWorldJoinLog/service';
 import { generateWorldJoinImagePath } from './fileNaming';
@@ -245,11 +244,8 @@ const generateMissingWorldJoinImagesInternal = (params: {
       return { generated: 0, skipped: joins.length, errors: 0 };
     }
 
+    // 起動時の進捗（init-progress）には載せない。ログ同期の完了後に裏で走り、起動の完了を待たせないため
     logger.info(`Found ${missingJoins.length} world joins without images`);
-    emitStageStart(
-      'world_join_image',
-      `Generating world join images (${missingJoins.length})...`,
-    );
 
     let generated = 0;
     let errors = 0;
@@ -277,11 +273,6 @@ const generateMissingWorldJoinImagesInternal = (params: {
       }
 
       generated++;
-      emitProgress({
-        stage: 'world_join_image',
-        progress: Math.round(((index + 1) / missingJoins.length) * 100),
-        message: `Generated ${generated}/${missingJoins.length} images`,
-      });
     }
 
     logger.info(

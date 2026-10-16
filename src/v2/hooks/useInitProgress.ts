@@ -1,57 +1,106 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { match } from 'ts-pattern';
 
 import type {
-  InitProgressPayload,
-  InitStage,
+  InitLaunch,
+  InitProgressDetails,
+  InitRunPayload,
+  InitStats,
+  ProgressStage,
+  RunStage,
 } from '../../../electron/module/initProgress/schema';
 import { trpcReact } from '../../trpc';
 
-// electronモジュールから型を再エクスポート
-export type { InitProgressPayload };
+export type { InitLaunch, InitProgressDetails, InitRunPayload, InitStats };
 
 /**
- * ステージ設定（順序と重み付けを統合）
- * 順序はこの配列の順序に従う。重みの合計は100。
+ * 全体進捗に占める各ステージの重み（合計 100）。
+ * 初回起動で最も時間がかかる写真インデックス（画像の読み込みと DB 登録）に最も大きく割り当てる。
  */
-const STAGE_CONFIG: readonly { stage: InitStage; weight: number }[] = [
-  { stage: 'database_sync', weight: 20 },
-  { stage: 'directory_check', weight: 15 },
-  { stage: 'log_append', weight: 15 },
-  { stage: 'log_load', weight: 25 },
-  { stage: 'photo_index', weight: 20 },
-  { stage: 'photo_metadata', weight: 5 },
-] as const;
+const STAGE_WEIGHTS = {
+  database_sync: 10,
+  log_append: 15,
+  log_load: 25,
+  photo_index: 35,
+  photo_metadata: 10,
+  photo_log_import: 5,
+} as const satisfies Record<ProgressStage, number>;
+
+const STAGE_ORDER = Object.keys(STAGE_WEIGHTS) as ProgressStage[];
 
 /**
- * 全体進捗を計算する
- * @param stage 現在のステージ
- * @param stageProgress ステージ内進捗 (0-100)
+ * 1 つのイベントが示す全体進捗（0-100）。終端の `error` は全体の位置を持たないため null。
+ * 処理対象が無く送られなかったステージは、後ろのステージが届いた時点で完了扱いになる。
  */
-const calculateOverallProgress = (
-  stage: InitStage,
-  stageProgress: number,
-): number => {
-  if (stage === 'completed') {
-    return 100;
-  }
-  if (stage === 'error' || stage === 'ready') {
-    return 0;
-  }
+const overallFromEvent = (stage: RunStage, progress: number): number | null =>
+  match(stage)
+    .with('completed', () => 100)
+    .with('error', () => null)
+    .otherwise((progressStage) => {
+      const index = STAGE_ORDER.indexOf(progressStage);
+      const before = STAGE_ORDER.slice(0, index).reduce(
+        (sum, s) => sum + STAGE_WEIGHTS[s],
+        0,
+      );
+      return Math.round(
+        before + (progress / 100) * STAGE_WEIGHTS[progressStage],
+      );
+    });
 
-  const idx = STAGE_CONFIG.findIndex((c) => c.stage === stage);
-  if (idx === -1) {
-    return 0;
-  }
+/**
+ * 画面に出した全体進捗。実行（runId）ごとに 0 から始まる。
+ */
+export interface ShownOverallProgress {
+  readonly runId: number;
+  readonly percent: number;
+}
 
-  // 前ステージまでの累積
-  const prevTotal = STAGE_CONFIG.slice(0, idx).reduce(
-    (sum, c) => sum + c.weight,
-    0,
-  );
+/**
+ * 次に表示する全体進捗を決める。同じ実行の中では前回表示した値より小さくしない。
+ * 実行が変わったら（手動更新やリトライで新しい実行が始まったら）その実行の値から数え直す。
+ */
+export const nextShownOverallProgress = (
+  shown: ShownOverallProgress | null,
+  event: Pick<InitRunPayload, 'runId' | 'stage' | 'progress'>,
+): ShownOverallProgress => {
+  const sameRun = shown !== null && shown.runId === event.runId;
+  const floor = sameRun ? shown.percent : 0;
+  const percent = overallFromEvent(event.stage, event.progress) ?? floor;
+  return { runId: event.runId, percent: Math.max(floor, percent) };
+};
 
-  // 現在ステージの進捗を加算
-  const currentWeight = STAGE_CONFIG[idx].weight;
-  return Math.round(prevTotal + (stageProgress / 100) * currentWeight);
+/**
+ * 初期化進捗の受信状態。統計と起動種別は、届かないイベントがあっても最後に届いた値を保持する。
+ */
+interface InitProgressState {
+  /** 最後に届いたイベント */
+  latest: InitRunPayload | null;
+  shown: ShownOverallProgress | null;
+  launch: InitLaunch | null;
+  stats: InitStats | null;
+}
+
+const initialState: InitProgressState = {
+  latest: null,
+  shown: null,
+  launch: null,
+  stats: null,
+};
+
+/**
+ * 受信したイベントを状態に反映する。新しい実行のイベントが来たら、前の実行の統計や起動種別は捨てる。
+ */
+const reduceInitProgress = (
+  state: InitProgressState,
+  event: InitRunPayload,
+): InitProgressState => {
+  const sameRun = state.latest?.runId === event.runId;
+  return {
+    latest: event,
+    shown: nextShownOverallProgress(state.shown, event),
+    launch: event.launch ?? (sameRun ? state.launch : null),
+    stats: event.stats ?? (sameRun ? state.stats : null),
+  };
 };
 
 /**
@@ -59,7 +108,7 @@ const calculateOverallProgress = (
  * tRPC subscriptionを使用して型安全に進捗を受信
  */
 export const useInitProgress = () => {
-  const [progress, setProgress] = useState<InitProgressPayload | null>(null);
+  const [state, setState] = useState<InitProgressState>(initialState);
   const [error, setError] = useState<Error | null>(null);
   const [isSubscriptionReady, setIsSubscriptionReady] = useState(false);
 
@@ -69,9 +118,9 @@ export const useInitProgress = () => {
       // readyイベントはsubscription接続完了の通知として扱う
       if (data.stage === 'ready') {
         setIsSubscriptionReady(true);
-        return; // readyイベントはprogressとして設定しない
+        return;
       }
-      setProgress(data);
+      setState((prev) => reduceInitProgress(prev, data));
       setError(null);
     },
     onError: (err) => {
@@ -82,31 +131,28 @@ export const useInitProgress = () => {
   });
 
   const reset = useCallback(() => {
-    setProgress(null);
+    setState(initialState);
     setError(null);
     setIsSubscriptionReady(false);
   }, []);
 
-  /**
-   * 全体進捗を計算
-   * ステージベースの進捗 + ステージ内進捗を組み合わせて計算
-   */
-  const overallProgress = useMemo(() => {
-    if (!progress?.stage) {
-      return 0;
-    }
-    return calculateOverallProgress(progress.stage, progress.progress ?? 0);
-  }, [progress?.stage, progress?.progress]);
-
   return {
     /** subscription接続完了フラグ */
     isSubscriptionReady,
-    /** 進捗情報（stage, progress, message, details を含む） */
-    progress,
-    /** 全体進捗パーセント (0-100) - ステージベース計算 */
-    overallProgress,
-    /** 進捗メッセージ */
-    message: progress?.message ?? '',
+    /** 最後に届いた進捗イベント（stage, progress, details など） */
+    progress: state.latest,
+    /** 現在のステージ。まだ何も届いていなければ null */
+    stage: state.latest?.stage ?? null,
+    /** 全体進捗パーセント (0-100)。同じ実行の中では減らない */
+    overallProgress: state.shown?.percent ?? 0,
+    /** 現在のステージの実件数 */
+    details: state.latest?.details ?? null,
+    /** 同期モード。DB の準備前は null */
+    syncMode: state.launch?.syncMode ?? null,
+    /** 初回起動か。DB の準備前は null */
+    isFirstLaunch: state.launch?.isFirstLaunch ?? null,
+    /** 最後に届いた統計（写真枚数・ワールド数・人数・月別枚数） */
+    stats: state.stats,
     /** subscription エラー */
     error,
     /** 進捗情報をリセット */

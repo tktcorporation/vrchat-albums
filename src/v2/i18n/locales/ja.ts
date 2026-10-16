@@ -143,6 +143,18 @@ const ja: Translations = {
     lastVisited: '最終訪問日',
     recommendedSeason: 'おすすめ時期',
   },
+  initProgress: {
+    stage: {
+      database_sync: 'データベースを準備しています',
+      log_append: 'VRChatのログファイルを読み込んでいます',
+      log_load: 'ログデータを保存しています',
+      photo_index: '写真を登録しています',
+      photo_metadata: '写真の情報を読み取っています',
+      photo_log_import: '写真からワールドの訪問履歴を読み取っています',
+      completed: '読み込みが完了しました',
+      error: '読み込みに失敗しました',
+    },
+  },
   pullToRefresh: {
     pull: '引っ張って更新',
     release: '指を離して更新',

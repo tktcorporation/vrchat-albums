@@ -69,9 +69,7 @@ async function getInitializeAppDataFunction() {
 }
 
 describe('settingsController.initializeAppData', () => {
-  let initializeAppData:
-    | (() => Promise<{ success: boolean; message?: string }>)
-    | undefined;
+  let initializeAppData: (() => Promise<{ success: boolean }>) | undefined;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -120,13 +118,13 @@ describe('settingsController.initializeAppData', () => {
     );
     expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalled();
     expect(mockLogger.info).toHaveBeenCalledWith(
-      'Step 3: Checking if this is first launch...',
+      'Step 2: Checking if this is first launch...',
     );
     expect(
       mockVrchatWorldJoinLogService.findVRChatWorldJoinLogList,
     ).toHaveBeenCalled();
     expect(mockLogger.info).toHaveBeenCalledWith(
-      'Step 4: Starting log sync...',
+      'Step 3: Starting log sync...',
     );
     expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
     expect(mockLogger.info).toHaveBeenCalledWith(
@@ -339,31 +337,43 @@ describe('settingsController.initializeAppData', () => {
     );
   });
 
-  it('重複実行防止が機能する', async () => {
-    // 最初の実行
+  it('実行中に重複して呼ばれたら、実行中の初期化に合流して同じ結果を返す', async () => {
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
     }
     const firstPromise = initializeAppData();
+    const secondPromise = initializeAppData();
 
-    // 2回目の実行（重複）
+    const [firstResult, secondResult] = await Promise.all([
+      firstPromise,
+      secondPromise,
+    ]);
+
+    // 2 回目は即答せず、1 回目の完了を待って同じ結果を受け取る
+    expect(firstResult).toEqual({ success: true });
+    expect(secondResult).toEqual({ success: true });
+    // 初期化本体は 1 回しか走らない
+    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(1);
+    expect(mockSyncLogs).toHaveBeenCalledTimes(1);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Initialization already in progress, joining the running initialization',
+    );
+  });
+
+  it('実行中の初期化が失敗したら、合流した呼び出しにも同じエラーが届く', async () => {
+    mockSequelizeClient.syncRDBClient.mockRejectedValue(
+      new Error('Database sync failed'),
+    );
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
     }
-    const secondResult = await initializeAppData();
+    const results = await Promise.allSettled([
+      initializeAppData(),
+      initializeAppData(),
+    ]);
 
-    // 2回目は重複として処理される
-    expect(secondResult).toEqual({
-      success: false,
-      message: '初期化処理が既に実行中です',
-    });
-    expect(mockLogger.debug).toHaveBeenCalledWith(
-      'Initialization already in progress, skipping duplicate request',
-    );
-
-    // 最初の実行は正常に完了
-    const firstResult = await firstPromise;
-    expect(firstResult).toEqual({ success: true });
+    expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
+    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(1);
   });
 
   it('正常完了後はフラグがリセットされる', async () => {

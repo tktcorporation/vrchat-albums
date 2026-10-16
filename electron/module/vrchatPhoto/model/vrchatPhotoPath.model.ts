@@ -18,6 +18,7 @@ import {
   Table,
 } from '@sequelize/core/decorators-legacy';
 import { uuidv7 } from 'uuidv7';
+import { z } from 'zod';
 
 @Table({ tableName: 'VRChatPhotoPathModels' })
 /**
@@ -201,6 +202,33 @@ export const getCountByYearMonthList = async (): Promise<
     }
     return { photoTakenYear: year, photoTakenMonth: month, photoCount };
   });
+};
+
+const PhotoCountPerMonthRowSchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  count: z.coerce.number().int().min(1),
+});
+
+/**
+ * 撮影月（ローカルタイム基準の `YYYY-MM`）ごとの写真枚数を、月の昇順で返す。
+ *
+ * photoTakenAt は UTC で保存されるため、SQLite の `localtime` 修飾子でローカルタイムに戻してから
+ * 月を切り出す。これをしないと月末深夜の写真が UTC 側の月に数えられる。
+ * 起動画面の月別グラフ（initProgress/stats.ts）から呼び出される。
+ */
+export const getPhotoCountPerLocalMonth = async (): Promise<
+  { month: string; count: number }[]
+> => {
+  const rows = await VRChatPhotoPathModel.findAll({
+    attributes: [
+      [fn('strftime', '%Y-%m', col('photoTakenAt'), 'localtime'), 'month'],
+      [fn('COUNT', col('id')), 'count'],
+    ],
+    group: [literal('month')],
+    order: [[literal('month'), 'ASC']],
+    raw: true,
+  });
+  return z.array(PhotoCountPerMonthRowSchema).parse(rows);
 };
 
 /** 最新の写真レコードを取得する */

@@ -239,3 +239,14 @@ export const findLatestPlayerJoinLog = async () => {
     order: [['joinDateTime', 'DESC']],
   });
 };
+
+/**
+ * 出会ったプレイヤーの数を数える。
+ *
+ * 古いログには playerId が無いため、全期間で値を持つ playerName の重複を除いて数える。
+ * 表示名を変えたプレイヤーは別人として数えられる。
+ * 起動画面の統計（initProgress/stats.ts）から呼び出される。
+ */
+export const countDistinctPlayerNames = async (): Promise<number> => {
+  return VRChatPlayerJoinLogModel.count({ distinct: true, col: 'playerName' });
+};

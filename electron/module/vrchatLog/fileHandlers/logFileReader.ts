@@ -225,6 +225,8 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
   includesList: string[];
   concurrency?: number;
   maxMemoryUsageMB?: number;
+  /** ファイルを読み終えるたびに、読み終えたファイル数と総ファイル数を受け取る（進捗表示用） */
+  onFilesRead?: (filesRead: number, totalFiles: number) => void;
 }): Promise<
   PartialSuccessResult<
     VRChatLogLine[],
@@ -261,6 +263,7 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
         return exit.value.map(castToVRChatLogLine);
       }),
     );
+    props.onFilesRead?.(i + batch.length, props.logFilePathList.length);
 
     // バッチの結果を統合
     for (const lines of batchResults) {
@@ -320,6 +323,8 @@ export async function* getLogLinesByLogFilePathListStreaming(props: {
   concurrency?: number;
   batchSize?: number;
   maxMemoryUsageMB?: number;
+  /** ファイルを読み終えるたびに、読み終えたファイル数と総ファイル数を受け取る（進捗表示用） */
+  onFilesRead?: (filesRead: number, totalFiles: number) => void;
 }): AsyncGenerator<VRChatLogLine[], void, unknown> {
   const config = createBatchConfig(props);
   const memoryMonitor = createMemoryMonitor();
@@ -361,6 +366,7 @@ export async function* getLogLinesByLogFilePathListStreaming(props: {
         return exit.value.map(castToVRChatLogLine);
       }),
     );
+    props.onFilesRead?.(i + fileBatch.length, props.logFilePathList.length);
 
     // 各ファイルの結果を処理
     for (const lines of batchResults) {
