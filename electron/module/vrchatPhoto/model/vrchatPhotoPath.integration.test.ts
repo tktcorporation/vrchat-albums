@@ -268,47 +268,52 @@ describe('VRChatPhotoPath Model Integration Tests', () => {
       expect(await getPhotoCountPerLocalMonth()).toEqual([]);
     });
 
-    describe('UTC と時差のあるタイムゾーン', () => {
-      // 実行環境が UTC だとローカル時刻と UTC が一致し、月の境目のずれを検出できないため、
-      // 時差のあるタイムゾーンに固定する。Node は TZ の代入で C ライブラリと ICU の時刻設定を
-      // 更新するので、SQLite の 'localtime' 変換にも反映される。
-      let originalTz: string | undefined;
-      beforeAll(() => {
-        originalTz = process.env.TZ;
-        process.env.TZ = 'Asia/Tokyo';
-      });
-      afterAll(() => {
-        if (originalTz === undefined) {
-          delete process.env.TZ;
-        } else {
-          process.env.TZ = originalTz;
-        }
-      });
+    // Windows の C ランタイムは IANA 名（Asia/Tokyo）の TZ を解釈できず、SQLite の 'localtime'
+    // だけが UTC のままになって JS の Date と食い違うため、Windows では実行しない。
+    describe.skipIf(process.platform === 'win32')(
+      'UTC と時差のあるタイムゾーン',
+      () => {
+        // 実行環境が UTC だとローカル時刻と UTC が一致し、月の境目のずれを検出できないため、
+        // 時差のあるタイムゾーンに固定する。glibc などIANA 名を読む C ライブラリでは、Node が
+        // TZ の代入で C ライブラリと ICU の時刻設定を更新するので、SQLite の 'localtime' 変換にも反映される。
+        let originalTz: string | undefined;
+        beforeAll(() => {
+          originalTz = process.env.TZ;
+          process.env.TZ = 'Asia/Tokyo';
+        });
+        afterAll(() => {
+          if (originalTz === undefined) {
+            delete process.env.TZ;
+          } else {
+            process.env.TZ = originalTz;
+          }
+        });
 
-      it('ローカルタイムの撮影月ごとに数え、月の昇順で返す', async () => {
-        // 月末深夜・月初未明の写真は、UTC に直すとタイムゾーンによって隣の月にずれる
-        const takenAtList = [
-          new Date(2024, 7, 31, 23, 30),
-          new Date(2024, 7, 1, 0, 15),
-          new Date(2024, 8, 1, 0, 10),
-          new Date(2023, 11, 15, 12, 0),
-        ];
-        await createOrUpdateListVRChatPhotoPath(
-          takenAtList.map((takenAt) => ({
-            photoPath: `/photos/VRChat_${datefns.format(takenAt, 'yyyy-MM-dd_HH-mm-ss')}.000_1920x1080.png`,
-            photoTakenAt: takenAt,
-            width: 1920,
-            height: 1080,
-          })),
-        );
+        it('ローカルタイムの撮影月ごとに数え、月の昇順で返す', async () => {
+          // 月末深夜・月初未明の写真は、UTC に直すとタイムゾーンによって隣の月にずれる
+          const takenAtList = [
+            new Date(2024, 7, 31, 23, 30),
+            new Date(2024, 7, 1, 0, 15),
+            new Date(2024, 8, 1, 0, 10),
+            new Date(2023, 11, 15, 12, 0),
+          ];
+          await createOrUpdateListVRChatPhotoPath(
+            takenAtList.map((takenAt) => ({
+              photoPath: `/photos/VRChat_${datefns.format(takenAt, 'yyyy-MM-dd_HH-mm-ss')}.000_1920x1080.png`,
+              photoTakenAt: takenAt,
+              width: 1920,
+              height: 1080,
+            })),
+          );
 
-        expect(await getPhotoCountPerLocalMonth()).toEqual([
-          { month: '2023-12', count: 1 },
-          { month: '2024-08', count: 2 },
-          { month: '2024-09', count: 1 },
-        ]);
-      });
-    });
+          expect(await getPhotoCountPerLocalMonth()).toEqual([
+            { month: '2023-12', count: 1 },
+            { month: '2024-08', count: 2 },
+            { month: '2024-09', count: 1 },
+          ]);
+        });
+      },
+    );
 
     it('同じ写真を登録し直しても二重に数えない', async () => {
       await createTestPhotos(3, new Date(2024, 0, 15));
