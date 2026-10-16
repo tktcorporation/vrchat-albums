@@ -21,16 +21,20 @@ export default defineConfig({
     },
     deps: {
       optimizer: {
-        web: {
+        client: {
           include: ['@sentry/electron/main'],
           enabled: true,
         },
       },
       interopDefault: true,
     },
+    // inline project はルートの test 設定を継承しない（extends: false）。継承させると
+    // ルートの setupFiles が各 project の setupFiles に追記され、electron では
+    // vitest.setup.ts が二重に、web と scripts では不要な vitest.setup.ts が走る。
     projects: [
       // フロントエンド用の設定
       {
+        extends: false,
         test: {
           name: 'web',
           environment: 'jsdom',
@@ -46,6 +50,7 @@ export default defineConfig({
       },
       // Electron/Node.js用の設定
       {
+        extends: false,
         test: {
           name: 'electron',
           environment: 'node',
@@ -61,6 +66,7 @@ export default defineConfig({
       },
       // Scripts用の設定
       {
+        extends: false,
         test: {
           name: 'scripts',
           environment: 'node',
