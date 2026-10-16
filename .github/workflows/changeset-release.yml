@@ -32,7 +32,5 @@ jobs:
           commit-message: "chore: release"
           # リリース PR のコミットを checkout と同じ PAT の git 操作で push し、後続のワークフローを起動させる
           push-with-git-cli: true
+          # version-script の実行環境にも GITHUB_TOKEN として渡り、changelog-github が PR とコミットの作者を引くときに使う
           github-token: ${{ secrets.MY_PERSONAL_ACCESS_TOKEN }}
-        env:
-          # changelog-github が PR とコミットの作者を引くときに使う
-          GITHUB_TOKEN: ${{ secrets.MY_PERSONAL_ACCESS_TOKEN }}
