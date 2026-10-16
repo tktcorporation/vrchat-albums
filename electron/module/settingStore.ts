@@ -239,13 +239,6 @@ const setAutoStartEnabled =
   };
 
 /**
- * Clear all settings
- */
-const clearAllStoredSettings = (settingsStore: Store) => () => {
-  settingsStore.clear();
-};
-
-/**
  * Clear stored setting by key
  */
 const clearStoredSetting =
@@ -317,7 +310,6 @@ const setSettingStore = (name: StoreName) => {
       setRemoveAdjacentDuplicateWorldEntriesFlag(set),
     getBackgroundFileCreateFlag: getBackgroundFileCreateFlag(getB),
     setBackgroundFileCreateFlag: setBackgroundFileCreateFlag(set),
-    clearAllStoredSettings: clearAllStoredSettings(store),
     clearStoredSetting: clearStoredSetting(store),
     setWindowBounds: (bounds: Rectangle) => {
       store.set('windowBounds', bounds);
@@ -427,7 +419,6 @@ export interface SettingStore {
   setRemoveAdjacentDuplicateWorldEntriesFlag: (flag: boolean) => void;
   getBackgroundFileCreateFlag: () => boolean | null;
   setBackgroundFileCreateFlag: (flag: boolean) => void;
-  clearAllStoredSettings: () => void;
   clearStoredSetting: (
     key: SettingStoreKey,
   ) => Effect.Effect<void, SettingStorageError>;

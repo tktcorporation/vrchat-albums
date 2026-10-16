@@ -36,11 +36,6 @@ vi.mock('@/trpc', () => ({
         useQuery: vi.fn().mockReturnValue({ data: null, isLoading: false }),
       },
     },
-    logInfo: {
-      getPlayerListInSameWorld: {
-        useQuery: vi.fn(),
-      },
-    },
     electronUtil: {
       openUrlInDefaultBrowser: {
         useMutation: vi.fn().mockReturnValue({

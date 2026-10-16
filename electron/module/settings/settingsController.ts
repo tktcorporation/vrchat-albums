@@ -2,7 +2,6 @@ import { Cause, Effect, Exit, Option } from 'effect';
 import type { UpdateCheckResult } from 'electron-updater';
 import { match, P } from 'ts-pattern';
 
-import { reloadMainWindow } from '../../electronUtil';
 import { runEffect } from '../../lib/effectTRPC';
 import { toUserFacing } from '../../lib/errorMapping';
 import {
@@ -19,33 +18,7 @@ import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
 import { procedure, router as trpcRouter } from './../../trpc';
-import type { UpdateError } from './errors';
 import * as settingService from './service';
-
-const mapUpdateErrorAsNetwork = toUserFacing<UpdateError>({
-  category: ERROR_CATEGORIES.NETWORK_ERROR,
-  userMessage: (e) => `アップデートに失敗しました: ${e.message}`,
-});
-
-/**
- * UpdateError → UserFacingError 変換ヘルパー（ネットワークエラーカテゴリ）。
- *
- * E チャネルに `UpdateError | UserFacingError` が混在するケースのため、
- * UserFacingError は素通し、UpdateError のみネットワークエラーとして変換する。
- */
-const mapUpdateError = (e: UpdateError | UserFacingError): UserFacingError => {
-  if (e instanceof UserFacingError) {
-    return e;
-  }
-  return mapUpdateErrorAsNetwork(e);
-};
-
-/**
- * UpdateError → UserFacingError 変換ヘルパー（汎用カテゴリ）。
- */
-const mapUpdateErrorGeneric = toUserFacing<UpdateError>({
-  userMessage: (e) => `アップデートに失敗しました: ${e.message}`,
-});
 
 /**
  * OpenPathFailed → UserFacingError 変換ヘルパー（ログフォルダ専用メッセージ）。
@@ -93,68 +66,10 @@ export const settingsRouter = () =>
       const version = settingService.getAppVersion();
       return version;
     }),
-    forceResetDatabase: procedure.mutation(async () => {
-      await sequelizeClient.syncRDBClient({
-        checkRequired: false,
-      });
-    }),
-    syncDatabase: procedure.mutation(async () => {
-      await sequelizeClient.syncRDBClient();
-    }),
     isDatabaseReady: procedure.query(() => {
       const appVersion = settingService.getAppVersion();
       return sequelizeClient.checkMigrationRDBClient(appVersion);
     }),
-    getAppUpdateInfo: procedure.query(async () => {
-      const exit = await Effect.runPromiseExit(
-        settingService.getElectronUpdaterInfo(),
-      );
-      if (Exit.isFailure(exit)) {
-        // ネットワークエラーなど。クライアントにはアップデートなしとして返す
-        return { isUpdateAvailable: false, updateInfo: null };
-      }
-      return exit.value;
-    }),
-    installUpdate: procedure.mutation(() =>
-      runEffect(
-        settingService.installUpdate().pipe(
-          Effect.tap(() => {
-            reloadMainWindow();
-          }),
-          Effect.catchTag('NoUpdateAvailable', (e) =>
-            Effect.fail(
-              UserFacingError.withStructuredInfo({
-                code: ERROR_CODES.VALIDATION_ERROR,
-                category: ERROR_CATEGORIES.VALIDATION_ERROR,
-                message: e.message,
-                userMessage: 'アップデートはありません。',
-                cause: e,
-              }),
-            ),
-          ),
-          Effect.mapError(mapUpdateError),
-        ),
-      ),
-    ),
-    checkForUpdates: procedure.query(async () => {
-      const exit = await Effect.runPromiseExit(
-        settingService.getElectronUpdaterInfo(),
-      );
-      if (Exit.isFailure(exit)) {
-        return { isUpdateAvailable: false, updateInfo: null };
-      }
-      return exit.value;
-    }),
-    installUpdatesAndReload: procedure.mutation(() =>
-      runEffect(
-        settingService.installUpdate().pipe(
-          Effect.tap(() => {
-            reloadMainWindow();
-          }),
-          Effect.mapError(mapUpdateErrorGeneric),
-        ),
-      ),
-    ),
     checkForUpdatesAndReturnResult: procedure.query(
       async (): Promise<{
         isUpdateAvailable: boolean;
@@ -171,16 +86,6 @@ export const settingsRouter = () =>
           updateInfo: exit.value.updateInfo,
         };
       },
-    ),
-    installUpdatesAndReloadApp: procedure.mutation(() =>
-      runEffect(
-        settingService.installUpdate().pipe(
-          Effect.tap(() => {
-            reloadMainWindow();
-          }),
-          Effect.mapError(mapUpdateErrorGeneric),
-        ),
-      ),
     ),
     openApplicationLogInExploler: procedure.mutation(() => {
       const logPath = electronUtilService.getApplicationLogPath();

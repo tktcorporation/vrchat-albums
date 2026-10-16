@@ -152,12 +152,6 @@ export class QueryCache {
 }
 
 // Global cache instances
-export const playerListCache = new QueryCache({
-  ttl: 5 * 60 * 1000, // 5 minutes
-  maxSize: 50,
-  onEvict: (key) => logger.debug(`Player list cache evicted: ${key}`),
-});
-
 export const worldInfoCache = new QueryCache({
   ttl: 30 * 60 * 1000, // 30 minutes
   maxSize: 200,
@@ -168,7 +162,6 @@ export const worldInfoCache = new QueryCache({
  * すべてのキャッシュをクリアする
  */
 export const clearAllCaches = (): void => {
-  playerListCache.clear();
   worldInfoCache.clear();
   logger.debug('All caches cleared');
 };

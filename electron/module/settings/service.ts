@@ -3,8 +3,7 @@ import { autoUpdater, type UpdateCheckResult } from 'electron-updater';
 
 import { getApp } from '../../lib/electronModules';
 import { logger } from '../../lib/logger';
-import type { UpdateError } from './errors';
-import { DownloadFailed, NoUpdateAvailable, UpdateCheckFailed } from './errors';
+import { UpdateCheckFailed } from './errors';
 
 export interface UpdaterInfo {
   isUpdateAvailable: boolean;
@@ -62,37 +61,5 @@ export const getElectronUpdaterInfo = (): Effect.Effect<
         updateInfo: updateInfo,
       };
     }),
-  );
-};
-
-/**
- * ダウンロード済みの更新をインストールしアプリを再起動する。
- */
-export const installUpdate = (): Effect.Effect<void, UpdateError> => {
-  return getElectronUpdaterInfo().pipe(
-    Effect.flatMap((updateInfo) => {
-      if (!updateInfo.isUpdateAvailable) {
-        return Effect.fail(
-          new NoUpdateAvailable({
-            message: 'No update available',
-          }),
-        );
-      }
-      return Effect.succeed(updateInfo);
-    }),
-    Effect.flatMap(() =>
-      Effect.tryPromise({
-        try: () => autoUpdater.downloadUpdate(),
-        catch: (error) =>
-          new DownloadFailed({
-            message: error instanceof Error ? error.message : String(error),
-          }),
-      }),
-    ),
-    Effect.tap(() => {
-      // quitAndInstall は void を返すので、同期的に呼び出し
-      autoUpdater.quitAndInstall();
-    }),
-    Effect.as(void 0),
   );
 };
