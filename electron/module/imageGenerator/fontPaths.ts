@@ -13,7 +13,7 @@ let cachedFontFilePaths: string[] = [];
  * フォントファイルパスを解決する（初回のみ）
  *
  * 背景: resvg-js は fontFiles オプションでフォントファイルパスを受け取る。
- * Inter + Noto Sans JP をバンドルし、日本語テキストを含む SVG をレンダリング可能にする。
+ * Noto Sans JP をバンドルし、日本語テキストを含む SVG をレンダリング可能にする。
  *
  * Electron API (`app.isPackaged` 等) に依存するため Main プロセス側でのみ呼び出す。
  * renderSvg.ts の worker-safe な関数群とはあえて別ファイルに分離し、
@@ -44,14 +44,9 @@ export const loadFonts = (): Effect.Effect<string[], FontLoadFailed> => {
   /**
    * ロード対象のフォントファイル名。
    * 環境によって存在するファイルが異なるため、existsSync でフィルタする。
-   * - Inter: Regular/Bold/SemiBold/Medium の4ウェイト
-   * - NotoSansJP: Variable weight (NotoSansJP.ttf) または個別ウェイト
+   * NotoSansJP は Variable weight (NotoSansJP.ttf) または個別ウェイトのどちらかを置く。
    */
   const fontFileNames = [
-    'Inter-Regular.ttf',
-    'Inter-Bold.ttf',
-    'Inter-SemiBold.ttf',
-    'Inter-Medium.ttf',
     'NotoSansJP.ttf',
     'NotoSansJP-Regular.ttf',
     'NotoSansJP-Bold.ttf',
