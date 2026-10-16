@@ -13,13 +13,7 @@ import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
 import type { OpenPathFailed } from '../electronUtil/errors';
 import * as electronUtilService from '../electronUtil/service';
-import {
-  beginInitProgressRun,
-  emitStageProgress,
-  endInitProgressRun,
-  setInitProgressLaunch,
-} from '../initProgress/emitter';
-import { flushInitStats } from '../initProgress/stats';
+import { beginInitProgressRun } from '../initProgress/emitter';
 import {
   LOG_SYNC_MODE,
   type LogSyncLock,
@@ -95,7 +89,7 @@ const runInitializationHoldingLock = async (
   lock: LogSyncLock,
 ): Promise<{ success: true }> => {
   // 起動種別は DB の準備ができるまで判定できないため、null で実行を始めて Step 2 で設定する
-  const runId = beginInitProgressRun('startup', null);
+  const run = beginInitProgressRun('startup', null);
 
   // effect-lint-allow-try-catch: 200行超の処理全体を Effect.gen に変換するのは大規模リファクタリングが必要。
   // catch はエラーの分類（UserFacingError はそのまま、それ以外は cause 付きで包む）と再スローのみ。
@@ -105,9 +99,9 @@ const runInitializationHoldingLock = async (
     // Step 1: データベース同期
     // VRChat ログディレクトリの存在確認は事前に行わず、ログ同期のエラーで判定する
     logger.info('Step 1: Syncing database schema...');
-    emitStageProgress('database_sync', 0);
+    run.stage('database_sync', 0);
     await sequelizeClient.syncRDBClient();
-    emitStageProgress('database_sync', 100);
+    run.stage('database_sync', 100);
 
     // Step 2: 初回起動判定とPhotoPath変更確認
     logger.info('Step 2: Checking if this is first launch...');
@@ -154,12 +148,12 @@ const runInitializationHoldingLock = async (
         isFirstLaunch ? 'first launch' : 'regular launch'
       }, using ${syncMode} sync mode`,
     );
-    setInitProgressLaunch({
+    run.setLaunch({
       syncMode: toInitSyncMode(syncMode),
       isFirstLaunch,
     });
     // 差分起動では登録済みの写真の月別枚数をここで送り、ログ同期の前にグラフを埋めておく
-    await flushInitStats();
+    await run.flushStats();
 
     // Step 2.5: 自動起動設定の初期化・復元（テスト時はスキップ）
     // 初回起動時: 自動起動を有効化し、意図を settingStore に保存
@@ -215,10 +209,10 @@ const runInitializationHoldingLock = async (
     }
 
     // Step 3: ログ同期実行
-    // log_append 以降のステージの進捗は syncLogs 内で送られる
+    // log_append 以降のステージの進捗は、ログ同期がこの実行へ送る
     logger.info('Step 3: Starting log sync...');
     const logSyncExit = await Effect.runPromiseExit(
-      syncLogsHoldingLock(lock, syncMode),
+      syncLogsHoldingLock(lock, syncMode, run),
     );
 
     if (Exit.isFailure(logSyncExit)) {
@@ -287,8 +281,8 @@ const runInitializationHoldingLock = async (
     }
 
     // 初期化完了を通知（最終の統計を届けてから終端イベントを送る）
-    await flushInitStats();
-    endInitProgressRun(runId, 'completed');
+    await run.flushStats();
+    run.end('completed');
 
     logger.info('=== Application data initialization completed ===');
     return { success: true };
@@ -304,7 +298,7 @@ const runInitializationHoldingLock = async (
       .otherwise(() => 'Unknown initialization error');
 
     // エラーの内容は mutation のエラーとしてレンダラーへ届くため、進捗ストリームには終端だけを送る
-    endInitProgressRun(runId, 'error');
+    run.end('error');
 
     // UserFacingErrorの場合は構造化情報を保持して再スロー
     if (error instanceof UserFacingError) {

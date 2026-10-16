@@ -4,9 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eventEmitter } from '../../trpc';
 import {
   beginInitProgressRun,
-  emitStageProgress,
-  endInitProgressRun,
-  getActiveInitProgressRun,
+  getInitProgressReplay,
 } from '../initProgress/emitter';
 import {
   INIT_PROGRESS_CHANNEL,
@@ -34,7 +32,11 @@ vi.mock('../vrchatLog/vrchatLogController', () => ({
 }));
 
 vi.mock('../initProgress/stats', () => ({
-  flushInitStats: vi.fn(() => Promise.resolve()),
+  createInitStatsCollector: vi.fn(() => ({
+    request: vi.fn(),
+    flush: vi.fn(() => Promise.resolve()),
+    close: vi.fn(),
+  })),
 }));
 
 vi.mock('../worldJoinImage/service', () => ({
@@ -89,21 +91,23 @@ describe('進捗ストリームの実行とログ同期のセマフォ', () => {
     let standalone: Promise<unknown> = Promise.resolve();
 
     await runWithLogSyncLock(async (lock) => {
-      initRunId = beginInitProgressRun('startup', null);
-      emitStageProgress('database_sync', 100);
+      const init = beginInitProgressRun('startup', null);
+      initRunId = init.runId;
+      init.stage('database_sync', 100);
 
       // 初期化の途中でバックグラウンド同期が要求される
       standalone = Effect.runPromise(syncLogs(LOG_SYNC_MODE.INCREMENTAL));
       await waitTicks();
-      expect(getActiveInitProgressRun()).toEqual({
-        id: initRunId,
+      expect(getInitProgressReplay()).toMatchObject({
+        runId: initRunId,
         kind: 'startup',
+        stage: 'database_sync',
       });
 
       await Effect.runPromise(
-        syncLogsHoldingLock(lock, LOG_SYNC_MODE.INCREMENTAL),
+        syncLogsHoldingLock(lock, LOG_SYNC_MODE.INCREMENTAL, init),
       );
-      endInitProgressRun(initRunId, 'completed');
+      init.end('completed');
     });
     await standalone;
 
@@ -125,6 +129,6 @@ describe('進捗ストリームの実行とログ同期のセマフォ', () => {
       new Set(['startup']),
     );
     expect(new Set(otherEvents.map((p) => p.kind))).toEqual(new Set(['sync']));
-    expect(getActiveInitProgressRun()).toBeNull();
+    expect(getInitProgressReplay()).toBeNull();
   });
 });

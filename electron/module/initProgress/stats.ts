@@ -1,16 +1,19 @@
 /**
- * 起動画面の統計（写真枚数・ワールド数・人数・月別枚数）を DB から集計し、進捗ストリームへ送る。
+ * 起動画面の統計（写真枚数・ワールド数・人数・月別枚数）を DB から集計するコレクター。
+ *
+ * コレクターは起動時の初期化の実行（emitter.ts の `beginInitProgressRun`）ごとに 1 つ作られ、その実行が
+ * 持つ。間引きのタイマー・数えたワールド数と人数・失敗を報告したかどうかはコレクターの中にあり、
+ * 実行が終わるとコレクターも閉じて、予約していた集計を走らせない。
  *
  * 月別の写真枚数は毎回 DB から数え直す。インデックス中の写真を手元で足し込む方式だと、
  * 全件再スキャンで既存の写真を上書きしたときに二重に数えてしまうため。
- * ワールド数・人数はログの登録でしか変わらないので、実行ごとに保持して必要なときだけ数え直す
- * （`logCounts` を参照）。
+ * ワールド数・人数はログの登録でしか変わらないので、数えた値を保持して必要なときだけ数え直す。
  * 写真のバッチ登録ごとに集計を求められるので、前回の集計が終わってから INTERVAL_MS 空けるまで
  * 次の集計を始めない。
  *
- * 集計は起動時の初期化（`startup` の実行）の間だけ行う。統計を表示するのは起動画面だけで、
- * 起動後の単独のログ同期（手動更新・バックグラウンド同期など）で写真テーブル全体を
- * 1 秒に何度も GROUP BY すると、その同期の写真登録と SQLite を取り合うため。
+ * 単独のログ同期（`sync` の実行）はコレクターを持たない。統計を表示するのは起動画面だけで、
+ * 起動後の同期（手動更新・バックグラウンド同期など）で写真テーブル全体を 1 秒に何度も GROUP BY すると、
+ * その同期の写真登録と SQLite を取り合うため。
  */
 import { Effect } from 'effect';
 
@@ -18,7 +21,6 @@ import { logger } from '../../lib/logger';
 import { getPhotoCountPerLocalMonth } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import { countDistinctPlayerNames } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import { countDistinctVisitedWorlds } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
-import { emitInitStats, getActiveInitProgressRun } from './emitter';
 import type { InitStats } from './schema';
 
 /**
@@ -48,6 +50,7 @@ const realTimers: ThrottleTimers = {
  * - request: 前回の終了から intervalMs 経っていればすぐ実行し、経っていなければその時点で 1 回だけ実行する。
  *   実行中に要求されたら、終わってから intervalMs 後にもう 1 回実行する（最後の要求の結果が必ず反映される）
  * - flush: 予約を取り消し、実行中のものを待ってから、間隔に関係なく 1 回実行して完了を待つ
+ * - close: 予約を取り消し、以後の request を何もしないものにする
  *
  * @param task 失敗しても reject しないこと（失敗の扱いはタスク側の責務）
  */
@@ -60,6 +63,7 @@ export const createThrottledRunner = (
   let inFlight: Promise<void> | null = null;
   let timer: unknown = null;
   let pendingAfterRun = false;
+  let closed = false;
 
   const cancelScheduled = (): void => {
     if (timer !== null) {
@@ -83,6 +87,9 @@ export const createThrottledRunner = (
   };
 
   const request = (): void => {
+    if (closed) {
+      return;
+    }
     if (inFlight) {
       pendingAfterRun = true;
       return;
@@ -111,7 +118,12 @@ export const createThrottledRunner = (
     await run();
   };
 
-  return { request, flush };
+  const close = (): void => {
+    closed = true;
+    cancelScheduled();
+  };
+
+  return { request, flush, close };
 };
 
 /**
@@ -139,114 +151,99 @@ class InitStatsQueryError extends Error {
   override readonly name = 'InitStatsQueryError';
 }
 
-/** 集計の失敗を error で報告した最後の実行の ID */
-let lastReportedFailureRunId: number | null = null;
+/** 1 回の実行が持つ統計のコレクター */
+export interface InitStatsCollector {
+  /**
+   * 統計の更新を求める。DB に登録が入るたびに呼んでよい（集計は間引かれる）。
+   * ログ（ワールド・プレイヤーの記録）を登録した後は `logsChanged: true` を渡し、ワールド数・人数を数え直させる。
+   */
+  readonly request: (options: { readonly logsChanged: boolean }) => void;
+  /**
+   * 間引きを待たずにワールド数・人数も含めて数え直し、完了を待つ。
+   * 実行の区切り（DB 準備完了直後・実行終了直前）で最新の値を確実に届けるために使う。
+   */
+  readonly flush: () => Promise<void>;
+  /** 予約していた集計を取り消し、以後の request を何もしないものにする */
+  readonly close: () => void;
+}
 
 /**
- * 集計の失敗を記録する。同じ実行で 2 回目以降の失敗は warn に留める。
+ * 統計のコレクターを作る。
+ *
+ * 集計の失敗は起動処理を止めない（統計は表示のためだけの値で、失敗しても写真の登録やログ同期の
+ * 結果は変わらない）。失敗はコレクターごとに 1 回だけ error で報告し、2 回目以降は warn に留める。
  * 集計は 1 秒に最大 10 回求められるので、DB が読めない状態が続くと同じ原因のエラーが
- * Sentry へ大量に届くため。
+ * Sentry へ大量に届くため。失敗しても次の要求で集計し直す。
+ *
+ * @param deliver 集計した統計の届け先
  */
-const reportStatsFailure = (
-  runId: number,
-  error: InitStatsQueryError,
-): void => {
-  if (lastReportedFailureRunId === runId) {
-    logger.warn(`${error.message} (repeated in run ${runId})`);
-    return;
-  }
-  lastReportedFailureRunId = runId;
-  logger.error({ message: error.message, stack: error });
-};
+export const createInitStatsCollector = (
+  deliver: (stats: InitStats) => void,
+  timers: ThrottleTimers = realTimers,
+): InitStatsCollector => {
+  let failureReported = false;
+  /**
+   * 数えたワールド数・人数。ログの登録でしか変わらないので、写真の登録中の集計では使い回し、
+   * ログの登録後と flush で捨てて数え直す。数え直しに失敗した間は null のままなので、次の集計で再び数える
+   */
+  let logCounts: { readonly worlds: number; readonly people: number } | null =
+    null;
 
-/**
- * ワールド数・人数はログの登録でしか変わらないため、写真の登録中は再集計しない。
- * ログを登録したとき（`requestInitStats({ logsChanged: true })`）と実行の区切り
- * （`flushInitStats`）でだけ数え直す。
- */
-let logCounts: { runId: number; worlds: number; people: number } | null = null;
-let logCountsStale = true;
-
-/**
- * 統計を集計して送る。集計の失敗は起動処理を止めない（統計は表示のためだけの値で、
- * 失敗しても写真の登録やログ同期の結果は変わらない）。失敗は実行ごとに 1 回 Sentry へ送り、
- * 次の要求で再集計する。
- */
-const collectAndEmitStats = (): Promise<void> => {
-  const run = getActiveInitProgressRun();
-  if (run?.kind !== 'startup') {
-    return Promise.resolve();
-  }
-  const cached =
-    !logCountsStale && logCounts?.runId === run.id ? logCounts : null;
-  logCountsStale = false;
-  return Effect.runPromise(
-    Effect.tryPromise({
-      try: async () => {
-        const [months, counts] = await Promise.all([
-          getPhotoCountPerLocalMonth(),
-          cached ??
-            Promise.all([
-              countDistinctVisitedWorlds(),
-              countDistinctPlayerNames(),
-            ]).then(([worlds, people]) => ({ runId: run.id, worlds, people })),
-        ]);
-        logCounts = counts;
-        return toInitStats({
-          months,
-          worlds: counts.worlds,
-          people: counts.people,
-        });
-      },
-      catch: (cause) =>
-        new InitStatsQueryError('Failed to collect init progress stats', {
-          cause,
-        }),
-    }).pipe(
-      Effect.match({
-        onSuccess: (stats) => {
-          emitInitStats(run.id, stats);
-        },
-        onFailure: (error) => {
-          // 数え直しに失敗したら古いワールド数・人数を使い続けないよう、次の集計で数え直す
-          logCountsStale = true;
-          reportStatsFailure(run.id, error);
-        },
-      }),
-    ),
-  );
-};
-
-const statsRunner = createThrottledRunner(collectAndEmitStats, INTERVAL_MS);
-
-const isStartupRunActive = (): boolean =>
-  getActiveInitProgressRun()?.kind === 'startup';
-
-/**
- * 統計の更新を求める。DB に登録が入るたびに呼んでよい（送信は間引かれる）。
- * ログ（ワールド・プレイヤーの記録）を登録した後は `logsChanged: true` を渡す。
- * 起動時の初期化の間でなければ何もしない。
- */
-export const requestInitStats = (
-  options: { logsChanged?: boolean } = {},
-): void => {
-  if (isStartupRunActive()) {
-    if (options.logsChanged === true) {
-      logCountsStale = true;
+  const reportFailure = (error: InitStatsQueryError): void => {
+    if (failureReported) {
+      logger.warn(`${error.message} (repeated in the same run)`);
+      return;
     }
-    statsRunner.request();
-  }
-};
+    failureReported = true;
+    logger.error({ message: error.message, stack: error });
+  };
 
-/**
- * 間引きを待たずに統計を集計して送り、完了を待つ。
- * 実行の区切り（DB 準備完了直後・実行終了直前）で最新の値を確実に届けるために使う。
- * 起動時の初期化の間でなければ何もしない。
- */
-export const flushInitStats = (): Promise<void> => {
-  if (!isStartupRunActive()) {
-    return Promise.resolve();
-  }
-  logCountsStale = true;
-  return statsRunner.flush();
+  const collect = (): Promise<void> => {
+    const cached = logCounts;
+    return Effect.runPromise(
+      Effect.tryPromise({
+        try: async () => {
+          const [months, counts] = await Promise.all([
+            getPhotoCountPerLocalMonth(),
+            cached ??
+              Promise.all([
+                countDistinctVisitedWorlds(),
+                countDistinctPlayerNames(),
+              ]).then(([worlds, people]) => ({ worlds, people })),
+          ]);
+          logCounts = counts;
+          return toInitStats({
+            months,
+            worlds: counts.worlds,
+            people: counts.people,
+          });
+        },
+        catch: (cause) =>
+          new InitStatsQueryError('Failed to collect init progress stats', {
+            cause,
+          }),
+      }).pipe(
+        Effect.match({
+          onSuccess: deliver,
+          onFailure: reportFailure,
+        }),
+      ),
+    );
+  };
+
+  const runner = createThrottledRunner(collect, INTERVAL_MS, timers);
+
+  return {
+    request: ({ logsChanged }) => {
+      if (logsChanged) {
+        logCounts = null;
+      }
+      runner.request();
+    },
+    flush: () => {
+      logCounts = null;
+      return runner.flush();
+    },
+    close: runner.close,
+  };
 };

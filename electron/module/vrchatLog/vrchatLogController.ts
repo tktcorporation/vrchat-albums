@@ -9,7 +9,7 @@ import {
   ERROR_CODES,
   UserFacingError,
 } from '../../lib/errors';
-import { emitStageProgress } from '../initProgress/emitter';
+import type { InitProgressRun } from '../initProgress/emitter';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
 import * as vrchatLogFileDirService from './../vrchatLogFileDir/service';
@@ -59,10 +59,12 @@ export interface AppendLoglinesResult {
  * 月ごとのログファイルがサイズ制限（10MB）を超えると、タイムスタンプ付きの新しいファイルが作成されます。
  * このディレクトリはメタデータの保存用ではなく、ログデータ自体の保存用です。
  *
+ * @param progress ファイル単位の進捗（log_append）を送る実行。実行に属さない呼び出しでは省く
  * @returns 処理結果。processedLogLines に新規処理されたログ行を含む。
  */
 export const appendLoglinesToFileFromLogFilePathList = async (
   processAll = false,
+  progress?: InitProgressRun,
 ): Promise<AppendLoglinesResult> => {
   const vrchatlogFilesDirExit = await Effect.runPromiseExit(
     vrchatLogFileDirService.getValidVRChatLogFileDir(),
@@ -122,7 +124,7 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   const logFilePathList = logFilePathListExit.value;
 
   logger.info(`Found ${logFilePathList.length} log files to process`);
-  emitStageProgress('log_append', 0, {
+  progress?.stage('log_append', 0, {
     current: 0,
     total: logFilePathList.length,
     unit: 'files',
@@ -144,7 +146,7 @@ export const appendLoglinesToFileFromLogFilePathList = async (
       batchSize: 1000, // バッチサイズを指定
       maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
       onFilesRead: (filesRead, totalFiles) => {
-        emitStageProgress(
+        progress?.stage(
           'log_append',
           totalFiles > 0 ? (filesRead / totalFiles) * 100 : 100,
           { current: filesRead, total: totalFiles, unit: 'files' },

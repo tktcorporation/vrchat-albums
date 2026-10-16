@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   beginInitProgressRun,
-  endInitProgressRun,
+  type InitProgressRun,
 } from '../initProgress/emitter';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
@@ -23,13 +23,7 @@ vi.mock('../vrchatLog/vrchatLogController', () => ({
 }));
 
 vi.mock('../initProgress/emitter', () => ({
-  beginInitProgressRun: vi.fn(() => 7),
-  emitStageProgress: vi.fn(),
-  endInitProgressRun: vi.fn(),
-}));
-
-vi.mock('../initProgress/stats', () => ({
-  flushInitStats: vi.fn(() => Promise.resolve()),
+  beginInitProgressRun: vi.fn(),
 }));
 
 vi.mock('../worldJoinImage/service', () => ({
@@ -57,9 +51,24 @@ const appendResult = {
   ReturnType<typeof appendLoglinesToFileFromLogFilePathList>
 >;
 
+/** 進捗の実行のハンドルの代わり。操作は呼び出しを記録するだけ */
+const createRunStub = (kind: InitProgressRun['kind']): InitProgressRun => ({
+  runId: 7,
+  kind,
+  stage: vi.fn(),
+  setLaunch: vi.fn(),
+  dbUpdated: vi.fn(),
+  flushStats: vi.fn(() => Promise.resolve()),
+  end: vi.fn(),
+});
+
+let syncRun: InitProgressRun;
+
 describe('syncLogs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    syncRun = createRunStub('sync');
+    vi.mocked(beginInitProgressRun).mockImplementation(() => syncRun);
   });
 
   it('appendLoglines の後に loadLogInfo を呼ぶ', async () => {
@@ -109,7 +118,7 @@ describe('syncLogs', () => {
         >,
       );
 
-    it('単独で呼ばれたときは実行を開始し、成功で completed として終える', async () => {
+    it('単独で呼ばれたときは自分の実行を開始してそこへ進捗を送り、成功で completed として終える', async () => {
       mockAppend.mockResolvedValue(appendResult);
       succeedLoad();
 
@@ -119,7 +128,13 @@ describe('syncLogs', () => {
         syncMode: 'full',
         isFirstLaunch: false,
       });
-      expect(endInitProgressRun).toHaveBeenCalledWith(7, 'completed');
+      expect(mockAppend).toHaveBeenCalledWith(true, syncRun);
+      expect(mockLoadLogInfo).toHaveBeenCalledWith(
+        expect.objectContaining({ progress: syncRun }),
+      );
+      expect(syncRun.stage).toHaveBeenCalledWith('log_append', 100);
+      expect(syncRun.end).toHaveBeenCalledTimes(1);
+      expect(syncRun.end).toHaveBeenCalledWith('completed');
     });
 
     it('単独で呼ばれて失敗したときは error として終える', async () => {
@@ -131,20 +146,29 @@ describe('syncLogs', () => {
         syncMode: 'incremental',
         isFirstLaunch: false,
       });
-      expect(endInitProgressRun).toHaveBeenCalledWith(7, 'error');
+      expect(syncRun.end).toHaveBeenCalledTimes(1);
+      expect(syncRun.end).toHaveBeenCalledWith('error');
     });
 
-    it('permit を持った呼び出し元からの同期は実行を開始も終了もしない', async () => {
+    it('permit を持った呼び出し元からの同期は実行を開始も終了もせず、渡された報告先へ進捗を送る', async () => {
       mockAppend.mockResolvedValue(appendResult);
       succeedLoad();
+      const caller = createRunStub('startup');
 
       await runWithLogSyncLock((lock) =>
-        Effect.runPromise(syncLogsHoldingLock(lock, LOG_SYNC_MODE.INCREMENTAL)),
+        Effect.runPromise(
+          syncLogsHoldingLock(lock, LOG_SYNC_MODE.INCREMENTAL, caller),
+        ),
       );
 
       expect(mockAppend).toHaveBeenCalledTimes(1);
+      expect(mockAppend).toHaveBeenCalledWith(false, caller);
+      expect(mockLoadLogInfo).toHaveBeenCalledWith(
+        expect.objectContaining({ progress: caller }),
+      );
+      expect(caller.stage).toHaveBeenCalledWith('log_append', 0);
+      expect(caller.stage).toHaveBeenCalledWith('log_append', 100);
       expect(beginInitProgressRun).not.toHaveBeenCalled();
-      expect(endInitProgressRun).not.toHaveBeenCalled();
     });
   });
 

@@ -4,8 +4,7 @@ import { match } from 'ts-pattern';
 import { logger } from '../../lib/logger';
 import {
   beginInitProgressRun,
-  emitStageProgress,
-  endInitProgressRun,
+  type InitProgressRun,
 } from '../initProgress/emitter';
 import type { InitLaunch } from '../initProgress/schema';
 import type { LogInfoError } from '../logInfo/error';
@@ -66,7 +65,7 @@ export const toInitSyncMode = (mode: LogSyncMode): InitLaunch['syncMode'] =>
  * 同時に走ると、appendLoglines → loadLogInfo の順序前提が崩れ、DB 二重書き込みやキャッシュ不整合を
  * 招く (ADR-001)。モジュールスコープで単一インスタンスを保持し、全ての syncLogs 呼び出しを直列化する。
  * 進捗ストリームの実行（initProgress/emitter.ts）も permit を持っている間に開始・終了するので、
- * 単独の同期が起動時の初期化の実行を置き換えたり閉じたりすることは無い。
+ * 実行が重なることは無い。
  *
  * 生の boolean フラグ（共有可変状態）ではなく Semaphore を使う理由:
  * withPermits は Effect の完了時（成功・失敗・中断のいずれでも）permit を必ず解放するため、
@@ -100,7 +99,7 @@ type SyncLogsError =
  * 2. loadLogInfo: 保存されたログをデータベースに読み込む
  *
  * 並行呼び出しは syncMutex により直列化され、同時実行による順序崩れを防ぐ。
- * 単独の同期として進捗ストリームの実行を permit の内側で開始・終了する。
+ * 単独の同期として進捗ストリームの実行（`sync`）を permit の内側で開始・終了する。
  *
  * @param mode 同期モード (FULL: 全件処理, INCREMENTAL: 差分処理)
  * @returns 処理結果（作成されたログ情報を含む）
@@ -108,20 +107,22 @@ type SyncLogsError =
 export function syncLogs(
   mode: LogSyncMode,
 ): Effect.Effect<LogSyncResults, SyncLogsError> {
-  return syncMutex.withPermits(1)(withOwnInitProgressRun(mode, runSync(mode)));
+  return syncMutex.withPermits(1)(withOwnSyncRun(mode));
 }
 
 /**
  * permit を既に持っている呼び出し元（起動時の初期化）からログ同期を行う。
- * 進捗ストリームの実行は呼び出し元が持っているので、開始も終了もしない。
+ * 進捗は呼び出し元の実行へ送る。実行は呼び出し元が持っているので、開始も終了もしない。
  *
  * @param _lock runWithLogSyncLock から受け取った値。permit を持っていることの証明にだけ使う
+ * @param progress 進捗の送り先（起動時の初期化の実行のハンドル）
  */
 export function syncLogsHoldingLock(
   _lock: LogSyncLock,
   mode: LogSyncMode,
+  progress: InitProgressRun,
 ): Effect.Effect<LogSyncResults, SyncLogsError> {
-  return runSync(mode);
+  return runSync(mode, progress);
 }
 
 /**
@@ -150,6 +151,7 @@ export const runWithLogSyncLock = async <T>(
  */
 const runSync = (
   mode: LogSyncMode,
+  progress: InitProgressRun,
 ): Effect.Effect<LogSyncResults, SyncLogsError> =>
   Effect.gen(function* () {
     const isFullSync = mode === LOG_SYNC_MODE.FULL;
@@ -158,9 +160,9 @@ const runSync = (
 
     // Step 1: VRChatログファイルから新しいログ行を抽出・保存
     // ファイル単位の進捗は appendLoglinesToFileFromLogFilePathList 内で送られる
-    emitStageProgress('log_append', 0);
+    progress.stage('log_append', 0);
     const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
-      try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
+      try: () => appendLoglinesToFileFromLogFilePathList(isFullSync, progress),
       catch: (error) => {
         logger.error({
           message: 'Failed to append log lines',
@@ -177,7 +179,7 @@ const runSync = (
         });
       },
     });
-    emitStageProgress('log_append', 100);
+    progress.stage('log_append', 100);
 
     // Step 2: 保存されたログをデータベースに読み込む
     // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
@@ -188,6 +190,7 @@ const runSync = (
       preLoadedLogLines: isFullSync
         ? undefined
         : appendResult.processedLogLines,
+      progress,
     });
 
     logger.info(`Log sync completed successfully with mode: ${mode}`);
@@ -199,26 +202,22 @@ const runSync = (
   });
 
 /**
- * 単独のログ同期（手動更新・バックグラウンド同期など）の進捗ストリームの実行を開始・終了する。
+ * 単独のログ同期（手動更新・バックグラウンド同期など）を、自分の進捗ストリームの実行で行う。
  * syncMutex の permit の内側で呼ぶので、他の実行と重ならない。
  * 種類は `sync` なので、起動画面はこの実行を表示せず、統計の集計も行われない。
  */
-const withOwnInitProgressRun = <A, E>(
+const withOwnSyncRun = (
   mode: LogSyncMode,
-  effect: Effect.Effect<A, E>,
-): Effect.Effect<A, E> =>
+): Effect.Effect<LogSyncResults, SyncLogsError> =>
   Effect.suspend(() => {
-    const runId = beginInitProgressRun('sync', {
+    const run = beginInitProgressRun('sync', {
       syncMode: toInitSyncMode(mode),
       isFirstLaunch: false,
     });
-    return effect.pipe(
+    return runSync(mode, run).pipe(
       Effect.onExit((exit) =>
         Effect.sync(() => {
-          endInitProgressRun(
-            runId,
-            exit._tag === 'Success' ? 'completed' : 'error',
-          );
+          run.end(exit._tag === 'Success' ? 'completed' : 'error');
         }),
       ),
     );

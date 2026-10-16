@@ -4,21 +4,14 @@ import { logger } from '../../lib/logger';
 import { getPhotoCountPerLocalMonth } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import { countDistinctPlayerNames } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import { countDistinctVisitedWorlds } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
-import { emitInitStats, getActiveInitProgressRun } from './emitter';
 import {
+  createInitStatsCollector,
   createThrottledRunner,
-  flushInitStats,
-  requestInitStats,
   toInitStats,
 } from './stats';
 
 vi.mock('../../lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
-}));
-
-vi.mock('./emitter', () => ({
-  emitInitStats: vi.fn(),
-  getActiveInitProgressRun: vi.fn(() => null),
 }));
 
 vi.mock('../vrchatPhoto/model/vrchatPhotoPath.model', () => ({
@@ -203,6 +196,21 @@ describe('createThrottledRunner', () => {
     await settle();
     expect(task).toHaveBeenCalledTimes(2);
   });
+  it('close の後は予約していた実行も、新しい要求も実行しない', async () => {
+    const { timers, advance } = createManualTimers();
+    const task = vi.fn(() => Promise.resolve());
+    const runner = createThrottledRunner(task, 100, timers);
+
+    runner.request();
+    await settle();
+    runner.request(); // 間隔内なので予約される
+    runner.close();
+    advance(500);
+    runner.request();
+    await settle();
+
+    expect(task).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('toInitStats', () => {
@@ -239,7 +247,12 @@ describe('toInitStats', () => {
   });
 });
 
-describe('統計の集計', () => {
+describe('統計のコレクター', () => {
+  const waitForThrottle = async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 250));
+    await settle();
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getPhotoCountPerLocalMonth).mockResolvedValue([
@@ -249,152 +262,89 @@ describe('統計の集計', () => {
     vi.mocked(countDistinctPlayerNames).mockResolvedValue(4);
   });
 
-  it('単独の同期の実行では DB を数えない', async () => {
-    vi.mocked(getActiveInitProgressRun).mockReturnValue({
-      id: 1,
-      kind: 'sync',
-    });
+  it('数えた値を届け先へ渡す', async () => {
+    const deliver = vi.fn();
+    const collector = createInitStatsCollector(deliver);
 
-    requestInitStats();
-    await flushInitStats();
-    await settle();
+    await collector.flush();
 
-    expect(getPhotoCountPerLocalMonth).not.toHaveBeenCalled();
-    expect(countDistinctVisitedWorlds).not.toHaveBeenCalled();
-    expect(countDistinctPlayerNames).not.toHaveBeenCalled();
-    expect(emitInitStats).not.toHaveBeenCalled();
-  });
-
-  it('実行が無いときは DB を数えない', async () => {
-    vi.mocked(getActiveInitProgressRun).mockReturnValue(null);
-
-    await flushInitStats();
-
-    expect(getPhotoCountPerLocalMonth).not.toHaveBeenCalled();
-  });
-
-  it('起動時の初期化の実行では数えた値を送る', async () => {
-    vi.mocked(getActiveInitProgressRun).mockReturnValue({
-      id: 2,
-      kind: 'startup',
-    });
-
-    await flushInitStats();
-
-    expect(emitInitStats).toHaveBeenCalledWith(2, {
+    expect(deliver).toHaveBeenCalledWith({
       photos: 2,
       worlds: 3,
       people: 4,
       months: [{ month: '2024-08', count: 2 }],
     });
+    collector.close();
   });
 
   it('写真の登録中の要求ではワールド数・人数を数え直さず、ログの登録後と区切りでだけ数え直す', async () => {
-    vi.mocked(getActiveInitProgressRun).mockReturnValue({
-      id: 5,
-      kind: 'startup',
-    });
-    const waitForThrottle = async () => {
-      await new Promise<void>((resolve) => setTimeout(resolve, 250));
-      await settle();
-    };
+    const deliver = vi.fn();
+    const collector = createInitStatsCollector(deliver);
 
-    await flushInitStats();
-    requestInitStats();
+    await collector.flush();
+    collector.request({ logsChanged: false });
     await waitForThrottle();
 
     expect(getPhotoCountPerLocalMonth).toHaveBeenCalledTimes(2);
     expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(1);
     expect(countDistinctPlayerNames).toHaveBeenCalledTimes(1);
-    expect(emitInitStats).toHaveBeenLastCalledWith(
-      5,
+    expect(deliver).toHaveBeenLastCalledWith(
       expect.objectContaining({ worlds: 3, people: 4 }),
     );
 
-    requestInitStats({ logsChanged: true });
+    collector.request({ logsChanged: true });
     await waitForThrottle();
 
     expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(2);
     expect(countDistinctPlayerNames).toHaveBeenCalledTimes(2);
+
+    await collector.flush();
+
+    expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(3);
+    collector.close();
   });
 
   it('ワールド数・人数の数え直しに失敗したら、次の集計で改めて数え直す', async () => {
-    vi.mocked(getActiveInitProgressRun).mockReturnValue({
-      id: 6,
-      kind: 'startup',
-    });
-    const waitForThrottle = async () => {
-      await new Promise<void>((resolve) => setTimeout(resolve, 250));
-      await settle();
-    };
+    const deliver = vi.fn();
+    const collector = createInitStatsCollector(deliver);
 
-    await flushInitStats();
+    await collector.flush();
     vi.mocked(countDistinctVisitedWorlds).mockRejectedValueOnce(
       new Error('busy'),
     );
     vi.mocked(countDistinctVisitedWorlds).mockResolvedValue(9);
-    requestInitStats({ logsChanged: true });
+    collector.request({ logsChanged: true });
     await waitForThrottle();
-    requestInitStats();
+    collector.request({ logsChanged: false });
     await waitForThrottle();
 
     expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(3);
-    expect(emitInitStats).toHaveBeenLastCalledWith(
-      6,
+    expect(deliver).toHaveBeenLastCalledWith(
       expect.objectContaining({ worlds: 9 }),
     );
+    collector.close();
   });
 
-  it('集計を始めた実行の ID で送り、集計中に実行が入れ替わっても後の実行の ID を使わない', async () => {
-    vi.mocked(getActiveInitProgressRun).mockReturnValue({
-      id: 7,
-      kind: 'startup',
-    });
-    let resolveMonths: (
-      months: { month: string; count: number }[],
-    ) => void = () => {};
-    vi.mocked(getPhotoCountPerLocalMonth).mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveMonths = resolve;
-      }),
-    );
-
-    const flushing = flushInitStats();
-    await settle();
-    vi.mocked(getActiveInitProgressRun).mockReturnValue({
-      id: 8,
-      kind: 'startup',
-    });
-    resolveMonths([{ month: '2024-08', count: 2 }]);
-    await flushing;
-
-    expect(emitInitStats).toHaveBeenCalledWith(7, expect.anything());
-    expect(emitInitStats).not.toHaveBeenCalledWith(8, expect.anything());
-  });
-
-  it('集計の失敗は実行ごとに 1 回だけ error で報告し、同じ実行の 2 回目以降は warn にする', async () => {
+  it('集計の失敗はコレクターごとに 1 回だけ error で報告し、同じコレクターの 2 回目以降は warn にする', async () => {
     vi.mocked(getPhotoCountPerLocalMonth).mockRejectedValue(
       new Error('database is locked'),
     );
-    vi.mocked(getActiveInitProgressRun).mockReturnValue({
-      id: 10,
-      kind: 'startup',
-    });
+    const deliver = vi.fn();
+    const first = createInitStatsCollector(deliver);
 
-    await flushInitStats();
-    await flushInitStats();
-    await flushInitStats();
+    await first.flush();
+    await first.flush();
+    await first.flush();
 
     expect(logger.error).toHaveBeenCalledTimes(1);
     expect(logger.warn).toHaveBeenCalledTimes(2);
-    expect(emitInitStats).not.toHaveBeenCalled();
+    expect(deliver).not.toHaveBeenCalled();
+    first.close();
 
-    vi.mocked(getActiveInitProgressRun).mockReturnValue({
-      id: 11,
-      kind: 'startup',
-    });
-    await flushInitStats();
+    const second = createInitStatsCollector(deliver);
+    await second.flush();
 
     expect(logger.error).toHaveBeenCalledTimes(2);
+    second.close();
   });
 });
