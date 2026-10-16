@@ -167,15 +167,26 @@ const collectAndEmitStats = (): Promise<void> => {
   if (run?.kind !== 'startup') {
     return Promise.resolve();
   }
+  const cached =
+    !logCountsStale && logCounts?.runId === run.id ? logCounts : null;
+  logCountsStale = false;
   return Effect.runPromise(
     Effect.tryPromise({
       try: async () => {
-        const [months, worlds, people] = await Promise.all([
+        const [months, counts] = await Promise.all([
           getPhotoCountPerLocalMonth(),
-          countDistinctVisitedWorlds(),
-          countDistinctPlayerNames(),
+          cached ??
+            Promise.all([
+              countDistinctVisitedWorlds(),
+              countDistinctPlayerNames(),
+            ]).then(([worlds, people]) => ({ runId: run.id, worlds, people })),
         ]);
-        return toInitStats({ months, worlds, people });
+        logCounts = counts;
+        return toInitStats({
+          months,
+          worlds: counts.worlds,
+          people: counts.people,
+        });
       },
       catch: (cause) =>
         new InitStatsQueryError('Failed to collect init progress stats', {
@@ -194,6 +205,14 @@ const collectAndEmitStats = (): Promise<void> => {
   );
 };
 
+/**
+ * ワールド数・人数はログの登録でしか変わらないため、写真の登録中は再集計しない。
+ * ログを登録したとき（`requestInitStats({ logsChanged: true })`）と実行の区切り
+ * （`flushInitStats`）でだけ数え直す。
+ */
+let logCounts: { runId: number; worlds: number; people: number } | null = null;
+let logCountsStale = true;
+
 const statsRunner = createThrottledRunner(collectAndEmitStats, INTERVAL_MS);
 
 const isStartupRunActive = (): boolean =>
@@ -201,10 +220,16 @@ const isStartupRunActive = (): boolean =>
 
 /**
  * 統計の更新を求める。DB に登録が入るたびに呼んでよい（送信は間引かれる）。
+ * ログ（ワールド・プレイヤーの記録）を登録した後は `logsChanged: true` を渡す。
  * 起動時の初期化の間でなければ何もしない。
  */
-export const requestInitStats = (): void => {
+export const requestInitStats = (
+  options: { logsChanged?: boolean } = {},
+): void => {
   if (isStartupRunActive()) {
+    if (options.logsChanged === true) {
+      logCountsStale = true;
+    }
     statsRunner.request();
   }
 };
@@ -214,5 +239,10 @@ export const requestInitStats = (): void => {
  * 実行の区切り（DB 準備完了直後・実行終了直前）で最新の値を確実に届けるために使う。
  * 起動時の初期化の間でなければ何もしない。
  */
-export const flushInitStats = (): Promise<void> =>
-  isStartupRunActive() ? statsRunner.flush() : Promise.resolve();
+export const flushInitStats = (): Promise<void> => {
+  if (!isStartupRunActive()) {
+    return Promise.resolve();
+  }
+  logCountsStale = true;
+  return statsRunner.flush();
+};

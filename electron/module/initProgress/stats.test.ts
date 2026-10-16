@@ -289,6 +289,34 @@ describe('統計の集計', () => {
     });
   });
 
+  it('写真の登録中の要求ではワールド数・人数を数え直さず、ログの登録後と区切りでだけ数え直す', async () => {
+    vi.mocked(getActiveInitProgressRun).mockReturnValue({
+      id: 5,
+      kind: 'startup',
+    });
+    const waitForThrottle = async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
+      await settle();
+    };
+
+    await flushInitStats();
+    requestInitStats();
+    await waitForThrottle();
+
+    expect(getPhotoCountPerLocalMonth).toHaveBeenCalledTimes(2);
+    expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(1);
+    expect(countDistinctPlayerNames).toHaveBeenCalledTimes(1);
+    expect(emitInitStats).toHaveBeenLastCalledWith(
+      expect.objectContaining({ worlds: 3, people: 4 }),
+    );
+
+    requestInitStats({ logsChanged: true });
+    await waitForThrottle();
+
+    expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(2);
+    expect(countDistinctPlayerNames).toHaveBeenCalledTimes(2);
+  });
+
   it('集計の失敗は実行ごとに 1 回だけ error で報告し、同じ実行の 2 回目以降は warn にする', async () => {
     vi.mocked(getPhotoCountPerLocalMonth).mockRejectedValue(
       new Error('database is locked'),

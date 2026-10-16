@@ -476,7 +476,7 @@ export function loadLogInfoIndexFromVRChatLog({
     );
     // 書き込みが 0 件でもステージを完了させる（コミット後なのでワールド数・人数も更新できる）
     reportLogsInserted(newLogs.length);
-    requestInitStats();
+    requestInitStats({ logsChanged: true });
 
     // 6. 写真のインデックス処理
     // excludeOldLogLoad=true → 差分スキャン（ダイジェスト・mtime使用）

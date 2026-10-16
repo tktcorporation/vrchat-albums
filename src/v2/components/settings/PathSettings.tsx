@@ -30,6 +30,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
     stage: progressStage,
     overallProgress,
     details: progressDetails,
+    reset: resetProgress,
   } = useInitProgress();
   const progressMessage = progressStage
     ? t(`initProgress.stage.${progressStage}`)
@@ -167,6 +168,8 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   const handleRefreshAll = async () => {
     if (!isRefreshing) {
+      // 前回の同期の「完了 100%」を残したまま新しい同期の表示を始めない
+      resetProgress();
       await syncLogs(LOG_SYNC_MODE.FULL);
     }
   };
