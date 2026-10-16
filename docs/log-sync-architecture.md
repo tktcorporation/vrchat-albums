@@ -90,12 +90,12 @@ const result = await syncLogsInBackground();
 - **トリガー**: リフレッシュボタン
 - **理由**: 通常の更新では最新データのみで十分
 
-### 3. useStartUpStage.ts（起動処理）
+### 3. settingsController.ts の initializeAppData（起動処理）
 
 - **モード**: 動的判定
   - 初回起動時（既存ログ0件 or DBエラー）: FULL
   - 通常起動時（既存ログあり）: INCREMENTAL
-- **トリガー**: アプリ起動時
+- **トリガー**: アプリ起動時、利用規約への同意後（画面側の流れは `src/v2/entryFlow/` が決める）
 - **判定ロジック**: 既存のワールド参加ログの件数で初回起動を判定
 
 ### 4. electronUtil.ts（バックグラウンド処理）
