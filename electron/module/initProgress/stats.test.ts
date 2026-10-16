@@ -345,6 +345,33 @@ describe('統計の集計', () => {
     );
   });
 
+  it('集計を始めた実行の ID で送り、集計中に実行が入れ替わっても後の実行の ID を使わない', async () => {
+    vi.mocked(getActiveInitProgressRun).mockReturnValue({
+      id: 7,
+      kind: 'startup',
+    });
+    let resolveMonths: (
+      months: { month: string; count: number }[],
+    ) => void = () => {};
+    vi.mocked(getPhotoCountPerLocalMonth).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveMonths = resolve;
+      }),
+    );
+
+    const flushing = flushInitStats();
+    await settle();
+    vi.mocked(getActiveInitProgressRun).mockReturnValue({
+      id: 8,
+      kind: 'startup',
+    });
+    resolveMonths([{ month: '2024-08', count: 2 }]);
+    await flushing;
+
+    expect(emitInitStats).toHaveBeenCalledWith(7, expect.anything());
+    expect(emitInitStats).not.toHaveBeenCalledWith(8, expect.anything());
+  });
+
   it('集計の失敗は実行ごとに 1 回だけ error で報告し、同じ実行の 2 回目以降は warn にする', async () => {
     vi.mocked(getPhotoCountPerLocalMonth).mockRejectedValue(
       new Error('database is locked'),

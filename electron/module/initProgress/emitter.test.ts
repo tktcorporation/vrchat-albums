@@ -115,12 +115,12 @@ describe('init progress emitter', () => {
   });
 
   it('ステージ送信前の統計は保持し、ステージ送信後は現在地と一緒に送る', () => {
-    begin('startup', null);
-    emitInitStats(openRunIds.at(-1) ?? 0, stats);
+    const runId = begin('startup', null);
+    emitInitStats(runId, stats);
     expect(received).toEqual([]);
 
     emitStageProgress('database_sync', 100);
-    emitInitStats(openRunIds.at(-1) ?? 0, stats);
+    emitInitStats(runId, stats);
     expect(received.at(-1)).toMatchObject({
       stage: 'database_sync',
       progress: 100,
@@ -130,7 +130,7 @@ describe('init progress emitter', () => {
 
   it('再送用の最新状態は最後の進捗と最新の統計を合わせたもの', () => {
     const runId = begin('startup', { syncMode: 'full', isFirstLaunch: true });
-    emitInitStats(openRunIds.at(-1) ?? 0, stats);
+    emitInitStats(runId, stats);
     emitStageProgress('photo_index', 40, {
       current: 4,
       total: 10,
@@ -149,7 +149,7 @@ describe('init progress emitter', () => {
   });
 
   it('統計だけのイベントと再送は、現在のステージの実件数を保つ', () => {
-    begin('startup', { syncMode: 'full', isFirstLaunch: true });
+    const runId = begin('startup', { syncMode: 'full', isFirstLaunch: true });
     const details = {
       current: 3412,
       total: 8900,
@@ -157,7 +157,7 @@ describe('init progress emitter', () => {
       currentItem: '2024-08',
     };
     emitStageProgress('photo_index', 38, details);
-    emitInitStats(openRunIds.at(-1) ?? 0, stats);
+    emitInitStats(runId, stats);
     // 同じステージで details を省いた進捗も、直前の実件数を載せる
     emitStageProgress('photo_index', 39);
 
@@ -172,14 +172,14 @@ describe('init progress emitter', () => {
   });
 
   it('ステージが変わったら前のステージの実件数を載せない', () => {
-    begin('startup', { syncMode: 'full', isFirstLaunch: true });
+    const runId = begin('startup', { syncMode: 'full', isFirstLaunch: true });
     emitStageProgress('photo_index', 100, {
       current: 10,
       total: 10,
       unit: 'photos',
     });
     emitStageProgress('photo_metadata', 0);
-    emitInitStats(openRunIds.at(-1) ?? 0, stats);
+    emitInitStats(runId, stats);
 
     expect(received[1].details).toBeUndefined();
     expect(received[2].details).toBeUndefined();
@@ -224,9 +224,12 @@ describe('init progress emitter', () => {
   });
 
   it('単独の同期の実行では統計を保持も送信もしない', () => {
-    begin('sync', { syncMode: 'incremental', isFirstLaunch: false });
+    const runId = begin('sync', {
+      syncMode: 'incremental',
+      isFirstLaunch: false,
+    });
     emitStageProgress('log_append', 10);
-    emitInitStats(openRunIds.at(-1) ?? 0, stats);
+    emitInitStats(runId, stats);
     emitStageProgress('log_append', 20);
 
     expect(received).toHaveLength(2);
