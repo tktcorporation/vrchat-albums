@@ -27,10 +27,12 @@ const isFontFile = (filePath: string): boolean => {
 const BUNDLED_FONTS_DIR = path.join(__dirname, '../../resources/fonts');
 
 describe('loadFonts', () => {
-  it('日本語を描けるフォントを 1 つ以上解決する', async () => {
+  it('日本語を描ける Noto Sans JP を解決する', async () => {
     const fontFilePaths = await Effect.runPromise(loadFonts());
 
-    expect(fontFilePaths.length).toBeGreaterThan(0);
+    expect(
+      fontFilePaths.some((p) => path.basename(p).startsWith('NotoSansJP')),
+    ).toBe(true);
   });
 
   it('解決したファイルはすべてフォントとして読める', async () => {
