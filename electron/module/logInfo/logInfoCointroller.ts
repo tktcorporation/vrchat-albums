@@ -1,3 +1,7 @@
+import {
+  buildWorldSessions,
+  findSessionStartingAt,
+} from '@shared/worldSession';
 import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 import z from 'zod';
@@ -12,10 +16,10 @@ import {
 } from '../../lib/errors';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
-import { findVRChatWorldJoinLogFromPhotoList } from '../vrchatWorldJoinLogFromPhoto/service';
 import { logger } from './../../lib/logger';
 import { procedure, router as trpcRouter } from './../../trpc';
 import {
+  fetchAndMergeSortedWorldJoinLogs,
   getFrequentPlayerNames,
   getPlayerNameSuggestions,
   getWorldNameSuggestions,
@@ -31,63 +35,6 @@ const mapWorldJoinLogDbError = toUserFacing<{ message: string }>({
   category: ERROR_CATEGORIES.DATABASE_ERROR,
   userMessage: 'ワールド参加ログの取得中にエラーが発生しました。',
 });
-
-/**
- * 統合されたワールド参加ログを取得・マージ・ソートする共通関数
- *
- * 予期しないエラーのみ発生するため、Effect の defect として伝播する。
- * E チャネルは never（型付きエラーなし）。
- *
- * @param searchParams - ログ検索パラメーター
- * @param sortOrder - ソート順序（'desc' = 降順、'asc' = 昇順）
- * @returns ソート済みの統合ログ配列
- */
-const fetchAndMergeSortedWorldJoinLogs = (
-  searchParams: {
-    ltJoinDateTime?: Date;
-    gtJoinDateTime?: Date;
-    orderByJoinDateTime: 'asc' | 'desc';
-  },
-  sortOrder: 'desc' | 'asc' = 'desc',
-): Effect.Effect<
-  {
-    id: string;
-    worldId: string;
-    worldName: string;
-    worldInstanceId: string;
-    joinDateTime: Date;
-    createdAt: Date;
-    updatedAt: Date | null;
-  }[]
-> =>
-  Effect.promise(async () => {
-    // 通常ログとPhotoAsLogを並行取得
-    const [normalLogs, photoLogs] = await Promise.all([
-      worldJoinLogService.findVRChatWorldJoinLogList(searchParams),
-      findVRChatWorldJoinLogFromPhotoList(searchParams),
-    ]);
-
-    logger.debug({
-      message: 'World join logs retrieved',
-      normalLogsCount: normalLogs.length,
-      photoLogsCount: photoLogs.length,
-    });
-
-    // 統合してソート
-    const mergedLogs = worldJoinLogService.mergeVRChatWorldJoinLogs({
-      normalLogs: normalLogs,
-      photoLogs: photoLogs,
-    });
-
-    // 指定された順序でソート
-    const sortedLogs = mergedLogs.toSorted((a, b) =>
-      sortOrder === 'desc'
-        ? b.joinDateTime.getTime() - a.joinDateTime.getTime()
-        : a.joinDateTime.getTime() - b.joinDateTime.getTime(),
-    );
-
-    return sortedLogs;
-  });
 
 /**
  * すべてのワールド参加ログを取得し、tRPC 用の形式に変換する
@@ -204,8 +151,15 @@ export const logInfoRouter = () =>
     /**
      * セッション情報（ワールド情報+プレイヤー情報）を効率的にバッチ取得
      * フロントエンドのバッチマネージャーからの複数リクエストを一つのDBクエリで処理
-     * @param joinDateTimes - 参加日時の配列
-     * @returns 日時ごとのセッション情報のマップ
+     *
+     * 入力はギャラリーのグループの joinDateTime（セッションの開始日時）。
+     * その日時で始まるセッションの区間 `[join, nextJoin)` に参加したプレイヤーを返し、
+     * 時刻からセッションを引き直すことはしない。区切りは `@shared/worldSession` の判定と
+     * 通常ログ + 写真由来ログのマージ済み参加ログに従い、ギャラリーのグループと一致する。
+     * 開始日時が一致するセッションが無い日時は、ワールド情報 null・プレイヤー空で返す。
+     *
+     * @param joinDateTimes - セッション開始日時の配列
+     * @returns 日時（toISOString）ごとのセッション情報のマップ
      */
     getSessionInfoBatch: procedure
       .input(
@@ -254,63 +208,54 @@ export const logInfoRouter = () =>
             `[SessionInfoBatch] Processing batch request for ${ctx.input.length} sessions`,
           );
 
-          // 統合されたワールド参加ログを取得（PhotoAsLogを含む）
+          // 要求された開始日時を含む範囲の参加ログと、範囲より後で最も早い参加ログ 1 件を
+          // 取得する（その 1 件は最後に要求されたセッションの終端になる）。後者は通常ログと
+          // 写真由来ログからそれぞれ最も早い 1 件だけを取り、マージ後の先頭を使う。
+          // gt / lt は境界を含まないため、1ms 広げて要求日時ちょうどの参加ログを含める
           const worldLogStartTime = performance.now();
-          const maxDateTime = Math.max(...ctx.input.map((d) => d.getTime()));
-          const searchEndTime = new Date(maxDateTime + 1000);
+          const requestedTimes = ctx.input.map((d) => d.getTime());
+          const minRequestedTime = Math.min(...requestedTimes);
+          const maxRequestedTime = Math.max(...requestedTimes);
 
-          // 要求された時刻までのログを取得
-          // fetchAndMergeSortedWorldJoinLogs は Effect を返すので Effect.runPromise で実行
-          const logsBeforeRequest = await Effect.runPromise(
-            fetchAndMergeSortedWorldJoinLogs(
-              {
-                ltJoinDateTime: searchEndTime,
-                orderByJoinDateTime: 'desc',
-              },
-              'desc',
-            ),
+          const [logsInRange, logsAfterRange] = await Effect.runPromise(
+            Effect.all([
+              fetchAndMergeSortedWorldJoinLogs(
+                {
+                  gtJoinDateTime: new Date(minRequestedTime - 1),
+                  ltJoinDateTime: new Date(maxRequestedTime + 1),
+                  orderByJoinDateTime: 'asc',
+                },
+                'asc',
+              ),
+              fetchAndMergeSortedWorldJoinLogs(
+                {
+                  gtJoinDateTime: new Date(maxRequestedTime),
+                  orderByJoinDateTime: 'asc',
+                  limit: 1,
+                },
+                'asc',
+              ),
+            ]),
           );
 
-          // 次のワールド参加ログを1件だけ追加で取得（セッション境界判定のため）
-          const nextLogResult = await Effect.runPromise(
-            fetchAndMergeSortedWorldJoinLogs(
-              {
-                gtJoinDateTime: searchEndTime,
-                orderByJoinDateTime: 'asc',
-              },
-              'asc',
-            ),
-          );
-
-          // 2つの結果を統合してソート
-          const sortedLogs = [
-            ...logsBeforeRequest,
-            ...(nextLogResult.length > 0 ? [nextLogResult[0]] : []),
-          ].toSorted(
-            (a, b) => b.joinDateTime.getTime() - a.joinDateTime.getTime(),
-          );
+          const sessions = buildWorldSessions([
+            ...logsInRange,
+            ...logsAfterRange.slice(0, 1),
+          ]);
 
           const worldLogTime = performance.now() - worldLogStartTime;
           logger.debug(
             `[SessionInfoBatch] Merged world join logs retrieved in ${worldLogTime.toFixed(
               2,
-            )}ms (${sortedLogs.length} merged logs)`,
+            )}ms (${sessions.length} sessions)`,
           );
 
-          // 各日時に対する最適なワールド参加ログを効率的に見つける（元のロジックと同じ）
           const sessionMappingStartTime = performance.now();
           for (const joinDateTime of ctx.input) {
             const dateKey = joinDateTime.toISOString();
-            const perSessionSearchEndTime = new Date(
-              joinDateTime.getTime() + 1000,
-            );
+            const session = findSessionStartingAt(sessions, joinDateTime);
 
-            // 指定時刻以前の最新ログを検索
-            const recentWorldJoin = sortedLogs.find(
-              (log) => log.joinDateTime <= perSessionSearchEndTime,
-            );
-
-            if (!recentWorldJoin) {
+            if (session === null) {
               results[dateKey] = {
                 worldId: null,
                 worldName: null,
@@ -320,35 +265,26 @@ export const logInfoRouter = () =>
               continue;
             }
 
-            // 次のワールド参加ログを検索（時系列順で最初に見つかるもの）
-            const nextWorldJoin = sortedLogs
-              .filter((log) => log.joinDateTime > recentWorldJoin.joinDateTime)
-              .toSorted(
-                (a, b) => a.joinDateTime.getTime() - b.joinDateTime.getTime(),
-              )[0];
-
-            const endDateTime = nextWorldJoin?.joinDateTime;
-
             sessionRanges.push({
               dateKey,
-              start: recentWorldJoin.joinDateTime,
-              end: endDateTime,
-              worldId: recentWorldJoin.worldId,
-              worldName: recentWorldJoin.worldName,
-              worldInstanceId: recentWorldJoin.worldInstanceId,
+              start: session.join.joinDateTime,
+              end: session.nextJoinDateTime,
+              worldId: session.join.worldId,
+              worldName: session.join.worldName,
+              worldInstanceId: session.join.worldInstanceId,
             });
 
             logger.debug(
-              `[SessionInfoBatch] Session range for ${dateKey}: ${recentWorldJoin.joinDateTime.toISOString()} to ${
-                endDateTime?.toISOString() || 'undefined'
-              } (${recentWorldJoin.worldName})`,
+              `[SessionInfoBatch] Session range for ${dateKey}: ${session.join.joinDateTime.toISOString()} to ${
+                session.nextJoinDateTime?.toISOString() ?? 'undefined'
+              } (${session.join.worldName})`,
             );
 
             // 初期化（プレイヤー情報は後で追加）
             results[dateKey] = {
-              worldId: recentWorldJoin.worldId,
-              worldName: recentWorldJoin.worldName,
-              worldInstanceId: recentWorldJoin.worldInstanceId,
+              worldId: session.join.worldId,
+              worldName: session.join.worldName,
+              worldInstanceId: session.join.worldInstanceId,
               players: [],
             };
           }

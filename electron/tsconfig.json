@@ -27,7 +27,10 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "rootDir": ".."
+    "rootDir": "..",
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
   },
   "exclude": ["node_modules", "vite.config.ts"],
   "include": ["./**/*.ts", "./**/*.tsx", "./**/*.js", "./**/*.d.ts"]

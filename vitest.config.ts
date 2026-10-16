@@ -54,7 +54,10 @@ export default defineConfig({
         test: {
           name: 'electron',
           environment: 'node',
-          include: ['electron/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+          include: [
+            'electron/**/*.{test,spec}.{js,jsx,ts,tsx}',
+            'shared/**/*.{test,spec}.{js,jsx,ts,tsx}',
+          ],
           setupFiles: ['./vitest.setup.ts'],
         },
         resolve: {

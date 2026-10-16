@@ -26,6 +26,7 @@ export const findVRChatWorldJoinLogFromPhotoList = async (query?: {
   gtJoinDateTime?: Date;
   ltJoinDateTime?: Date;
   orderByJoinDateTime: 'asc' | 'desc';
+  limit?: number;
 }) => {
   const modelList = await Model.findVRChatWorldJoinLogFromPhotoList(query);
   return modelList.map((m) => {

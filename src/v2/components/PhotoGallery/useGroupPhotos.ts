@@ -1,3 +1,4 @@
+import { buildWorldSessions, resolveSessionIndex } from '@shared/worldSession';
 import { useEffect, useMemo, useRef } from 'react';
 
 import { trpcReact } from '@/trpc';
@@ -8,15 +9,6 @@ interface WorldInfo {
   worldId: string;
   worldName: string;
   worldInstanceId: string;
-}
-
-interface Session {
-  worldId: string;
-  worldName: string;
-  worldInstanceId: string;
-  joinTime: Date;
-  leaveTime?: Date;
-  photos: Photo[];
 }
 
 export interface GroupedPhoto {
@@ -45,123 +37,22 @@ export interface DebugInfo {
 }
 
 /**
- * ログからセッションを構築する（改善版）
+ * 最初のワールド参加より前に撮られた写真の割り当て先（古い順のセッション列の添字）。
  *
- * @param joinLogs ワールド参加ログ（新しい順）
- * @param leaveLogs ワールド退出ログ（利用可能な場合）
- * @returns セッションの配列（新しい順）
+ * 共通の判定（`resolveSessionIndex`）はこの写真に「セッション無し」を返すが、
+ * ギャラリーでは写真を非表示にせず最も近いセッションへ寄せて表示する。
+ * 撮影時刻はすべての参加時刻より前なので、最も近いのは最も古いセッションになる。
  */
-function buildSessions(
-  joinLogs: WorldJoinLog[],
-  leaveLogs: { leaveDateTime: Date; reason?: string }[] = [],
-): Session[] {
-  const sessions: Session[] = [];
-
-  // 新しい順のログを古い順に処理（時系列順）
-  const chronologicalJoins = [...joinLogs].toReversed();
-  const chronologicalLeaves = [...leaveLogs].toSorted(
-    (a, b) => a.leaveDateTime.getTime() - b.leaveDateTime.getTime(),
-  );
-
-  for (let i = 0; i < chronologicalJoins.length; i++) {
-    const currentJoin = chronologicalJoins[i];
-    const nextJoin = chronologicalJoins[i + 1];
-
-    // このセッションに対応する退出ログを探す
-    let sessionLeaveTime: Date | undefined;
-
-    if (leaveLogs.length > 0) {
-      // 現在の参加時刻以降で最初の退出ログを探す
-      const correspondingLeave = chronologicalLeaves.find(
-        (leave) =>
-          leave.leaveDateTime.getTime() > currentJoin.joinDateTime.getTime() &&
-          (!nextJoin ||
-            leave.leaveDateTime.getTime() < nextJoin.joinDateTime.getTime()),
-      );
-      sessionLeaveTime = correspondingLeave?.leaveDateTime;
-    }
-
-    // 退出ログが見つからない場合、次の参加ログを退出時刻として使用
-    if (!sessionLeaveTime && nextJoin) {
-      sessionLeaveTime = nextJoin.joinDateTime;
-    }
-
-    const session: Session = {
-      worldId: currentJoin.worldId,
-      worldName: currentJoin.worldName,
-      worldInstanceId: currentJoin.worldInstanceId,
-      joinTime: currentJoin.joinDateTime,
-      leaveTime: sessionLeaveTime,
-      photos: [],
-    };
-
-    sessions.push(session);
-  }
-
-  // 新しい順に戻す
-  return sessions.toReversed();
-}
-
-/**
- * 写真をセッションに割り当てる
- *
- * @param photo 割り当てる写真
- * @param sessions セッションの配列（新しい順）
- * @returns 割り当て先のセッション、見つからない場合はnull
- */
-function assignPhotoToSession(
-  photo: Photo,
-  sessions: Session[],
-): Session | null {
-  const photoTime = photo.takenAt.getTime();
-
-  // 1. 写真撮影時刻に対応するアクティブなセッションを探す
-  const activeSession = sessions.find((session) => {
-    const joinTime = session.joinTime.getTime();
-    const leaveTime = session.leaveTime?.getTime();
-
-    // セッション期間内に撮影された写真
-    if (leaveTime) {
-      return photoTime >= joinTime && photoTime < leaveTime;
-    }
-    // 最新のセッション（終了時刻が不明）
-    return photoTime >= joinTime;
-  });
-
-  if (activeSession) {
-    return activeSession;
-  }
-
-  // 2. フォールバック: 最も近いセッションを探す
-  let closestSession: Session | null = null;
-  let minDiff = Number.POSITIVE_INFINITY;
-
-  for (const session of sessions) {
-    const joinDiff = Math.abs(session.joinTime.getTime() - photoTime);
-
-    if (joinDiff < minDiff) {
-      minDiff = joinDiff;
-      closestSession = session;
-    }
-
-    // leaveTimeがある場合は、それとの差も考慮
-    if (session.leaveTime) {
-      const leaveDiff = Math.abs(session.leaveTime.getTime() - photoTime);
-      if (leaveDiff < minDiff) {
-        minDiff = leaveDiff;
-        closestSession = session;
-      }
-    }
-  }
-
-  return closestSession;
-}
+const NEAREST_SESSION_INDEX_BEFORE_FIRST_JOIN = 0;
 
 /**
  * 写真をVRChatのワールドセッション単位でグループ化する
  *
+ * セッションの区切りは `@shared/worldSession` の判定に従い、プレイヤー一覧・
+ * プレイヤー検索と同じワールドへ写真を振り分ける。
+ *
  * @param photos グループ化する写真配列
- * @param joinLogs 降順に並べたワールド参加ログ
+ * @param joinLogs ワールド参加ログ（通常ログと写真由来ログのマージ済み。並び順は問わない）
  * @returns ワールド情報を含むグループ配列
  */
 export function groupPhotosBySession(
@@ -173,38 +64,31 @@ export function groupPhotosBySession(
     return [];
   }
 
-  // セッションを構築
-  const sessions = buildSessions(joinLogs);
+  // 古い順のセッション列（境界は共通の判定に従う）
+  const sessions = buildWorldSessions(joinLogs);
+  const photosBySession: Photo[][] = sessions.map(() => []);
 
-  // 写真を新しい順にソート
-  const sortedPhotos = [...photos].toSorted(
-    (a, b) => b.takenAt.getTime() - a.takenAt.getTime(),
-  );
-
-  // 各写真をセッションに割り当て
-  for (const photo of sortedPhotos) {
-    const session = assignPhotoToSession(photo, sessions);
-    if (session) {
-      session.photos.push(photo);
-    } else {
-      console.warn(
-        `Could not find appropriate session for photo: ${photo.id} taken at ${photo.takenAt.toISOString()}`,
-      );
-    }
+  for (const photo of photos) {
+    const index =
+      resolveSessionIndex(sessions, photo.takenAt) ??
+      NEAREST_SESSION_INDEX_BEFORE_FIRST_JOIN;
+    photosBySession[index].push(photo);
   }
 
-  // セッションからGroupedPhoto形式に変換
-  const groups: GroupedPhoto[] = sessions.map((session) => ({
-    photos: session.photos.toSorted(
-      (a, b) => b.takenAt.getTime() - a.takenAt.getTime(),
-    ),
-    worldInfo: {
-      worldId: session.worldId,
-      worldName: session.worldName,
-      worldInstanceId: session.worldInstanceId,
-    },
-    joinDateTime: session.joinTime,
-  }));
+  // セッションから GroupedPhoto 形式に変換（新しい順）
+  const groups: GroupedPhoto[] = sessions
+    .map((session, index) => ({
+      photos: photosBySession[index].toSorted(
+        (a, b) => b.takenAt.getTime() - a.takenAt.getTime(),
+      ),
+      worldInfo: {
+        worldId: session.join.worldId,
+        worldName: session.join.worldName,
+        worldInstanceId: session.join.worldInstanceId,
+      },
+      joinDateTime: session.join.joinDateTime,
+    }))
+    .toReversed();
 
   return groups;
 }
@@ -291,11 +175,14 @@ export function useGroupPhotos(
 
     // セッション情報を追加
     if (joinLogs) {
-      const sessions = buildSessions(joinLogs);
+      const sessions = buildWorldSessions(joinLogs);
+      const openSessions = sessions.filter(
+        (s) => s.nextJoinDateTime === undefined,
+      ).length;
       baseDebug.sessionInfo = {
         totalSessions: sessions.length,
-        openSessions: sessions.filter((s) => !s.leaveTime).length,
-        closedSessions: sessions.filter((s) => s.leaveTime).length,
+        openSessions,
+        closedSessions: sessions.length - openSessions,
       };
     }
 

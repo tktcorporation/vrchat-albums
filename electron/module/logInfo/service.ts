@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks';
 
 import { col, fn, literal, Op } from '@sequelize/core';
+import { buildWorldSessions, resolveSession } from '@shared/worldSession';
 import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
@@ -26,6 +27,7 @@ import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/pla
 import * as playerLeaveLogService from '../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
 import { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
+import { findVRChatWorldJoinLogFromPhotoList } from '../vrchatWorldJoinLogFromPhoto/service';
 import { LogInfoError } from './error';
 import { type LogInfoServiceError, LogInfoUnknownError } from './errors';
 
@@ -611,43 +613,102 @@ export const getFrequentPlayerNames = (
 };
 
 /**
+ * 通常のワールド参加ログと写真由来の参加ログを取得し、マージして並べる
+ *
+ * ワールドセッションの判定（`@shared/worldSession`）に渡す参加ログの取得元。
+ * 写真のグループ化と同じく、通常ログと写真由来ログを `mergeVRChatWorldJoinLogs`
+ * でマージした列を使うことで、プレイヤー一覧・検索とギャラリーの区切りを揃える。
+ *
+ * 予期しないエラーのみ発生するため、Effect の defect として伝播する。
+ * E チャネルは never（型付きエラーなし）。
+ *
+ * @param searchParams - ログ検索パラメーター（gt / lt はどちらも境界を含まない）。
+ *   limit は通常ログと写真由来ログのそれぞれに orderByJoinDateTime の順で適用するため、
+ *   マージ後の件数は最大で limit の 2 倍になる
+ * @param sortOrder - ソート順序（'desc' = 降順、'asc' = 昇順）
+ * @returns ソート済みの統合ログ配列
+ */
+export const fetchAndMergeSortedWorldJoinLogs = (
+  searchParams: {
+    ltJoinDateTime?: Date;
+    gtJoinDateTime?: Date;
+    orderByJoinDateTime: 'asc' | 'desc';
+    limit?: number;
+  },
+  sortOrder: 'desc' | 'asc' = 'desc',
+): Effect.Effect<
+  {
+    id: string;
+    worldId: string;
+    worldName: string;
+    worldInstanceId: string;
+    joinDateTime: Date;
+    createdAt: Date;
+    updatedAt: Date | null;
+  }[]
+> =>
+  Effect.promise(async () => {
+    // 通常ログとPhotoAsLogを並行取得
+    const [normalLogs, photoLogs] = await Promise.all([
+      worldJoinLogService.findVRChatWorldJoinLogList(searchParams),
+      findVRChatWorldJoinLogFromPhotoList(searchParams),
+    ]);
+
+    logger.debug({
+      message: 'World join logs retrieved',
+      normalLogsCount: normalLogs.length,
+      photoLogsCount: photoLogs.length,
+    });
+
+    const mergedLogs = worldJoinLogService.mergeVRChatWorldJoinLogs({
+      normalLogs: normalLogs,
+      photoLogs: photoLogs,
+    });
+
+    return mergedLogs.toSorted((a, b) =>
+      sortOrder === 'desc'
+        ? b.joinDateTime.getTime() - a.joinDateTime.getTime()
+        : a.joinDateTime.getTime() - b.joinDateTime.getTime(),
+    );
+  });
+
+/**
  * プレイヤー名で検索して、そのプレイヤーがいたセッションの参加日時を返す
  *
- * 効率的なサーバーサイド検索により、該当するセッションのみを返します。
- * これにより、フロントエンドは全データをフェッチする必要がなくなります。
+ * 各プレイヤー参加日時を `@shared/worldSession` の判定でセッションへ対応付け、
+ * セッションの開始日時を返す。参加ログは通常ログと写真由来ログのマージ済みの列を
+ * 使うため、返す日時はギャラリーのグループの joinDateTime と一致する。
  *
- * メモリ使用量を抑えるため、以下の最適化を行っています:
- * - プレイヤー検索結果に LIMIT を設定
- * - ワールドセッションを1回のクエリでバッチ取得（N+1問題を解決）
- * - 二分探索でインメモリマッチング
- * - 重複排除を効率的に行う
+ * メモリ使用量を抑えるため、プレイヤー検索結果に LIMIT を設定し、
+ * セッション判定は二分探索でインメモリに行う。
  *
  * @param playerName 検索するプレイヤー名（部分一致）
  * @param options.limit 検索するプレイヤー参加ログの最大件数（デフォルト: 1000）
  * @param options.maxSessions 返すセッションの最大件数（デフォルト: 100）
- * @returns 該当するセッションの参加日時の配列
+ * @returns 該当するセッションの開始日時の配列（新しい順）
  */
 export const searchSessionsByPlayerName = (
   playerName: string,
   options: { limit?: number; maxSessions?: number } = {},
-): Effect.Effect<Date[]> => {
-  return Effect.promise(async () => {
+): Effect.Effect<Date[]> =>
+  Effect.gen(function* () {
     const startTime = performance.now();
     const { limit = 1000, maxSessions = 100 } = options;
 
-    // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
+    // データベースエラーは予期しないエラーなので defect として上位に伝播
     // プレイヤー名で部分一致検索（大文字小文字を区別しない）
-    // LIMITを設定してメモリ使用量を抑える
-    const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
-      attributes: ['joinDateTime'], // 必要なカラムのみ取得
-      where: {
-        playerName: {
-          [Op.like]: `%${playerName}%`,
+    const playerJoinLogs = yield* Effect.promise(() =>
+      VRChatPlayerJoinLogModel.findAll({
+        attributes: ['joinDateTime'],
+        where: {
+          playerName: {
+            [Op.like]: `%${playerName}%`,
+          },
         },
-      },
-      order: [['joinDateTime', 'DESC']],
-      limit,
-    });
+        order: [['joinDateTime', 'DESC']],
+        limit,
+      }),
+    );
 
     if (playerJoinLogs.length === 0) {
       logger.debug(
@@ -656,59 +717,57 @@ export const searchSessionsByPlayerName = (
       return [];
     }
 
-    // プレイヤー参加日時を取得
+    // DESC 順なので先頭が最新、末尾が最古。判定に要る参加ログは、プレイヤー参加日時の
+    // 範囲 [最古, 最新] にあるものと、最古より前で最も新しいもの（最古の参加日時が属する
+    // セッションの開始）だけなので、履歴全体を読まずにこの 2 つだけを取得する。
+    // gt / lt は境界を含まないため、1ms 広げて範囲の端ちょうどの参加ログを含める
     const playerJoinDates = playerJoinLogs.map((log) => log.joinDateTime);
-    const maxPlayerJoinDate = playerJoinDates[0]; // DESC順なので最初が最大
+    const maxPlayerJoinDate = playerJoinDates[0];
+    const minPlayerJoinDate = playerJoinDates[playerJoinDates.length - 1];
 
-    // N+1問題を解決: ワールド参加ログを1回のクエリでバッチ取得
-    // プレイヤー参加日時以前のワールド参加ログをすべて取得
-    const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
-      attributes: ['joinDateTime'],
-      where: {
-        joinDateTime: {
-          [Op.lte]: maxPlayerJoinDate,
+    const [logsInRange, logsBeforeRange] = yield* Effect.all([
+      fetchAndMergeSortedWorldJoinLogs(
+        {
+          gtJoinDateTime: new Date(minPlayerJoinDate.getTime() - 1),
+          ltJoinDateTime: new Date(maxPlayerJoinDate.getTime() + 1),
+          orderByJoinDateTime: 'asc',
         },
-      },
-      order: [['joinDateTime', 'DESC']],
-      // 最大でプレイヤーログ数と同程度のワールドログがあると想定
-      limit: limit * 2,
-    });
+        'asc',
+      ),
+      fetchAndMergeSortedWorldJoinLogs(
+        {
+          ltJoinDateTime: minPlayerJoinDate,
+          orderByJoinDateTime: 'desc',
+          limit: 1,
+        },
+        'desc',
+      ),
+    ]);
+    // 直前の参加ログは通常ログと写真由来ログから 1 件ずつ取るため最大 2 件になる。
+    // 返すのはセッションの開始日時だけなので、最も新しい日時を持つものを残せば足りる
+    const latestBeforeRange = logsBeforeRange[0]?.joinDateTime.getTime();
+    const precedingJoins = logsBeforeRange.filter(
+      (log) => log.joinDateTime.getTime() === latestBeforeRange,
+    );
+    const worldJoinLogs = [...precedingJoins, ...logsInRange];
+    const sessions = buildWorldSessions(worldJoinLogs);
 
-    if (worldJoinLogs.length === 0) {
-      logger.debug(
-        `searchSessionsByPlayerName: No world join logs found before ${maxPlayerJoinDate.toISOString()}`,
-      );
-      return [];
-    }
-
-    // ワールド参加ログを時系列順にソート（二分探索用）
-    const sortedWorldJoinDates = worldJoinLogs
-      .map((log) => log.joinDateTime)
-      .toSorted((a, b) => a.getTime() - b.getTime());
-
-    // 各プレイヤー参加日時に対して、対応するワールド参加日時を探す（インメモリ）
     const sessionJoinDates: Date[] = [];
-    const processedWorldJoins = new Set<string>();
+    const processedSessionKeys = new Set<number>();
 
     for (const playerJoinDate of playerJoinDates) {
       if (sessionJoinDates.length >= maxSessions) {
         break;
       }
-
-      // 二分探索でプレイヤー参加日時以下の最大のワールド参加日時を見つける
-      const worldJoinDate = findLatestWorldJoinBefore(
-        sortedWorldJoinDates,
-        playerJoinDate,
-      );
-
-      if (worldJoinDate) {
-        const worldJoinKey = worldJoinDate.toISOString();
-
-        // 同じワールドセッションを重複して追加しないようにする
-        if (!processedWorldJoins.has(worldJoinKey)) {
-          processedWorldJoins.add(worldJoinKey);
-          sessionJoinDates.push(worldJoinDate);
-        }
+      const session = resolveSession(sessions, playerJoinDate);
+      if (session === null) {
+        continue;
+      }
+      const sessionStart = session.join.joinDateTime;
+      // 同じワールドセッションを重複して追加しないようにする
+      if (!processedSessionKeys.has(sessionStart.getTime())) {
+        processedSessionKeys.add(sessionStart.getTime());
+        sessionJoinDates.push(sessionStart);
       }
     }
 
@@ -726,48 +785,3 @@ export const searchSessionsByPlayerName = (
     // 新しい順にソートして返す
     return sessionJoinDates.toSorted((a, b) => b.getTime() - a.getTime());
   });
-};
-
-/**
- * 二分探索でtargetDate以下の最大の日時を見つける
- * @param sortedDates 昇順にソートされた日時配列
- * @param targetDate 検索対象の日時
- * @returns targetDate以下の最大の日時、見つからない場合はnull
- * @internal テスト用にexport
- */
-export const findLatestWorldJoinBefore = (
-  sortedDates: Date[],
-  targetDate: Date,
-): Date | null => {
-  if (sortedDates.length === 0) {
-    return null;
-  }
-
-  const targetTime = targetDate.getTime();
-
-  // 最小値より小さい場合は見つからない
-  if (targetTime < sortedDates[0].getTime()) {
-    return null;
-  }
-
-  // 最大値以上の場合は最大値を返す
-  // biome-ignore lint: sortedDates is non-empty (checked at line 793)
-  if (targetTime >= sortedDates.at(-1)!.getTime()) {
-    return sortedDates.at(-1) ?? null;
-  }
-
-  // 二分探索
-  let left = 0;
-  let right = sortedDates.length - 1;
-
-  while (left < right) {
-    const mid = Math.ceil((left + right + 1) / 2);
-    if (sortedDates[mid].getTime() <= targetTime) {
-      left = mid;
-    } else {
-      right = mid - 1;
-    }
-  }
-
-  return sortedDates[left];
-};

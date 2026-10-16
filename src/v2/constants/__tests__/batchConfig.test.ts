@@ -12,6 +12,5 @@ describe('バッチ設定の SSOT', () => {
 
   it('フロント専用のタイミング定数が定義されている', () => {
     expect(BATCH_CONFIG.BATCH_DELAY_MS).toBeGreaterThan(0);
-    expect(BATCH_CONFIG.DUPLICATE_THRESHOLD_MS).toBeGreaterThan(0);
   });
 });

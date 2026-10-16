@@ -35,7 +35,6 @@ class PlayerInfoBatchManager {
   private batchTimeout: NodeJS.Timeout | null = null;
   private readonly batchDelay = BATCH_CONFIG.BATCH_DELAY_MS;
   private readonly maxBatchSize = BATCH_CONFIG.MAX_SESSION_BATCH_SIZE;
-  private readonly duplicateThresholdMs = BATCH_CONFIG.DUPLICATE_THRESHOLD_MS;
   private batchCount = 0; // バッチ実行回数のカウンター
 
   private executeBatch: (() => Promise<void>) | null = null;
@@ -49,11 +48,10 @@ class PlayerInfoBatchManager {
     return new Promise((resolve, reject) => {
       const requestId = `${joinDateTime.getTime()}-${Math.random()}`;
 
-      // 既存の同じ日時のリクエストがあるかチェック
+      // 同じセッション（開始日時がミリ秒単位で一致）のリクエストがあれば相乗りする。
+      // 開始日時が近いだけの別セッションを相乗りさせると、別のワールドのプレイヤーを返してしまう
       const existingRequest = this.pendingRequests.find(
-        (req) =>
-          Math.abs(req.joinDateTime.getTime() - joinDateTime.getTime()) <
-          this.duplicateThresholdMs,
+        (req) => req.joinDateTime.getTime() === joinDateTime.getTime(),
       );
 
       if (existingRequest) {
