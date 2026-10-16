@@ -221,7 +221,6 @@ export const settingsRouter = () =>
               .then(({ app }) => {
                 app.setLoginItemSettings({
                   openAtLogin: true,
-                  openAsHidden: true,
                 });
                 settingStore.setAutoStartEnabled(true);
                 logger.info(
@@ -244,7 +243,6 @@ export const settingsRouter = () =>
                   );
                   app.setLoginItemSettings({
                     openAtLogin: true,
-                    openAsHidden: true,
                   });
                   logger.info(
                     'Auto-start re-registered successfully after update',

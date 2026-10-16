@@ -39,7 +39,7 @@ export const electronUtilRouter = () =>
         .replace('.', '')};base64,${Buffer.from(photoBuf).toString('base64')}`;
     }),
     copyTextToClipboard: procedure.input(z.string()).mutation(async (ctx) => {
-      getClipboard().writeText(ctx.input);
+      await getClipboard().writeText(ctx.input);
       eventEmitter.emit('toast', 'copied');
     }),
     copyImageDataByPath: procedure.input(z.string()).mutation(async (ctx) => {

@@ -18,7 +18,7 @@ const mockElectron = vi.hoisted(() => ({
   },
   clipboard: {
     writeText: vi.fn(),
-    writeImage: vi.fn(),
+    write: vi.fn(),
   },
   nativeImage: {
     createFromPath: vi.fn(),
@@ -35,6 +35,7 @@ vi.mock('../../../../lib/electronModules', () => ({
   getShell: () => ({}),
   getDialog: () => mockElectron.dialog,
   getClipboard: () => mockElectron.clipboard,
+  getClipboardItem: () => class {},
   getNativeImage: () => mockElectron.nativeImage,
 }));
 

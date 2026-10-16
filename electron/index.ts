@@ -6,7 +6,6 @@ import {
   init as initSentry,
 } from '@sentry/electron/main';
 import { app, type BrowserWindow, ipcMain } from 'electron';
-import unhandled from 'electron-unhandled';
 
 // electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
 // Electron ネイティブの app.isPackaged を使用
@@ -17,6 +16,7 @@ import { createIPCHandler } from 'trpc-electron/main';
 
 import { scrubEventData } from '../src/lib/utils/masking';
 import { router } from './api';
+import { SENTRY_DATA_COLLECTION } from './constants/sentryDataCollection';
 import * as electronUtil from './electronUtil';
 import { initializeSettingStoreForUtil } from './electronUtil';
 import { logger } from './lib/logger';
@@ -57,6 +57,7 @@ export const initializeMainSentry = () => {
     // __SENTRY_RELEASE__ はビルド時に Sentry プラグインによって置換される
     // リリースバージョンを表す定数
     release: __SENTRY_RELEASE__,
+    dataCollection: SENTRY_DATA_COLLECTION,
     beforeSend: (event: ErrorEvent, _hint: EventHint) => {
       // 開発環境でも規約同意をチェックする
       if (!settingStore.getTermsAccepted()) {
@@ -183,6 +184,9 @@ const initializeApp = async () => {
   });
   void electronUtil.setTray();
 
+  // electron-unhandled は top-level await を含む ESM のため、CJS の main バンドルから
+  // require() で読めない。外部モジュールのまま動的 import で読み込む。
+  const { default: unhandled } = await import('electron-unhandled');
   unhandled({
     logger: (error) => logger.error({ message: error }),
   });

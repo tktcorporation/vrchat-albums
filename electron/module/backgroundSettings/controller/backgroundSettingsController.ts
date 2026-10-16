@@ -53,10 +53,8 @@ const setIsAppAutoStartEnabled = async (
   isEnabled: boolean,
   settingStore: ReturnType<typeof getSettingStore>,
 ) => {
-  // macOSの場合、openAsHiddenをtrueに設定することで、バックグラウンドで起動するように
   getApp().setLoginItemSettings({
     openAtLogin: isEnabled,
-    openAsHidden: true,
   });
 
   // ユーザーの意図を永続化（アップデート後の復元用）

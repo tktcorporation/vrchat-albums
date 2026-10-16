@@ -19,6 +19,7 @@ export const getApp = () => getElectron().app;
 export const getShell = () => getElectron().shell;
 export const getDialog = () => getElectron().dialog;
 export const getClipboard = () => getElectron().clipboard;
+export const getClipboardItem = () => getElectron().ClipboardItem;
 export const getNativeImage = () => getElectron().nativeImage;
 
 /**
