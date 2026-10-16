@@ -51,6 +51,17 @@ export class OperationCanceled extends Data.TaggedError('OperationCanceled')<{
   readonly message?: string;
 }> {}
 
+/**
+ * 外部ブラウザで開けない URL を渡された。
+ * 許可するスキームは electron/lib/externalUrl.ts の checkExternalUrl が決める。
+ */
+export class ExternalUrlNotAllowed extends Data.TaggedError(
+  'ExternalUrlNotAllowed',
+)<{
+  message: string;
+  url: string;
+}> {}
+
 /** 画像保存に失敗 */
 export class SaveFileFailed extends Data.TaggedError('SaveFileFailed')<{
   message: string;

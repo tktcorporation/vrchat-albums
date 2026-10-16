@@ -7,7 +7,6 @@ import { Effect } from 'effect';
 import {
   app,
   BrowserWindow,
-  type Event,
   ipcMain,
   Menu,
   Notification,
@@ -20,6 +19,11 @@ import {
 // Electron ネイティブの app.isPackaged を使用
 const isDev = !app.isPackaged;
 
+import {
+  type AppEntry,
+  checkExternalUrl,
+  decideNavigation,
+} from './lib/externalUrl';
 import { logger } from './lib/logger';
 // Local
 import { getSettingStore, type SettingStore } from './module/settingStore'; // Import the type
@@ -36,6 +40,101 @@ const WINDOW_CONFIG = {
 type DisplayMetricsError =
   | { code: 'WINDOW_DESTROYED'; message: string }
   | { code: 'BOUNDS_ADJUSTMENT_FAILED'; message: string };
+
+/**
+ * 許可済みの URL を既定のブラウザで開く。開けなかった場合（スキームに対応するアプリが無い等）は
+ * ナビゲーションのイベントハンドラ内で拾える呼び出し元が無いため、ログに残す。
+ */
+const openAllowedExternalUrl = (url: string): void => {
+  shell.openExternal(url).catch((error: unknown) => {
+    logger.warn({
+      message: `Failed to open external URL: ${url}`,
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+  });
+};
+
+/**
+ * ウィンドウの webContents に、アプリ外への遷移・ウィンドウ生成・権限要求を
+ * 塞ぐガードを登録する。
+ *
+ * レンダラーに外部由来の文字列（VRChat のログから読んだワールド名やプレイヤー名など）が入り込んでも、
+ * ウィンドウがアプリ外のページを読み込んだり、OS のスキームハンドラを起動したりしない
+ * ようにする。許可するのは、アプリ本体への遷移と、checkExternalUrl が許可した URL を
+ * 既定のブラウザで開くことだけ。
+ */
+const hardenWebContents = (
+  browserWindow: BrowserWindow,
+  appEntry: AppEntry,
+): void => {
+  const { webContents } = browserWindow;
+
+  // ウィンドウのページ遷移。リンクのクリックやファイルのドロップによる遷移（will-navigate）に加え、
+  // 許可した遷移や loadURL の読み込み先がサーバー側でリダイレクトされた場合（will-redirect）も
+  // 同じ判定にかける。アプリ外の https は既定のブラウザへ回す
+  const guardNavigation = (event: {
+    url: string;
+    preventDefault: () => void;
+  }) => {
+    match(decideNavigation(event.url, appEntry))
+      .with({ action: 'allow' }, () => {
+        // アプリ本体への遷移は preventDefault せずそのまま通す
+      })
+      .with({ action: 'openExternal' }, (decision) => {
+        event.preventDefault();
+        openAllowedExternalUrl(decision.url);
+      })
+      .with({ action: 'block' }, (decision) => {
+        event.preventDefault();
+        logger.warn({
+          message: `Blocked navigation outside the app: ${decision.reason.type} ${decision.reason.input}`,
+        });
+      })
+      .exhaustive();
+  };
+  webContents.on('will-navigate', guardNavigation);
+  webContents.on('will-redirect', (event) => {
+    // will-redirect はサブフレームでも発火する。アプリは iframe を持たないため、
+    // サブフレームのリダイレクトは外部ブラウザへも回さずに止める
+    if (!event.isMainFrame) {
+      event.preventDefault();
+      logger.warn({
+        message: `Blocked subframe redirect: ${event.url}`,
+      });
+      return;
+    }
+    guardNavigation(event);
+  });
+
+  // target="_blank" や window.open。アプリ内に新しいウィンドウは作らない
+  webContents.setWindowOpenHandler(({ url }) => {
+    const checked = checkExternalUrl(url);
+    if (checked.ok) {
+      openAllowedExternalUrl(checked.url);
+    } else {
+      logger.warn({
+        message: `Blocked window.open: ${checked.rejection.type} ${checked.rejection.input}`,
+      });
+    }
+    return { action: 'deny' };
+  });
+
+  // アプリは <webview> を使わないため、注入されたタグからのゲストページ生成を拒否する
+  webContents.on('will-attach-webview', (event) => {
+    event.preventDefault();
+    logger.warn({ message: 'Blocked <webview> attachment' });
+  });
+
+  // レンダラーはカメラ・通知・クリップボード読み取り等の権限を要する Web API を
+  // 使わない（クリップボード操作と通知は main プロセスの tRPC 経由）ため、すべて拒否する
+  webContents.session.setPermissionRequestHandler(
+    (_webContents, permission, callback) => {
+      logger.warn({ message: `Denied permission request: ${permission}` });
+      callback(false);
+    },
+  );
+  webContents.session.setPermissionCheckHandler(() => false);
+};
 
 /**
  * メインウィンドウを生成するヘルパー関数。
@@ -95,10 +194,15 @@ function createWindow(): BrowserWindow {
     transparent: true,
     vibrancy: 'under-window',
     visualEffectState: 'active',
+    // いずれも Electron の既定値と同じだが、既定値の変更や設定の書き換えで
+    // 気づかないうちに緩まないよう明示する。preload は sandbox 内で動くよう
+    // electron/vite.config.preload.ts で 'electron' 以外を 1 ファイルにバンドルしている。
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
-      nodeIntegration: false, // セキュリティのため明示的に無効化
-      contextIsolation: true, // セキュリティのため明示的に有効化
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
     },
   });
 
@@ -108,25 +212,24 @@ function createWindow(): BrowserWindow {
   // }
 
   const port = process.env.PORT ?? 3000;
-  const url = isDev
-    ? `http://localhost:${port}`
-    : join(__dirname, '../src/out/index.html');
+  const devServerUrl = `http://localhost:${port}`;
+  const indexHtmlPath = join(__dirname, '../src/out/index.html');
+  const appEntry: AppEntry = isDev
+    ? { kind: 'devServer', origin: new URL(devServerUrl).origin }
+    : {
+        kind: 'file',
+        filePath: indexHtmlPath,
+        windows: process.platform === 'win32',
+      };
 
-  // and load the index.html of the app.
+  // ガードは読み込み開始より前に登録し、最初のページからナビゲーションを制限する
+  hardenWebContents(mainWindow, appEntry);
+
   if (isDev) {
-    void mainWindow.loadURL(url);
+    void mainWindow.loadURL(devServerUrl);
   } else {
-    void mainWindow.loadFile(url);
+    void mainWindow.loadFile(indexHtmlPath);
   }
-
-  // http or httpsのリンクをクリックしたときにデフォルトブラウザで開く
-  const handleUrlOpen = (e: Event, linkUrl: string) => {
-    if (linkUrl.startsWith('http')) {
-      e.preventDefault();
-      void shell.openExternal(linkUrl);
-    }
-  };
-  mainWindow.webContents.on('will-navigate', handleUrlOpen);
 
   // For AppBar
   ipcMain.on('minimize', () => {
