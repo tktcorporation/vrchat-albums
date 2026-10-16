@@ -96,8 +96,8 @@ const openElectronDialog = (
  * 既定のブラウザで URL を開く。ShareDialog などからリンクを開く際に使用される。
  *
  * `shell.openExternal` はスキームに関連付けられた OS のハンドラを起動するため、
- * checkExternalUrl が許可した URL だけを渡す。拒否した URL は呼び出し元が
- * ユーザーに伝えられるよう ExternalUrlNotAllowed で返す。
+ * checkExternalUrl が許可した URL だけを渡す。拒否は入力に起因する予期された失敗なので、
+ * Sentry へ送る defect にせず ExternalUrlNotAllowed として値で返す。
  */
 const openUrlInDefaultBrowser = (
   url: string,

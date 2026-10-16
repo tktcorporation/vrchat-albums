@@ -17,10 +17,11 @@ import { ERROR_CATEGORIES, ERROR_CODES } from '../../../lib/errors';
 import * as exiftool from '../../../lib/wrappedExifTool';
 import { eventEmitter, procedure, router as trpcRouter } from './../../../trpc';
 import { DirectoryPathSchema } from './../../../valueObjects/index';
+import type { ExternalUrlNotAllowed } from './../errors';
 import * as utilsService from './../service';
 
 /** 許可していないスキームの URL を外部で開こうとしたときのユーザー向けエラー */
-const mapToExternalUrlNotAllowedError = toUserFacing<{ message: string }>({
+const mapToExternalUrlNotAllowedError = toUserFacing<ExternalUrlNotAllowed>({
   code: ERROR_CODES.VALIDATION_ERROR,
   category: ERROR_CATEGORIES.VALIDATION_ERROR,
   userMessage: 'このリンクは開けません。',

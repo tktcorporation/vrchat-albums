@@ -1,7 +1,6 @@
 // Native
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { Effect } from 'effect';
 // Packages
@@ -51,6 +50,19 @@ type DisplayMetricsError =
  * ようにする。許可するのは、アプリ本体への遷移と、checkExternalUrl が許可した URL を
  * 既定のブラウザで開くことだけ。
  */
+/**
+ * 許可済みの URL を既定のブラウザで開く。開けなかった場合（スキームに対応するアプリが無い等）は
+ * ナビゲーションのイベントハンドラ内で拾える呼び出し元が無いため、ログに残す。
+ */
+const openAllowedExternalUrl = (url: string): void => {
+  shell.openExternal(url).catch((error: unknown) => {
+    logger.warn({
+      message: `Failed to open external URL: ${url}`,
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+  });
+};
+
 const hardenWebContents = (
   browserWindow: BrowserWindow,
   appEntry: AppEntry,
@@ -65,7 +77,7 @@ const hardenWebContents = (
       })
       .with({ action: 'openExternal' }, (decision) => {
         event.preventDefault();
-        void shell.openExternal(decision.url);
+        openAllowedExternalUrl(decision.url);
       })
       .with({ action: 'block' }, (decision) => {
         event.preventDefault();
@@ -80,7 +92,7 @@ const hardenWebContents = (
   webContents.setWindowOpenHandler(({ url }) => {
     const checked = checkExternalUrl(url);
     if (checked.ok) {
-      void shell.openExternal(checked.url);
+      openAllowedExternalUrl(checked.url);
     } else {
       logger.warn({
         message: `Blocked window.open: ${checked.rejection.type} ${checked.rejection.input}`,
@@ -186,7 +198,11 @@ function createWindow(): BrowserWindow {
   const indexHtmlPath = join(__dirname, '../src/out/index.html');
   const appEntry: AppEntry = isDev
     ? { kind: 'devServer', origin: new URL(devServerUrl).origin }
-    : { kind: 'file', pathname: pathToFileURL(indexHtmlPath).pathname };
+    : {
+        kind: 'file',
+        filePath: indexHtmlPath,
+        windows: process.platform === 'win32',
+      };
 
   // ガードは読み込み開始より前に登録し、最初のページからナビゲーションを制限する
   hardenWebContents(mainWindow, appEntry);

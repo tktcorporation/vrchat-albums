@@ -55,7 +55,14 @@ describe('decideNavigation', () => {
   };
   const fileEntry: AppEntry = {
     kind: 'file',
-    pathname: '/C:/Program%20Files/VRChatAlbums/resources/src/out/index.html',
+    filePath:
+      'C:\\Program Files\\VRChatAlbums\\resources\\src\\out\\index.html',
+    windows: true,
+  };
+  const posixFileEntry: AppEntry = {
+    kind: 'file',
+    filePath: '/opt/VRChatAlbums/resources/src/out/index.html',
+    windows: false,
   };
 
   it('開発時は dev server と同じ origin への遷移を許可する', () => {
@@ -82,6 +89,49 @@ describe('decideNavigation', () => {
         fileEntry,
       ),
     ).toEqual({ action: 'allow' });
+  });
+
+  it('Windows ではドライブレターや大文字小文字が違っても同じファイルとして許可する', () => {
+    expect(
+      decideNavigation(
+        'file:///c:/program%20files/vrchatalbums/resources/src/out/INDEX.html',
+        fileEntry,
+      ),
+    ).toEqual({ action: 'allow' });
+  });
+
+  it('パーセントエンコードの仕方が違っても同じファイルとして許可する', () => {
+    const entry: AppEntry = {
+      kind: 'file',
+      filePath: 'C:\\Users\\a%b\\app\\index.html',
+      windows: true,
+    };
+    expect(
+      decideNavigation('file:///C:/Users/a%25b/app/index.html', entry),
+    ).toEqual({ action: 'allow' });
+  });
+
+  it('POSIX では大文字小文字を区別して比較する', () => {
+    expect(
+      decideNavigation(
+        'file:///opt/VRChatAlbums/resources/src/out/index.html',
+        posixFileEntry,
+      ),
+    ).toEqual({ action: 'allow' });
+    expect(
+      decideNavigation(
+        'file:///opt/vrchatalbums/resources/src/out/index.html',
+        posixFileEntry,
+      ),
+    ).toMatchObject({ action: 'block' });
+  });
+
+  it('ファイルパスとして表せない file URL は遷移させない', () => {
+    const input = 'file://attacker.example/share/index.html';
+    expect(decideNavigation(input, posixFileEntry)).toEqual({
+      action: 'block',
+      reason: { type: 'NOT_APP_AND_NOT_EXTERNAL', input, protocol: 'file:' },
+    });
   });
 
   it('本番時に同じディレクトリでも別の file へは遷移させない', () => {
