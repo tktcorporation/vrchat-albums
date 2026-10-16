@@ -224,13 +224,12 @@ const ToasterWrapper = () => {
           },
         )
         // その他の場合: 予期しないデータは無視
-        // trpc-electron IPC バグ: query レスポンスが subscription に漏れる問題への対処
-        // 根本原因: trpc-electron v0.1.2 の IPC 実装で query/subscription の分離が不完全
-        // See: https://github.com/tktcorporation/vrchat-albums/issues/570
+        // 想定外の形のデータは表示せずに捨てる。別のリクエストの応答が届く問題は、
+        // tRPC クライアントを 1 つにして防いでいる（src/trpc.ts）
         .otherwise((c) => {
           if (import.meta.env.DEV) {
             console.warn(
-              '[ToasterWrapper] Ignoring unexpected subscription data (trpc-electron IPC leak):',
+              '[ToasterWrapper] Ignoring unexpected subscription data:',
               typeof c,
             );
           }

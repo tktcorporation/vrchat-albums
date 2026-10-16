@@ -147,8 +147,7 @@ export const useInitProgress = ({ runKind }: UseInitProgressOptions = {}) => {
   // tRPC subscriptionで進捗を購読
   trpcReact.subscribeInitProgress.useSubscription(undefined, {
     onData: (raw) => {
-      // trpc-electron の IPC では、同時に走る query や mutation の応答が subscription に漏れて届くことがある
-      // （https://github.com/tktcorporation/vrchat-albums/issues/570）。進捗の形をしていないものは捨てる
+      // 購読のペイロードは境界で検証し、進捗の形をしていないものは捨てる
       const parsed = InitProgressPayloadSchema.safeParse(raw);
       if (!parsed.success) {
         return;
