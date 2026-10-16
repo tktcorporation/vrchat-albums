@@ -36,20 +36,26 @@ describe('fillMonthRange', () => {
     );
   });
 
-  it('写真の月が今月より後なら、その月までを並べる', () => {
+  it('今月より後の月は並べず、その枚数を今月の棒に足す', () => {
     const filled = fillMonthRange(
       [
         { month: '2025-03', count: 1 },
+        { month: '2025-04', count: 4 },
         { month: '2025-06', count: 2 },
+        { month: '2099-01', count: 3 },
       ],
       '2025-04',
     );
-    expect(filled.map((m) => m.month)).toEqual([
-      '2025-03',
-      '2025-04',
-      '2025-05',
-      '2025-06',
+    expect(filled).toEqual([
+      { month: '2025-03', count: 1 },
+      { month: '2025-04', count: 9 },
     ]);
+  });
+
+  it('写真がすべて今月より後の月なら、今月の 1 本にまとめる', () => {
+    expect(fillMonthRange([{ month: '2099-12', count: 5 }], '2025-04')).toEqual(
+      [{ month: '2025-04', count: 5 }],
+    );
   });
 
   it('10 年分でも月を 1 つも飛ばさない', () => {

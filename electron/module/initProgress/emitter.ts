@@ -7,7 +7,10 @@
  *
  * 呼び出し元は深い階層（ログ読み込み・写真インデックス）にあり、実行のハンドルを引数で
  * 引き回すと既存の関数シグネチャを広く変えることになるため、実行状態はモジュールに置く。
- * ログ同期は syncLogs のセマフォで直列化されており、実行が同時に 2 つ進むことは無い前提。
+ * 実行の開始から終了までは、ログ同期のセマフォ（logSync/service.ts の syncMutex）の permit を
+ * 持ったまま行う（起動時の初期化は初期化全体、単独のログ同期はその同期全体）。そのため実行が
+ * 同時に 2 つ進むことは無い。開始時に返す runId を終了時に渡させ、開始した呼び出し元以外が
+ * 実行を閉じられないようにしている。
  *
  * zod スキーマによる検証は subscription 側で行う。
  */
@@ -32,6 +35,11 @@ interface ActiveRun {
   lastPayload: InitRunPayload | null;
   /** 最後に集計した統計（ステージ未送信の間に届いた統計もここに保持する） */
   latestStats: InitStats | undefined;
+  /**
+   * 現在のステージで最後に送った実件数。統計だけのイベントにも載せ、
+   * 統計の更新で「3,412 / 8,900 枚」や処理中の月の表示が消えないようにする。ステージが変わったら捨てる
+   */
+  latestDetails: InitProgressDetails | undefined;
 }
 
 let lastRunId = 0;
@@ -58,11 +66,13 @@ const toPayload = (
 
 /**
  * 新しい実行を始める。以後の進捗イベントはこの実行の ID で送られる。
+ * ログ同期のセマフォの permit を持った状態で呼ぶ（ファイル冒頭の説明を参照）。
  *
  * @param launch 起動種別。DB の準備前で判定できないときは null を渡し、
  *               判定後に setInitProgressLaunch で設定する
+ * @returns この実行の ID。endInitProgressRun に渡す
  */
-export const beginInitProgressRun = (launch: InitLaunch | null): void => {
+export const beginInitProgressRun = (launch: InitLaunch | null): number => {
   if (activeRun) {
     logger.warn(
       `Init progress run ${activeRun.id} was replaced before it finished`,
@@ -75,7 +85,9 @@ export const beginInitProgressRun = (launch: InitLaunch | null): void => {
     cursor: null,
     lastPayload: null,
     latestStats: undefined,
+    latestDetails: undefined,
   };
+  return lastRunId;
 };
 
 /**
@@ -95,6 +107,7 @@ export const setInitProgressLaunch = (launch: InitLaunch): void => {
 /**
  * ステージの進捗を送る。進行中の実行が無いとき、または既に先のステージへ進んでいるときは送らない。
  * 同じステージで前回より小さい progress が渡された場合は前回値で送る。
+ * 同じステージで details を省いた場合は、そのステージで最後に送った details を載せる。
  *
  * @param progress ステージ内の進捗（0-100）
  * @param details 実件数。件数を数えられるステージでのみ渡す
@@ -115,12 +128,14 @@ export const emitStageProgress = (
     );
     return;
   }
+  const sameStage = run.cursor?.stageIndex === decision.cursor.stageIndex;
+  run.latestDetails = sameStage ? (details ?? run.latestDetails) : details;
   run.cursor = decision.cursor;
-  send(toPayload(run, decision.cursor, { details }));
+  send(toPayload(run, decision.cursor, { details: run.latestDetails }));
 };
 
 /**
- * 統計を送る。最後に送った進捗と同じステージ・進捗のイベントに載せる。
+ * 統計を送る。最後に送った進捗と同じステージ・進捗・実件数のイベントに載せる。
  * まだどのステージも送っていなければ保持だけして、次の進捗イベントに載せる。
  *
  * 間引きは呼び出し側（stats.ts）が行う。
@@ -134,15 +149,27 @@ export const emitInitStats = (stats: InitStats): void => {
   if (run.cursor === null) {
     return;
   }
-  send(toPayload(run, run.cursor, { stats }));
+  send(toPayload(run, run.cursor, { details: run.latestDetails, stats }));
 };
 
 /**
  * 実行を終える。終端イベント（`completed` / `error`）を送り、実行状態を破棄する。
+ * 渡された runId が進行中の実行と一致しなければ何もしない（別の呼び出し元の実行を閉じない）。
+ *
+ * @param runId beginInitProgressRun が返した ID
  */
-export const endInitProgressRun = (outcome: 'completed' | 'error'): void => {
+export const endInitProgressRun = (
+  runId: number,
+  outcome: 'completed' | 'error',
+): void => {
   const run = activeRun;
   if (!run) {
+    return;
+  }
+  if (run.id !== runId) {
+    logger.warn(
+      `Init progress run ${runId} tried to end run ${run.id} and was ignored`,
+    );
     return;
   }
   const payload: InitRunPayload = {

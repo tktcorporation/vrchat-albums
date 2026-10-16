@@ -4,6 +4,7 @@ import { match, P } from 'ts-pattern';
 import { cn } from '@/components/lib/utils';
 
 import type { RunStage } from '../../../../electron/module/initProgress/schema';
+import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
 import type {
   InitLaunch,
   InitProgressDetails,
@@ -162,7 +163,11 @@ export const StartupTimelineScreen = ({
           {/* 小さな文字をアクセント色で塗るとライトテーマで読める濃さが足りないため、
               アクセント色は文字の前の短い線に持たせ、文字は本文の補助色で書く */}
           <span
-            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+            className={cn(
+              'flex items-center gap-2',
+              TYPOGRAPHY.overline,
+              TEXT_COLOR.secondary,
+            )}
             data-testid="startup-eyebrow"
           >
             <span
@@ -172,7 +177,11 @@ export const StartupTimelineScreen = ({
             {t(`initProgress.timeline.eyebrow.${variant}`)}
           </span>
           <h1
-            className="text-3xl font-bold leading-tight tracking-tight whitespace-pre-line text-foreground"
+            className={cn(
+              TYPOGRAPHY.display.page,
+              'tracking-tight whitespace-pre-line',
+              TEXT_COLOR.primary,
+            )}
             data-testid="startup-headline"
           >
             {t(`initProgress.timeline.headline.${variant}`)}
@@ -211,7 +220,10 @@ export const StartupTimelineScreen = ({
             {years.map((y) => (
               <span
                 key={y.year}
-                className="overflow-hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground"
+                className={cn(
+                  'overflow-hidden whitespace-nowrap tabular-nums',
+                  TYPOGRAPHY.caption.default,
+                )}
                 style={{ gridColumn: `${y.start + 1} / span ${y.span}` }}
               >
                 {y.span >= MIN_LABEL_SPAN || years.length === 1 ? y.year : ''}
@@ -224,11 +236,15 @@ export const StartupTimelineScreen = ({
           <dl className="flex gap-10">
             {COUNTER_KEYS.map((key) => (
               <div key={key} className="flex flex-col gap-0.5">
-                <dt className="text-xs text-muted-foreground">
+                <dt className={TYPOGRAPHY.caption.default}>
                   {t(`initProgress.timeline.counters.${key}`)}
                 </dt>
                 <dd
-                  className="order-first text-3xl font-bold leading-tight tracking-tight tabular-nums text-foreground"
+                  className={cn(
+                    'order-first',
+                    TYPOGRAPHY.display.metric,
+                    TEXT_COLOR.primary,
+                  )}
                   data-testid={`startup-counter-${key}`}
                 >
                   {formatCount(stats?.[key] ?? 0, language)}
@@ -237,20 +253,20 @@ export const StartupTimelineScreen = ({
             ))}
           </dl>
 
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex w-80 max-w-full flex-col gap-2 lg:w-96"
-          >
+          {/* 読み上げはフェーズの切り替わりだけに絞る。割合と件数は 1 秒に何度も変わるため、
+              ライブリージョンに含めると読み上げが途切れなく続く。割合は progressbar の aria-valuenow が持つ */}
+          <div className="flex w-80 max-w-full flex-col gap-2 lg:w-96">
             <div className="flex items-baseline justify-between gap-3">
               <span
-                className="text-sm font-medium text-foreground"
+                role="status"
+                aria-live="polite"
+                className={cn(TYPOGRAPHY.body.emphasis, TEXT_COLOR.primary)}
                 data-testid="progress-message"
               >
                 {phaseLabel}
               </span>
               <span
-                className="text-xs tabular-nums text-muted-foreground"
+                className={cn('tabular-nums', TYPOGRAPHY.caption.default)}
                 data-testid="progress-percent"
               >
                 {`${overallProgress}%`}
@@ -272,7 +288,10 @@ export const StartupTimelineScreen = ({
               />
             </div>
             <span
-              className="min-h-[1lh] text-xs tabular-nums text-muted-foreground"
+              className={cn(
+                'min-h-[1lh] tabular-nums',
+                TYPOGRAPHY.caption.default,
+              )}
               data-testid="progress-detail"
             >
               {detailLine}

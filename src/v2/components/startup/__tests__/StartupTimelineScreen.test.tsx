@@ -144,4 +144,23 @@ describe('StartupTimelineScreen', () => {
     );
     expect(screen.getByTestId('progress-detail').textContent).toBe('');
   });
+
+  it('読み上げ対象はフェーズ名だけで、割合と件数はライブリージョンに含めない', () => {
+    render(
+      <StartupTimelineScreen
+        runStage="photo_index"
+        overallProgress={60}
+        details={{ current: 160, total: 400, unit: 'photos' }}
+        syncMode="full"
+        isFirstLaunch
+        stats={stats}
+        currentMonth="2025-04"
+      />,
+    );
+    const status = screen.getByRole('status');
+    expect(status).toBe(screen.getByTestId('progress-message'));
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(status.contains(screen.getByTestId('progress-percent'))).toBe(false);
+    expect(status.contains(screen.getByTestId('progress-detail'))).toBe(false);
+  });
 });

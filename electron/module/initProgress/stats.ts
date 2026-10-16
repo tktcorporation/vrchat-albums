@@ -3,7 +3,8 @@
  *
  * 統計は毎回 DB から数え直す。インデックス中の写真を手元で足し込む方式だと、
  * 全件再スキャンで既存の写真を上書きしたときに二重に数えてしまうため。
- * 写真のバッチ登録ごとに集計を求められるので、集計の開始を INTERVAL_MS に 1 回までに間引く。
+ * 写真のバッチ登録ごとに集計を求められるので、前回の集計が終わってから INTERVAL_MS 空けるまで
+ * 次の集計を始めない。
  */
 import { Effect } from 'effect';
 
@@ -14,7 +15,11 @@ import { countDistinctVisitedWorlds } from '../vrchatWorldJoinLog/VRChatWorldJoi
 import { emitInitStats, hasActiveInitProgressRun } from './emitter';
 import type { InitStats } from './schema';
 
-/** 統計の送信間隔の下限。1 秒あたり 10 回を超えて集計・送信しない */
+/**
+ * 集計が終わってから次の集計を始めるまでに空ける時間。1 秒あたり 10 回を超えて集計・送信しない。
+ * 集計の開始からではなく終了から数えるのは、写真の登録中に集計が遅くなったとき、
+ * 集計クエリが間を空けずに続いて SQLite を登録処理と取り合わないようにするため。
+ */
 const INTERVAL_MS = 100;
 
 interface ThrottleTimers {
@@ -32,10 +37,10 @@ const realTimers: ThrottleTimers = {
 };
 
 /**
- * 非同期タスクの開始を intervalMs に 1 回までに間引くランナー。
+ * 非同期タスクを、前回の実行が終わってから intervalMs 以上空けて実行するランナー。
  *
- * - request: 間隔が空いていればすぐ実行し、空いていなければ間隔の終わりに 1 回だけ実行する。
- *   実行中に要求されたら、終わった後にもう 1 回実行する（最後の要求の結果が必ず反映される）
+ * - request: 前回の終了から intervalMs 経っていればすぐ実行し、経っていなければその時点で 1 回だけ実行する。
+ *   実行中に要求されたら、終わってから intervalMs 後にもう 1 回実行する（最後の要求の結果が必ず反映される）
  * - flush: 予約を取り消し、実行中のものを待ってから、間隔に関係なく 1 回実行して完了を待つ
  *
  * @param task 失敗しても reject しないこと（失敗の扱いはタスク側の責務）
@@ -45,15 +50,23 @@ export const createThrottledRunner = (
   intervalMs: number,
   timers: ThrottleTimers = realTimers,
 ) => {
-  let lastStartedAt = Number.NEGATIVE_INFINITY;
+  let lastFinishedAt = Number.NEGATIVE_INFINITY;
   let inFlight: Promise<void> | null = null;
   let timer: unknown = null;
   let pendingAfterRun = false;
 
+  const cancelScheduled = (): void => {
+    if (timer !== null) {
+      timers.clearTimer(timer);
+      timer = null;
+    }
+    pendingAfterRun = false;
+  };
+
   const run = (): Promise<void> => {
-    lastStartedAt = timers.now();
     const current = task().finally(() => {
       inFlight = null;
+      lastFinishedAt = timers.now();
       if (pendingAfterRun) {
         pendingAfterRun = false;
         request();
@@ -71,7 +84,7 @@ export const createThrottledRunner = (
     if (timer !== null) {
       return;
     }
-    const wait = lastStartedAt + intervalMs - timers.now();
+    const wait = lastFinishedAt + intervalMs - timers.now();
     if (wait <= 0) {
       void run();
       return;
@@ -83,13 +96,11 @@ export const createThrottledRunner = (
   };
 
   const flush = async (): Promise<void> => {
-    if (timer !== null) {
-      timers.clearTimer(timer);
-      timer = null;
-    }
-    pendingAfterRun = false;
+    cancelScheduled();
     if (inFlight) {
       await inFlight;
+      // 待っている間に来た要求は、これから行う実行で満たされる
+      cancelScheduled();
     }
     await run();
   };

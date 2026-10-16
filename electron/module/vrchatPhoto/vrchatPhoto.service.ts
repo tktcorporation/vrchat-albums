@@ -1201,10 +1201,18 @@ export const createVRChatPhotoPathIndex = async (
       folderPathStr: string;
       currentDigest: FolderDigest;
       newFiles: string[];
+      /** このフォルダのファイル一覧を取る直前の時刻。lastScannedAt として保存する */
+      scannedAt: Date;
     }[] = [];
 
     for (const dir of allDirs) {
       logger.debug(`Processing photos from directory: ${dir.value}`);
+
+      // lastScannedAt には、Stage 3 の終了時刻ではなくファイル一覧を取る直前の時刻を保存する。
+      // 一覧を取った後に作られたファイルは今回の対象に入らないが、mtime がこの時刻より新しいので
+      // 次回の差分スキャンで拾われる。終了時刻を保存すると、登録中に作られたファイルの mtime が
+      // lastScannedAt より古くなり、以後の差分スキャンで永久に除外される。
+      const scannedAt = new Date();
 
       // Stage 1: フォルダダイジェストチェック
       const { changedFolders, skipStats } = await getChangedFoldersWithFiles(
@@ -1263,7 +1271,7 @@ export const createVRChatPhotoPathIndex = async (
           // ダイジェストは更新する
           updatedStates[folderPathStr] = {
             digest: currentDigest,
-            lastScannedAt: new Date().toISOString(),
+            lastScannedAt: scannedAt.toISOString(),
           };
           continue;
         }
@@ -1271,7 +1279,12 @@ export const createVRChatPhotoPathIndex = async (
         logger.debug(
           `Found ${newFiles.length} new files in: ${changedFolder.folderPath}`,
         );
-        pendingFolders.push({ folderPathStr, currentDigest, newFiles });
+        pendingFolders.push({
+          folderPathStr,
+          currentDigest,
+          newFiles,
+          scannedAt,
+        });
       }
     }
 
@@ -1282,7 +1295,12 @@ export const createVRChatPhotoPathIndex = async (
     let handledFiles = 0;
     onProgress?.({ handled: 0, total: totalNewFiles });
 
-    for (const { folderPathStr, currentDigest, newFiles } of pendingFolders) {
+    for (const {
+      folderPathStr,
+      currentDigest,
+      newFiles,
+      scannedAt,
+    } of pendingFolders) {
       // Stage 3: バッチ処理（画像処理 + DB保存）
       for (let i = 0; i < newFiles.length; i += PHOTO_METADATA_BATCH_SIZE) {
         const batch = newFiles.slice(i, i + PHOTO_METADATA_BATCH_SIZE);
@@ -1346,10 +1364,10 @@ export const createVRChatPhotoPathIndex = async (
         });
       }
 
-      // フォルダスキャン状態を更新
+      // フォルダスキャン状態を更新（時刻は一覧を取った時点のもの。scannedAt の説明を参照）
       updatedStates[folderPathStr] = {
         digest: currentDigest,
-        lastScannedAt: new Date().toISOString(),
+        lastScannedAt: scannedAt.toISOString(),
       };
     }
   } finally {

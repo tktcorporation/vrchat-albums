@@ -71,7 +71,7 @@ describe('createThrottledRunner', () => {
     expect(task.mock.calls.length).toBeGreaterThanOrEqual(9);
   });
 
-  it('実行中に来た要求は、終わった後にもう 1 回実行して取りこぼさない', async () => {
+  it('実行中に来た要求は、終わってから間隔を空けてもう 1 回実行して取りこぼさない', async () => {
     const { timers, advance } = createManualTimers();
     let finish: () => void = () => {};
     const task = vi.fn(
@@ -89,7 +89,47 @@ describe('createThrottledRunner', () => {
     advance(150);
     finish();
     await settle();
+    // 開始から 150ms 経っていても、終了からはまだ間隔が空いていない
+    expect(task).toHaveBeenCalledTimes(1);
+
+    advance(99);
+    expect(task).toHaveBeenCalledTimes(1);
+    advance(1);
+    await settle();
     expect(task).toHaveBeenCalledTimes(2);
+  });
+
+  it('集計が遅くても、終了から次の開始まで必ず間隔を空ける', async () => {
+    const { timers, advance } = createManualTimers();
+    const starts: number[] = [];
+    const finishes: number[] = [];
+    let finish: () => void = () => {};
+    const task = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          starts.push(timers.now());
+          finish = () => {
+            finishes.push(timers.now());
+            resolve();
+          };
+        }),
+    );
+    const runner = createThrottledRunner(task, 100, timers);
+
+    // 1 回の集計に 80ms かかり、その間も要求が来続ける
+    for (let elapsed = 0; elapsed < 1000; elapsed += 10) {
+      runner.request();
+      if (task.mock.calls.length > finishes.length && elapsed % 80 === 0) {
+        finish();
+      }
+      advance(10);
+      await settle();
+    }
+
+    expect(starts.length).toBeGreaterThan(2);
+    for (let i = 1; i < starts.length; i++) {
+      expect(starts[i] - finishes[i - 1]).toBeGreaterThanOrEqual(100);
+    }
   });
 
   it('flush は予約を待たずに実行し、完了を待つ', async () => {
@@ -108,6 +148,33 @@ describe('createThrottledRunner', () => {
 
     expect(task).toHaveBeenCalledTimes(2);
     expect(order).toEqual(['run', 'run', 'flushed']);
+  });
+
+  it('flush は実行中のものを待ってから実行し、待っている間の要求で余分に実行しない', async () => {
+    const { timers, advance } = createManualTimers();
+    let finish: () => void = () => {};
+    let calls = 0;
+    const task = vi.fn(() => {
+      calls += 1;
+      if (calls === 1) {
+        return new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+    const runner = createThrottledRunner(task, 100, timers);
+
+    runner.request();
+    const flushed = runner.flush();
+    runner.request();
+    finish();
+    await flushed;
+    expect(task).toHaveBeenCalledTimes(2);
+
+    advance(500);
+    await settle();
+    expect(task).toHaveBeenCalledTimes(2);
   });
 });
 

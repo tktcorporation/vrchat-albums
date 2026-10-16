@@ -4,7 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ERROR_CODES, UserFacingError } from '../../../lib/errors';
 import { logger } from '../../../lib/logger';
 import * as sequelizeClient from '../../../lib/sequelize';
-import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
+import {
+  beginInitProgressRun,
+  endInitProgressRun,
+} from '../../initProgress/emitter';
+import {
+  LOG_SYNC_MODE,
+  type LogSyncLock,
+  runWithLogSyncLock,
+  syncLogsHoldingLock,
+} from '../../logSync/service';
 import * as settingStore from '../../settingStore';
 import * as vrchatWorldJoinLogService from '../../vrchatWorldJoinLog/service';
 
@@ -38,7 +47,10 @@ const mockSequelizeClient = sequelizeClient as unknown as {
   syncRDBClient: ReturnType<typeof vi.fn>;
 };
 
-const mockSyncLogs = syncLogs as ReturnType<typeof vi.fn>;
+const mockSyncLogs = syncLogsHoldingLock as ReturnType<typeof vi.fn>;
+
+/** runWithLogSyncLock が task に渡す値の代わり（中身は使われない） */
+const lockStub = {} as LogSyncLock;
 
 const mockVrchatWorldJoinLogService = vrchatWorldJoinLogService as unknown as {
   findVRChatWorldJoinLogList: ReturnType<typeof vi.fn>;
@@ -89,6 +101,7 @@ describe('settingsController.initializeAppData', () => {
 
     // syncLogs returns Effect, not Promise
     mockSyncLogs.mockReturnValue(Effect.succeed({ success: true }));
+    vi.mocked(runWithLogSyncLock).mockImplementation((task) => task(lockStub));
 
     // getSettingStoreのモック
     mockSettingStore.getSettingStore = vi.fn().mockReturnValue({
@@ -126,7 +139,7 @@ describe('settingsController.initializeAppData', () => {
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Step 3: Starting log sync...',
     );
-    expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
+    expect(mockSyncLogs).toHaveBeenCalledWith(lockStub, LOG_SYNC_MODE.FULL);
     expect(mockLogger.info).toHaveBeenCalledWith(
       '=== Application data initialization completed ===',
     );
@@ -143,7 +156,7 @@ describe('settingsController.initializeAppData', () => {
     }
     await initializeAppData();
 
-    expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
+    expect(mockSyncLogs).toHaveBeenCalledWith(lockStub, LOG_SYNC_MODE.FULL);
     expect(mockLogger.info).toHaveBeenCalledWith('Found 0 existing logs');
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Detected first launch, using FULL sync mode',
@@ -165,7 +178,10 @@ describe('settingsController.initializeAppData', () => {
     }
     await initializeAppData();
 
-    expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.INCREMENTAL);
+    expect(mockSyncLogs).toHaveBeenCalledWith(
+      lockStub,
+      LOG_SYNC_MODE.INCREMENTAL,
+    );
     expect(mockLogger.info).toHaveBeenCalledWith('Found 2 existing logs');
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Detected regular launch, using INCREMENTAL sync mode',
@@ -183,7 +199,7 @@ describe('settingsController.initializeAppData', () => {
     }
     await initializeAppData();
 
-    expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
+    expect(mockSyncLogs).toHaveBeenCalledWith(lockStub, LOG_SYNC_MODE.FULL);
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Database error detected, treating as first launch:',
       expect.any(Error),
@@ -413,5 +429,58 @@ describe('settingsController.initializeAppData', () => {
     }
     const result = await initializeAppData();
     expect(result).toEqual({ success: true });
+  });
+
+  it('初期化はログ同期のセマフォの permit を持ったまま、進捗の実行を開始から終了まで進める', async () => {
+    const order: string[] = [];
+    vi.mocked(runWithLogSyncLock).mockImplementation(async (task) => {
+      order.push('lock:acquire');
+      const result = await task(lockStub);
+      order.push('lock:release');
+      return result;
+    });
+    vi.mocked(beginInitProgressRun).mockImplementation(() => {
+      order.push('run:begin');
+      return 1;
+    });
+    vi.mocked(endInitProgressRun).mockImplementation((_runId, outcome) => {
+      order.push(`run:${outcome}`);
+    });
+
+    if (!initializeAppData) {
+      throw new Error('initializeAppData not initialized');
+    }
+    await initializeAppData();
+
+    expect(order).toEqual([
+      'lock:acquire',
+      'run:begin',
+      'run:completed',
+      'lock:release',
+    ]);
+    expect(endInitProgressRun).toHaveBeenCalledWith(1, 'completed');
+  });
+
+  it('失敗した初期化の後の再呼び出しは、新しい進捗の実行で始め直す', async () => {
+    vi.mocked(beginInitProgressRun)
+      .mockReturnValueOnce(1)
+      .mockReturnValueOnce(2);
+    mockSequelizeClient.syncRDBClient.mockRejectedValueOnce(
+      new Error('Database sync failed'),
+    );
+
+    if (!initializeAppData) {
+      throw new Error('initializeAppData not initialized');
+    }
+    await expect(initializeAppData()).rejects.toBeDefined();
+    const result = await initializeAppData();
+
+    expect(result).toEqual({ success: true });
+    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(2);
+    expect(beginInitProgressRun).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(endInitProgressRun).mock.calls).toEqual([
+      [1, 'error'],
+      [2, 'completed'],
+    ]);
   });
 });

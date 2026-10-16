@@ -63,9 +63,10 @@ const XMP_READ_CHUNK_SIZE = 500;
  * 差分処理: 既にメタデータ抽出済みの写真はスキップする。
  * 写真インデックス作成時（loadLogInfoIndexFromVRChatLog）から呼び出される。
  *
- * 背景: 従来は parsePhotoMetadataBatch で1ファイルずつ readXmpTags を呼んでいたが、
- * readXmpTagsBatch で Rust 側の Rayon 全コア並列 + 部分読み込みを一発呼びに変更。
- * N-API 境界の往復を N 回→1 回に削減し、I/O もファイルヘッダーだけ読む。
+ * XMP の読み取りは readXmpTagsBatch に XMP_READ_CHUNK_SIZE 件ずつまとめて渡す。
+ * Rust 側が 1 回の呼び出しの中で全コア並列（Rayon）に処理し、ファイルはヘッダー部分だけを読むため、
+ * 1 件ずつ呼ぶより N-API 境界の往復とファイル I/O が少ない。全件を 1 回で渡さずに分けるのは、
+ * 呼び出しの途中では進捗を受け取れず、写真が多いと進捗表示が長く止まって見えるため。
  *
  * @param options.onProgress 処理済み件数と総件数（= photoPaths.length）を受け取る。
  *        抽出対象から外した写真（抽出済み・対象外の日付や形式）は処理済みに数える

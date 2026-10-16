@@ -119,6 +119,11 @@ export const TYPOGRAPHY = {
     page: 'text-3xl font-bold leading-tight',
     /** セクションタイトル（24px, bold, snug line-height） */
     section: 'text-2xl font-bold leading-snug',
+    /**
+     * 大きな数値（30px, bold, 等幅数字） - 起動画面の累計カウンターなど、見出しと同じ大きさで見せる値。
+     * 等幅数字にするのは、値が増えるたびに桁の幅が揺れて隣の要素が動かないようにするため
+     */
+    metric: 'text-3xl font-bold leading-tight tracking-tight tabular-nums',
   },
 
   // =========================================================================

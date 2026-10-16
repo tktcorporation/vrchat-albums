@@ -22,8 +22,10 @@ import {
 import { flushInitStats } from '../initProgress/stats';
 import {
   LOG_SYNC_MODE,
+  type LogSyncLock,
   type LogSyncMode,
-  syncLogs,
+  runWithLogSyncLock,
+  syncLogsHoldingLock,
   toInitSyncMode,
 } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
@@ -78,12 +80,22 @@ const hasPhotoPathChanged = (): boolean => {
 };
 
 /**
- * アプリケーション起動時の初期化処理の本体。
- * データベース初期化、初回起動判定、ログ同期を順に実行し、進捗を init-progress へ送る。
+ * アプリケーション起動時の初期化処理。
+ * 進捗ストリームの実行を最初から最後まで、ログ同期のセマフォの permit を持ったまま進める。
+ * permit の外で開始すると、初期化中に始まった単独のログ同期（バックグラウンド同期・インポート後の同期など）が
+ * 初期化の実行を置き換えたり閉じたりしてしまうため。単独の同期は初期化が終わるまで待つ。
  */
-const runInitialization = async (): Promise<{ success: true }> => {
+const runInitialization = (): Promise<{ success: true }> =>
+  runWithLogSyncLock((lock) => runInitializationHoldingLock(lock));
+
+/**
+ * 初期化処理の本体。データベース初期化、初回起動判定、ログ同期を順に実行し、進捗を init-progress へ送る。
+ */
+const runInitializationHoldingLock = async (
+  lock: LogSyncLock,
+): Promise<{ success: true }> => {
   // 起動種別は DB の準備ができるまで判定できないため、null で実行を始めて Step 2 で設定する
-  beginInitProgressRun(null);
+  const runId = beginInitProgressRun(null);
 
   // effect-lint-allow-try-catch: 200行超の処理全体を Effect.gen に変換するのは大規模リファクタリングが必要。
   // catch はエラーの分類（UserFacingError はそのまま、それ以外は cause 付きで包む）と再スローのみ。
@@ -205,7 +217,9 @@ const runInitialization = async (): Promise<{ success: true }> => {
     // Step 3: ログ同期実行
     // log_append 以降のステージの進捗は syncLogs 内で送られる
     logger.info('Step 3: Starting log sync...');
-    const logSyncExit = await Effect.runPromiseExit(syncLogs(syncMode));
+    const logSyncExit = await Effect.runPromiseExit(
+      syncLogsHoldingLock(lock, syncMode),
+    );
 
     if (Exit.isFailure(logSyncExit)) {
       const failOpt = Cause.failureOption(logSyncExit.cause);
@@ -274,7 +288,7 @@ const runInitialization = async (): Promise<{ success: true }> => {
 
     // 初期化完了を通知（最終の統計を届けてから終端イベントを送る）
     await flushInitStats();
-    endInitProgressRun('completed');
+    endInitProgressRun(runId, 'completed');
 
     logger.info('=== Application data initialization completed ===');
     return { success: true };
@@ -290,7 +304,7 @@ const runInitialization = async (): Promise<{ success: true }> => {
       .otherwise(() => 'Unknown initialization error');
 
     // エラーの内容は mutation のエラーとしてレンダラーへ届くため、進捗ストリームには終端だけを送る
-    endInitProgressRun('error');
+    endInitProgressRun(runId, 'error');
 
     // UserFacingErrorの場合は構造化情報を保持して再スロー
     if (error instanceof UserFacingError) {

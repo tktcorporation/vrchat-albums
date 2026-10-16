@@ -4,11 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   beginInitProgressRun,
   endInitProgressRun,
-  hasActiveInitProgressRun,
 } from '../initProgress/emitter';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
 import { appendLoglinesToFileFromLogFilePathList } from '../vrchatLog/vrchatLogController';
-import { LOG_SYNC_MODE, syncLogs } from './service';
+import {
+  LOG_SYNC_MODE,
+  runWithLogSyncLock,
+  syncLogs,
+  syncLogsHoldingLock,
+} from './service';
 
 vi.mock('../logInfo/service', () => ({
   loadLogInfoIndexFromVRChatLog: vi.fn(),
@@ -19,10 +23,9 @@ vi.mock('../vrchatLog/vrchatLogController', () => ({
 }));
 
 vi.mock('../initProgress/emitter', () => ({
-  beginInitProgressRun: vi.fn(),
+  beginInitProgressRun: vi.fn(() => 7),
   emitStageProgress: vi.fn(),
   endInitProgressRun: vi.fn(),
-  hasActiveInitProgressRun: vi.fn(() => false),
 }));
 
 vi.mock('../initProgress/stats', () => ({
@@ -107,7 +110,6 @@ describe('syncLogs', () => {
       );
 
     it('単独で呼ばれたときは実行を開始し、成功で completed として終える', async () => {
-      vi.mocked(hasActiveInitProgressRun).mockReturnValue(false);
       mockAppend.mockResolvedValue(appendResult);
       succeedLoad();
 
@@ -117,11 +119,10 @@ describe('syncLogs', () => {
         syncMode: 'full',
         isFirstLaunch: false,
       });
-      expect(endInitProgressRun).toHaveBeenCalledWith('completed');
+      expect(endInitProgressRun).toHaveBeenCalledWith(7, 'completed');
     });
 
     it('単独で呼ばれて失敗したときは error として終える', async () => {
-      vi.mocked(hasActiveInitProgressRun).mockReturnValue(false);
       mockAppend.mockRejectedValue(new Error('read failed'));
 
       await Effect.runPromiseExit(syncLogs(LOG_SYNC_MODE.INCREMENTAL));
@@ -130,18 +131,65 @@ describe('syncLogs', () => {
         syncMode: 'incremental',
         isFirstLaunch: false,
       });
-      expect(endInitProgressRun).toHaveBeenCalledWith('error');
+      expect(endInitProgressRun).toHaveBeenCalledWith(7, 'error');
     });
 
-    it('初期化の実行中に呼ばれたときは実行を開始も終了もしない', async () => {
-      vi.mocked(hasActiveInitProgressRun).mockReturnValue(true);
+    it('permit を持った呼び出し元からの同期は実行を開始も終了もしない', async () => {
       mockAppend.mockResolvedValue(appendResult);
       succeedLoad();
 
-      await Effect.runPromise(syncLogs(LOG_SYNC_MODE.INCREMENTAL));
+      await runWithLogSyncLock((lock) =>
+        Effect.runPromise(syncLogsHoldingLock(lock, LOG_SYNC_MODE.INCREMENTAL)),
+      );
 
+      expect(mockAppend).toHaveBeenCalledTimes(1);
       expect(beginInitProgressRun).not.toHaveBeenCalled();
       expect(endInitProgressRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('runWithLogSyncLock', () => {
+    it('permit を持っている間に呼ばれた syncLogs は、permit が返るまで始まらない', async () => {
+      mockAppend.mockResolvedValue(appendResult);
+      mockLoadLogInfo.mockReturnValue(
+        Effect.succeed([]) as unknown as ReturnType<
+          typeof loadLogInfoIndexFromVRChatLog
+        >,
+      );
+      const order: string[] = [];
+      let standalone: Promise<unknown> = Promise.resolve();
+
+      await runWithLogSyncLock(async () => {
+        order.push('lock:start');
+        standalone = Effect.runPromise(
+          syncLogs(LOG_SYNC_MODE.INCREMENTAL),
+        ).then(() => {
+          order.push('standalone:done');
+        });
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(beginInitProgressRun).not.toHaveBeenCalled();
+        order.push('lock:end');
+      });
+      await standalone;
+
+      expect(order).toEqual(['lock:start', 'lock:end', 'standalone:done']);
+      expect(beginInitProgressRun).toHaveBeenCalledTimes(1);
+    });
+
+    it('task の reject をそのまま伝え、permit を返す', async () => {
+      const failure = new Error('init failed');
+      await expect(
+        runWithLogSyncLock(() => Promise.reject(failure)),
+      ).rejects.toBe(failure);
+
+      mockAppend.mockResolvedValue(appendResult);
+      mockLoadLogInfo.mockReturnValue(
+        Effect.succeed([]) as unknown as ReturnType<
+          typeof loadLogInfoIndexFromVRChatLog
+        >,
+      );
+      await Effect.runPromise(syncLogs(LOG_SYNC_MODE.INCREMENTAL));
+      expect(mockAppend).toHaveBeenCalledTimes(1);
     });
   });
 });

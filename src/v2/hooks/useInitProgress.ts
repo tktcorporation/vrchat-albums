@@ -71,6 +71,7 @@ export const nextShownOverallProgress = (
 
 /**
  * 初期化進捗の受信状態。統計と起動種別は、届かないイベントがあっても最後に届いた値を保持する。
+ * 実件数は同じ実行・同じステージの間だけ保持する。
  */
 interface InitProgressState {
   /** 最後に届いたイベント */
@@ -78,28 +79,34 @@ interface InitProgressState {
   shown: ShownOverallProgress | null;
   launch: InitLaunch | null;
   stats: InitStats | null;
+  details: InitProgressDetails | null;
 }
 
-const initialState: InitProgressState = {
+export const initialInitProgressState: InitProgressState = {
   latest: null,
   shown: null,
   launch: null,
   stats: null,
+  details: null,
 };
 
 /**
  * 受信したイベントを状態に反映する。新しい実行のイベントが来たら、前の実行の統計や起動種別は捨てる。
+ * details を持たないイベントが同じ実行・同じステージで届いた場合は、直前の実件数を残す
+ * （統計だけのイベントで件数表示や処理中の月の強調が消えないようにする）。
  */
-const reduceInitProgress = (
+export const reduceInitProgress = (
   state: InitProgressState,
   event: InitRunPayload,
 ): InitProgressState => {
   const sameRun = state.latest?.runId === event.runId;
+  const sameStage = sameRun && state.latest?.stage === event.stage;
   return {
     latest: event,
     shown: nextShownOverallProgress(state.shown, event),
     launch: event.launch ?? (sameRun ? state.launch : null),
     stats: event.stats ?? (sameRun ? state.stats : null),
+    details: event.details ?? (sameStage ? state.details : null),
   };
 };
 
@@ -108,7 +115,9 @@ const reduceInitProgress = (
  * tRPC subscriptionを使用して型安全に進捗を受信
  */
 export const useInitProgress = () => {
-  const [state, setState] = useState<InitProgressState>(initialState);
+  const [state, setState] = useState<InitProgressState>(
+    initialInitProgressState,
+  );
   const [error, setError] = useState<Error | null>(null);
   const [isSubscriptionReady, setIsSubscriptionReady] = useState(false);
 
@@ -131,7 +140,7 @@ export const useInitProgress = () => {
   });
 
   const reset = useCallback(() => {
-    setState(initialState);
+    setState(initialInitProgressState);
     setError(null);
     setIsSubscriptionReady(false);
   }, []);
@@ -146,7 +155,7 @@ export const useInitProgress = () => {
     /** 全体進捗パーセント (0-100)。同じ実行の中では減らない */
     overallProgress: state.shown?.percent ?? 0,
     /** 現在のステージの実件数 */
-    details: state.latest?.details ?? null,
+    details: state.details,
     /** 同期モード。DB の準備前は null */
     syncMode: state.launch?.syncMode ?? null,
     /** 初回起動か。DB の準備前は null */

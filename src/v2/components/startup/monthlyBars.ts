@@ -52,7 +52,10 @@ export const yearMonthOf = (date: Date): YearMonth =>
 
 /**
  * 最初に写真がある月から今月までを、写真の無い月も 0 枚として埋めて返す。
- * 端末の時計がずれて写真の月が今月より後にある場合は、その最後の月までを並べる。
+ * 横軸の右端は常に今月にする。今月より後の月（ファイル名の日時が誤っている写真や、
+ * 端末の時計が遅れている場合）の枚数は今月の棒に足す。右端を最も新しい写真の月まで伸ばすと、
+ * 2099 年のような日時の写真が 1 枚あるだけで数百本の空の棒が並んでしまうため。
+ * 今月に足すのは、写真を捨てずにグラフの枚数の合計を累計の写真枚数と一致させるため。
  * `YYYY-MM` はゼロ埋めされているので、文字列の大小比較が年月の前後と一致する。
  */
 export const fillMonthRange = (
@@ -60,14 +63,17 @@ export const fillMonthRange = (
   currentMonth: YearMonth,
 ): MonthCount[] => {
   const first = months.at(0);
-  const last = months.at(-1);
-  if (first === undefined || last === undefined) {
+  if (first === undefined) {
     return [];
   }
-  const end = last.month > currentMonth ? last.month : currentMonth;
-  const counts = new Map(months.map((m) => [m.month, m.count]));
+  const counts = new Map<YearMonth, number>();
+  for (const { month, count } of months) {
+    const key = month > currentMonth ? currentMonth : month;
+    counts.set(key, (counts.get(key) ?? 0) + count);
+  }
+  const start = first.month < currentMonth ? first.month : currentMonth;
   const filled: MonthCount[] = [];
-  for (let month = first.month; month <= end; month = nextYearMonth(month)) {
+  for (let month = start; month <= currentMonth; month = nextYearMonth(month)) {
     filled.push({ month, count: counts.get(month) ?? 0 });
   }
   return filled;
