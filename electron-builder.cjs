@@ -33,9 +33,10 @@ const config = {
   // 配布バイナリの起動オプションを固定する。既定のままだと、環境変数や起動引数を渡すだけで
   // 同じ署名済みバイナリを汎用の Node.js として動かしたり、デバッガを繋いだりできる。
   // アプリはどの機能も使わないため無効化する。
-  // ここに無い fuse は既定値のまま:
+  // 次の fuse は理由があって既定値のままにする（ここに書かない fuse も既定値のまま）:
   // - grantFileProtocolExtraPrivileges: 画面を file:// から読み込んでいるため
-  // - enableEmbeddedAsarIntegrityValidation: 各 OS のパッケージでの起動確認が要るため
+  // - enableEmbeddedAsarIntegrityValidation: 整合性の検証に失敗するとアプリが起動しなくなる。
+  //   macOS / Windows のパッケージで起動を確かめてから有効にする
   // - enableCookieEncryption: アプリは Cookie を使わないため
   electronFuses: {
     // ELECTRON_RUN_AS_NODE=1 でバイナリを Node.js として起動できなくする
