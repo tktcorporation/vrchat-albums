@@ -4,6 +4,7 @@ import { match } from 'ts-pattern';
 import type {
   InitLaunch,
   InitProgressDetails,
+  InitRunKind,
   InitRunPayload,
   InitStats,
   ProgressStage,
@@ -111,10 +112,32 @@ export const reduceInitProgress = (
 };
 
 /**
+ * イベントを状態に反映する。`runKind` を指定したときは、その種類の実行のイベントだけを反映し、
+ * それ以外は状態をそのまま返す（同じ参照を返すので React は再描画しない）。
+ *
+ * 起動画面は `startup` だけを見る。起動画面の表示中に単独のログ同期がロックを持っていると、
+ * subscription の接続時にその同期の現在地が再送されるが、それで起動画面の進捗や
+ * 「準備ができました」を動かさないため。起動後の同期で起動画面の状態が更新され続けることも防ぐ。
+ */
+export const applyInitProgressEvent = (
+  state: InitProgressState,
+  event: InitRunPayload,
+  runKind: InitRunKind | undefined,
+): InitProgressState =>
+  runKind !== undefined && event.kind !== runKind
+    ? state
+    : reduceInitProgress(state, event);
+
+interface UseInitProgressOptions {
+  /** 指定した種類の実行のイベントだけを受け取る。省略時はすべての実行を受け取る */
+  runKind?: InitRunKind;
+}
+
+/**
  * 初期化進捗を監視するフック
  * tRPC subscriptionを使用して型安全に進捗を受信
  */
-export const useInitProgress = () => {
+export const useInitProgress = ({ runKind }: UseInitProgressOptions = {}) => {
   const [state, setState] = useState<InitProgressState>(
     initialInitProgressState,
   );
@@ -129,7 +152,7 @@ export const useInitProgress = () => {
         setIsSubscriptionReady(true);
         return;
       }
-      setState((prev) => reduceInitProgress(prev, data));
+      setState((prev) => applyInitProgressEvent(prev, data, runKind));
       setError(null);
     },
     onError: (err) => {

@@ -163,4 +163,83 @@ describe('StartupTimelineScreen', () => {
     expect(status.contains(screen.getByTestId('progress-percent'))).toBe(false);
     expect(status.contains(screen.getByTestId('progress-detail'))).toBe(false);
   });
+
+  it('件数は数・単位の順で 1 続きに読み上げられる', () => {
+    render(
+      <StartupTimelineScreen
+        runStage="photo_index"
+        overallProgress={60}
+        details={null}
+        syncMode="incremental"
+        isFirstLaunch={false}
+        stats={stats}
+        currentMonth="2025-04"
+      />,
+    );
+    expect(screen.getByTestId('startup-counter-item-photos').textContent).toBe(
+      '8,900 枚の写真',
+    );
+    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual(
+      ['8,900 枚の写真', '312 のワールド', '1,204 人と一緒に'],
+    );
+  });
+
+  it('今月より後の撮影月を処理している間は今月の棒を強調する', () => {
+    render(
+      <StartupTimelineScreen
+        runStage="photo_index"
+        overallProgress={60}
+        details={{
+          current: 1,
+          total: 2,
+          unit: 'photos',
+          currentItem: '2099-12',
+        }}
+        syncMode="full"
+        isFirstLaunch
+        stats={{
+          ...stats,
+          months: [...stats.months, { month: '2099-12', count: 1 }],
+        }}
+        currentMonth="2025-04"
+      />,
+    );
+    const chart = screen.getByTestId('startup-month-chart');
+    const current = [
+      ...chart.querySelectorAll<HTMLElement>('[data-tone="current"]'),
+    ].map((bar) => bar.dataset.month);
+    expect(current).toEqual(['2025-04']);
+  });
+
+  it('2017-01 より前の撮影月を処理している間は左端の棒を強調する', () => {
+    render(
+      <StartupTimelineScreen
+        runStage="photo_index"
+        overallProgress={60}
+        details={{
+          current: 1,
+          total: 2,
+          unit: 'photos',
+          currentItem: '1970-01',
+        }}
+        syncMode="full"
+        isFirstLaunch
+        stats={{
+          ...stats,
+          months: [{ month: '1970-01', count: 1 }, ...stats.months],
+        }}
+        currentMonth="2025-04"
+      />,
+    );
+    const bars = [
+      ...screen
+        .getByTestId('startup-month-chart')
+        .querySelectorAll<HTMLElement>('[data-month]'),
+    ];
+    expect(bars.at(0)?.dataset).toMatchObject({
+      month: '2017-01',
+      tone: 'current',
+    });
+    expect(bars).toHaveLength(100);
+  });
 });

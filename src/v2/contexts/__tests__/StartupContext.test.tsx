@@ -32,6 +32,7 @@ vi.mock('../../hooks/useInitProgress', () => ({
   })),
 }));
 
+import { useInitProgress } from '../../hooks/useInitProgress';
 import { useStartupStage } from '../../hooks/useStartUpStage';
 
 const mockUseStartupStageHook = useStartupStage as ReturnType<typeof vi.fn>;
@@ -211,5 +212,15 @@ describe('StartupContext', () => {
     );
 
     expect(screen.getByTestId('isReady').textContent).toBe('true');
+  });
+
+  it('起動時の初期化の実行だけを購読し、単独の同期の進捗は受け取らない', () => {
+    render(
+      <StartupProvider>
+        <TestComponent />
+      </StartupProvider>,
+    );
+
+    expect(useInitProgress).toHaveBeenCalledWith({ runKind: 'startup' });
   });
 });

@@ -8,7 +8,6 @@ import {
   endInitProgressRun,
 } from '../initProgress/emitter';
 import type { InitLaunch } from '../initProgress/schema';
-import { flushInitStats } from '../initProgress/stats';
 import type { LogInfoError } from '../logInfo/error';
 import type { LogInfoServiceError } from '../logInfo/errors';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
@@ -202,18 +201,18 @@ const runSync = (
 /**
  * 単独のログ同期（手動更新・バックグラウンド同期など）の進捗ストリームの実行を開始・終了する。
  * syncMutex の permit の内側で呼ぶので、他の実行と重ならない。
+ * 種類は `sync` なので、起動画面はこの実行を表示せず、統計の集計も行われない。
  */
 const withOwnInitProgressRun = <A, E>(
   mode: LogSyncMode,
   effect: Effect.Effect<A, E>,
 ): Effect.Effect<A, E> =>
   Effect.suspend(() => {
-    const runId = beginInitProgressRun({
+    const runId = beginInitProgressRun('sync', {
       syncMode: toInitSyncMode(mode),
       isFirstLaunch: false,
     });
     return effect.pipe(
-      Effect.tap(() => Effect.promise(() => flushInitStats())),
       Effect.onExit((exit) =>
         Effect.sync(() => {
           endInitProgressRun(

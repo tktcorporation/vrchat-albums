@@ -6,7 +6,7 @@ import {
   beginInitProgressRun,
   emitStageProgress,
   endInitProgressRun,
-  hasActiveInitProgressRun,
+  getActiveInitProgressRun,
 } from '../initProgress/emitter';
 import {
   INIT_PROGRESS_CHANNEL,
@@ -89,13 +89,16 @@ describe('進捗ストリームの実行とログ同期のセマフォ', () => {
     let standalone: Promise<unknown> = Promise.resolve();
 
     await runWithLogSyncLock(async (lock) => {
-      initRunId = beginInitProgressRun(null);
+      initRunId = beginInitProgressRun('startup', null);
       emitStageProgress('database_sync', 100);
 
       // 初期化の途中でバックグラウンド同期が要求される
       standalone = Effect.runPromise(syncLogs(LOG_SYNC_MODE.INCREMENTAL));
       await waitTicks();
-      expect(hasActiveInitProgressRun()).toBe(true);
+      expect(getActiveInitProgressRun()).toEqual({
+        id: initRunId,
+        kind: 'startup',
+      });
 
       await Effect.runPromise(
         syncLogsHoldingLock(lock, LOG_SYNC_MODE.INCREMENTAL),
@@ -118,6 +121,10 @@ describe('進捗ストリームの実行とログ同期のセマフォ', () => {
     expect(new Set(otherEvents.map((p) => p.runId)).size).toBe(1);
     expect(otherEvents.at(-1)).toMatchObject({ stage: 'completed' });
     expect(otherEvents[0].runId).toBeGreaterThan(initRunId);
-    expect(hasActiveInitProgressRun()).toBe(false);
+    expect(new Set(initEvents.map((p) => p.kind))).toEqual(
+      new Set(['startup']),
+    );
+    expect(new Set(otherEvents.map((p) => p.kind))).toEqual(new Set(['sync']));
+    expect(getActiveInitProgressRun()).toBeNull();
   });
 });

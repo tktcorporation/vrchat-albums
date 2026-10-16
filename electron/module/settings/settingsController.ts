@@ -95,7 +95,7 @@ const runInitializationHoldingLock = async (
   lock: LogSyncLock,
 ): Promise<{ success: true }> => {
   // 起動種別は DB の準備ができるまで判定できないため、null で実行を始めて Step 2 で設定する
-  const runId = beginInitProgressRun(null);
+  const runId = beginInitProgressRun('startup', null);
 
   // effect-lint-allow-try-catch: 200行超の処理全体を Effect.gen に変換するのは大規模リファクタリングが必要。
   // catch はエラーの分類（UserFacingError はそのまま、それ以外は cause 付きで包む）と再スローのみ。

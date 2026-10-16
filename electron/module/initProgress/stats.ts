@@ -5,6 +5,10 @@
  * 全件再スキャンで既存の写真を上書きしたときに二重に数えてしまうため。
  * 写真のバッチ登録ごとに集計を求められるので、前回の集計が終わってから INTERVAL_MS 空けるまで
  * 次の集計を始めない。
+ *
+ * 集計は起動時の初期化（`startup` の実行）の間だけ行う。統計を表示するのは起動画面だけで、
+ * 起動後の単独のログ同期（手動更新・バックグラウンド同期など）で写真テーブル全体を
+ * 1 秒に何度も GROUP BY すると、その同期の写真登録と SQLite を取り合うため。
  */
 import { Effect } from 'effect';
 
@@ -12,7 +16,7 @@ import { logger } from '../../lib/logger';
 import { getPhotoCountPerLocalMonth } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import { countDistinctPlayerNames } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import { countDistinctVisitedWorlds } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
-import { emitInitStats, hasActiveInitProgressRun } from './emitter';
+import { emitInitStats, getActiveInitProgressRun } from './emitter';
 import type { InitStats } from './schema';
 
 /**
@@ -133,12 +137,34 @@ class InitStatsQueryError extends Error {
   override readonly name = 'InitStatsQueryError';
 }
 
+/** 集計の失敗を error で報告した最後の実行の ID */
+let lastReportedFailureRunId: number | null = null;
+
+/**
+ * 集計の失敗を記録する。同じ実行で 2 回目以降の失敗は warn に留める。
+ * 集計は 1 秒に最大 10 回求められるので、DB が読めない状態が続くと同じ原因のエラーが
+ * Sentry へ大量に届くため。
+ */
+const reportStatsFailure = (
+  runId: number,
+  error: InitStatsQueryError,
+): void => {
+  if (lastReportedFailureRunId === runId) {
+    logger.warn(`${error.message} (repeated in run ${runId})`);
+    return;
+  }
+  lastReportedFailureRunId = runId;
+  logger.error({ message: error.message, stack: error });
+};
+
 /**
  * 統計を集計して送る。集計の失敗は起動処理を止めない（統計は表示のためだけの値で、
- * 失敗しても写真の登録やログ同期の結果は変わらない）。失敗は Sentry へ送り、次の要求で再集計する。
+ * 失敗しても写真の登録やログ同期の結果は変わらない）。失敗は実行ごとに 1 回 Sentry へ送り、
+ * 次の要求で再集計する。
  */
 const collectAndEmitStats = (): Promise<void> => {
-  if (!hasActiveInitProgressRun()) {
+  const run = getActiveInitProgressRun();
+  if (run?.kind !== 'startup') {
     return Promise.resolve();
   }
   return Effect.runPromise(
@@ -161,7 +187,7 @@ const collectAndEmitStats = (): Promise<void> => {
           emitInitStats(stats);
         },
         onFailure: (error) => {
-          logger.error({ message: error.message, stack: error });
+          reportStatsFailure(run.id, error);
         },
       }),
     ),
@@ -170,15 +196,23 @@ const collectAndEmitStats = (): Promise<void> => {
 
 const statsRunner = createThrottledRunner(collectAndEmitStats, INTERVAL_MS);
 
+const isStartupRunActive = (): boolean =>
+  getActiveInitProgressRun()?.kind === 'startup';
+
 /**
  * 統計の更新を求める。DB に登録が入るたびに呼んでよい（送信は間引かれる）。
+ * 起動時の初期化の間でなければ何もしない。
  */
 export const requestInitStats = (): void => {
-  statsRunner.request();
+  if (isStartupRunActive()) {
+    statsRunner.request();
+  }
 };
 
 /**
  * 間引きを待たずに統計を集計して送り、完了を待つ。
  * 実行の区切り（DB 準備完了直後・実行終了直前）で最新の値を確実に届けるために使う。
+ * 起動時の初期化の間でなければ何もしない。
  */
-export const flushInitStats = (): Promise<void> => statsRunner.flush();
+export const flushInitStats = (): Promise<void> =>
+  isStartupRunActive() ? statsRunner.flush() : Promise.resolve();

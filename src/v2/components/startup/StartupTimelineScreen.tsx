@@ -15,6 +15,7 @@ import type { StartupLaunchVariant } from '../../i18n/types';
 import { AppHeader } from '../AppHeader';
 import {
   type BarTone,
+  chartMonthOf,
   fillMonthRange,
   toMonthBars,
   yearMonthOf,
@@ -105,9 +106,12 @@ export const StartupTimelineScreen = ({
   const variant = launchVariantOf(syncMode, isFirstLaunch);
   const month = currentMonth ?? yearMonthOf(new Date());
 
+  // 範囲外の撮影月の写真を処理している間は、その枚数を足している端の棒を強調する
   const highlightMonth =
-    runStage === 'photo_index' && details?.unit === 'photos'
-      ? (details.currentItem ?? null)
+    runStage === 'photo_index' &&
+    details?.unit === 'photos' &&
+    details.currentItem !== undefined
+      ? chartMonthOf(details.currentItem, month)
       : null;
 
   const bars = useMemo(
@@ -233,25 +237,27 @@ export const StartupTimelineScreen = ({
         </div>
 
         <div className="flex flex-wrap items-end justify-between gap-8">
-          <dl className="flex gap-10">
+          {/* 数と単位を DOM でもこの順に並べ、読み上げを「1,234 枚の写真」のように 1 続きにする */}
+          <ul className="flex gap-10">
             {COUNTER_KEYS.map((key) => (
-              <div key={key} className="flex flex-col gap-0.5">
-                <dt className={TYPOGRAPHY.caption.default}>
-                  {t(`initProgress.timeline.counters.${key}`)}
-                </dt>
-                <dd
-                  className={cn(
-                    'order-first',
-                    TYPOGRAPHY.display.metric,
-                    TEXT_COLOR.primary,
-                  )}
+              <li
+                key={key}
+                className="flex flex-col gap-0.5"
+                data-testid={`startup-counter-item-${key}`}
+              >
+                <span
+                  className={cn(TYPOGRAPHY.display.metric, TEXT_COLOR.primary)}
                   data-testid={`startup-counter-${key}`}
                 >
                   {formatCount(stats?.[key] ?? 0, language)}
-                </dd>
-              </div>
+                </span>
+                {/* 縦に並べるので見た目には出ない。英語で数と単位が 1 語として読まれないための区切り */}{' '}
+                <span className={TYPOGRAPHY.caption.default}>
+                  {t(`initProgress.timeline.counters.${key}`)}
+                </span>
+              </li>
             ))}
-          </dl>
+          </ul>
 
           {/* 読み上げはフェーズの切り替わりだけに絞る。割合と件数は 1 秒に何度も変わるため、
               ライブリージョンに含めると読み上げが途切れなく続く。割合は progressbar の aria-valuenow が持つ */}

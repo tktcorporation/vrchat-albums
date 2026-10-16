@@ -1,7 +1,8 @@
 /**
  * 初期化進捗を tRPC subscription（`subscribeInitProgress`）へ送るエミッター。
  *
- * 進捗は「実行（run）」単位で送る。実行は起動時の初期化か、それ単独で呼ばれたログ同期。
+ * 進捗は「実行（run）」単位で送る。実行は起動時の初期化（`startup`）か、それ単独で呼ばれたログ同期
+ * （`sync`）で、すべてのイベントに種類が入る。
  * 実行の状態をモジュールで 1 つだけ持ち、ステージの逆行と同一ステージ内の後退を
  * `advanceProgressCursor` で弾くことで、schema.ts に書いたストリームの不変条件を送信側で保証する。
  *
@@ -21,6 +22,7 @@ import {
   INIT_PROGRESS_CHANNEL,
   type InitLaunch,
   type InitProgressDetails,
+  type InitRunKind,
   type InitRunPayload,
   type InitStats,
   PROGRESS_STAGES,
@@ -29,6 +31,7 @@ import {
 
 interface ActiveRun {
   readonly id: number;
+  readonly kind: InitRunKind;
   launch: InitLaunch | null;
   cursor: ProgressCursor | null;
   /** 最後に送ったイベント（遅れて購読したクライアントへの再送用） */
@@ -58,6 +61,7 @@ const toPayload = (
   extra: Pick<InitRunPayload, 'details' | 'stats'>,
 ): InitRunPayload => ({
   runId: run.id,
+  kind: run.kind,
   stage: PROGRESS_STAGES[cursor.stageIndex],
   progress: cursor.progress,
   launch: run.launch,
@@ -68,11 +72,15 @@ const toPayload = (
  * 新しい実行を始める。以後の進捗イベントはこの実行の ID で送られる。
  * ログ同期のセマフォの permit を持った状態で呼ぶ（ファイル冒頭の説明を参照）。
  *
+ * @param kind 起動時の初期化なら `startup`、単独のログ同期なら `sync`
  * @param launch 起動種別。DB の準備前で判定できないときは null を渡し、
  *               判定後に setInitProgressLaunch で設定する
  * @returns この実行の ID。endInitProgressRun に渡す
  */
-export const beginInitProgressRun = (launch: InitLaunch | null): number => {
+export const beginInitProgressRun = (
+  kind: InitRunKind,
+  launch: InitLaunch | null,
+): number => {
   if (activeRun) {
     logger.warn(
       `Init progress run ${activeRun.id} was replaced before it finished`,
@@ -81,6 +89,7 @@ export const beginInitProgressRun = (launch: InitLaunch | null): number => {
   lastRunId += 1;
   activeRun = {
     id: lastRunId,
+    kind,
     launch,
     cursor: null,
     lastPayload: null,
@@ -91,9 +100,14 @@ export const beginInitProgressRun = (launch: InitLaunch | null): number => {
 };
 
 /**
- * 進行中の実行があるか。ログ同期が初期化の一部として呼ばれたか、単独で呼ばれたかの判定に使う。
+ * 進行中の実行の ID と種類。実行が無ければ null。
+ * 統計の集計（stats.ts）が、起動時の初期化の間だけ DB を数え、集計の失敗を実行ごとに 1 回だけ
+ * 報告するために使う。
  */
-export const hasActiveInitProgressRun = (): boolean => activeRun !== null;
+export const getActiveInitProgressRun = (): {
+  readonly id: number;
+  readonly kind: InitRunKind;
+} | null => (activeRun ? { id: activeRun.id, kind: activeRun.kind } : null);
 
 /**
  * 進行中の実行の起動種別を設定する。以後のすべてのイベントに入る。
@@ -137,12 +151,13 @@ export const emitStageProgress = (
 /**
  * 統計を送る。最後に送った進捗と同じステージ・進捗・実件数のイベントに載せる。
  * まだどのステージも送っていなければ保持だけして、次の進捗イベントに載せる。
+ * 統計は起動画面のためだけの値なので、`startup` 以外の実行では捨てる。
  *
  * 間引きは呼び出し側（stats.ts）が行う。
  */
 export const emitInitStats = (stats: InitStats): void => {
   const run = activeRun;
-  if (!run) {
+  if (run?.kind !== 'startup') {
     return;
   }
   run.latestStats = stats;
@@ -174,6 +189,7 @@ export const endInitProgressRun = (
   }
   const payload: InitRunPayload = {
     runId: run.id,
+    kind: run.kind,
     stage: outcome,
     progress: outcome === 'completed' ? 100 : (run.cursor?.progress ?? 0),
     launch: run.launch,

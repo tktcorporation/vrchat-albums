@@ -104,6 +104,15 @@ export const InitLaunchSchema = z
 export type InitLaunch = z.infer<typeof InitLaunchSchema>;
 
 /**
+ * 実行の種類。`startup` は起動時の初期化、`sync` は起動後に単独で呼ばれたログ同期
+ * （手動更新・バックグラウンド同期・インポート後の再同期など）。
+ * 起動画面は `startup` の実行だけを表示し、統計（`stats`）も `startup` の実行にだけ載る。
+ * 起動画面の表示中に単独の同期がログ同期のロックを持っていても、その進捗で起動画面を動かさないため。
+ */
+const InitRunKindSchema = z.enum(['startup', 'sync']);
+export type InitRunKind = z.infer<typeof InitRunKindSchema>;
+
+/**
  * subscription 接続完了の通知。実行に属さないので進捗も統計も持たない。
  */
 export const InitReadyPayloadSchema = z
@@ -122,6 +131,8 @@ export const InitRunPayloadSchema = z
   .object({
     /** 実行ごとに増える ID。レンダラーはこれが変わったら進捗の表示状態を初期化する */
     runId: z.number().int().min(1),
+    /** 実行の種類（同じ実行のすべてのイベントで同じ値） */
+    kind: InitRunKindSchema,
     /** 現在のステージ */
     stage: RunStageSchema,
     /** ステージ内での進捗（0-100） */
@@ -131,7 +142,7 @@ export const InitRunPayloadSchema = z
     /** ステージ内の実件数。件数を数えられるステージでのみ入る */
     details: InitProgressDetailsSchema.optional(),
     /**
-     * DB 上の累計。更新があったイベントにだけ入り、送信は 1 秒あたり約 10 回までに間引かれる。
+     * DB 上の累計。`startup` の実行で更新があったイベントにだけ入り、送信は 1 秒あたり約 10 回までに間引かれる。
      * 受け取った側は最後に受け取った値を保持して使う。
      */
     stats: InitStatsSchema.optional(),

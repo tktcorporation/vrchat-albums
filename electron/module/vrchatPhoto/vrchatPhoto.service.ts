@@ -1146,7 +1146,8 @@ interface PhotoIndexProgress {
  * - バッチ間でキャッシュをクリア
  *
  * @param isIncremental true: 差分スキャン（ダイジェスト・mtime使用）、false: フルスキャン
- * @param onProgress 登録対象の総数が確定したときと、バッチを 1 つ処理するたびに呼ばれる（進捗表示用）
+ * @param onProgress 登録対象の総数が確定したときと、バッチを 1 つ処理するたびに呼ばれる（進捗表示用）。
+ *                   登録対象が 1 件も無ければ呼ばれない
  */
 export const createVRChatPhotoPathIndex = async (
   isIncremental = true,
@@ -1293,7 +1294,10 @@ export const createVRChatPhotoPathIndex = async (
       0,
     );
     let handledFiles = 0;
-    onProgress?.({ handled: 0, total: totalNewFiles });
+    // 新規ファイルが無ければ件数を送らない。「0 / 0 枚」と表示しても伝わる情報が無いため
+    if (totalNewFiles > 0) {
+      onProgress?.({ handled: 0, total: totalNewFiles });
+    }
 
     for (const {
       folderPathStr,

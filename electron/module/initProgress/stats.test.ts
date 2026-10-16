@@ -1,9 +1,36 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createThrottledRunner, toInitStats } from './stats';
+import { logger } from '../../lib/logger';
+import { getPhotoCountPerLocalMonth } from '../vrchatPhoto/model/vrchatPhotoPath.model';
+import { countDistinctPlayerNames } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
+import { countDistinctVisitedWorlds } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
+import { emitInitStats, getActiveInitProgressRun } from './emitter';
+import {
+  createThrottledRunner,
+  flushInitStats,
+  requestInitStats,
+  toInitStats,
+} from './stats';
 
 vi.mock('../../lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('./emitter', () => ({
+  emitInitStats: vi.fn(),
+  getActiveInitProgressRun: vi.fn(() => null),
+}));
+
+vi.mock('../vrchatPhoto/model/vrchatPhotoPath.model', () => ({
+  getPhotoCountPerLocalMonth: vi.fn(),
+}));
+
+vi.mock('../VRChatPlayerJoinLogModel/playerJoinInfoLog.model', () => ({
+  countDistinctPlayerNames: vi.fn(),
+}));
+
+vi.mock('../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model', () => ({
+  countDistinctVisitedWorlds: vi.fn(),
 }));
 
 /** 時刻とタイマーを手で進めるための偽物 */
@@ -209,5 +236,82 @@ describe('toInitStats', () => {
       people: 0,
       months: [],
     });
+  });
+});
+
+describe('統計の集計', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getPhotoCountPerLocalMonth).mockResolvedValue([
+      { month: '2024-08', count: 2 },
+    ]);
+    vi.mocked(countDistinctVisitedWorlds).mockResolvedValue(3);
+    vi.mocked(countDistinctPlayerNames).mockResolvedValue(4);
+  });
+
+  it('単独の同期の実行では DB を数えない', async () => {
+    vi.mocked(getActiveInitProgressRun).mockReturnValue({
+      id: 1,
+      kind: 'sync',
+    });
+
+    requestInitStats();
+    await flushInitStats();
+    await settle();
+
+    expect(getPhotoCountPerLocalMonth).not.toHaveBeenCalled();
+    expect(countDistinctVisitedWorlds).not.toHaveBeenCalled();
+    expect(countDistinctPlayerNames).not.toHaveBeenCalled();
+    expect(emitInitStats).not.toHaveBeenCalled();
+  });
+
+  it('実行が無いときは DB を数えない', async () => {
+    vi.mocked(getActiveInitProgressRun).mockReturnValue(null);
+
+    await flushInitStats();
+
+    expect(getPhotoCountPerLocalMonth).not.toHaveBeenCalled();
+  });
+
+  it('起動時の初期化の実行では数えた値を送る', async () => {
+    vi.mocked(getActiveInitProgressRun).mockReturnValue({
+      id: 2,
+      kind: 'startup',
+    });
+
+    await flushInitStats();
+
+    expect(emitInitStats).toHaveBeenCalledWith({
+      photos: 2,
+      worlds: 3,
+      people: 4,
+      months: [{ month: '2024-08', count: 2 }],
+    });
+  });
+
+  it('集計の失敗は実行ごとに 1 回だけ error で報告し、同じ実行の 2 回目以降は warn にする', async () => {
+    vi.mocked(getPhotoCountPerLocalMonth).mockRejectedValue(
+      new Error('database is locked'),
+    );
+    vi.mocked(getActiveInitProgressRun).mockReturnValue({
+      id: 10,
+      kind: 'startup',
+    });
+
+    await flushInitStats();
+    await flushInitStats();
+    await flushInitStats();
+
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledTimes(2);
+    expect(emitInitStats).not.toHaveBeenCalled();
+
+    vi.mocked(getActiveInitProgressRun).mockReturnValue({
+      id: 11,
+      kind: 'startup',
+    });
+    await flushInitStats();
+
+    expect(logger.error).toHaveBeenCalledTimes(2);
   });
 });

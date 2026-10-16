@@ -458,6 +458,7 @@ describe('settingsController.initializeAppData', () => {
       'run:completed',
       'lock:release',
     ]);
+    expect(beginInitProgressRun).toHaveBeenCalledWith('startup', null);
     expect(endInitProgressRun).toHaveBeenCalledWith(1, 'completed');
   });
 

@@ -115,7 +115,7 @@ describe('syncLogs', () => {
 
       await Effect.runPromise(syncLogs(LOG_SYNC_MODE.FULL));
 
-      expect(beginInitProgressRun).toHaveBeenCalledWith({
+      expect(beginInitProgressRun).toHaveBeenCalledWith('sync', {
         syncMode: 'full',
         isFirstLaunch: false,
       });
@@ -127,7 +127,7 @@ describe('syncLogs', () => {
 
       await Effect.runPromiseExit(syncLogs(LOG_SYNC_MODE.INCREMENTAL));
 
-      expect(beginInitProgressRun).toHaveBeenCalledWith({
+      expect(beginInitProgressRun).toHaveBeenCalledWith('sync', {
         syncMode: 'incremental',
         isFirstLaunch: false,
       });

@@ -7,7 +7,7 @@ import {
   emitStageProgress,
   endInitProgressRun,
   getInitProgressReplay,
-  hasActiveInitProgressRun,
+  getActiveInitProgressRun,
   setInitProgressLaunch,
 } from './emitter';
 import {
@@ -62,11 +62,11 @@ describe('init progress emitter', () => {
   it('実行が無いときは何も送らない', () => {
     emitStageProgress('log_append', 10);
     expect(received).toEqual([]);
-    expect(hasActiveInitProgressRun()).toBe(false);
+    expect(getActiveInitProgressRun()).toBeNull();
   });
 
   it('ステージの逆行と同一ステージ内の後退を送らない', () => {
-    begin({ syncMode: 'full', isFirstLaunch: true });
+    begin('startup', { syncMode: 'full', isFirstLaunch: true });
     emitStageProgress('log_load', 50);
     emitStageProgress('log_load', 20);
     emitStageProgress('log_append', 100);
@@ -83,7 +83,7 @@ describe('init progress emitter', () => {
   });
 
   it('起動種別は判定後のすべてのイベントに入り、終端イベントで実行が閉じる', () => {
-    const runId = begin(null);
+    const runId = begin('startup', null);
     emitStageProgress('database_sync', 100);
     setInitProgressLaunch({ syncMode: 'incremental', isFirstLaunch: false });
     emitStageProgress('log_append', 0);
@@ -99,14 +99,14 @@ describe('init progress emitter', () => {
       progress: 100,
     });
     expect(new Set(received.map((p) => p.runId)).size).toBe(1);
-    expect(hasActiveInitProgressRun()).toBe(false);
+    expect(getActiveInitProgressRun()).toBeNull();
   });
 
   it('実行ごとに runId が変わる', () => {
-    const firstRunId = begin(null);
+    const firstRunId = begin('startup', null);
     emitStageProgress('database_sync', 0);
     endInitProgressRun(firstRunId, 'error');
-    begin(null);
+    begin('startup', null);
     emitStageProgress('database_sync', 0);
 
     const runIds = received.map((p) => p.runId);
@@ -115,7 +115,7 @@ describe('init progress emitter', () => {
   });
 
   it('ステージ送信前の統計は保持し、ステージ送信後は現在地と一緒に送る', () => {
-    begin(null);
+    begin('startup', null);
     emitInitStats(stats);
     expect(received).toEqual([]);
 
@@ -129,7 +129,7 @@ describe('init progress emitter', () => {
   });
 
   it('再送用の最新状態は最後の進捗と最新の統計を合わせたもの', () => {
-    const runId = begin({ syncMode: 'full', isFirstLaunch: true });
+    const runId = begin('startup', { syncMode: 'full', isFirstLaunch: true });
     emitInitStats(stats);
     emitStageProgress('photo_index', 40, {
       current: 4,
@@ -149,7 +149,7 @@ describe('init progress emitter', () => {
   });
 
   it('統計だけのイベントと再送は、現在のステージの実件数を保つ', () => {
-    begin({ syncMode: 'full', isFirstLaunch: true });
+    begin('startup', { syncMode: 'full', isFirstLaunch: true });
     const details = {
       current: 3412,
       total: 8900,
@@ -172,7 +172,7 @@ describe('init progress emitter', () => {
   });
 
   it('ステージが変わったら前のステージの実件数を載せない', () => {
-    begin({ syncMode: 'full', isFirstLaunch: true });
+    begin('startup', { syncMode: 'full', isFirstLaunch: true });
     emitStageProgress('photo_index', 100, {
       current: 10,
       total: 10,
@@ -187,14 +187,36 @@ describe('init progress emitter', () => {
   });
 
   it('開始した実行の runId でなければ実行を閉じない', () => {
-    const ownRunId = begin(null);
+    const ownRunId = begin('startup', null);
     emitStageProgress('database_sync', 0);
     endInitProgressRun(ownRunId + 1, 'completed');
 
-    expect(hasActiveInitProgressRun()).toBe(true);
+    expect(getActiveInitProgressRun()).not.toBeNull();
     expect(received.map((p) => p.stage)).toEqual(['database_sync']);
 
     endInitProgressRun(ownRunId, 'completed');
-    expect(hasActiveInitProgressRun()).toBe(false);
+    expect(getActiveInitProgressRun()).toBeNull();
+  });
+  it('実行の種類はすべてのイベントに入る', () => {
+    const runId = begin('sync', {
+      syncMode: 'incremental',
+      isFirstLaunch: false,
+    });
+    emitStageProgress('log_append', 0);
+    endInitProgressRun(runId, 'completed');
+
+    expect(received.map((p) => p.kind)).toEqual(['sync', 'sync']);
+    expect(getActiveInitProgressRun()).toBeNull();
+  });
+
+  it('単独の同期の実行では統計を保持も送信もしない', () => {
+    begin('sync', { syncMode: 'incremental', isFirstLaunch: false });
+    emitStageProgress('log_append', 10);
+    emitInitStats(stats);
+    emitStageProgress('log_append', 20);
+
+    expect(received).toHaveLength(2);
+    expect(received.every((p) => p.stats === undefined)).toBe(true);
+    expect(getInitProgressReplay()?.stats).toBeUndefined();
   });
 });

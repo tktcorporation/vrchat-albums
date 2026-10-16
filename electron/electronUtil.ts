@@ -40,6 +40,13 @@ const WINDOW_CONFIG = {
 /** ready-to-show が届かないときに、ウィンドウを強制的に表示するまでの待ち時間 */
 const WINDOW_SHOW_FALLBACK_MS = 5000;
 
+/**
+ * 最初の表示（ready-to-show、または待ち時間切れによる表示）を済ませたウィンドウ。
+ * まだ入っていないウィンドウは描画前なので、トレイ・Dock・二重起動からの表示要求では見せず、
+ * createWindow の最初の表示に任せる。
+ */
+const initiallyShownWindows = new WeakSet<BrowserWindow>();
+
 type DisplayMetricsError =
   | { code: 'WINDOW_DESTROYED'; message: string }
   | { code: 'BOUNDS_ADJUSTMENT_FAILED'; message: string };
@@ -229,14 +236,19 @@ function createWindow(): BrowserWindow {
 
   // 描画が終わらないまま（レンダラーのクラッシュ等）ウィンドウが見えなくならないよう、
   // ready-to-show が来なくても一定時間で表示する。
-  const showFallbackTimer = setTimeout(() => {
-    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-      mainWindow.show();
+  // どちらの経路も、もう一方が表示した後や、表示後にユーザーが最小化・非表示にした後には
+  // show() を呼ばない（呼ぶとウィンドウが元に戻されて前面に出てしまう）。
+  const showInitially = (): void => {
+    if (mainWindow.isDestroyed() || initiallyShownWindows.has(mainWindow)) {
+      return;
     }
-  }, WINDOW_SHOW_FALLBACK_MS);
+    initiallyShownWindows.add(mainWindow);
+    mainWindow.show();
+  };
+  const showFallbackTimer = setTimeout(showInitially, WINDOW_SHOW_FALLBACK_MS);
   mainWindow.once('ready-to-show', () => {
     clearTimeout(showFallbackTimer);
-    mainWindow.show();
+    showInitially();
   });
 
   // ガードは読み込み開始より前に登録し、最初のページからナビゲーションを制限する
@@ -418,6 +430,22 @@ const createOrGetWindow = (): BrowserWindow => {
 };
 
 /**
+ * ユーザー操作（トレイ・Dock・二重起動）に応えてウィンドウを前面に出す。
+ * 最初の表示を済ませていないウィンドウは描画前で中身が透けて見えるため、何もしない
+ * （描画が済めば createWindow の ready-to-show で表示される）。
+ */
+const revealWindow = (window: BrowserWindow): void => {
+  if (window.isDestroyed() || !initiallyShownWindows.has(window)) {
+    return;
+  }
+  if (window.isMinimized()) {
+    window.restore();
+  }
+  window.show();
+  window.focus();
+};
+
+/**
  * システムトレイに常駐させるための初期化処理を行う。
  * アプリ終了時に破棄され、ウィンドウ表示などのメニューを提供する。
  */
@@ -468,12 +496,7 @@ const setTray = () => {
       {
         label: 'ウィンドウを表示',
         click: () => {
-          const window = createOrGetWindow();
-          if (window.isMinimized()) {
-            window.restore();
-          }
-          window.show();
-          window.focus();
+          revealWindow(createOrGetWindow());
         },
       },
       { type: 'separator' },
@@ -499,12 +522,7 @@ const setTray = () => {
 
       // トレイアイコンクリック時にウィンドウを表示
       tray.on('click', () => {
-        const window = createOrGetWindow();
-        if (window.isMinimized()) {
-          window.restore();
-        }
-        window.show();
-        window.focus();
+        revealWindow(createOrGetWindow());
       });
     }
   };
@@ -619,7 +637,7 @@ export const reloadMainWindow = (): void => {
   }
 };
 
-export { setTray, createOrGetWindow, setTimeEventEmitter };
+export { setTray, createOrGetWindow, revealWindow, setTimeEventEmitter };
 
 /**
  * 他モジュールから設定ストアを利用できるよう初期化する。

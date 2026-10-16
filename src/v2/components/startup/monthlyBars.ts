@@ -1,7 +1,7 @@
 /**
  * 起動画面の月別棒グラフを組み立てる純粋関数群。
  *
- * メインプロセスは写真が 1 枚以上ある月だけを `InitStats.months` で送る。
+ * メインプロセスは写真が 1 枚以上ある月だけを `InitStats.months` で送る（月の昇順）。
  * 画面では撮影期間の空白も見せたいので、最初の月から今月までを 1 か月ずつ埋めて並べる。
  */
 import type { InitStats } from '../../hooks/useInitProgress';
@@ -51,12 +51,36 @@ export const yearMonthOf = (date: Date): YearMonth =>
   formatYearMonth(date.getFullYear(), date.getMonth() + 1);
 
 /**
- * 最初に写真がある月から今月までを、写真の無い月も 0 枚として埋めて返す。
- * 横軸の右端は常に今月にする。今月より後の月（ファイル名の日時が誤っている写真や、
- * 端末の時計が遅れている場合）の枚数は今月の棒に足す。右端を最も新しい写真の月まで伸ばすと、
- * 2099 年のような日時の写真が 1 枚あるだけで数百本の空の棒が並んでしまうため。
- * 今月に足すのは、写真を捨てずにグラフの枚数の合計を累計の写真枚数と一致させるため。
+ * 横軸の左端にできる最も古い月。VRChat の一般公開（Steam の早期アクセス）が 2017 年 2 月なので、
+ * それより前の撮影月を持つ写真は、ファイル名の日時が誤っているか、端末の時計が初期値（1970 年など）の
+ * まま撮られたものとみなす。
+ */
+const CHART_FLOOR_MONTH: YearMonth = '2017-01';
+
+/**
+ * 撮影月を、横軸に並べる範囲（CHART_FLOOR_MONTH から今月まで）の中の月に寄せる。
+ * 範囲より後の月は今月に、前の月は左端の月に寄せる。
+ * グラフの枚数と処理中の月の強調が同じ棒を指すよう、両方ともこの関数を通す。
  * `YYYY-MM` はゼロ埋めされているので、文字列の大小比較が年月の前後と一致する。
+ */
+export const chartMonthOf = (
+  month: YearMonth,
+  currentMonth: YearMonth,
+): YearMonth => {
+  if (month > currentMonth) {
+    return currentMonth;
+  }
+  const floor =
+    CHART_FLOOR_MONTH < currentMonth ? CHART_FLOOR_MONTH : currentMonth;
+  return month < floor ? floor : month;
+};
+
+/**
+ * 最初に写真がある月から今月までを、写真の無い月も 0 枚として埋めて返す。
+ * 横軸の右端は常に今月、左端は早くても CHART_FLOOR_MONTH にし、範囲外の月の枚数は端の棒に足す
+ * （chartMonthOf）。範囲を最も新しい・古い写真の月まで伸ばすと、2099 年や 1970 年のような日時の写真が
+ * 1 枚あるだけで数百本の空の棒が並んでしまうため。端の棒に足すのは、写真を捨てずに
+ * グラフの枚数の合計を累計の写真枚数と一致させるため。
  */
 export const fillMonthRange = (
   months: readonly MonthCount[],
@@ -68,10 +92,10 @@ export const fillMonthRange = (
   }
   const counts = new Map<YearMonth, number>();
   for (const { month, count } of months) {
-    const key = month > currentMonth ? currentMonth : month;
+    const key = chartMonthOf(month, currentMonth);
     counts.set(key, (counts.get(key) ?? 0) + count);
   }
-  const start = first.month < currentMonth ? first.month : currentMonth;
+  const start = chartMonthOf(first.month, currentMonth);
   const filled: MonthCount[] = [];
   for (let month = start; month <= currentMonth; month = nextYearMonth(month)) {
     filled.push({ month, count: counts.get(month) ?? 0 });

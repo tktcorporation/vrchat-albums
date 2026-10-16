@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  chartMonthOf,
   fillMonthRange,
   toMonthBars,
   yearMonthOf,
@@ -59,10 +60,59 @@ describe('fillMonthRange', () => {
   });
 
   it('10 年分でも月を 1 つも飛ばさない', () => {
-    const filled = fillMonthRange([{ month: '2015-11', count: 1 }], '2025-10');
+    const filled = fillMonthRange([{ month: '2017-11', count: 1 }], '2027-10');
     expect(filled).toHaveLength(120);
-    expect(filled.at(0)?.month).toBe('2015-11');
-    expect(filled.at(-1)?.month).toBe('2025-10');
+    expect(filled.at(0)?.month).toBe('2017-11');
+    expect(filled.at(-1)?.month).toBe('2027-10');
+  });
+
+  it('2017-01 より前の月は並べず、その枚数を左端の 2017-01 の棒に足す', () => {
+    const filled = fillMonthRange(
+      [
+        { month: '1970-01', count: 3 },
+        { month: '2016-12', count: 2 },
+        { month: '2017-01', count: 1 },
+        { month: '2017-03', count: 4 },
+      ],
+      '2017-04',
+    );
+    expect(filled).toEqual([
+      { month: '2017-01', count: 6 },
+      { month: '2017-02', count: 0 },
+      { month: '2017-03', count: 4 },
+      { month: '2017-04', count: 0 },
+    ]);
+  });
+
+  it('古い外れ値の月が 1 つあっても、左端は 2017-01 で止まる', () => {
+    const filled = fillMonthRange(
+      [
+        { month: '1970-01', count: 1 },
+        { month: '2024-06', count: 10 },
+      ],
+      '2025-04',
+    );
+    expect(filled.at(0)).toEqual({ month: '2017-01', count: 1 });
+    expect(filled).toHaveLength(100);
+  });
+});
+
+describe('chartMonthOf', () => {
+  it('範囲内の月はそのまま返す', () => {
+    expect(chartMonthOf('2024-08', '2025-04')).toBe('2024-08');
+  });
+
+  it('今月より後の月は今月に寄せる', () => {
+    expect(chartMonthOf('2099-12', '2025-04')).toBe('2025-04');
+  });
+
+  it('2017-01 より前の月は 2017-01 に寄せる', () => {
+    expect(chartMonthOf('1970-01', '2025-04')).toBe('2017-01');
+  });
+
+  it('今月が 2017-01 より前（端末の時計の誤り）なら、すべて今月に寄せる', () => {
+    expect(chartMonthOf('1970-01', '2010-05')).toBe('2010-05');
+    expect(chartMonthOf('2024-08', '2010-05')).toBe('2010-05');
   });
 });
 
@@ -82,14 +132,14 @@ describe('yearSpans', () => {
 
   it('120 か月は 11 年に分かれ、月数の合計が一致する', () => {
     const months = fillMonthRange(
-      [{ month: '2015-11', count: 1 }],
-      '2025-10',
+      [{ month: '2017-11', count: 1 }],
+      '2027-10',
     ).map((m) => m.month);
     const spans = yearSpans(months);
     expect(spans).toHaveLength(11);
     expect(spans.reduce((sum, s) => sum + s.span, 0)).toBe(120);
-    expect(spans.at(0)).toEqual({ year: '2015', start: 0, span: 2 });
-    expect(spans.at(-1)).toEqual({ year: '2025', start: 110, span: 10 });
+    expect(spans.at(0)).toEqual({ year: '2017', start: 0, span: 2 });
+    expect(spans.at(-1)).toEqual({ year: '2027', start: 110, span: 10 });
   });
 });
 
@@ -138,10 +188,10 @@ describe('toMonthBars', () => {
   it('120 本すべてが 0〜1 の比に収まる', () => {
     const months = fillMonthRange(
       [
-        { month: '2015-11', count: 4 },
+        { month: '2017-11', count: 4 },
         { month: '2020-05', count: 400 },
       ],
-      '2025-10',
+      '2027-10',
     );
     const bars = toMonthBars(months, '2020-05');
     expect(bars).toHaveLength(120);

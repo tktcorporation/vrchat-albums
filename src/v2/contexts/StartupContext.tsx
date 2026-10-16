@@ -45,6 +45,7 @@ interface StartupProviderProps {
 export const StartupProvider: React.FC<StartupProviderProps> = ({
   children,
 }) => {
+  // 起動後の手動更新・バックグラウンド同期の進捗で起動画面を動かさないよう、起動時の初期化の実行だけを見る
   const {
     isSubscriptionReady,
     progress,
@@ -54,7 +55,7 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
     isFirstLaunch,
     stats,
     reset: resetProgress,
-  } = useInitProgress();
+  } = useInitProgress({ runKind: 'startup' });
 
   const { stages, errorMessage, originalError, retryProcess, completed } =
     useStartupStage({ isSubscriptionReady });

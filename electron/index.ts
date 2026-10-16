@@ -159,20 +159,16 @@ process.on('uncaughtException', (error) => logger.error({ message: error }));
 process.on('unhandledRejection', (error) => logger.error({ message: error }));
 
 app.on('second-instance', () => {
-  const mainWindow = electronUtil.createOrGetWindow();
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore();
-  }
-  mainWindow.focus();
+  electronUtil.revealWindow(electronUtil.createOrGetWindow());
 });
 
+// macOS では起動直後（ウィンドウの描画前）にも activate が届く。描画前のウィンドウは
+// revealWindow が見せないので、最初の表示は createWindow の ready-to-show に任せられる
 app.on(
   'activate',
   () =>
     void (async () => {
-      const mainWindow = await createOrGetMainWindow();
-      mainWindow.show();
-      mainWindow.focus();
+      electronUtil.revealWindow(await createOrGetMainWindow());
     })(),
 );
 

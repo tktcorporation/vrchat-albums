@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../../../trpc', () => ({ trpcReact: {} }));
 
 import {
+  applyInitProgressEvent,
   initialInitProgressState,
   nextShownOverallProgress,
   reduceInitProgress,
@@ -111,6 +112,7 @@ describe('reduceInitProgress', () => {
   it('同じ実行・同じステージで details の無いイベントが来ても直前の実件数を残す', () => {
     const afterProgress = reduceInitProgress(initialInitProgressState, {
       runId: 1,
+      kind: 'startup',
       stage: 'photo_index',
       progress: 38,
       launch,
@@ -118,6 +120,7 @@ describe('reduceInitProgress', () => {
     });
     const afterStats = reduceInitProgress(afterProgress, {
       runId: 1,
+      kind: 'startup',
       stage: 'photo_index',
       progress: 38,
       launch,
@@ -130,6 +133,7 @@ describe('reduceInitProgress', () => {
   it('ステージか実行が変わったら直前の実件数を捨てる', () => {
     const afterProgress = reduceInitProgress(initialInitProgressState, {
       runId: 1,
+      kind: 'startup',
       stage: 'photo_index',
       progress: 100,
       launch,
@@ -138,6 +142,7 @@ describe('reduceInitProgress', () => {
     expect(
       reduceInitProgress(afterProgress, {
         runId: 1,
+        kind: 'startup',
         stage: 'photo_metadata',
         progress: 0,
         launch,
@@ -146,10 +151,77 @@ describe('reduceInitProgress', () => {
     expect(
       reduceInitProgress(afterProgress, {
         runId: 2,
+        kind: 'startup',
         stage: 'photo_index',
         progress: 0,
         launch,
       }).details,
     ).toBeNull();
+  });
+});
+
+describe('applyInitProgressEvent', () => {
+  const launch = { syncMode: 'incremental' as const, isFirstLaunch: false };
+
+  it('起動時の初期化だけを見るとき、接続時に再送された単独の同期の現在地では起動画面を動かさない', () => {
+    // レンダラー起動時、単独の同期（runId 3）がロックを持っていて、その現在地が再送される
+    const afterReplay = applyInitProgressEvent(
+      initialInitProgressState,
+      {
+        runId: 3,
+        kind: 'sync',
+        stage: 'photo_index',
+        progress: 80,
+        launch,
+        details: { current: 8, total: 10, unit: 'photos' },
+      },
+      'startup',
+    );
+    expect(afterReplay).toBe(initialInitProgressState);
+
+    const afterSyncCompleted = applyInitProgressEvent(
+      afterReplay,
+      { runId: 3, kind: 'sync', stage: 'completed', progress: 100, launch },
+      'startup',
+    );
+    expect(afterSyncCompleted).toBe(initialInitProgressState);
+
+    // ロックが返った後に始まる起動時の初期化の実行は、そのまま反映される
+    const afterStartup = applyInitProgressEvent(
+      afterSyncCompleted,
+      {
+        runId: 4,
+        kind: 'startup',
+        stage: 'database_sync',
+        progress: 0,
+        launch: null,
+      },
+      'startup',
+    );
+    expect(afterStartup.latest?.runId).toBe(4);
+    expect(afterStartup.shown).toEqual({ runId: 4, percent: 0 });
+  });
+
+  it('起動が終わった後の単独の同期は、起動画面の状態を同じ参照のまま残す', () => {
+    const ready = applyInitProgressEvent(
+      initialInitProgressState,
+      { runId: 1, kind: 'startup', stage: 'completed', progress: 100, launch },
+      'startup',
+    );
+    const afterSync = applyInitProgressEvent(
+      ready,
+      { runId: 2, kind: 'sync', stage: 'log_append', progress: 0, launch },
+      'startup',
+    );
+    expect(afterSync).toBe(ready);
+  });
+
+  it('種類を指定しなければ単独の同期の進捗も反映する', () => {
+    const next = applyInitProgressEvent(
+      initialInitProgressState,
+      { runId: 2, kind: 'sync', stage: 'log_append', progress: 50, launch },
+      undefined,
+    );
+    expect(next.latest).toMatchObject({ runId: 2, stage: 'log_append' });
   });
 });

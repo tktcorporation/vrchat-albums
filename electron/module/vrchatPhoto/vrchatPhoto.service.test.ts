@@ -862,6 +862,31 @@ describe('createVRChatPhotoPathIndex', () => {
       const handled = progress.map((p) => p.handled);
       expect(handled).toEqual(handled.toSorted((a, b) => a - b));
     });
+
+    it('新規ファイルが無ければ進捗を通知しない（0 / 0 の件数を送らない）', async () => {
+      savedScanStates = {
+        [yearMonthFolder2024_01]: {
+          digest: computeExpectedDigestForFolder([
+            file1Name,
+            'not-a-vrchat-file.txt',
+          ]),
+          lastScannedAt: now.toISOString(),
+        },
+        [yearMonthFolder2024_02]: {
+          digest: computeExpectedDigestForFolder([file2Name]),
+          lastScannedAt: now.toISOString(),
+        },
+        [extraYearMonthFolder]: {
+          digest: computeExpectedDigestForFolder([extraFileName]),
+          lastScannedAt: now.toISOString(),
+        },
+      };
+      const onProgress = vi.fn();
+
+      await service.createVRChatPhotoPathIndex(true, onProgress);
+
+      expect(onProgress).not.toHaveBeenCalled();
+    });
   });
 
   describe('lastScannedAt', () => {
