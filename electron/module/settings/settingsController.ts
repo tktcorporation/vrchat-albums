@@ -2,7 +2,6 @@ import { Cause, Effect, Exit, Option } from 'effect';
 import type { UpdateCheckResult } from 'electron-updater';
 import { match, P } from 'ts-pattern';
 
-import { TERMS_VERSION } from '../../../src/v2/constants/terms/version';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -20,6 +19,7 @@ import {
   toInitSyncMode,
 } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
+import { hasAcceptedCurrentTerms } from '../terms/consent';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
 import { procedure, router as trpcRouter } from './../../trpc';
 import * as settingService from './service';
@@ -349,11 +349,7 @@ export const settingsRouter = () =>
     initializeAppData: procedure.mutation(async () => {
       // 初期化は利用者のログと写真を読み、初回は OS のログイン項目も登録する。
       // 画面側の流れに不具合があっても、現在の版の規約に同意する前にこれらへ触れないようここでも拒む
-      const settingStore = getSettingStore();
-      if (
-        !settingStore.getTermsAccepted() ||
-        settingStore.getTermsVersion() !== TERMS_VERSION
-      ) {
+      if (!hasAcceptedCurrentTerms(getSettingStore())) {
         throw new UserFacingError(
           '利用規約に同意してから読み込みを始めてください',
         );

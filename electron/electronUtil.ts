@@ -541,6 +541,7 @@ const setTray = () => {
 import { match } from 'ts-pattern';
 
 import { syncLogsInBackground } from './module/logSync/service';
+import { hasAcceptedCurrentTerms } from './module/terms/consent';
 
 /**
  * 一定間隔でログ処理を実行するタイマーイベントを設定する。
@@ -566,6 +567,13 @@ const setTimeEventEmitter = (
       if (!passedSettingStore.getBackgroundFileCreateFlag()) {
         // Use passedSettingStore
         logger.debug('バックグラウンド処理が無効になっています');
+        return;
+      }
+      // 規約の更新後、同意し直す前にウィンドウを閉じても、ログや写真を読まない
+      if (!hasAcceptedCurrentTerms(passedSettingStore)) {
+        logger.debug(
+          '現在の版の利用規約に未同意のため、バックグラウンド同期を行いません',
+        );
         return;
       }
 
