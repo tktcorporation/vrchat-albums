@@ -1,51 +1,27 @@
 /**
  * VRChat 写真メタデータサービス
  *
- * VRChat公式XMPメタデータの抽出・保存・取得を管理するサービス層。
+ * VRChat公式XMPメタデータの抽出・保存を管理するサービス層。
  * パーサーとDBモデルの間を仲介する。
  *
- * 呼び出し元: 写真インデックス作成時、tRPC コントローラー
+ * 呼び出し元: 写真インデックス作成時
  */
 
 import { Effect } from 'effect';
 
 import { logger } from '../../lib/logger';
-import { readXmpTags, readXmpTagsBatch } from '../../lib/wrappedExifTool';
-import {
-  MetadataDbError,
-  type MetadataParseError,
-  type NoMetadataFound,
-} from './errors';
-import { extractOfficialMetadata, parsePhotoMetadata } from './parser';
-import type { VRChatPhotoMetadata } from './schema';
+import { readXmpTagsBatch } from '../../lib/wrappedExifTool';
+import { MetadataDbError } from './errors';
+import { extractOfficialMetadata } from './parser';
 import {
   createOrUpdatePhotoMetadataBatch,
   filterPathsWithoutMetadata,
-  getPhotoMetadataByPhotoPath,
-  getPhotoMetadataByPhotoPaths,
-  getPhotoMetadataByWorldId,
   type VRChatPhotoMetadataCreationAttributes,
 } from './vrchatPhotoMetadata.model';
 
 // ============================================================================
 // サービス関数
 // ============================================================================
-
-/**
- * 単一の写真からメタデータを抽出する
- */
-export const extractMetadataFromPhoto = (
-  photoPath: string,
-): Effect.Effect<VRChatPhotoMetadata, NoMetadataFound | MetadataParseError> => {
-  // readXmpTags (Effect) → Promise アダプター。parsePhotoMetadata が Promise を要求するため。
-  const exifTagReader = (
-    fp: string,
-    // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
-  ): Promise<Record<string, any>> =>
-    // biome-ignore lint/suspicious/noExplicitAny: exiftool.Tags は Record<string, any> と互換
-    Effect.runPromise(readXmpTags(fp)) as Promise<Record<string, any>>;
-  return parsePhotoMetadata(photoPath, exifTagReader);
-};
 
 /** バッチ処理の進捗をログ出力する間隔（ファイル数） */
 const PROGRESS_LOG_INTERVAL = 100;
@@ -217,99 +193,4 @@ export const extractAndSaveMetadataBatch = (
       `Photo metadata complete: ${attributes.length} found with XMP out of ${targetPaths.length} scanned (worldId: ${withWorldId}, worldName: ${withWorldName})`,
     );
     return attributes.length;
-  });
-
-// ============================================================================
-// クエリ関数
-// ============================================================================
-
-/**
- * 写真パスからメタデータを取得する
- *
- * 呼び出し元: tRPC getPhotoMetadata エンドポイント
- */
-export const getMetadataForPhoto = (
-  photoPath: string,
-): Effect.Effect<VRChatPhotoMetadata | null, MetadataDbError> =>
-  Effect.gen(function* () {
-    const record = yield* Effect.tryPromise({
-      try: () => getPhotoMetadataByPhotoPath(photoPath),
-      catch: (e) =>
-        new MetadataDbError({
-          message: `Failed to get metadata for photo: ${e instanceof Error ? e.message : String(e)}`,
-        }),
-    });
-
-    if (!record) {
-      return null;
-    }
-
-    return {
-      authorId: record.authorId,
-      authorDisplayName: record.authorDisplayName,
-      worldId: record.worldId,
-      worldDisplayName: record.worldDisplayName,
-    };
-  });
-
-/**
- * 複数写真のメタデータをバッチ取得する
- *
- * 呼び出し元: tRPC getPhotoMetadataBatch エンドポイント
- */
-export const getMetadataForPhotos = (
-  photoPaths: string[],
-): Effect.Effect<Map<string, VRChatPhotoMetadata>, MetadataDbError> =>
-  Effect.gen(function* () {
-    const records = yield* Effect.tryPromise({
-      try: () => getPhotoMetadataByPhotoPaths(photoPaths),
-      catch: (e) =>
-        new MetadataDbError({
-          message: `Failed to get metadata for photos: ${e instanceof Error ? e.message : String(e)}`,
-        }),
-    });
-
-    const metadataMap = new Map<string, VRChatPhotoMetadata>();
-    for (const record of records) {
-      metadataMap.set(record.photoPath, {
-        authorId: record.authorId,
-        authorDisplayName: record.authorDisplayName,
-        worldId: record.worldId,
-        worldDisplayName: record.worldDisplayName,
-      });
-    }
-
-    return metadataMap;
-  });
-
-/**
- * ワールドIDから写真メタデータを検索する
- *
- * メタデータベースのワールド紐付けに使用。
- * ログファイルに依存しない直接的なワールド紐付けが可能。
- *
- * 呼び出し元: tRPC getPhotosByWorldId エンドポイント
- */
-export const getPhotosByWorldId = (
-  worldId: string,
-): Effect.Effect<
-  {
-    photoPath: string;
-    worldDisplayName: string | null;
-  }[],
-  MetadataDbError
-> =>
-  Effect.gen(function* () {
-    const records = yield* Effect.tryPromise({
-      try: () => getPhotoMetadataByWorldId(worldId),
-      catch: (e) =>
-        new MetadataDbError({
-          message: `Failed to get photos by world ID: ${e instanceof Error ? e.message : String(e)}`,
-        }),
-    });
-
-    return records.map((record) => ({
-      photoPath: record.photoPath,
-      worldDisplayName: record.worldDisplayName,
-    }));
   });

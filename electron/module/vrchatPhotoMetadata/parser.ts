@@ -7,9 +7,6 @@
  * @see electron/module/vrchatPhotoMetadata/schema.ts - メタデータの Zod スキーマ定義
  */
 
-import { Effect } from 'effect';
-
-import { MetadataParseError, NoMetadataFound } from './errors';
 import { type VRChatPhotoMetadata, VRChatPhotoMetadataSchema } from './schema';
 
 // ============================================================================
@@ -92,38 +89,3 @@ export const extractOfficialMetadata = (
 
   return parsed.data;
 };
-
-/**
- * VRChat 写真ファイルから公式XMPメタデータを読み取る
- *
- * exiftool のインスタンスは外部から注入する設計。
- * これにより、複数ファイルの処理時にインスタンスを再利用でき、
- * テスト時にモック可能。
- */
-export const parsePhotoMetadata = (
-  filePath: string,
-  // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
-  readExifTags: (filePath: string) => Promise<Record<string, any>>,
-): Effect.Effect<VRChatPhotoMetadata, NoMetadataFound | MetadataParseError> =>
-  Effect.gen(function* () {
-    const tags = yield* Effect.tryPromise({
-      try: () => readExifTags(filePath),
-      catch: (e) =>
-        new MetadataParseError({
-          photoPath: filePath,
-          message: `Failed to read EXIF/XMP from ${filePath}: ${e instanceof Error ? e.message : String(e)}`,
-        }),
-    });
-
-    const metadata = extractOfficialMetadata(tags);
-    if (metadata === null) {
-      return yield* Effect.fail(new NoMetadataFound({ photoPath: filePath }));
-    }
-
-    return metadata;
-  });
-
-// parsePhotoMetadataBatch は削除済み。
-// 従来は1ファイルずつ readXmpTags を並列呼びしていたが、
-// readXmpTagsBatch (Rust Rayon + 部分読み込み) で一発呼びに切り替えた。
-// 新しいフローは service.ts の extractAndSaveMetadataBatch を参照。

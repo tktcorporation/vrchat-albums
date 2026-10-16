@@ -56,10 +56,6 @@ export const electronUtilRouter = () =>
       await getClipboard().writeText(ctx.input);
       eventEmitter.emit('toast', 'copied');
     }),
-    copyImageDataByPath: procedure.input(z.string()).mutation(async (ctx) => {
-      await Effect.runPromise(utilsService.copyImageDataByPath(ctx.input));
-      return true;
-    }),
     /**
      * 単一の画像ファイルパスをクリップボードにコピーする
      * 画像データではなく、ファイルパスそのものをコピーします
@@ -70,25 +66,6 @@ export const electronUtilRouter = () =>
       );
       return true;
     }),
-    downloadImageAsPng: procedure
-      .input(
-        z.object({
-          pngBase64: z.string(),
-          filenameWithoutExt: z.string(),
-        }),
-      )
-      .mutation(({ input }) =>
-        runEffect(
-          utilsService.downloadImageAsPng(input).pipe(
-            Effect.map(() => true as const),
-            // ユーザーキャンセルは silent → false を返す
-            Effect.catchTag('OperationCanceled', () =>
-              Effect.succeed(false as const),
-            ),
-            Effect.mapError(mapToFileOperationError),
-          ),
-        ),
-      ),
     downloadImageAsPhotoLogPng: procedure
       .input(
         z.object({
@@ -180,16 +157,6 @@ export const electronUtilRouter = () =>
     getDownloadsPath: procedure.query(async () => {
       return utilsService.getDownloadsPath();
     }),
-    openPathWithAssociatedApp: procedure
-      .input(z.string())
-      .mutation(({ input }) =>
-        runEffect(
-          utilsService.openPathWithAssociatedApp(input).pipe(
-            Effect.map(() => true as const),
-            Effect.mapError(mapToOpenPathError),
-          ),
-        ),
-      ),
     /**
      * 複数の画像ファイルパスをクリップボードにコピーする
      * 画像データではなく、ファイルパスそのものをコピーします

@@ -29,12 +29,6 @@ const getVRChatLogFilePathModelList = async (query?: {
   }));
 };
 
-const getCountByYearMonthList = async () => {
-  const countByYearMonthList =
-    await vrchatPhotoService.getCountByYearMonthList();
-  return countByYearMonthList;
-};
-
 const setVRChatPhotoDirPathByDialog = async (): Promise<'ok' | 'canceled'> => {
   const exit = await Effect.runPromiseExit(
     utilsService
@@ -65,9 +59,6 @@ export const vrchatPhotoRouter = () =>
       eventEmitter.emit('toast', 'canceled');
       return false;
     }),
-    clearVRChatPhotoDirPathInSettingStore: procedure.mutation(() => {
-      return vrchatPhotoService.clearVRChatPhotoDirPathInSettingStore();
-    }),
     setVRChatPhotoDirPathDirectly: procedure
       .input(z.string().min(1, 'パスを入力してください'))
       .mutation(async ({ input: photoPath }) => {
@@ -92,23 +83,6 @@ export const vrchatPhotoRouter = () =>
       .query(async (ctx) => {
         return getVRChatLogFilePathModelList(ctx.input);
       }),
-    getVrchatPhotoPathCount: procedure
-      .input(
-        z
-          .object({
-            gtPhotoTakenAt: z.date().optional(),
-            ltPhotoTakenAt: z.date().optional(),
-          })
-          .optional(),
-      )
-      .query(async (ctx) => {
-        // サービス関数は予期されたエラーを返さない
-        // データベースエラーなどの予期しないエラーはthrowされてSentryに送信される
-        return vrchatPhotoService.getVRChatPhotoPathCount(ctx.input);
-      }),
-    getCountByYearMonthList: procedure.query(async () => {
-      return getCountByYearMonthList();
-    }),
     getVRChatPhotoItemData: procedure.input(z.string()).query(async (ctx) => {
       const exit = await Effect.runPromiseExit(
         vrchatPhotoService.getVRChatPhotoItemData({

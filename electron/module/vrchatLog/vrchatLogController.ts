@@ -369,12 +369,6 @@ export const vrchatLogRouter = () => {
     userMessageFromError: true,
   });
 
-  const mapPreImportBackupError = reportFailureAsUserFacing({
-    logLabel: 'Pre-import backup',
-    userLabel: 'バックアップ作成',
-    extractMessage: getBackupErrorMessage,
-  });
-
   const mapImportError = reportFailureAsUserFacing({
     logLabel: 'LogStore import',
     userLabel: 'インポート',
@@ -401,22 +395,6 @@ export const vrchatLogRouter = () => {
   });
 
   return trpcRouter({
-    appendLoglinesToFileFromLogFilePathList: procedure
-      .input(
-        z
-          .object({
-            processAll: z.boolean().optional().default(false),
-          })
-          .optional()
-          .default(() => ({ processAll: false })),
-      )
-      .mutation(async (opts) => {
-        const { input } = opts;
-        logger.info(
-          `appendLoglinesToFileFromLogFilePathList (processAll=${input.processAll})`,
-        );
-        await appendLoglinesToFileFromLogFilePathList(input.processAll);
-      }),
     exportLogStoreData: procedure
       .input(
         z.object({
@@ -455,23 +433,6 @@ export const vrchatLogRouter = () => {
 
         return result;
       }),
-    createPreImportBackup: procedure.mutation(async () => {
-      logger.info('Creating pre-import backup');
-
-      const backup = await runEffect(
-        backupService
-          .createPreImportBackup(getDBLogsFromDatabase)
-          .pipe(Effect.mapError(mapPreImportBackupError)),
-      );
-
-      logger.info(`Pre-import backup created successfully: ${backup.id}`);
-      eventEmitter.emit(
-        'toast',
-        `バックアップ作成完了: ${backup.exportFolderPath}`,
-      );
-
-      return backup;
-    }),
     importLogStoreFiles: procedure
       .input(
         z.object({

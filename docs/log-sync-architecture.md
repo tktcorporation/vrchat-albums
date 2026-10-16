@@ -125,13 +125,6 @@ const mutation = trpcReact.logSync.syncLogs.useMutation({
 await mutation.mutateAsync({ mode: 'FULL' });
 ```
 
-### 従来のエンドポイント（非推奨）
-
-```typescript
-// 個別エンドポイント（可能な限り使用を避ける）
-trpcReact.vrchatLog.appendLoglinesToFileFromLogFilePathList.useMutation();
-```
-
 ## クエリ無効化
 
 ログ同期完了後、以下のクエリが自動的に無効化されます：

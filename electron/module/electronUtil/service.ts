@@ -16,7 +16,7 @@ import {
   getShell,
 } from '../../lib/electronModules';
 import { checkExternalUrl } from '../../lib/externalUrl';
-import type { DownloadImageError, FileIOError } from './errors';
+import type { FileIOError } from './errors';
 import {
   ExternalUrlNotAllowed,
   FileCopyFailed,
@@ -24,12 +24,11 @@ import {
   OpenPathFailed,
   OperationCanceled,
   PermissionDenied,
-  SaveFileFailed,
 } from './errors';
 
 /**
  * shell.openPath() をラップした共通ヘルパー関数。
- * エクスプローラー、フォトビューア、関連付けアプリでの開く操作で共通利用される。
+ * エクスプローラーとフォトビューアでの開く操作で共通利用される。
  * shell.openPath() はエラー時に文字列を返し、成功時は空文字列を返す。
  */
 const openPathWithShell = (
@@ -57,14 +56,6 @@ const openPathWithShell = (
  * main プロセスの service モジュール各所から利用される。
  */
 const openPathInExplorer = openPathWithShell;
-
-/**
- * アプリケーションのログ保存ディレクトリを取得する。
- * エラーログ閲覧メニューなどで参照される。
- */
-export const getApplicationLogPath = (): string => {
-  return getApp().getPath('logs');
-};
 
 /**
  * ダウンロードフォルダのパスを取得する。
@@ -122,12 +113,6 @@ const openUrlInDefaultBrowser = (
 const openPhotoPathWithPhotoApp = openPathWithShell;
 
 /**
- * 拡張子に関連付けられたアプリケーションでファイルを開く関数。
- * エクスプローラーから開く機能などで利用される。
- */
-const openPathWithAssociatedApp = openPathWithShell;
-
-/**
  * NativeImage を PNG としてクリップボードへ書き込む。
  * Electron の clipboard は W3C Clipboard API と同じ MIME 型付きの ClipboardItem を受け取るため、
  * 元画像の形式に関わらず PNG へ変換して `image/png` として渡す。
@@ -136,21 +121,6 @@ const writeImageToClipboard = (image: NativeImage): Promise<void> => {
   const ClipboardItem = getClipboardItem();
   const png = new Blob([new Uint8Array(image.toPNG())], { type: 'image/png' });
   return getClipboard().write([new ClipboardItem({ 'image/png': png })]);
-};
-
-/**
- * 画像ファイルを読み込み、クリップボードへ転送する。
- * ShareDialog からのコピー処理で利用される。
- */
-const copyImageDataByPath = (filePath: string): Effect.Effect<void> => {
-  // All errors from readFile and clipboard operations are unexpected
-  // and should propagate to Sentry
-  return Effect.promise(async () => {
-    const photoBuf = await fs.readFile(filePath);
-    const image = getNativeImage().createFromBuffer(photoBuf);
-    await writeImageToClipboard(image);
-    // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
-  });
 };
 
 /**
@@ -170,65 +140,6 @@ const copyImageByBase64 = (options: {
       await writeImageToClipboard(image);
       // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
     },
-  );
-};
-
-/**
- * Base64 画像を一時ファイル化して PNG として保存する処理。
- * プレビュー画像のダウンロード機能から呼び出される。
- */
-const downloadImageAsPng = (options: {
-  pngBase64: string;
-  filenameWithoutExt: string;
-}): Effect.Effect<void, DownloadImageError> => {
-  /**
-   * 一時ディレクトリを作成し、画像保存ダイアログを経由して PNG を保存する。
-   * Effect.acquireUseRelease で一時ディレクトリのクリーンアップを保証する。
-   */
-  return Effect.acquireUseRelease(
-    // acquire: 一時ディレクトリ作成
-    Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), 'vrchat-photo-'))),
-    // use: 画像保存処理
-    (tempDir) =>
-      Effect.gen(function* () {
-        const base64Data = options.pngBase64.replace(
-          /^data:image\/[^;]+;base64,/,
-          '',
-        );
-        const tempFilePath = path.join(
-          tempDir,
-          `${options.filenameWithoutExt}.png`,
-        );
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        yield* Effect.promise(() =>
-          fs.writeFile(tempFilePath, new Uint8Array(imageBuffer)),
-        );
-
-        const dialogResult = yield* Effect.promise(() =>
-          showSavePngDialog(options.filenameWithoutExt),
-        );
-
-        if (dialogResult.canceled || !dialogResult.filePath) {
-          return yield* Effect.fail(new OperationCanceled({}));
-        }
-
-        const saveResult = yield* Effect.either(
-          saveFileToPath(tempFilePath, dialogResult.filePath),
-        );
-
-        if (saveResult._tag === 'Left') {
-          return yield* Effect.fail(
-            new SaveFileFailed({
-              message: saveResult.left.message,
-            }),
-          );
-        }
-      }),
-    // release: 一時ディレクトリ削除（成功・失敗に関わらず実行）
-    (tempDir) =>
-      Effect.promise(() =>
-        fs.rm(tempDir, { recursive: true, force: true }).catch(console.error),
-      ),
   );
 };
 
@@ -315,7 +226,7 @@ export const handlePngBase64WithCallback = (
 
 /**
  * PNG ファイル保存用のダイアログを表示する。
- * downloadImageAsPng から呼び出される。
+ * downloadImageAsPhotoLogPng から呼び出される。
  */
 export const showSavePngDialog = async (filenameWithoutExt: string) => {
   return getDialog().showSaveDialog({
@@ -333,7 +244,7 @@ export const showSavePngDialog = async (filenameWithoutExt: string) => {
 
 /**
  * 一時ファイルから指定パスへファイルを保存する単純なヘルパー。
- * downloadImageAsPng 内部で利用される。
+ * downloadImageAsPhotoLogPng から呼び出される。
  */
 export const saveFileToPath = (
   sourcePath: string,
@@ -370,10 +281,7 @@ export {
   openElectronDialog,
   openUrlInDefaultBrowser,
   openPhotoPathWithPhotoApp,
-  openPathWithAssociatedApp,
-  copyImageDataByPath,
   copyImageByBase64,
-  downloadImageAsPng,
   copyMultipleFilesToClipboard,
   getDownloadsPath,
 };

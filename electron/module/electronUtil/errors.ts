@@ -62,18 +62,6 @@ export class ExternalUrlNotAllowed extends Data.TaggedError(
   url: string;
 }> {}
 
-/** 画像保存に失敗 */
-export class SaveFileFailed extends Data.TaggedError('SaveFileFailed')<{
-  message: string;
-}> {}
-
-/** PNG 処理に失敗 */
-export class PngProcessingFailed extends Data.TaggedError(
-  'PngProcessingFailed',
-)<{
-  message: string;
-}> {}
-
 /** ファイルI/Oエラーの Union 型 */
 export type FileIOError =
   | FileCreateFailed
@@ -82,9 +70,3 @@ export type FileIOError =
   | FileWriteFailed
   | TempDirCreateFailed
   | PermissionDenied;
-
-/** ダウンロード画像エラーの Union 型 */
-export type DownloadImageError =
-  | OperationCanceled
-  | SaveFileFailed
-  | PngProcessingFailed;

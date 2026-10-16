@@ -35,34 +35,6 @@ const getVrcWorldInfoByWorldId = (
   );
 };
 
-const getVrcUserInfoListByUserNameList = async (
-  userNameList: string[],
-): Promise<
-  {
-    searchName: string;
-    user: z.infer<typeof vrchatApiService.UserSchema> | null;
-  }[]
-> => {
-  const result = await Promise.all(
-    userNameList.map(async (name) => {
-      const exit = await Effect.runPromiseExit(
-        vrchatApiService.getVrcUserInfoByUserName(name),
-      );
-      if (exit._tag === 'Success') {
-        return {
-          searchName: name,
-          user: exit.value,
-        };
-      }
-      return {
-        searchName: name,
-        user: null,
-      };
-    }),
-  );
-  return result;
-};
-
 import { ofetch } from 'ofetch';
 
 const convertImageToBase64 = async (imageUrl: string): Promise<string> => {
@@ -87,11 +59,6 @@ export const vrchatApiRouter = trpcRouter({
     .input(VRChatWorldIdSchema)
     .query((ctx) => {
       return getVrcWorldInfoByWorldId(ctx.input);
-    }),
-  getVrcUserInfoListByUserNameList: procedure
-    .input(z.string().array())
-    .query((ctx) => {
-      return getVrcUserInfoListByUserNameList(ctx.input);
     }),
   convertImageToBase64: procedure
     .input(z.string().min(1))

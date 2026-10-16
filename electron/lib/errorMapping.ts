@@ -124,7 +124,7 @@ export const toUserFacing =
 /**
  * 汎用ファイル操作エラー → UserFacingError。
  *
- * `electronUtilController` / `api.ts` の openPathOnExplorer 等で重複していた
+ * `electronUtilController` / `api.ts` のファイル操作系 procedure が共通で使う
  * 「ファイル操作中にエラーが発生しました。」のマッパー。
  */
 export const mapToFileOperationError = toUserFacing<{ message: string }>({
