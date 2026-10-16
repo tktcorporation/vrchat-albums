@@ -205,7 +205,7 @@ const collectAndEmitStats = (): Promise<void> => {
     }).pipe(
       Effect.match({
         onSuccess: (stats) => {
-          emitInitStats(stats);
+          emitInitStats(run.id, stats);
         },
         onFailure: (error) => {
           // 数え直しに失敗したら古いワールド数・人数を使い続けないよう、次の集計で数え直す

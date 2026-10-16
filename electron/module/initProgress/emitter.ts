@@ -153,11 +153,16 @@ export const emitStageProgress = (
  * まだどのステージも送っていなければ保持だけして、次の進捗イベントに載せる。
  * 統計は起動画面のためだけの値なので、`startup` 以外の実行では捨てる。
  *
+ * @param runId 集計を始めたときの実行の ID
+ * @param stats 集計した統計
+ *
  * 間引きは呼び出し側（stats.ts）が行う。
  */
-export const emitInitStats = (stats: InitStats): void => {
+export const emitInitStats = (runId: number, stats: InitStats): void => {
   const run = activeRun;
-  if (run?.kind !== 'startup') {
+  // 集計は非同期なので、集計中に実行が入れ替わる（失敗した初期化の直後に再試行する等）ことがある。
+  // 集計を始めた実行でなければ、別の実行の値を混ぜないよう捨てる。
+  if (run?.kind !== 'startup' || run.id !== runId) {
     return;
   }
   run.latestStats = stats;

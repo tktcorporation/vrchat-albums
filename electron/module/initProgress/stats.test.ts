@@ -281,7 +281,7 @@ describe('統計の集計', () => {
 
     await flushInitStats();
 
-    expect(emitInitStats).toHaveBeenCalledWith({
+    expect(emitInitStats).toHaveBeenCalledWith(2, {
       photos: 2,
       worlds: 3,
       people: 4,
@@ -307,6 +307,7 @@ describe('統計の集計', () => {
     expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(1);
     expect(countDistinctPlayerNames).toHaveBeenCalledTimes(1);
     expect(emitInitStats).toHaveBeenLastCalledWith(
+      5,
       expect.objectContaining({ worlds: 3, people: 4 }),
     );
 
@@ -339,6 +340,7 @@ describe('統計の集計', () => {
 
     expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(3);
     expect(emitInitStats).toHaveBeenLastCalledWith(
+      6,
       expect.objectContaining({ worlds: 9 }),
     );
   });

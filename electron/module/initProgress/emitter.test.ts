@@ -116,11 +116,11 @@ describe('init progress emitter', () => {
 
   it('ステージ送信前の統計は保持し、ステージ送信後は現在地と一緒に送る', () => {
     begin('startup', null);
-    emitInitStats(stats);
+    emitInitStats(openRunIds.at(-1) ?? 0, stats);
     expect(received).toEqual([]);
 
     emitStageProgress('database_sync', 100);
-    emitInitStats(stats);
+    emitInitStats(openRunIds.at(-1) ?? 0, stats);
     expect(received.at(-1)).toMatchObject({
       stage: 'database_sync',
       progress: 100,
@@ -130,7 +130,7 @@ describe('init progress emitter', () => {
 
   it('再送用の最新状態は最後の進捗と最新の統計を合わせたもの', () => {
     const runId = begin('startup', { syncMode: 'full', isFirstLaunch: true });
-    emitInitStats(stats);
+    emitInitStats(openRunIds.at(-1) ?? 0, stats);
     emitStageProgress('photo_index', 40, {
       current: 4,
       total: 10,
@@ -157,7 +157,7 @@ describe('init progress emitter', () => {
       currentItem: '2024-08',
     };
     emitStageProgress('photo_index', 38, details);
-    emitInitStats(stats);
+    emitInitStats(openRunIds.at(-1) ?? 0, stats);
     // 同じステージで details を省いた進捗も、直前の実件数を載せる
     emitStageProgress('photo_index', 39);
 
@@ -179,7 +179,7 @@ describe('init progress emitter', () => {
       unit: 'photos',
     });
     emitStageProgress('photo_metadata', 0);
-    emitInitStats(stats);
+    emitInitStats(openRunIds.at(-1) ?? 0, stats);
 
     expect(received[1].details).toBeUndefined();
     expect(received[2].details).toBeUndefined();
@@ -209,10 +209,24 @@ describe('init progress emitter', () => {
     expect(getActiveInitProgressRun()).toBeNull();
   });
 
+  it('集計を始めた実行が終わっていたら、その統計を次の実行に混ぜない', () => {
+    const failedRunId = begin('startup', null);
+    emitStageProgress('database_sync', 100);
+    endInitProgressRun(failedRunId, 'error');
+    begin('startup', null);
+    emitStageProgress('database_sync', 100);
+    received.length = 0;
+
+    emitInitStats(failedRunId, stats);
+
+    expect(received).toEqual([]);
+    expect(getInitProgressReplay()?.stats).toBeUndefined();
+  });
+
   it('単独の同期の実行では統計を保持も送信もしない', () => {
     begin('sync', { syncMode: 'incremental', isFirstLaunch: false });
     emitStageProgress('log_append', 10);
-    emitInitStats(stats);
+    emitInitStats(openRunIds.at(-1) ?? 0, stats);
     emitStageProgress('log_append', 20);
 
     expect(received).toHaveLength(2);
