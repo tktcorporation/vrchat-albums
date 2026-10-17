@@ -90,31 +90,17 @@ const getExifNative = (): ExifNativeModule => {
 // ============================================================================
 
 /**
- * VRChat XMP メタデータに必要なタグだけを高速に読み取る。
+ * 1 ファイルから VRChat XMP メタデータを読み取る。
  *
- * 戻り値は exiftool-vendored の Tags 互換の Record<string, any> 形式。
- * extractOfficialMetadata() がそのまま使えるようにする。
+ * 戻り値は exif-native の JsVrcXmpMetadata をそのまま返し、
+ * extractOfficialMetadata() に渡せば VRChatPhotoMetadata へパースできる。
+ * VRChat メタデータを持たない写真では null を返す。
  */
 export const readXmpTags = (
   filePath: string,
-): Effect.Effect<Record<string, unknown>, ExifOperationError> =>
+): Effect.Effect<JsVrcXmpMetadata | null, ExifOperationError> =>
   Effect.try({
-    try: () => {
-      const native = getExifNative();
-      const result = native.readVrcXmp(filePath);
-      if (result === null) {
-        // メタデータなし: 空のオブジェクトを返す（extractOfficialMetadata が null を返す）
-        return {} as Record<string, unknown>;
-      }
-      // exiftool-vendored の Tags 互換フォーマットに変換
-      // extractOfficialMetadata が期待するキー名にマッピング
-      return {
-        AuthorID: result.authorId ?? undefined,
-        Author: result.author ?? undefined,
-        WorldID: result.worldId ?? undefined,
-        WorldDisplayName: result.worldDisplayName ?? undefined,
-      } as Record<string, unknown>;
-    },
+    try: () => getExifNative().readVrcXmp(filePath),
     catch: (error): ExifOperationError => {
       logger.debug('Failed to read XMP tags', error);
       return new ExifOperationError({
@@ -236,18 +222,4 @@ export const readImageDimensionsBatch = (
 ): Promise<(JsImageDimensions | null | undefined)[]> => {
   const native = getExifNative();
   return native.readImageDimensionsBatch(filePaths);
-};
-
-// ============================================================================
-// ライフサイクル管理（exif-native では不要だが、既存の呼び出し元との互換性のため残す）
-// ============================================================================
-
-/**
- * ExifTool インスタンスのクリーンアップ。
- *
- * exif-native はインプロセスで動作するためプロセス管理が不要。
- * 既存の呼び出し元（process.on('exit') 等）との互換性のために no-op として残す。
- */
-export const closeExiftoolInstance = async (): Promise<void> => {
-  // exif-native はプロセス管理不要 — no-op
 };

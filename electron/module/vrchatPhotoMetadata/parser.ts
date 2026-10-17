@@ -1,86 +1,51 @@
 /**
  * VRChat 写真メタデータパーサー
  *
- * VRChat公式 (2025.3.1以降) が XMP 形式で写真に埋め込むメタデータを
- * exiftool-vendored で読み取り、型安全にパースする。
+ * VRChat公式 (2025.3.1以降) が XMP 形式で写真に埋め込むメタデータを、
+ * @vrchat-albums/exif-native が読み取った JsVrcXmpMetadata から型安全にパースする。
+ *
+ * XMP フィールドと JsVrcXmpMetadata の対応:
+ * - vrc:AuthorID → authorId: 撮影者ユーザーID
+ * - Author → author: 撮影者表示名
+ * - vrc:WorldID → worldId: ワールドID
+ * - vrc:WorldDisplayName → worldDisplayName: ワールド表示名
  *
  * @see electron/module/vrchatPhotoMetadata/schema.ts - メタデータの Zod スキーマ定義
  */
 
+import type { JsVrcXmpMetadata } from '@vrchat-albums/exif-native';
+
 import { type VRChatPhotoMetadata, VRChatPhotoMetadataSchema } from './schema';
 
-// ============================================================================
-// VRChat公式メタデータ (XMP) パーサー
-// ============================================================================
-
-/*
- * VRChat 2025.3.1 で導入された XMP フィールド:
- * - AuthorID (vrc:AuthorID): 撮影者ユーザーID
- * - Author: 撮影者表示名
- * - WorldID (vrc:WorldID): ワールドID
- * - WorldDisplayName (vrc:WorldDisplayName): ワールド表示名
+/**
+ * 欠けたフィールド（undefined）と空文字を null に揃える。
  *
- * exiftool-vendored は XMP カスタムネームスペースのフィールドを
- * 複数の名前で返す可能性がある（例: AuthorID, vrc:AuthorID）。
- * resolveStringTag で候補を統一し、extractOfficialMetadata で Zod 検証する。
+ * スキーマは空文字を拒否するため、空のワールド情報で写真全体を捨てないよう先に null へ寄せる。
  */
+const nonEmptyOrNull = (value: string | undefined): string | null =>
+  value === undefined || value.length === 0 ? null : value;
 
 /**
- * exiftool Tags から指定キーの候補値を正規化して string | null に変換するヘルパー
- */
-const resolveStringTag = (
-  // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
-  tags: Record<string, any>,
-  ...keys: string[]
-): string | null => {
-  for (const key of keys) {
-    const value: unknown = tags[key];
-    if (typeof value === 'string' && value.length > 0) {
-      return value;
-    }
-  }
-  return null;
-};
-
-/**
- * exiftool の Tags オブジェクトから VRChat 公式メタデータを抽出する
+ * exif-native の XMP 読み取り結果から VRChat 公式メタデータを抽出する
  *
- * AuthorID が存在しなければ VRChat メタデータなしと判断して null を返す。
+ * authorId が無ければ VRChat メタデータなしと判断して null を返す。
  * Zod スキーマで最終検証する（Parse Don't Validate）。
  */
 export const extractOfficialMetadata = (
-  // biome-ignore lint/suspicious/noExplicitAny: exiftool Tags の型は広すぎるため any で受ける
-  tags: Record<string, any>,
+  xmp: JsVrcXmpMetadata,
 ): VRChatPhotoMetadata | null => {
-  // AuthorID がなければ VRChat メタデータなしと判断（最低限の存在チェック）
-  const authorId = resolveStringTag(tags, 'AuthorID', 'vrc:AuthorID');
-  if (!authorId) {
+  const authorId = nonEmptyOrNull(xmp.authorId);
+  if (authorId === null) {
     return null;
   }
 
-  const authorDisplayName =
-    resolveStringTag(tags, 'Author', 'Creator', 'xmp:Creator', 'dc:creator') ??
-    authorId;
-
-  const worldId = resolveStringTag(
-    tags,
-    'WorldID',
-    'vrc:WorldID',
-    'VRCWorldID',
-  );
-  const worldDisplayName = resolveStringTag(
-    tags,
-    'WorldDisplayName',
-    'vrc:WorldDisplayName',
-    'VRCWorldDisplayName',
-  );
-
-  // Zod スキーマで最終検証（Parse Don't Validate）
   const parsed = VRChatPhotoMetadataSchema.safeParse({
     authorId,
-    authorDisplayName,
-    worldId,
-    worldDisplayName,
+    // 表示名が埋め込まれていない写真では ID を表示名として扱う
+    authorDisplayName: nonEmptyOrNull(xmp.author) ?? authorId,
+    // プライベートワールド等ではワールド情報が欠ける
+    worldId: nonEmptyOrNull(xmp.worldId),
+    worldDisplayName: nonEmptyOrNull(xmp.worldDisplayName),
   });
 
   if (!parsed.success) {
