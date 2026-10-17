@@ -2,9 +2,11 @@
  * EXIF/XMP メタデータ操作のラッパー。
  *
  * XMP 読み取りと EXIF 書き込みは @vrchat-albums/exif-native（Rust napi-rs）が同じプロセス内で行う。
- * exiftool のような Perl 子プロセスは、IPC と一時ファイルを経由するうえ、1 ファイルのハングが
- * 後続の全リクエストを止めるため、タイムアウトと回復処理を抱えることになる。インプロセスなら
- * それらが要らない。
+ * exiftool のような Perl 子プロセスに 1 つのキューで処理を流すと、1 ファイルのハングが後続の
+ * 全リクエストを止めるため、タイムアウトと回復処理を抱えることになる。インプロセスならそれが要らない。
+ *
+ * ファイルへの書き込み（writeDateTimeWithTimezone）だけは、クラッシュ時に元の写真を壊さないよう
+ * exif-native が同じディレクトリの一時ファイルに書いてから rename する。
  */
 
 import type {
@@ -154,8 +156,7 @@ export const readXmpTagsBatch = (
 /**
  * ファイルに EXIF メタデータ（日時・説明・タイムゾーン）を書き込む。
  *
- * World Join Image 生成時に使用。Rust ネイティブモジュールで
- * TIFF IFD を直接構築して書き込むため、一時ファイル不要。
+ * World Join Image 生成時に使用。Rust ネイティブモジュールが TIFF IFD を直接構築する。
  */
 export const writeDateTimeWithTimezone = (params: {
   filePath: string;
