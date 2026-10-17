@@ -21,6 +21,7 @@ export const getDialog = () => getElectron().dialog;
 export const getClipboard = () => getElectron().clipboard;
 export const getClipboardItem = () => getElectron().ClipboardItem;
 export const getNativeImage = () => getElectron().nativeImage;
+export const getNotification = () => getElectron().Notification;
 
 /**
  * Electron 環境であれば `fn(app)` を、そうでなければ `fallback` を返す。
