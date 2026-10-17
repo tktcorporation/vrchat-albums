@@ -30,14 +30,17 @@ runs:
 
     - name: Setup Rust toolchain
       if: inputs.include-native == 'true'
-      uses: dtolnay/rust-toolchain@stable
+      # SHA で固定すると ref 名から toolchain を読めないので、stable を明示する
+      uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      with:
+        toolchain: stable
 
     # Swatinem/rust-cache は cargo registry / git / target を OS / Cargo.lock /
     # rustc バージョン込みで賢くキャッシュする。素の actions/cache よりヒット率が高く、
     # incremental 成果物の自動 prune も入る。
     - name: Cache Rust build (cargo registry / target)
       if: inputs.include-native == 'true'
-      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       with:
         workspaces: 'packages/exif-native -> target'
 

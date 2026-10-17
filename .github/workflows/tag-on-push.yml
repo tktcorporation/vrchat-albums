@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# 連続した main への push で同じ版タグを同時に作ろうとして片方が失敗しないよう、1 本ずつ流す
+concurrency:
+  group: tag-on-push
+  cancel-in-progress: false
+
 jobs:
   create_tag:
     if: >-

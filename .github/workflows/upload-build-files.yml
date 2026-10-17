@@ -102,7 +102,7 @@ jobs:
 
       - name: Create Release Draft
         id: create-release-draft
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           draft: true
           # v0.0.0 or ref
