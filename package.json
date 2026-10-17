@@ -46,7 +46,7 @@
     "test": "vitest run",
     "test:web": "vitest run --project web",
     "test:electron": "vitest run --project electron",
-    "test:memory": "MEMORY_PROFILE=1 vitest run electron/module/vrchatPhoto/vrchatPhoto.memory.integration.test.ts",
+    "test:memory": "node scripts/run-memory-profile.mjs",
     "test:playwright": "SENTRY_DSN='' run-s build \"playwright:setup-and-run\" sync-landing-images",
     "test:playwright:ci": "SENTRY_DSN='' run-s playwright:run sync-landing-images",
     "playwright:setup-and-run": "playwright install --with-deps && playwright test --timeout=60000",
