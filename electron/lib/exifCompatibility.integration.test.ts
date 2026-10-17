@@ -1,15 +1,13 @@
 /**
  * exif-native 互換性テスト（Contract Test）
  *
- * 背景: exiftool-vendored を Rust + napi-rs ネイティブモジュール (exif-native) に
- * 置き換えた。このテストで以下を検証する:
+ * アプリのメタデータ処理を担う exif-native（Rust + napi-rs）の結果を、
+ * 広く使われている exiftool で読み戻して突き合わせる。このテストで以下を検証する:
  *
  * 1. XMP 読み取り: exif-native が VRChat XMP メタデータを正しく読み取れること
  * 2. EXIF 書き込み: exif-native が書いた EXIF を exiftool-vendored で読み戻して検証
  *    （exiftool-vendored は検証用ツールとしてのみ使用）
  * 3. バッファ経由の読み書き
- *
- * @see docs/plans/exif-native-spec.md — 移行仕様書
  */
 
 import * as fs from 'node:fs';

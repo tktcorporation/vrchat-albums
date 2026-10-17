@@ -1,10 +1,10 @@
 /**
  * EXIF/XMP メタデータ操作のラッパー。
  *
- * 背景: exiftool-vendored（Perl 子プロセス）から @vrchat-albums/exif-native（Rust napi-rs）に
- * 移行。XMP 読み取りと EXIF 書き込みは exif-native が担当する。
- *
- * @see docs/plans/exif-native-spec.md — 移行仕様書
+ * XMP 読み取りと EXIF 書き込みは @vrchat-albums/exif-native（Rust napi-rs）が同じプロセス内で行う。
+ * exiftool のような Perl 子プロセスは、IPC と一時ファイルを経由するうえ、1 ファイルのハングが
+ * 後続の全リクエストを止めるため、タイムアウトと回復処理を抱えることになる。インプロセスなら
+ * それらが要らない。
  */
 
 import type {
