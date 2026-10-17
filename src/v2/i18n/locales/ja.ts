@@ -128,6 +128,10 @@ const ja: Translations = {
         downloaded: '新しいバージョンがダウンロード済みです',
         installAndRestart: 'インストールして再起動',
         checkFailed: 'アップデートの確認に失敗しました',
+        openDownloadPage: 'ダウンロードページを開く',
+        installUpdate: 'アップデートをインストール',
+        availableOpenDownloadPage:
+          '新しいバージョン {version} が利用可能です。ダウンロードページを開く',
       },
       licenses: {
         title: 'ライセンス情報',

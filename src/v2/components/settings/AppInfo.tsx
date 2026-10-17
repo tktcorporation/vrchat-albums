@@ -8,6 +8,7 @@ import { trpcClient, trpcReact } from '@/trpc';
 
 import packageJson from '../../../../package.json';
 import { Button } from '../../../components/ui/button';
+import { RELEASES_LATEST_URL } from '../../constants/externalLinks';
 import {
   BORDER,
   ICON_SIZE,
@@ -32,7 +33,7 @@ interface UpdateCheckError {
 type UpdateCheckState =
   | { status: 'idle' }
   | { status: 'checking' }
-  | { status: 'available'; version: string }
+  | { status: 'available'; version: string; canAutoInstall: boolean }
   | { status: 'downloaded' }
   | { status: 'up-to-date' }
   | { status: 'error' };
@@ -51,6 +52,7 @@ const AppInfo = memo(() => {
   const [updateState, setUpdateState] = useState<UpdateCheckState>({
     status: 'idle',
   });
+  const utils = trpcReact.useUtils();
 
   /**
    * アップデートを確認し、結果に応じて状態を更新する。
@@ -62,7 +64,7 @@ const AppInfo = memo(() => {
 
     type CheckResult =
       | { status: 'up-to-date' }
-      | { status: 'available'; version: string }
+      | { status: 'available'; version: string; canAutoInstall: boolean }
       | { status: 'downloaded' };
 
     const checkEffect: Effect.Effect<CheckResult, UpdateCheckError> =
@@ -76,8 +78,8 @@ const AppInfo = memo(() => {
               return Effect.succeed({ status: 'up-to-date' });
             }
             const version = result.updateInfo.updateInfo.version;
-            // autoDownload=true なので、チェック後すぐにダウンロードが始まる。
-            // ダウンロード済みかどうかを確認して表示を分ける。
+            // 自動インストールできる環境ではチェック後すぐにダウンロードが始まる。
+            // ダウンロード済みかどうかと、自動インストールできるかを確認して表示を分ける。
             return Effect.tryPromise({
               try: () => trpcClient.updater.getUpdateStatus.query(),
               catch: (): UpdateCheckError => ({
@@ -87,7 +89,11 @@ const AppInfo = memo(() => {
               Effect.map((downloadStatus) =>
                 downloadStatus.updateDownloaded
                   ? { status: 'downloaded' as const }
-                  : { status: 'available' as const, version },
+                  : {
+                      status: 'available' as const,
+                      version,
+                      canAutoInstall: downloadStatus.canAutoInstall,
+                    },
               ),
             );
           },
@@ -101,11 +107,16 @@ const AppInfo = memo(() => {
       }),
     );
 
-    void Effect.runPromise(program);
-  }, []);
+    // ここで見つかった新バージョンをヘッダーにも出すため、確認後にアップデート状態を取り直す
+    void Effect.runPromise(program).then(() =>
+      utils.updater.getUpdateStatus.invalidate(),
+    );
+  }, [utils]);
 
   const { mutate: quitAndInstall, isPending: isInstalling } =
     trpcReact.updater.quitAndInstall.useMutation();
+  const { mutate: openUrl } =
+    trpcReact.electronUtil.openUrlInDefaultBrowser.useMutation();
 
   /** ログフォルダをエクスプローラーで開く */
   const handleOpenLog = () => {
@@ -200,19 +211,32 @@ const AppInfo = memo(() => {
             )}
             {updateState.status === 'available' && (
               <div
-                className={cn(
-                  'flex items-center gap-1.5',
-                  TYPOGRAPHY.caption.default,
-                  STATUS_COLOR.info.text,
-                )}
+                className={cn('flex flex-col items-end', SPACING.stack.tight)}
               >
-                <Download className={ICON_SIZE.xs.class} />
-                <span>
-                  {t('settings.info.update.available').replace(
-                    '{version}',
-                    updateState.version,
+                <div
+                  className={cn(
+                    'flex items-center gap-1.5',
+                    TYPOGRAPHY.caption.default,
+                    STATUS_COLOR.info.text,
                   )}
-                </span>
+                >
+                  <Download className={ICON_SIZE.xs.class} />
+                  <span>
+                    {t('settings.info.update.available').replace(
+                      '{version}',
+                      updateState.version,
+                    )}
+                  </span>
+                </div>
+                {!updateState.canAutoInstall && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => openUrl(RELEASES_LATEST_URL)}
+                  >
+                    {t('settings.info.update.openDownloadPage')}
+                  </Button>
+                )}
               </div>
             )}
             {updateState.status === 'downloaded' && (

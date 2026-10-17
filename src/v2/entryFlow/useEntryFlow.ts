@@ -123,9 +123,13 @@ export const useEntryFlow = () => {
     }
     initRendererSentry();
     // 確認に失敗しても使い続けられる。次回起動時に確認し直す
-    void trpcClient.updater.checkForUpdates.mutate().catch((error: unknown) => {
-      console.warn('Failed to check for updates:', error);
-    });
+    // 確認で見つかった新バージョンをヘッダーへ出すため、確認後にアップデート状態を取り直す
+    void trpcClient.updater.checkForUpdates
+      .mutate()
+      .then(() => utilsRef.current.updater.getUpdateStatus.invalidate())
+      .catch((error: unknown) => {
+        console.warn('Failed to check for updates:', error);
+      });
   }, [consented]);
 
   const acceptTerms = useCallback(() => {

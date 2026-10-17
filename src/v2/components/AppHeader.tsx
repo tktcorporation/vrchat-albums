@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 import { trpcReact as trpc } from '../../trpc';
+import { RELEASES_LATEST_URL } from '../constants/externalLinks';
 import { ICON_SIZE } from '../constants/ui';
 import type { UseLoadingStateResult } from '../hooks/useLoadingState';
 import { LOG_SYNC_MODE, useLogSync } from '../hooks/useLogSync';
@@ -75,6 +76,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   );
 
   const quitAndInstall = trpc.updater.quitAndInstall.useMutation();
+  const openUrl = trpc.electronUtil.openUrlInDefaultBrowser.useMutation();
+
+  // 自動インストールできない環境では、新バージョンを配布ページへの誘導で知らせる
+  const manualUpdateVersion =
+    updateStatus && !updateStatus.canAutoInstall
+      ? updateStatus.availableVersion
+      : null;
 
   const { sync: syncLogs, isLoading: isSyncing } = useLogSync({
     onSuccess: () => {
@@ -188,7 +196,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             size="sm"
             onClick={() => quitAndInstall.mutate()}
             className="h-7 w-7 p-0 hover:bg-success/15 text-success/70 hover:text-success transition-colors duration-150"
-            title="アップデートをインストール"
+            title={t('settings.info.update.installUpdate')}
+          >
+            <Download className={ICON_SIZE.sm.class} />
+          </Button>
+        )}
+        {manualUpdateVersion && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openUrl.mutate(RELEASES_LATEST_URL)}
+            className="h-7 w-7 p-0 hover:bg-success/15 text-success/70 hover:text-success transition-colors duration-150"
+            title={t('settings.info.update.availableOpenDownloadPage').replace(
+              '{version}',
+              manualUpdateVersion,
+            )}
           >
             <Download className={ICON_SIZE.sm.class} />
           </Button>
