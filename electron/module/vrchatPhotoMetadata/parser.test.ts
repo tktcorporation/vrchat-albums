@@ -1,9 +1,10 @@
 /**
  * VRChat 写真メタデータパーサーのテスト
  *
- * extractOfficialMetadata: exiftool Tags から VRChat公式XMPメタデータを抽出する関数のテスト
+ * extractOfficialMetadata: exif-native の XMP 読み取り結果から VRChat公式メタデータを抽出する関数のテスト
  */
 
+import type { JsVrcXmpMetadata } from '@vrchat-albums/exif-native';
 import { describe, expect, it } from 'vitest';
 
 import { extractOfficialMetadata } from './parser';
@@ -13,15 +14,15 @@ import { extractOfficialMetadata } from './parser';
 // ============================================================================
 
 describe('extractOfficialMetadata', () => {
-  it('should extract VRChat official metadata from exiftool tags', () => {
-    const tags = {
-      AuthorID: 'usr_12345678-1234-1234-1234-123456789012',
-      Author: 'TestPhotographer',
-      WorldID: 'wrld_12345678-1234-1234-1234-123456789012',
-      WorldDisplayName: 'Beautiful World',
+  it('should extract VRChat official metadata from native XMP result', () => {
+    const xmp: JsVrcXmpMetadata = {
+      authorId: 'usr_12345678-1234-1234-1234-123456789012',
+      author: 'TestPhotographer',
+      worldId: 'wrld_12345678-1234-1234-1234-123456789012',
+      worldDisplayName: 'Beautiful World',
     };
 
-    const result = extractOfficialMetadata(tags);
+    const result = extractOfficialMetadata(xmp);
     expect(result).not.toBeNull();
     expect(result?.authorId).toBe('usr_12345678-1234-1234-1234-123456789012');
     expect(result?.authorDisplayName).toBe('TestPhotographer');
@@ -29,80 +30,61 @@ describe('extractOfficialMetadata', () => {
     expect(result?.worldDisplayName).toBe('Beautiful World');
   });
 
-  it('should handle vrc: prefixed field names', () => {
-    const tags = {
-      'vrc:AuthorID': 'usr_test',
-      Author: 'TestUser',
-      'vrc:WorldID': 'wrld_test',
-      'vrc:WorldDisplayName': 'Test World',
-    };
-
-    const result = extractOfficialMetadata(tags);
-    expect(result).not.toBeNull();
-    expect(result?.authorId).toBe('usr_test');
-    expect(result?.worldId).toBe('wrld_test');
-    expect(result?.worldDisplayName).toBe('Test World');
+  it('should return null when no authorId is present', () => {
+    const result = extractOfficialMetadata({
+      author: 'SomeUser',
+      worldId: 'wrld_test',
+    });
+    expect(result).toBeNull();
   });
 
-  it('should return null when no AuthorID is present', () => {
-    const tags = {
-      Author: 'SomeUser',
-      WorldID: 'wrld_test',
-    };
+  it('should return null when authorId is an empty string', () => {
+    const result = extractOfficialMetadata({
+      authorId: '',
+      author: 'SomeUser',
+    });
+    expect(result).toBeNull();
+  });
 
-    const result = extractOfficialMetadata(tags);
+  it('should return null for an empty result', () => {
+    const result = extractOfficialMetadata({});
     expect(result).toBeNull();
   });
 
   it('should handle missing world info (private world)', () => {
-    const tags = {
-      AuthorID: 'usr_test',
-      Author: 'TestUser',
-    };
-
-    const result = extractOfficialMetadata(tags);
+    const result = extractOfficialMetadata({
+      authorId: 'usr_test',
+      author: 'TestUser',
+    });
     expect(result).not.toBeNull();
     expect(result?.worldId).toBeNull();
     expect(result?.worldDisplayName).toBeNull();
   });
 
-  it('should return null for empty tags', () => {
-    const result = extractOfficialMetadata({});
-    expect(result).toBeNull();
-  });
-
-  it('should fallback to Creator field for author display name', () => {
-    const tags = {
-      AuthorID: 'usr_test',
-      Creator: 'CreatorName',
-      WorldID: 'wrld_test',
-      WorldDisplayName: 'World',
-    };
-
-    const result = extractOfficialMetadata(tags);
-    expect(result).not.toBeNull();
-    expect(result?.authorDisplayName).toBe('CreatorName');
-  });
-
-  it('should use authorId as display name when no author name fields exist', () => {
-    const tags = {
-      AuthorID: 'usr_test',
-    };
-
-    const result = extractOfficialMetadata(tags);
+  it('should use authorId as display name when author is missing', () => {
+    const result = extractOfficialMetadata({ authorId: 'usr_test' });
     expect(result).not.toBeNull();
     expect(result?.authorDisplayName).toBe('usr_test');
   });
 
-  it('should treat empty string worldId as null', () => {
-    const tags = {
-      AuthorID: 'usr_test',
-      Author: 'TestUser',
-      WorldID: '',
-    };
+  it('should use authorId as display name when author is an empty string', () => {
+    const result = extractOfficialMetadata({
+      authorId: 'usr_test',
+      author: '',
+    });
+    expect(result).not.toBeNull();
+    expect(result?.authorDisplayName).toBe('usr_test');
+  });
 
-    const result = extractOfficialMetadata(tags);
+  it('should treat empty string world fields as null', () => {
+    const result = extractOfficialMetadata({
+      authorId: 'usr_test',
+      author: 'TestUser',
+      worldId: '',
+      worldDisplayName: '',
+    });
     expect(result).not.toBeNull();
     expect(result?.worldId).toBeNull();
+    expect(result?.worldDisplayName).toBeNull();
   });
 });

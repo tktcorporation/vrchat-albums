@@ -152,19 +152,13 @@ export const extractAndSaveMetadataBatch = (
           // I/O エラーは debug レベルで個別ログ（大量出力を防ぐ）
           logger.debug(`XMP read error: ${targetPaths[i]}: ${error}`);
         } else if (data) {
-          // extractOfficialMetadata で Zod 検証 + フィールド正規化
-          const tags = {
-            AuthorID: data.authorId ?? undefined,
-            Author: data.author ?? undefined,
-            WorldID: data.worldId ?? undefined,
-            WorldDisplayName: data.worldDisplayName ?? undefined,
-          };
-          const metadata = extractOfficialMetadata(tags);
+          // 空文字の正規化と Zod 検証は extractOfficialMetadata が担う
+          const metadata = extractOfficialMetadata(data);
           if (metadata === null) {
             zodRejectCount++;
             logger.debug(
               `XMP data found but Zod validation rejected: ${targetPaths[i]}`,
-              { tags },
+              { data },
             );
           } else {
             attributes.push({

@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { Transformer } from '@napi-rs/image';
 import { Effect } from 'effect';
 import type { ExifDateTime, ExifTool } from 'exiftool-vendored';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import * as wrappedExiftool from './wrappedExifTool';
 
@@ -48,10 +48,6 @@ describe('wrappedExifTool', () => {
     } catch {
       // ディレクトリが削除できない場合は無視
     }
-  });
-
-  afterAll(async () => {
-    await wrappedExiftool.closeExiftoolInstance();
   });
 
   describe('writeDateTimeWithTimezone', () => {

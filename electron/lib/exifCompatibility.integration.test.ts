@@ -18,12 +18,12 @@ import * as path from 'node:path';
 import { Transformer } from '@napi-rs/image';
 import { Cause, Effect, Exit, Option } from 'effect';
 import type { ExifDateTime, ExifTool } from 'exiftool-vendored';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { extractOfficialMetadata } from '../module/vrchatPhotoMetadata/parser';
+import type { VRChatPhotoMetadata } from '../module/vrchatPhotoMetadata/schema';
 import {
   ExifOperationError,
-  closeExiftoolInstance,
   readXmpTags,
   setExifToBuffer,
   writeDateTimeWithTimezone,
@@ -32,6 +32,17 @@ import {
 // ============================================================================
 // テストヘルパー
 // ============================================================================
+
+/**
+ * readXmpTags → extractOfficialMetadata を通して VRChat 公式メタデータを得る。
+ * VRChat メタデータを持たない写真では readXmpTags が null を返すため、そのまま null にする。
+ */
+const readOfficialMetadata = async (
+  filePath: string,
+): Promise<VRChatPhotoMetadata | null> => {
+  const xmp = await Effect.runPromise(readXmpTags(filePath));
+  return xmp === null ? null : extractOfficialMetadata(xmp);
+};
 
 /** テスト用の 100x100 PNG バッファを生成 */
 const createTestPng = async (): Promise<Buffer> => {
@@ -150,10 +161,6 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
     await fs.promises.rm(tempDir, { recursive: true, force: true });
   });
 
-  afterAll(async () => {
-    await closeExiftoolInstance();
-  });
-
   // ==========================================================================
   // 1. XMP 読み取り — VRChat メタデータ
   // ==========================================================================
@@ -170,8 +177,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
         worldDisplayName: 'Beautiful World',
       });
 
-      const tags = await Effect.runPromise(readXmpTags(pngPath));
-      const metadata = extractOfficialMetadata(tags);
+      const metadata = await readOfficialMetadata(pngPath);
 
       expect(metadata).not.toBeNull();
       expect(metadata?.authorId).toBe(
@@ -195,8 +201,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
         worldDisplayName: null,
       });
 
-      const tags = await Effect.runPromise(readXmpTags(pngPath));
-      const metadata = extractOfficialMetadata(tags);
+      const metadata = await readOfficialMetadata(pngPath);
 
       expect(metadata).not.toBeNull();
       expect(metadata?.authorId).toBe('usr_private_user');
@@ -209,10 +214,9 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const pngPath = path.join(tempDir, 'no-xmp.png');
       await fs.promises.writeFile(pngPath, await createTestPng());
 
-      const tags = await Effect.runPromise(readXmpTags(pngPath));
-      const metadata = extractOfficialMetadata(tags);
+      const xmp = await Effect.runPromise(readXmpTags(pngPath));
 
-      expect(metadata).toBeNull();
+      expect(xmp).toBeNull();
     });
   });
 
@@ -228,8 +232,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
         worldDisplayName: 'JPEG World',
       });
 
-      const tags = await Effect.runPromise(readXmpTags(jpegPath));
-      const metadata = extractOfficialMetadata(tags);
+      const metadata = await readOfficialMetadata(jpegPath);
 
       expect(metadata).not.toBeNull();
       expect(metadata?.authorId).toBe('usr_jpeg_user');
@@ -408,8 +411,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       expect(allTags.ImageDescription).toBe('Coexist World');
 
       // XMP フィールドも読み取れる（exif-native で検証）
-      const xmpTags = await Effect.runPromise(readXmpTags(pngPath));
-      const metadata = extractOfficialMetadata(xmpTags);
+      const metadata = await readOfficialMetadata(pngPath);
       expect(metadata).not.toBeNull();
       expect(metadata?.authorId).toBe('usr_coexist');
     });
@@ -477,8 +479,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       });
 
       // XMP が書き込まれたことを確認
-      const tagsBefore = await Effect.runPromise(readXmpTags(pngPath));
-      const metaBefore = extractOfficialMetadata(tagsBefore);
+      const metaBefore = await readOfficialMetadata(pngPath);
       expect(metaBefore).not.toBeNull();
       expect(metaBefore?.authorId).toBe('usr_preserve_test');
 
@@ -496,8 +497,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const outputPath = path.join(tempDir, 'xmp-preserve-result.png');
       await fs.promises.writeFile(outputPath, resultBuffer);
 
-      const tagsAfter = await Effect.runPromise(readXmpTags(outputPath));
-      const metaAfter = extractOfficialMetadata(tagsAfter);
+      const metaAfter = await readOfficialMetadata(outputPath);
       expect(metaAfter).not.toBeNull();
       expect(metaAfter?.authorId).toBe('usr_preserve_test');
       expect(metaAfter?.authorDisplayName).toBe('PreserveUser');
@@ -539,8 +539,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
         worldDisplayName: 'お花見ワールド 🌸',
       });
 
-      const tags = await Effect.runPromise(readXmpTags(pngPath));
-      const metadata = extractOfficialMetadata(tags);
+      const metadata = await readOfficialMetadata(pngPath);
 
       expect(metadata).not.toBeNull();
       expect(metadata?.authorDisplayName).toBe('日本語ユーザー');
@@ -648,15 +647,9 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       expect(results[2].error).toBeUndefined();
 
       // extractOfficialMetadata で Zod 検証もパスすることを確認
-      const { extractOfficialMetadata } =
-        await import('../module/vrchatPhotoMetadata/parser');
       const r0 = results[0].data;
-      const meta0 = extractOfficialMetadata({
-        AuthorID: r0?.authorId,
-        Author: r0?.author,
-        WorldID: r0?.worldId,
-        WorldDisplayName: r0?.worldDisplayName,
-      });
+      expect(r0).toBeDefined();
+      const meta0 = r0 === undefined ? null : extractOfficialMetadata(r0);
       expect(meta0?.authorId).toBe('usr_batch1');
       expect(meta0?.worldId).toBe('wrld_batch1');
     });
@@ -726,8 +719,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
     it.skipIf(!photoExists())(
       'readXmpTags で VRChat 公式 XMP メタデータを読み取れる',
       async () => {
-        const tags = await Effect.runPromise(readXmpTags(REAL_PHOTO_PATH));
-        const metadata = extractOfficialMetadata(tags);
+        const metadata = await readOfficialMetadata(REAL_PHOTO_PATH);
 
         expect(metadata).not.toBeNull();
         expect(metadata?.authorId).toMatch(/^usr_[0-9a-f-]+$/);
@@ -743,33 +735,15 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
     );
 
     it.skipIf(!photoExists())(
-      'readXmpTags が返すフィールドから extractOfficialMetadata が正しく抽出できる',
+      'readXmpTags が exif-native の各フィールドを文字列で返す',
       async () => {
-        const tags = await Effect.runPromise(readXmpTags(REAL_PHOTO_PATH));
-        // biome-ignore lint/suspicious/noExplicitAny: exif-native が返す Record のキー名を検証
-        const t = tags as Record<string, any>;
+        const xmp = await Effect.runPromise(readXmpTags(REAL_PHOTO_PATH));
 
-        expect(t.AuthorID).toBeDefined();
-        expect(t.AuthorID).toBeTypeOf('string');
-        expect(t.Author).toBeDefined();
-        expect(t.Author).toBeTypeOf('string');
-        expect(t.WorldID).toBeDefined();
-        expect(t.WorldID).toBeTypeOf('string');
-        expect(t.WorldDisplayName).toBeDefined();
-        expect(t.WorldDisplayName).toBeTypeOf('string');
-      },
-    );
-
-    it.skipIf(!photoExists())(
-      'readExif でも同じメタデータが取得できる',
-      async () => {
-        // readExif は readXmpTags と同じ結果を返す（exif-native は XMP のみ読み取る）
-        const tags = await Effect.runPromise(readXmpTags(REAL_PHOTO_PATH));
-        const metadata = extractOfficialMetadata(tags);
-
-        expect(metadata).not.toBeNull();
-        expect(metadata?.authorId).toMatch(/^usr_[0-9a-f-]+$/);
-        expect(metadata?.authorDisplayName).toBeTruthy();
+        expect(xmp).not.toBeNull();
+        expect(xmp?.authorId).toBeTypeOf('string');
+        expect(xmp?.author).toBeTypeOf('string');
+        expect(xmp?.worldId).toBeTypeOf('string');
+        expect(xmp?.worldDisplayName).toBeTypeOf('string');
       },
     );
   });

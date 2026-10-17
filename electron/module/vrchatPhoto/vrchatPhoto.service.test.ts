@@ -36,7 +36,6 @@ vi.mock('./../../lib/wrappedExifTool', () => ({
   readXmpTags: vi.fn(),
   writeDateTimeWithTimezone: vi.fn(),
   setExifToBuffer: vi.fn(),
-  closeExiftoolInstance: vi.fn(),
 }));
 vi.mock('./../../lib/logger', () => ({
   logger: {
