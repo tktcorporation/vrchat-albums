@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.31.1
+
+### Patch Changes
+
+- [#856](https://github.com/tktcorporation/vrchat-albums/pull/856) [`e1da9ec`](https://github.com/tktcorporation/vrchat-albums/commit/e1da9ece92c060c5b8fd9e587a20e5ebf7899097) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 起動の流れ（利用規約の同意 → 読み込み → 初期設定またはエラー → ギャラリー）を 1 つの状態で管理するようにした。利用規約に同意するまでは、ログと写真の読み込み、ログイン時の自動起動の登録、エラー監視、アップデート確認を始めない。読み込みの再試行はすぐに始まり、同意状況を読めなかったときは再試行できる画面を出す。
+
+- [#858](https://github.com/tktcorporation/vrchat-albums/pull/858) [`9f60082`](https://github.com/tktcorporation/vrchat-albums/commit/9f60082ce7074f429e11860d3f39e4fffefa3ac0) Thanks [@tktcorporation](https://github.com/tktcorporation)! - バックグラウンド常駐中の定期的なログ同期が、ウィンドウを閉じた回数だけ重なって走り、同じ通知が何度も出ることがある問題を直す。定期同期のタイマーはアプリ全体で 1 つだけにする。
+
+- [#862](https://github.com/tktcorporation/vrchat-albums/pull/862) [`3ad5efc`](https://github.com/tktcorporation/vrchat-albums/commit/3ad5efcf7ce7212bae400ef1f9a2853505fa1216) Thanks [@tktcorporation](https://github.com/tktcorporation)! - ログの同期・取り込み・ロールバックを、現在の版の利用規約に同意するまでメインプロセス側でも拒むようにした
+
+- [#865](https://github.com/tktcorporation/vrchat-albums/pull/865) [`84cb2ef`](https://github.com/tktcorporation/vrchat-albums/commit/84cb2ef74d9a3710906a4f97e11e3c7d50cd1460) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Electron を 44.7.2、Sentry を 8.2.0、zod を 4.6.7、electron-log を 5.4.4 にパッチ・マイナー更新し、使っていない依存（autoprefixer・postcss・minimatch）を外した。Sentry のビルド用ツールは開発用の依存に移し、配布物のライセンス一覧から外れる。
+
+- [#851](https://github.com/tktcorporation/vrchat-albums/pull/851) [`1e61cfd`](https://github.com/tktcorporation/vrchat-albums/commit/1e61cfd5a3da4e43bb046a91ae499a8f7e38d560) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 配布するアプリのバイナリで、環境変数や起動引数による Node.js としての起動・デバッガの接続・同梱外のコードの読み込みを無効にする。アプリの見た目や操作は変わらない。
+
+- [#867](https://github.com/tktcorporation/vrchat-albums/pull/867) [`5941745`](https://github.com/tktcorporation/vrchat-albums/commit/594174554742aa1d241366f3a29c356e7be7b9e2) Thanks [@tktcorporation](https://github.com/tktcorporation)! - macOS で新しいバージョンがあるとき、自動ダウンロードを試みる代わりに、ヘッダーと設定画面の「ダウンロードページを開く」ボタンから最新リリースの配布ページを開けるようにしました。
+
+- [#849](https://github.com/tktcorporation/vrchat-albums/pull/849) [`63f0cd5`](https://github.com/tktcorporation/vrchat-albums/commit/63f0cd5e064d4c716fb51abbdebe1d297c968da3) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 画面の見た目や操作は変わらないまま、アプリ画面側から任意の内部メッセージをメインプロセスへ送れないようにする。tRPC の通信路のほかに画面へ公開する操作は、ウィンドウの最小化・最大化・閉じるだけになる。
+
+- [#848](https://github.com/tktcorporation/vrchat-albums/pull/848) [`01a3c26`](https://github.com/tktcorporation/vrchat-albums/commit/01a3c26a329301883a3d143cf55ddfb2265c9d19) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 共有画像の描画用に同梱していた、フォントとして読めない Inter のファイル 4 つを取り除く。共有画像はこれまでどおり Noto Sans JP で描かれ、見た目は変わらない。インストール後のアプリ容量が約 1.2 MB 小さくなる。
+
+- [#853](https://github.com/tktcorporation/vrchat-albums/pull/853) [`a187b11`](https://github.com/tktcorporation/vrchat-albums/commit/a187b1105be4488937143491917e242f13870333) Thanks [@tktcorporation](https://github.com/tktcorporation)! - ギャラリーの選択状態を管理する jotai をメジャー更新する。写真メタデータのテストでだけ使う exiftool-vendored もメジャー更新し、開発用の依存へ移して配布物に含めないようにする。アプリの見た目や操作は変わらない。
+
+- [#855](https://github.com/tktcorporation/vrchat-albums/pull/855) [`1954124`](https://github.com/tktcorporation/vrchat-albums/commit/195412471050b5e5c35fa693991d796c08b65a82) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 起動画面を刷新し、撮影月ごとの写真を年ごとの輪（1 周が 1 年、1 区画が 1 か月）に並べた図と、写真の枚数・訪れたワールドの数・ログに記録されたプレイヤーの数（同じ名前は 1 人として数える）で、読み込みの進み具合が分かるようにする。進み具合は正確な件数で表示され、途中で戻らない。起動時のウィンドウは最初の描画が済んでから表示するので、通常は透明なウィンドウや何も描かれていないウィンドウが先に出ない（描画に 5 秒以上かかったときは、ウィンドウが見つからなくならないよう描画の完了を待たずに表示する）。
+  
+  写真の読み込み中に VRChat が保存した写真が、その後の差分読み込みで取り込まれずに残ることがあった問題を修正する。
+
+- [#857](https://github.com/tktcorporation/vrchat-albums/pull/857) [`e92f08e`](https://github.com/tktcorporation/vrchat-albums/commit/e92f08e97f0ca9c4e443709e153a2011c2aa37c3) Thanks [@tktcorporation](https://github.com/tktcorporation)! - アプリ内の通知と起動時の読み込みの進み具合が届かず、表示されない問題を直す。Electron 44 に入っている Node では非同期ジェネレーターが標準で `Symbol.asyncDispose` を持つため、通信ライブラリ（trpc-electron）がメインプロセスから画面への購読を始めるたびにエラーになっていた。
+
+- [#850](https://github.com/tktcorporation/vrchat-albums/pull/850) [`9939081`](https://github.com/tktcorporation/vrchat-albums/commit/9939081de5e79664996a9f03ad135773d10e5262) Thanks [@tktcorporation](https://github.com/tktcorporation)! - アプリ内のリンク（GitHub の Issue ページやライセンス表記のリポジトリなど）を、アプリ内の新しいウィンドウではなく既定のブラウザで開くようにする。あわせて、アプリのウィンドウがアプリ外のページへ遷移したり、https 以外のリンク（ファイルや OS の設定画面など）を開いたりしないようにする。
+
 ## 0.31.0
 
 ### Minor Changes
