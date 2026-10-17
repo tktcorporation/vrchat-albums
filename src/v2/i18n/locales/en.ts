@@ -122,6 +122,10 @@ const en: Translations = {
         downloaded: 'New version has been downloaded',
         installAndRestart: 'Install and restart',
         checkFailed: 'Failed to check for updates',
+        openDownloadPage: 'Open download page',
+        installUpdate: 'Install update',
+        availableOpenDownloadPage:
+          'Version {version} is available. Open the download page',
       },
       licenses: {
         title: 'License Information',

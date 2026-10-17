@@ -23,6 +23,8 @@ export const updaterRouter = router({
   getUpdateStatus: procedure.query(() => {
     return {
       updateDownloaded: updaterService.getUpdateDownloaded(),
+      availableVersion: updaterService.getAvailableVersion(),
+      canAutoInstall: updaterService.getCanAutoInstall(),
     };
   }),
 });
