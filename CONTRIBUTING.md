@@ -101,6 +101,7 @@
   pnpm test:web       # レンダラープロセスのテスト (Vitest)
   pnpm test:electron  # メインプロセスのテスト (Vitest)
   pnpm test:playwright # E2E テスト (Playwright)
+  pnpm test:memory    # 写真インデックス作成のメモリ計測 (数分かかるため pnpm test には含まれない)
   ```
 
 - **デバッグ用データの生成**:

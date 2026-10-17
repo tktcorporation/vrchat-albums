@@ -46,7 +46,8 @@ jobs:
   # 通常のテストから分けて Linux だけで並行して走らせる
   memory-profile:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    # テスト側の beforeAll と本体のタイムアウト（各 10 分）より長くし、止まったときに vitest がどの段階かを報告できるようにする
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
