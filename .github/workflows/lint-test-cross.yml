@@ -41,3 +41,19 @@ jobs:
 
       - name: test
         run: pnpm test
+
+  # 写真インデックス作成のヒープ増加を見張るベンチマーク。4K 写真を数百枚生成して数分かかるので、
+  # 通常のテストから分けて Linux だけで並行して走らせる
+  memory-profile:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node and Install Dependencies
+        uses: ./.github/actions/setup-node-and-install
+
+      - name: memory profile
+        run: pnpm test:memory
