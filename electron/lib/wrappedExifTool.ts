@@ -2,8 +2,7 @@
  * EXIF/XMP メタデータ操作のラッパー。
  *
  * XMP 読み取りと EXIF 書き込みは @vrchat-albums/exif-native（Rust napi-rs）が同じプロセス内で行う。
- * exiftool のような Perl 子プロセスに 1 つのキューで処理を流すと、1 ファイルのハングが後続の
- * 全リクエストを止めるため、タイムアウトと回復処理を抱えることになる。インプロセスならそれが要らない。
+ * 子プロセスを使わないので、その起動・IPC・ハング時の再起動といったプロセス管理を持たずに済む。
  *
  * ファイルへの書き込み（writeDateTimeWithTimezone）だけは、クラッシュ時に元の写真を壊さないよう
  * exif-native が同じディレクトリの一時ファイルに書いてから rename する。
@@ -188,7 +187,7 @@ export const writeDateTimeWithTimezone = (params: {
  * バッファに EXIF メタデータを書き込んで新しいバッファを返す。
  *
  * World Join Image のバッファに EXIF を埋め込む際に使用。
- * 一時ファイルを介さず、メモリ上のバッファを直接書き換える。
+ * 一時ファイルを介さず、メモリ上で新しいバッファを組み立てて返す（引数のバッファは変更しない）。
  */
 export const setExifToBuffer = (
   buffer: Buffer,

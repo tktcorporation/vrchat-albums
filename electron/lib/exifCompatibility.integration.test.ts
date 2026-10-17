@@ -1,8 +1,9 @@
 /**
  * exif-native 互換性テスト（Contract Test）
  *
- * アプリのメタデータ処理を担う exif-native（Rust + napi-rs）の結果を、
- * 広く使われている exiftool で読み戻して突き合わせる。このテストで以下を検証する:
+ * アプリのメタデータ処理を担う exif-native（Rust + napi-rs）を、広く使われている
+ * exiftool-vendored と双方向に突き合わせる。exiftool-vendored が書いた XMP を exif-native が読み、
+ * exif-native が書いた EXIF を exiftool-vendored が読み戻す。このテストで以下を検証する:
  *
  * 1. XMP 読み取り: exif-native が VRChat XMP メタデータを正しく読み取れること
  * 2. EXIF 書き込み: exif-native が書いた EXIF を exiftool-vendored で読み戻して検証
