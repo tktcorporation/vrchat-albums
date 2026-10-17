@@ -11,7 +11,12 @@ import {
 } from '../../lib/errors';
 import type { InitProgressRun } from '../initProgress/emitter';
 import { logger } from './../../lib/logger';
-import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
+import {
+  consentedProcedure,
+  eventEmitter,
+  procedure,
+  router as trpcRouter,
+} from './../../trpc';
 import * as vrchatLogFileDirService from './../vrchatLogFileDir/service';
 import * as playerJoinLogService from './../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as playerLeaveLogService from './../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
@@ -429,7 +434,7 @@ export const vrchatLogRouter = () => {
 
         return result;
       }),
-    importLogStoreFiles: procedure
+    importLogStoreFiles: consentedProcedure
       .input(
         z.object({
           filePaths: z.array(z.string()),
@@ -467,7 +472,7 @@ export const vrchatLogRouter = () => {
           .pipe(Effect.mapError(mapBackupHistoryError)),
       );
     }),
-    rollbackToBackup: procedure
+    rollbackToBackup: consentedProcedure
       .input(
         z.object({
           backupId: z.string(),

@@ -224,8 +224,24 @@ vi.mock('./backupService/rollbackService', async (importOriginal) => {
   };
 });
 
+// 規約の同意を要する手続きを呼ぶため、実ストアの読み書きはそのままに、現在の版の規約へ同意済みと報告させる
+vi.mock('../settingStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof SettingStoreModule>();
+  const { TERMS_VERSION } =
+    await import('../../../src/v2/constants/terms/version');
+  return {
+    ...actual,
+    getSettingStore: () => ({
+      ...actual.getSettingStore(),
+      getTermsAccepted: () => true,
+      getTermsVersion: () => TERMS_VERSION,
+    }),
+  };
+});
+
 import * as initRDBClient from '../../lib/sequelize';
 import { eventEmitter } from '../../trpc';
+import type * as SettingStoreModule from '../settingStore';
 import { initSettingStore } from '../settingStore';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';

@@ -72,9 +72,32 @@ vi.mock('../../lib/sequelize', () => ({
   __cleanupTestRDBClient: vi.fn(),
 }));
 
+// 規約の同意を要する手続きを呼ぶため、実ストアの読み書きはそのままに、同意状態だけをテストから切り替える。
+// version が null なら現在の版に同意済みと報告する
+const termsConsent = vi.hoisted(() => ({
+  accepted: true,
+  version: null as string | null,
+}));
+vi.mock('../settingStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof SettingStoreModule>();
+  const { TERMS_VERSION } =
+    await import('../../../src/v2/constants/terms/version');
+  return {
+    ...actual,
+    getSettingStore: () => ({
+      ...actual.getSettingStore(),
+      getTermsAccepted: () => termsConsent.accepted,
+      getTermsVersion: () => termsConsent.version ?? TERMS_VERSION,
+    }),
+  };
+});
+
 import { eventEmitter } from '../../trpc';
 // モック後にインポート
+import type * as SettingStoreModule from '../settingStore';
 import { initSettingStore } from '../settingStore';
+import { rollbackService } from './backupService/rollbackService';
+import { importService } from './importService/importService';
 import { vrchatLogRouter } from './vrchatLogController';
 
 describe('vrchatLogController unit tests - Import and Rollback', () => {
@@ -85,6 +108,9 @@ describe('vrchatLogController unit tests - Import and Rollback', () => {
   let testExportDir: string;
 
   beforeEach(async () => {
+    termsConsent.accepted = true;
+    termsConsent.version = null;
+
     // 設定ストアとルーター初期化
     initSettingStore();
     router = vrchatLogRouter();
@@ -104,6 +130,7 @@ describe('vrchatLogController unit tests - Import and Rollback', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     // テスト用ディレクトリをクリーンアップ
     await fs.rm(testUserDataDir, { recursive: true, force: true });
     await fs.rm(testExportDir, { recursive: true, force: true });
@@ -164,6 +191,48 @@ describe('vrchatLogController unit tests - Import and Rollback', () => {
       await expect(
         caller.rollbackToBackup({ backupId: 'non-existent-backup-id' }),
       ).rejects.toThrow('バックアップが見つかりません');
+    });
+  });
+
+  describe('利用規約への同意', () => {
+    it('利用規約に未同意ならインポートせずに拒む', async () => {
+      termsConsent.accepted = false;
+      const importSpy = vi.spyOn(importService, 'importLogStoreFiles');
+
+      await expect(
+        caller.importLogStoreFiles({ filePaths: ['/any/logStore.txt'] }),
+      ).rejects.toThrow('利用規約に同意してから操作してください');
+      expect(importSpy).not.toHaveBeenCalled();
+    });
+
+    it('古い版の規約にしか同意していなければインポートせずに拒む', async () => {
+      termsConsent.version = '0.0';
+      const importSpy = vi.spyOn(importService, 'importLogStoreFiles');
+
+      await expect(
+        caller.importLogStoreFiles({ filePaths: ['/any/logStore.txt'] }),
+      ).rejects.toThrow('利用規約に同意してから操作してください');
+      expect(importSpy).not.toHaveBeenCalled();
+    });
+
+    it('利用規約に未同意ならロールバックせずに拒む', async () => {
+      termsConsent.accepted = false;
+      const rollbackSpy = vi.spyOn(rollbackService, 'rollbackToBackup');
+
+      await expect(
+        caller.rollbackToBackup({ backupId: 'any-backup-id' }),
+      ).rejects.toThrow('利用規約に同意してから操作してください');
+      expect(rollbackSpy).not.toHaveBeenCalled();
+    });
+
+    it('古い版の規約にしか同意していなければロールバックせずに拒む', async () => {
+      termsConsent.version = '0.0';
+      const rollbackSpy = vi.spyOn(rollbackService, 'rollbackToBackup');
+
+      await expect(
+        caller.rollbackToBackup({ backupId: 'any-backup-id' }),
+      ).rejects.toThrow('利用規約に同意してから操作してください');
+      expect(rollbackSpy).not.toHaveBeenCalled();
     });
   });
 });

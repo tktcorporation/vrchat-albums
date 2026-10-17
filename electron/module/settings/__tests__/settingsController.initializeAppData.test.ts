@@ -176,7 +176,7 @@ describe('settingsController.initializeAppData', () => {
     });
 
     await expect(initializeAppData()).rejects.toThrow(
-      '利用規約に同意してから読み込みを始めてください',
+      '利用規約に同意してから操作してください',
     );
     expect(mockSequelizeClient.syncRDBClient).not.toHaveBeenCalled();
     expect(beginInitProgressRun).not.toHaveBeenCalled();
@@ -192,7 +192,7 @@ describe('settingsController.initializeAppData', () => {
     });
 
     await expect(initializeAppData()).rejects.toThrow(
-      '利用規約に同意してから読み込みを始めてください',
+      '利用規約に同意してから操作してください',
     );
     expect(mockSequelizeClient.syncRDBClient).not.toHaveBeenCalled();
   });

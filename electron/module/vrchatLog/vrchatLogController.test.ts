@@ -55,6 +55,11 @@ vi.mock('./../../trpc', () => ({
     mutation: vi.fn().mockImplementation((handler) => handler),
     query: vi.fn().mockImplementation((handler) => handler),
   },
+  consentedProcedure: {
+    input: vi.fn().mockReturnThis(),
+    mutation: vi.fn().mockImplementation((handler) => handler),
+    query: vi.fn().mockImplementation((handler) => handler),
+  },
   router: vi.fn().mockImplementation((routes) => routes),
 }));
 
