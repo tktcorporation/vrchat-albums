@@ -24,6 +24,7 @@ import * as sequelizeClient from './lib/sequelize';
 import { getAppUserDataPath } from './lib/wrappedApp';
 import { getBackgroundUsecase } from './module/backGroundUsecase';
 import { initSettingStore } from './module/settingStore';
+import { hasAcceptedCurrentTerms } from './module/terms/consent';
 
 const settingStore = initSettingStore();
 initializeSettingStoreForUtil();
@@ -59,8 +60,8 @@ export const initializeMainSentry = () => {
     release: __SENTRY_RELEASE__,
     dataCollection: SENTRY_DATA_COLLECTION,
     beforeSend: (event: ErrorEvent, _hint: EventHint) => {
-      // 開発環境でも規約同意をチェックする
-      if (!settingStore.getTermsAccepted()) {
+      // 開発環境でも、現在の版の規約に同意しているかを確かめる
+      if (!hasAcceptedCurrentTerms(settingStore)) {
         if (isDev) {
           logger.info(
             'Sentry event dropped in development mode due to terms not accepted.',

@@ -184,6 +184,9 @@ const ja: Translations = {
     title: '利用規約とプライバシーポリシー',
     updateTitle: '利用規約とプライバシーポリシーの更新',
     accept: '同意する',
+    saveFailed: '同意を保存できませんでした',
+    loadFailed: '利用規約への同意状況を確認できませんでした',
+    retry: '再試行',
   },
   debug: {
     sqliteConsole: {

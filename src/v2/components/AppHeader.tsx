@@ -74,7 +74,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     },
   );
 
-  const checkForUpdates = trpc.updater.checkForUpdates.useMutation();
   const quitAndInstall = trpc.updater.quitAndInstall.useMutation();
 
   const { sync: syncLogs, isLoading: isSyncing } = useLogSync({
@@ -92,11 +91,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       setUpdateDownloaded(updateStatus.updateDownloaded);
     }
   }, [updateStatus]);
-
-  useEffect(() => {
-    checkForUpdates.mutate();
-    // oxlint-disable-next-line react/exhaustive-deps -- 起動時に一度だけ実行。mutate の参照変化で再実行させたくない
-  }, []);
 
   /** ログ同期をトリガーしてギャラリーを更新する */
   const handleRefresh = async () => {

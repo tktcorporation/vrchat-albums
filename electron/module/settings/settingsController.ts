@@ -19,6 +19,7 @@ import {
   toInitSyncMode,
 } from '../logSync/service';
 import { getSettingStore } from '../settingStore';
+import { hasAcceptedCurrentTerms } from '../terms/consent';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
 import { procedure, router as trpcRouter } from './../../trpc';
 import * as settingService from './service';
@@ -346,6 +347,13 @@ export const settingsRouter = () =>
      * データベース初期化、同期、ログ同期まで順次実行される。
      */
     initializeAppData: procedure.mutation(async () => {
+      // 初期化は利用者のログと写真を読み、初回は OS のログイン項目も登録する。
+      // 画面側の流れに不具合があっても、現在の版の規約に同意する前にこれらへ触れないようここでも拒む
+      if (!hasAcceptedCurrentTerms(getSettingStore())) {
+        throw new UserFacingError(
+          '利用規約に同意してから読み込みを始めてください',
+        );
+      }
       if (inFlightInitialization) {
         logger.info(
           'Initialization already in progress, joining the running initialization',

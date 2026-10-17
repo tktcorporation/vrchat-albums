@@ -214,13 +214,6 @@ export const router = trpcRouter({
         initializeMainSentry();
       }
     }),
-  initializeSentry: procedure.mutation(() => {
-    // メインプロセスのSentryはelectron/index.tsで早期に初期化されるため、
-    // ここでは追加の初期化処理は不要。
-    // レンダラープロセスがSentryを使う準備ができたことをログで記録する程度に留める。
-    const hasAcceptedTerms = settingStore.getTermsAccepted();
-    logger.info('initializeSentry', hasAcceptedTerms);
-  }),
   getVRChatPhotoExtraDirList: procedure.query((): string[] => {
     const extraDirs = settingStore.getVRChatPhotoExtraDirList();
     return extraDirs.map((dir) => dir.value);

@@ -184,6 +184,9 @@ const en: Translations = {
     title: 'Terms of Service and Privacy Policy',
     updateTitle: 'Terms of Service and Privacy Policy Update',
     accept: 'Accept',
+    saveFailed: 'Couldn’t save your agreement',
+    loadFailed: 'Couldn’t check whether you agreed to the terms',
+    retry: 'Try again',
   },
   debug: {
     sqliteConsole: {

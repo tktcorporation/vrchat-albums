@@ -1,216 +1,145 @@
-import type { Event, EventHint } from '@sentry/electron/main';
-import { init as initSentry } from '@sentry/electron/renderer';
-import { memo, useEffect, useState } from 'react';
+import { memo, type ReactNode } from 'react';
 import { match } from 'ts-pattern';
 
 import { Toaster } from '@/components/ui/toaster';
-import { scrubEventData } from '@/lib/utils/masking';
-import { trpcClient, trpcReact } from '@/trpc';
+import { trpcReact } from '@/trpc';
 import { TrpcWrapper } from '@/trpcWrapper';
 
-import { ERROR_CATEGORIES, parseErrorFromTRPC } from './types/errors';
-
-// Electron レンダラープロセスでの開発環境検出
-const isDev = process.env.NODE_ENV === 'development';
-
-import { SENTRY_DATA_COLLECTION } from '../../electron/constants/sentryDataCollection';
 import { AppHeader } from './components/AppHeader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import PhotoGallery from './components/PhotoGallery';
 import PathSettings from './components/settings/PathSettings';
 import { StartupTimelineScreen } from './components/startup/StartupTimelineScreen';
 import { TermsModal } from './components/TermsModal';
-import { terms } from './constants/terms/ja';
-import { StartupProvider, useStartup } from './contexts/StartupContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { useEntryFlow } from './entryFlow/useEntryFlow';
 import { useToast } from './hooks/use-toast';
+import { useInitProgress } from './hooks/useInitProgress';
 import { useLoadingState } from './hooks/useLoadingState';
 import { useI18n } from './i18n/store';
-
-interface ErrorEvent extends Event {
-  type: undefined;
-}
-
-/**
- * 規約の確認や Sentry の初期化など、起動時の処理を行うコンポーネント。
- * これらが完了した後にアプリのメイン画面を表示する。
- */
-function AppContent() {
-  const [showTerms, setShowTerms] = useState(false);
-  const [isUpdate, setIsUpdate] = useState(false);
-  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
-  const { toast } = useToast();
-
-  const { data: termsStatus } = trpcReact.getTermsAccepted.useQuery();
-  const { mutateAsync: setTermsAccepted } =
-    trpcReact.setTermsAccepted.useMutation({
-      onError: (error) => {
-        toast({
-          variant: 'destructive',
-          title: '規約同意の保存に失敗しました',
-          description: error.message,
-        });
-      },
-    });
-  const { mutateAsync: initializeSentryMain } =
-    trpcReact.initializeSentry.useMutation({
-      onSuccess: () => {
-        initSentry({
-          dsn: process.env.SENTRY_DSN, // 環境変数からDSNを取得
-          environment: isDev ? 'development' : 'production',
-          debug: isDev,
-          // Sentryプラグインが注入するリリース識別子
-          release: __SENTRY_RELEASE__,
-          dataCollection: SENTRY_DATA_COLLECTION,
-          tags: {
-            source: 'electron-renderer',
-          },
-          beforeSend: async (event: ErrorEvent, _hint: EventHint) => {
-            // effect-lint-allow-try-catch: React フロントエンド境界
-            try {
-              // 開発環境でも規約同意をチェックする
-              const currentTermsStatus =
-                await trpcClient.getTermsAccepted.query();
-              if (!currentTermsStatus?.accepted) {
-                if (isDev) {
-                  console.log(
-                    'Sentry event dropped in renderer development mode due to terms not accepted.',
-                  );
-                } else {
-                  console.log(
-                    'Sentry event dropped in renderer due to terms not accepted (queried from main).',
-                  );
-                }
-                return null;
-              }
-
-              // 個人情報マスク処理を追加
-              const processedEvent = scrubEventData(event);
-
-              if (isDev) {
-                console.log('Sentry event sent in renderer development mode.');
-              }
-
-              return processedEvent;
-            } catch (error) {
-              console.error(
-                'Failed to query terms status from main process for Sentry or scrub event:',
-                error,
-              );
-              return null;
-            }
-          },
-        });
-        console.log('Sentry initialized in renderer process');
-      },
-      onError: (error) => {
-        toast({
-          variant: 'destructive',
-          title: 'Sentryの初期化に失敗しました',
-          description: error.message,
-        });
-      },
-    });
-
-  useEffect(() => {
-    /**
-     * 規約同意状況を確認した上で Sentry を初期化する内部処理。
-     * termsStatus が取得できたタイミングで useEffect から呼ばれる。
-     */
-    const checkTermsAndInitializeSentry = async () => {
-      if (!termsStatus) {
-        return;
-      } // termsStatusが取得できるまで待つ
-
-      // Sentryの初期化（レンダラープロセス側）を試みる
-      // 実際の初期化やイベント送信は、DSNの有無やbeforeSendフックで制御される
-      // initializeSentryMain の onSuccess フック内でレンダラープロセスのSentryが初期化される
-      await initializeSentryMain();
-
-      const { accepted, version } = termsStatus;
-      const currentVersion = terms.version;
-      console.log('termsStatus', termsStatus);
-
-      match({ accepted, version, currentVersion })
-        .when(
-          (ctx) => !ctx.accepted,
-          () => {
-            setShowTerms(true);
-            setIsUpdate(false);
-            setHasAcceptedTerms(false);
-          },
-        )
-        .when(
-          (ctx) => ctx.version !== ctx.currentVersion,
-          () => {
-            setShowTerms(true);
-            setIsUpdate(true);
-            setHasAcceptedTerms(false);
-          },
-        )
-        .otherwise(() => {
-          setHasAcceptedTerms(true);
-          // setShowTerms(false); // 既に同意済みなのでモーダルは表示しない (この行はあってもなくても良い)
-        });
-    };
-
-    void checkTermsAndInitializeSentry();
-  }, [termsStatus, initializeSentryMain]); // initializeSentryMain と termsStatus を依存配列に含める
-
-  /**
-   * 規約同意ボタン押下時に呼び出され、
-   * 同意状態を保存して Sentry 初期化を完了させる。
-   */
-  const handleTermsAccept = async () => {
-    await setTermsAccepted({
-      accepted: true,
-      version: terms.version,
-    });
-    setShowTerms(false);
-    setHasAcceptedTerms(true);
-    // useEffectでtermsStatusが更新された際に initializeSentryMain が呼ばれるため、ここでの直接呼び出しは不要
-    // await initializeSentryMain();
-  };
-
-  if (!hasAcceptedTerms) {
-    return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <AppHeader showGalleryControls={false} />
-        <TermsModal
-          open={showTerms}
-          onAccept={() => void handleTermsAccept()}
-          isUpdate={isUpdate}
-          canClose={false}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <ToasterWrapper />
-      <Contents />
-    </div>
-  );
-}
+import {
+  ERROR_CATEGORIES,
+  type ParsedErrorInfo,
+  parseErrorFromTRPC,
+} from './types/errors';
 
 /**
  * アプリ全体をエラーバウンダリや各種プロバイダーで包むルートコンポーネント。
  * `main.tsx` から呼び出され、UI をレンダリングするエントリーポイントとなる。
+ *
+ * 通知（Toaster）は起動の流れのどの段階でも出せるよう、画面の出し分けより外に置く。
  */
 function App() {
   return (
     <ErrorBoundary>
       <TrpcWrapper>
         <ThemeProvider>
-          <StartupProvider>
-            <AppContent />
-          </StartupProvider>
+          <div className="h-screen flex flex-col overflow-hidden">
+            <ToasterWrapper />
+            <AppEntry />
+          </div>
         </ThemeProvider>
       </TrpcWrapper>
     </ErrorBoundary>
   );
 }
+
+/**
+ * 起動の流れの段階（`useEntryFlow`）に応じて画面を出し分ける。どの画面を出すかはここだけで決まる。
+ */
+const AppEntry = () => {
+  const { state, acceptTerms, retry } = useEntryFlow();
+  return (
+    match(state)
+      .with({ phase: 'checkingTerms' }, () => <HeaderOnlyScreen />)
+      .with({ phase: 'termsUnavailable' }, ({ error }) => (
+        <TermsUnavailableScreen error={error} onRetry={retry} />
+      ))
+      .with({ phase: 'termsRequired' }, ({ reason }) => (
+        <HeaderOnlyScreen>
+          <TermsModal
+            open
+            onAccept={acceptTerms}
+            isUpdate={reason === 'update'}
+            canClose={false}
+          />
+        </HeaderOnlyScreen>
+      ))
+      // 再試行のたびに作り直し、前の試行の進捗を引き継がない
+      .with({ phase: 'initializing' }, ({ attempt }) => (
+        <StartupLoadingScreen key={attempt} />
+      ))
+      .with({ phase: 'setupRequired' }, () => (
+        <SetupScreen onContinue={retry} />
+      ))
+      .with({ phase: 'initFailed' }, ({ error }) => (
+        <InitFailedScreen error={error} onRetry={retry} />
+      ))
+      .with({ phase: 'ready' }, () => <GalleryScreen />)
+      .exhaustive()
+  );
+};
+
+/** ヘッダー（ウィンドウ操作を含む）だけの画面。規約の確認中と同意画面の背景に使う */
+const HeaderOnlyScreen = ({ children }: { children?: ReactNode }) => (
+  <div className="h-screen flex flex-col overflow-hidden">
+    <AppHeader showGalleryControls={false} />
+    {children}
+  </div>
+);
+
+/** 保存された同意状況を読めなかったときの画面。読めるまでは先へ進めない */
+const TermsUnavailableScreen = ({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => void;
+}) => {
+  const { t } = useI18n();
+  return (
+    <HeaderOnlyScreen>
+      <div className="flex items-center justify-center flex-1">
+        <div className="text-center p-4 max-w-md mx-auto">
+          <h2 className="text-xl font-semibold text-destructive">
+            {t('terms.loadFailed')}
+          </h2>
+          <p className="mt-2 text-muted-foreground">
+            {parseErrorFromTRPC(error).userMessage}
+          </p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+          >
+            {t('terms.retry')}
+          </button>
+        </div>
+      </div>
+    </HeaderOnlyScreen>
+  );
+};
+
+/** 起動時の初期化の進み具合を出す画面。起動時の実行の進捗だけを見る */
+const StartupLoadingScreen = () => {
+  const { progress, overallProgress, details, syncMode, isFirstLaunch, stats } =
+    useInitProgress({ runKind: 'startup' });
+  return (
+    <StartupTimelineScreen
+      runStage={progress?.stage ?? null}
+      overallProgress={overallProgress}
+      details={details}
+      syncMode={syncMode}
+      isFirstLaunch={isFirstLaunch}
+      stats={stats}
+    />
+  );
+};
+
+const GalleryScreen = () => {
+  const loadingState = useLoadingState();
+  return <PhotoGallery {...loadingState} />;
+};
 
 /**
  * 構造化エラー情報を持つトーストメッセージの型定義
@@ -295,13 +224,12 @@ const ToasterWrapper = () => {
           },
         )
         // その他の場合: 予期しないデータは無視
-        // trpc-electron IPC バグ: query レスポンスが subscription に漏れる問題への対処
-        // 根本原因: trpc-electron v0.1.2 の IPC 実装で query/subscription の分離が不完全
-        // See: https://github.com/tktcorporation/vrchat-albums/issues/570
+        // 想定外の形のデータは表示せずに捨てる。別のリクエストの応答が届く問題は、
+        // tRPC クライアントを 1 つにして防いでいる（src/trpc.ts）
         .otherwise((c) => {
           if (import.meta.env.DEV) {
             console.warn(
-              '[ToasterWrapper] Ignoring unexpected subscription data (trpc-electron IPC leak):',
+              '[ToasterWrapper] Ignoring unexpected subscription data:',
               typeof c,
             );
           }
@@ -311,159 +239,97 @@ const ToasterWrapper = () => {
   return <Toaster />;
 };
 
-/**
- * 起動処理の進行状況に応じて UI を切り替えるメインコンテンツ部分。
- * 初期同期やエラー状態を監視しながら各画面を表示する。
- */
-const Contents = memo(() => {
-  const { t } = useI18n();
-  const {
-    stage,
-    error,
-    originalError,
-    retry,
-    progress,
-    progressPercent,
-    progressDetails,
-    syncMode,
-    isFirstLaunch,
-    stats,
-  } = useStartup();
-  const loadingState = useLoadingState();
+/** 写真やログのフォルダが見つからず初期化できなかったときの画面。設定し直して初期化をやり直す */
+const SetupScreen = ({ onContinue }: { onContinue: () => void }) => (
+  <HeaderOnlyScreen>
+    <div className="flex items-center justify-center flex-1">
+      <div className="w-full max-w-2xl mx-auto p-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
+          初期セットアップ
+        </h2>
+        <PathSettings showRefreshAll={false} />
+        <div className="mt-6 text-right">
+          <button
+            type="button"
+            onClick={onContinue}
+            className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            設定を確認して続ける
+          </button>
+        </div>
+      </div>
+    </div>
+  </HeaderOnlyScreen>
+);
 
-  // 必要な関数を分割代入で取得し、依存配列を最適化
-  const { startLoadingStartupSync, finishLoadingStartupSync } = loadingState;
-
-  useEffect(() => {
-    if (stage === 'idle' || stage === 'syncing') {
-      startLoadingStartupSync();
-    } else {
-      finishLoadingStartupSync();
-    }
-  }, [stage, startLoadingStartupSync, finishLoadingStartupSync]);
-
-  if (stage === 'error') {
-    // 型安全なエラー解析 - tRPCエラーオブジェクトがある場合は優先的に使用
-    const errorInfo = (() => {
-      if (originalError) {
-        return parseErrorFromTRPC(originalError);
-      }
-      if (error) {
-        return parseErrorFromTRPC(error);
-      }
-      return null;
-    })();
-
-    // ts-patternを使用した型安全なエラー判定
-    const errorDisplayType = match(errorInfo?.category)
-      .with(ERROR_CATEGORIES.SETUP_REQUIRED, () => 'setup' as const)
+/** 初期設定では解決しない理由で初期化に失敗したときの画面 */
+const InitFailedScreen = memo(
+  ({ error, onRetry }: { error: ParsedErrorInfo; onRetry: () => void }) => {
+    const { t } = useI18n();
+    const kind = match(error.category)
       .with(ERROR_CATEGORIES.PERMISSION_DENIED, () => 'permission' as const)
       .with(ERROR_CATEGORIES.DATABASE_ERROR, () => 'database' as const)
       .with(ERROR_CATEGORIES.NETWORK_ERROR, () => 'network' as const)
       .otherwise(() => 'generic' as const);
 
     return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <AppHeader showGalleryControls={false} />
+      <HeaderOnlyScreen>
         <div className="flex items-center justify-center flex-1">
-          {match(errorDisplayType)
-            .with('setup', () => (
-              <div className="w-full max-w-2xl mx-auto p-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-6">
-                  初期セットアップ
-                </h2>
-                <PathSettings showRefreshAll={false} />
-                <div className="mt-6 text-right">
-                  <button
-                    type="button"
-                    onClick={retry}
-                    className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                  >
-                    設定を確認して続ける
-                  </button>
-                </div>
-              </div>
-            ))
-            .otherwise(() => (
-              <div className="text-center p-4 max-w-md mx-auto">
-                <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">
-                  {match(errorDisplayType)
-                    .with('permission', () => 'アクセス許可エラー')
-                    .with('database', () => 'データベースエラー')
-                    .with('network', () => 'ネットワークエラー')
-                    .otherwise(() => 'アプリケーションエラー')}
-                </h2>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">
-                  {match(errorDisplayType)
-                    .with(
-                      'permission',
-                      () => 'ファイルやフォルダへのアクセス許可が必要です。',
-                    )
-                    .with(
-                      'database',
-                      () => 'データベースに接続できませんでした。',
-                    )
-                    .with(
-                      'network',
-                      () => 'ネットワーク接続を確認してください。',
-                    )
-                    .otherwise(() => (
-                      <>
-                        予期せぬエラーが発生しました。
-                        <br />
-                        <a
-                          href="https://github.com/tktcorporation/vrchat-albums/issues/new"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline text-foreground hover:text-primary"
-                        >
-                          {t('common.reportBug')}
-                        </a>
-                      </>
-                    ))}
-                </p>
-                {errorInfo && (
-                  <details className="mt-4 text-left" open>
-                    <summary className="cursor-pointer text-sm text-gray-500">
-                      エラー詳細
-                    </summary>
-                    <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto">
-                      {errorInfo.userMessage}
-                    </pre>
-                  </details>
-                )}
-                <button
-                  type="button"
-                  onClick={retry}
-                  className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
-                >
-                  再試行
-                </button>
-              </div>
-            ))}
+          <div className="text-center p-4 max-w-md mx-auto">
+            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">
+              {match(kind)
+                .with('permission', () => 'アクセス許可エラー')
+                .with('database', () => 'データベースエラー')
+                .with('network', () => 'ネットワークエラー')
+                .with('generic', () => 'アプリケーションエラー')
+                .exhaustive()}
+            </h2>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">
+              {match(kind)
+                .with(
+                  'permission',
+                  () => 'ファイルやフォルダへのアクセス許可が必要です。',
+                )
+                .with('database', () => 'データベースに接続できませんでした。')
+                .with('network', () => 'ネットワーク接続を確認してください。')
+                .with('generic', () => (
+                  <>
+                    予期せぬエラーが発生しました。
+                    <br />
+                    <a
+                      href="https://github.com/tktcorporation/vrchat-albums/issues/new"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline text-foreground hover:text-primary"
+                    >
+                      {t('common.reportBug')}
+                    </a>
+                  </>
+                ))
+                .exhaustive()}
+            </p>
+            <details className="mt-4 text-left" open>
+              <summary className="cursor-pointer text-sm text-gray-500">
+                エラー詳細
+              </summary>
+              <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto">
+                {error.userMessage}
+              </pre>
+            </details>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+            >
+              再試行
+            </button>
+          </div>
         </div>
-      </div>
+      </HeaderOnlyScreen>
     );
-  }
+  },
+);
 
-  // idle: 初期化開始待ち（subscription未接続）、syncing: 初期化実行中
-  // どちらもローディング画面を表示し、PhotoGallery のマウント（＝DB未初期化でのクエリ発火）を防ぐ
-  if (stage === 'idle' || stage === 'syncing') {
-    return (
-      <StartupTimelineScreen
-        runStage={progress?.stage ?? null}
-        overallProgress={progressPercent}
-        details={progressDetails}
-        syncMode={syncMode}
-        isFirstLaunch={isFirstLaunch}
-        stats={stats}
-      />
-    );
-  }
-
-  return <PhotoGallery {...loadingState} />;
-});
-
-Contents.displayName = 'Contents';
+InitFailedScreen.displayName = 'InitFailedScreen';
 
 export default App;

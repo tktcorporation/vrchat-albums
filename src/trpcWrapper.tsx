@@ -1,10 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { FC, ReactNode } from 'react';
-import { useMemo, useState } from 'react';
-import superjson from 'superjson';
-import { ipcLink } from 'trpc-electron/renderer';
+import { useMemo } from 'react';
 
-import { trpcReact } from './trpc';
+import { trpcClient, trpcReact } from './trpc';
 
 const MOCK_API = import.meta.env.VITE_MOCK_API === 'true';
 
@@ -37,12 +35,6 @@ export const TrpcWrapper: FC<Props> = ({ children }) => {
         },
       }),
     [],
-  );
-  // oxlint-disable-next-line react/rules-of-hooks -- 同上
-  const [trpcClient] = useState(() =>
-    trpcReact.createClient({
-      links: [ipcLink({ transformer: superjson })],
-    }),
   );
   return (
     <trpcReact.Provider client={trpcClient} queryClient={queryClient}>
