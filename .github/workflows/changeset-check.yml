@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+permissions:
+  contents: read
+
 jobs:
   changeset-check:
     runs-on: ubuntu-22.04
@@ -35,7 +38,7 @@ jobs:
 
           for file in $CHANGED_FILES; do
             case "$file" in
-              src/*|electron/*|scripts/*|package.json|tsconfig*.json|vite.config.*|electron-builder.*)
+              src/*|electron/*|shared/*|packages/*|scripts/*|package.json|pnpm-lock.yaml|tsconfig*.json|vite.config.*|electron-builder.*)
                 CODE_CHANGED=true
                 break
                 ;;
