@@ -1,10 +1,11 @@
 /**
  * EXIF/XMP メタデータ操作のラッパー。
  *
- * 背景: exiftool-vendored（Perl 子プロセス）から @vrchat-albums/exif-native（Rust napi-rs）に
- * 移行。XMP 読み取りと EXIF 書き込みは exif-native が担当する。
+ * XMP 読み取りと EXIF 書き込みは @vrchat-albums/exif-native（Rust napi-rs）が同じプロセス内で行う。
+ * 子プロセスを使わないので、その起動・IPC・ハング時の再起動といったプロセス管理を持たずに済む。
  *
- * @see docs/plans/exif-native-spec.md — 移行仕様書
+ * ファイルへの書き込み（writeDateTimeWithTimezone）だけは、クラッシュ時に元の写真を壊さないよう
+ * exif-native が同じディレクトリの一時ファイルに書いてから rename する。
  */
 
 import type {
@@ -91,9 +92,6 @@ const getExifNative = (): ExifNativeModule => {
 /**
  * VRChat XMP メタデータに必要なタグだけを高速に読み取る。
  *
- * 背景: Rust ネイティブモジュールでインプロセス実行するため、
- * exiftool-vendored の子プロセス起動やタイムアウト管理が不要。
- *
  * 戻り値は exiftool-vendored の Tags 互換の Record<string, any> 形式。
  * extractOfficialMetadata() がそのまま使えるようにする。
  */
@@ -157,8 +155,7 @@ export const readXmpTagsBatch = (
 /**
  * ファイルに EXIF メタデータ（日時・説明・タイムゾーン）を書き込む。
  *
- * World Join Image 生成時に使用。Rust ネイティブモジュールで
- * TIFF IFD を直接構築して書き込むため、一時ファイル不要。
+ * World Join Image 生成時に使用。Rust ネイティブモジュールが TIFF IFD を直接構築する。
  */
 export const writeDateTimeWithTimezone = (params: {
   filePath: string;
@@ -190,8 +187,7 @@ export const writeDateTimeWithTimezone = (params: {
  * バッファに EXIF メタデータを書き込んで新しいバッファを返す。
  *
  * World Join Image のバッファに EXIF を埋め込む際に使用。
- * exiftool-vendored では一時ファイル経由だったが、Rust 実装では
- * インメモリで直接操作するため高速。
+ * 一時ファイルを介さず、メモリ上で新しいバッファを組み立てて返す（引数のバッファは変更しない）。
  */
 export const setExifToBuffer = (
   buffer: Buffer,
