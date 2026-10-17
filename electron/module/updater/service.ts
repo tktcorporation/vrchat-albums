@@ -43,7 +43,8 @@ export class UpdaterService {
       this.updateDownloaded.next(true);
     });
 
-    // ダウンロードやインストールの失敗はイベントでしか届かないため、ここでログに残す
+    // ダウンロードやインストールの失敗はイベントでしか届かないため、ここでログに残す。
+    // 確認の失敗もこのイベントに届くので、checkForUpdates の失敗ログと重複して残る
     autoUpdater.on('error', (error) => {
       logger.warn(`アップデート処理中にエラーが発生しました: ${error.message}`);
     });

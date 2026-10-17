@@ -52,6 +52,7 @@ const AppInfo = memo(() => {
   const [updateState, setUpdateState] = useState<UpdateCheckState>({
     status: 'idle',
   });
+  const utils = trpcReact.useUtils();
 
   /**
    * アップデートを確認し、結果に応じて状態を更新する。
@@ -106,8 +107,11 @@ const AppInfo = memo(() => {
       }),
     );
 
-    void Effect.runPromise(program);
-  }, []);
+    // ここで見つかった新バージョンをヘッダーにも出すため、確認後にアップデート状態を取り直す
+    void Effect.runPromise(program).then(() =>
+      utils.updater.getUpdateStatus.invalidate(),
+    );
+  }, [utils]);
 
   const { mutate: quitAndInstall, isPending: isInstalling } =
     trpcReact.updater.quitAndInstall.useMutation();
