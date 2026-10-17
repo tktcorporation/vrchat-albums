@@ -8,6 +8,8 @@ import type { ZodError } from 'zod';
 import { UserFacingError } from './lib/errors';
 import { logger } from './lib/logger';
 import * as settingService from './module/settings/service';
+import { getSettingStore } from './module/settingStore';
+import { hasAcceptedCurrentTerms } from './module/terms/consent';
 
 // oxlint-disable-next-line unicorn/prefer-event-target -- EventTarget は emit() をサポートしないため、tRPC/Node.js 境界では EventEmitter を使用
 const eventEmitter = new EventEmitter();
@@ -255,4 +257,18 @@ const { procedure: p, router: r } = t;
 const procedure = p.use(logRequest).use(errorHandler);
 const router = r;
 
-export { procedure, router, eventEmitter };
+const requireCurrentTermsConsent = t.middleware(async (opts) => {
+  if (!hasAcceptedCurrentTerms(getSettingStore())) {
+    throw new UserFacingError('利用規約に同意してから操作してください');
+  }
+  return opts.next();
+});
+
+/**
+ * 利用者のログや写真をアプリへ取り込む手続き（初期化・ログ同期・取り込み・ロールバック・旧アプリからの移行）は
+ * これで定義する。画面側の流れを経ずに呼ばれても、現在の版の利用規約に同意するまでメインプロセス側で拒むため。
+ * 取り込み済みのデータを DB から引くだけの手続きは、取り込みがこの判定を通った後にしか中身を持たないので対象にしない。
+ */
+const consentedProcedure = procedure.use(requireCurrentTermsConsent);
+
+export { procedure, consentedProcedure, router, eventEmitter };

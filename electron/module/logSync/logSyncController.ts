@@ -8,7 +8,7 @@ import {
   toUserFacing,
 } from '../../lib/errorMapping';
 import { ERROR_CATEGORIES, ERROR_CODES } from '../../lib/errors';
-import { procedure, router as trpcRouter } from '../../trpc';
+import { consentedProcedure, router as trpcRouter } from '../../trpc';
 import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from './service';
 
 const logSyncModeSchema = z.enum([
@@ -50,7 +50,7 @@ export const logSyncRouter = () => {
      *
      * @param mode 同期モード (FULL: 全件処理, INCREMENTAL: 差分処理)
      */
-    syncLogs: procedure
+    syncLogs: consentedProcedure
       .input(
         z.object({
           mode: logSyncModeSchema,

@@ -15,6 +15,7 @@ import {
   runWithLogSyncLock,
   syncLogsHoldingLock,
 } from '../../logSync/service';
+import * as migrationService from '../../migration/service';
 import * as settingStore from '../../settingStore';
 import * as vrchatWorldJoinLogService from '../../vrchatWorldJoinLog/service';
 
@@ -25,6 +26,7 @@ vi.mock('../../logSync/service');
 vi.mock('../../vrchatWorldJoinLog/service');
 vi.mock('../../settingStore');
 vi.mock('../../initProgress/emitter');
+vi.mock('../../migration/service');
 
 // Electron環境のモック
 vi.mock('electron', () => ({
@@ -176,7 +178,7 @@ describe('settingsController.initializeAppData', () => {
     });
 
     await expect(initializeAppData()).rejects.toThrow(
-      '利用規約に同意してから読み込みを始めてください',
+      '利用規約に同意してから操作してください',
     );
     expect(mockSequelizeClient.syncRDBClient).not.toHaveBeenCalled();
     expect(beginInitProgressRun).not.toHaveBeenCalled();
@@ -192,7 +194,7 @@ describe('settingsController.initializeAppData', () => {
     });
 
     await expect(initializeAppData()).rejects.toThrow(
-      '利用規約に同意してから読み込みを始めてください',
+      '利用規約に同意してから操作してください',
     );
     expect(mockSequelizeClient.syncRDBClient).not.toHaveBeenCalled();
   });
@@ -568,5 +570,25 @@ describe('settingsController.initializeAppData', () => {
       expect.anything(),
       retryRun,
     );
+  });
+});
+
+describe('settingsController.performMigration', () => {
+  it('利用規約に未同意なら移行を始めずに拒む', async () => {
+    vi.clearAllMocks();
+    mockSettingStore.getSettingStore = vi.fn().mockReturnValue({
+      getTermsAccepted: vi.fn().mockReturnValue(false),
+      getTermsVersion: vi.fn().mockReturnValue(TERMS_VERSION),
+    });
+    const { settingsRouter } = await import('../settingsController');
+    const { EventEmitter } = await import('node:events');
+    const caller = settingsRouter().createCaller({
+      eventEmitter: new EventEmitter(),
+    });
+
+    await expect(caller.performMigration()).rejects.toThrow(
+      '利用規約に同意してから操作してください',
+    );
+    expect(migrationService.performMigration).not.toHaveBeenCalled();
   });
 });
