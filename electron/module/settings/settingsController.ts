@@ -391,7 +391,7 @@ export const settingsRouter = () =>
     /**
      * ユーザーの承認を得て旧アプリからのデータ移行を実行する
      */
-    performMigration: procedure.mutation(async () => {
+    performMigration: consentedProcedure.mutation(async () => {
       // 動的インポートで移行サービスを読み込む
       const { performMigration } = await import('../migration/service');
       const migrationResult = await Effect.runPromise(performMigration());
