@@ -91,9 +91,6 @@ const getExifNative = (): ExifNativeModule => {
 /**
  * VRChat XMP メタデータに必要なタグだけを高速に読み取る。
  *
- * 背景: Rust ネイティブモジュールでインプロセス実行するため、
- * exiftool-vendored の子プロセス起動やタイムアウト管理が不要。
- *
  * 戻り値は exiftool-vendored の Tags 互換の Record<string, any> 形式。
  * extractOfficialMetadata() がそのまま使えるようにする。
  */
@@ -190,8 +187,7 @@ export const writeDateTimeWithTimezone = (params: {
  * バッファに EXIF メタデータを書き込んで新しいバッファを返す。
  *
  * World Join Image のバッファに EXIF を埋め込む際に使用。
- * exiftool-vendored では一時ファイル経由だったが、Rust 実装では
- * インメモリで直接操作するため高速。
+ * 一時ファイルを介さず、メモリ上のバッファを直接書き換える。
  */
 export const setExifToBuffer = (
   buffer: Buffer,
