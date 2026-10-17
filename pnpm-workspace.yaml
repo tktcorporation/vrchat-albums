@@ -115,3 +115,10 @@ overrides:
   # 0.17.x は Node >=24 を要求し、このリポジトリの engines.node (Node 22 系) と CI の Node バージョンを
   # 超えるため、eslint が依存範囲 ^0.16.6 で期待する 0.16.x 系に留める。
   '@humanfs/node': '>=0.16.8 <0.17'
+
+# trpc-electron は購読の非同期イテレーターに Symbol.asyncDispose を足し、既にあればエラーにする。
+# Electron 44 の Node（24 系）では非同期ジェネレーターが標準で Symbol.asyncDispose を持つため、
+# すべての購読（通知・起動時の進捗）が失敗する。既にある場合は標準のもの（return() を呼ぶ）を使うよう変える。
+# trpc-electron がこの判定を直した版を出したら、このパッチは外せる。
+patchedDependencies:
+  trpc-electron@0.1.2: patches/trpc-electron@0.1.2.patch

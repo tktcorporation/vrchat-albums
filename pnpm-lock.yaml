@@ -18,6 +18,9 @@ overrides:
   esbuild: '>=0.28.1'
   '@humanfs/node': '>=0.16.8 <0.17'
 
+patchedDependencies:
+  trpc-electron@0.1.2: 921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4
+
 importers:
 
   .:
@@ -171,7 +174,7 @@ importers:
         version: 4.3.3
       trpc-electron:
         specifier: ^0.1.2
-        version: 0.1.2(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.7.0)
+        version: 0.1.2(patch_hash=921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4)(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.7.0)
       ts-pattern:
         specifier: 5.9.0
         version: 5.9.0
@@ -13219,7 +13222,7 @@ snapshots:
 
   trough@2.2.0: {}
 
-  trpc-electron@0.1.2(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.7.0):
+  trpc-electron@0.1.2(patch_hash=921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4)(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.7.0):
     dependencies:
       '@trpc/client': 11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3)
       '@trpc/server': 11.19.0(typescript@6.0.3)
