@@ -22,8 +22,6 @@ const config: KnipConfig = {
   project: ['src/**/*.{ts,tsx}', 'electron/**/*.ts', 'shared/**/*.ts'],
   ignoreBinaries: [
     'only-allow',
-    // grit binary comes from @getgrit/cli package
-    'grit',
     // napi-rs CLI — CI で npx -p @napi-rs/cli napi build として使用
     'napi',
     // Aikido Safe Chain が実行時に shim として提供するコマンド。
@@ -35,8 +33,6 @@ const config: KnipConfig = {
     '@antfu/ni',
     // CSS-only import in src/index.css (not detected by knip)
     'tw-animate-css',
-    // Used in scripts/ which is ignored by knip
-    'minimatch',
     // electron-builder の optional peer dependency（直接 import されないが macOS/Windows ビルドに必要）
     'electron-builder-squirrel-windows',
     // scripts/rebuild-native.mjs から execFile 経由で `pnpm exec electron-rebuild` を呼ぶ。
@@ -50,8 +46,6 @@ const config: KnipConfig = {
     'src/v2/constants/ui.ts',
     // Lint scripts and test fixtures
     'scripts/**',
-    // GritQL patterns and modules
-    '.grit/**',
     // napi-rs 生成コード（index.js/index.d.ts）は knip のスコープ外
     'packages/exif-native/**',
     // lint-contrast テストフィクスチャは vitest が動的 glob で読み込むため未使用誤検出される
