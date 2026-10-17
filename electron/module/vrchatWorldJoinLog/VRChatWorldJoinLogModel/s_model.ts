@@ -144,3 +144,11 @@ export const findLatestWorldJoinLog = async () => {
     order: [['joinDateTime', 'DESC']],
   });
 };
+
+/**
+ * 訪れたワールドの数（ワールド ID の重複を除く）を数える。
+ * 起動画面の統計（initProgress/stats.ts）から呼び出される。
+ */
+export const countDistinctVisitedWorlds = async (): Promise<number> => {
+  return VRChatWorldJoinLogModel.count({ distinct: true, col: 'worldId' });
+};

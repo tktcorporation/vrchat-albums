@@ -143,6 +143,36 @@ const en: Translations = {
     lastVisited: 'Last visited',
     recommendedSeason: 'Best season',
   },
+  initProgress: {
+    stage: {
+      database_sync: 'Preparing database',
+      log_append: 'Reading logs',
+      log_load: 'Saving logs',
+      photo_index: 'Adding photos',
+      photo_metadata: 'Reading photo details',
+      photo_log_import: 'Reading visits from photos',
+      completed: 'Done',
+      error: 'Couldn’t finish loading',
+    },
+    timeline: {
+      headline: {
+        pending: 'Starting up',
+        firstLaunch: 'First-time load',
+        fullResync: 'Reloading everything',
+        incremental: 'Loading new photos',
+      },
+      summary: '{photos} photos   {worlds} worlds   {people} players',
+      ready: 'Done',
+      progressLabel: 'Loading progress',
+      chartLabel: 'Photos per month, one ring per year',
+      detail: {
+        photosInMonth: '{month}   {current} / {total}',
+        photos: '{current} / {total} photos',
+        files: '{current} / {total} files',
+        logs: '{current} / {total} records',
+      },
+    },
+  },
   pullToRefresh: {
     pull: 'Pull to refresh',
     release: 'Release to refresh',

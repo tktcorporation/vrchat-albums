@@ -143,6 +143,36 @@ const ja: Translations = {
     lastVisited: '最終訪問日',
     recommendedSeason: 'おすすめ時期',
   },
+  initProgress: {
+    stage: {
+      database_sync: 'データベースを準備中',
+      log_append: 'ログを読み込み中',
+      log_load: 'ログを保存中',
+      photo_index: '写真を登録中',
+      photo_metadata: '写真の情報を読み取り中',
+      photo_log_import: '写真から訪問履歴を読み取り中',
+      completed: '完了',
+      error: '読み込みに失敗しました',
+    },
+    timeline: {
+      headline: {
+        pending: '起動中',
+        firstLaunch: 'はじめての読み込み',
+        fullResync: 'すべて読み込み直しています',
+        incremental: '新しい写真を読み込んでいます',
+      },
+      summary: '写真 {photos}枚　ワールド {worlds}　プレイヤー {people}人',
+      ready: '完了',
+      progressLabel: '読み込み状況',
+      chartLabel: '撮影月ごとの写真の枚数（1 年ごとに 1 つの輪）',
+      detail: {
+        photosInMonth: '{month}　{current} / {total}枚',
+        photos: '{current} / {total}枚',
+        files: '{current} / {total} ファイル',
+        logs: '{current} / {total} 件',
+      },
+    },
+  },
   pullToRefresh: {
     pull: '引っ張って更新',
     release: '指を離して更新',

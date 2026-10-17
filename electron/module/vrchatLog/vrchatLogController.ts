@@ -9,7 +9,7 @@ import {
   ERROR_CODES,
   UserFacingError,
 } from '../../lib/errors';
-import { emitProgress } from '../initProgress/emitter';
+import type { InitProgressRun } from '../initProgress/emitter';
 import { logger } from './../../lib/logger';
 import { eventEmitter, procedure, router as trpcRouter } from './../../trpc';
 import * as vrchatLogFileDirService from './../vrchatLogFileDir/service';
@@ -59,10 +59,12 @@ export interface AppendLoglinesResult {
  * 月ごとのログファイルがサイズ制限（10MB）を超えると、タイムスタンプ付きの新しいファイルが作成されます。
  * このディレクトリはメタデータの保存用ではなく、ログデータ自体の保存用です。
  *
+ * @param progress ファイル単位の進捗（log_append）を送る実行。実行に属さない呼び出しでは省く
  * @returns 処理結果。processedLogLines に新規処理されたログ行を含む。
  */
 export const appendLoglinesToFileFromLogFilePathList = async (
   processAll = false,
+  progress?: InitProgressRun,
 ): Promise<AppendLoglinesResult> => {
   const vrchatlogFilesDirExit = await Effect.runPromiseExit(
     vrchatLogFileDirService.getValidVRChatLogFileDir(),
@@ -122,6 +124,11 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   const logFilePathList = logFilePathListExit.value;
 
   logger.info(`Found ${logFilePathList.length} log files to process`);
+  progress?.stage('log_append', 0, {
+    current: 0,
+    total: logFilePathList.length,
+    unit: 'files',
+  });
 
   let totalProcessedLines = 0;
   let hasProcessedAnyLines = false;
@@ -131,7 +138,6 @@ export const appendLoglinesToFileFromLogFilePathList = async (
   // バッチごとのlogStoreファイル再読み込みを回避する）
   const dedupCache = vrchatLogService.createDedupCache();
 
-  let processedBatchCount = 0;
   // ストリーミング処理で各バッチを処理
   for await (const logLineBatch of vrchatLogService.getLogLinesByLogFilePathListStreaming(
     {
@@ -139,25 +145,15 @@ export const appendLoglinesToFileFromLogFilePathList = async (
       includesList: [...FILTER_PATTERNS],
       batchSize: 1000, // バッチサイズを指定
       maxMemoryUsageMB: 500, // メモリ使用量の上限を500MBに制限
+      onFilesRead: (filesRead, totalFiles) => {
+        progress?.stage(
+          'log_append',
+          totalFiles > 0 ? (filesRead / totalFiles) * 100 : 100,
+          { current: filesRead, total: totalFiles, unit: 'files' },
+        );
+      },
     },
   )) {
-    processedBatchCount += 1;
-    // ログファイル数ベースで進捗を算出（完了の100%は syncLogs 側で発行するため99%を上限とする）
-    const batchProgress = Math.min(
-      Math.round(
-        (processedBatchCount / Math.max(logFilePathList.length, 1)) * 99,
-      ),
-      99,
-    );
-    emitProgress({
-      stage: 'log_append',
-      progress: batchProgress,
-      message: 'VRChatログファイルを読み込んでいます...',
-      details: {
-        current: processedBatchCount,
-        total: logFilePathList.length,
-      },
-    });
     // ログ行をフィルタリング（processAll=trueの場合はスキップ）
     const filteredLogLines = processAll
       ? logLineBatch

@@ -11,7 +11,9 @@ import { debugRouter } from './module/debug/debugController';
 import { electronUtilRouter } from './module/electronUtil/controller/electronUtilController';
 import { openElectronDialog } from './module/electronUtil/service';
 import { imageGeneratorRouter } from './module/imageGenerator/imageGeneratorController';
+import { getInitProgressReplay } from './module/initProgress/emitter';
 import {
+  INIT_PROGRESS_CHANNEL,
   type InitProgressPayload,
   InitProgressPayloadSchema,
 } from './module/initProgress/schema';
@@ -100,11 +102,7 @@ export const router = trpcRouter({
    */
   subscribeInitProgress: procedure.subscription(async function* () {
     // subscription接続完了を即座に通知
-    yield {
-      stage: 'ready' as const,
-      progress: 0,
-      message: '接続完了',
-    } satisfies InitProgressPayload;
+    yield { stage: 'ready' as const } satisfies InitProgressPayload;
 
     const signal = createEventQueueSignal<InitProgressPayload>();
 
@@ -125,14 +123,20 @@ export const router = trpcRouter({
       }
     }
 
-    ee.on('init-progress', onInitProgress);
+    ee.on(INIT_PROGRESS_CHANNEL, onInitProgress);
+    // 実行の途中で接続したクライアントにも、次のイベントを待たずに現在地と統計を渡す。
+    // リスナー登録の後に取得するので、これより新しいイベントはすべてキューに入る。
+    const replay = getInitProgressReplay();
+    if (replay) {
+      onInitProgress(replay);
+    }
     // effect-lint-allow-try-catch: finally でイベントリスナーのクリーンアップが必要
     try {
       while (true) {
         yield* signal.drain();
       }
     } finally {
-      ee.off('init-progress', onInitProgress);
+      ee.off(INIT_PROGRESS_CHANNEL, onInitProgress);
     }
   }),
   getVRChatLogFilesDir: procedure.query(async () => {

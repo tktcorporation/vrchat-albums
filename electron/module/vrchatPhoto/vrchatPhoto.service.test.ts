@@ -845,4 +845,132 @@ describe('createVRChatPhotoPathIndex', () => {
       });
     });
   });
+
+  describe('進捗通知', () => {
+    it('画像として読めないファイルも処理済みに数え、最後に handled が total に届く', async () => {
+      vi.mocked(readImageDimensionsBatch).mockImplementation(async (paths) =>
+        paths.map(() => null),
+      );
+      const progress: { handled: number; total: number }[] = [];
+
+      await service.createVRChatPhotoPathIndex(false, (p) => {
+        progress.push({ handled: p.handled, total: p.total });
+      });
+
+      expect(progress[0]).toEqual({ handled: 0, total: 3 });
+      expect(progress.at(-1)).toEqual({ handled: 3, total: 3 });
+      const handled = progress.map((p) => p.handled);
+      expect(handled).toEqual(handled.toSorted((a, b) => a - b));
+    });
+
+    it('新規ファイルが無ければ進捗を通知しない（0 / 0 の件数を送らない）', async () => {
+      savedScanStates = {
+        [yearMonthFolder2024_01]: {
+          digest: computeExpectedDigestForFolder([
+            file1Name,
+            'not-a-vrchat-file.txt',
+          ]),
+          lastScannedAt: now.toISOString(),
+        },
+        [yearMonthFolder2024_02]: {
+          digest: computeExpectedDigestForFolder([file2Name]),
+          lastScannedAt: now.toISOString(),
+        },
+        [extraYearMonthFolder]: {
+          digest: computeExpectedDigestForFolder([extraFileName]),
+          lastScannedAt: now.toISOString(),
+        },
+      };
+      const onProgress = vi.fn();
+
+      await service.createVRChatPhotoPathIndex(true, onProgress);
+
+      expect(onProgress).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('lastScannedAt', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('登録の途中で作られたファイルも、次回の差分スキャンで拾われる', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const listedAt = dateFns.addMinutes(now, 1);
+      vi.setSystemTime(listedAt);
+
+      // 1 回目のスキャンの登録処理中（一覧を取った後）にファイルが作られる
+      const lateFileName = `VRChat_${dateFns.format(dateFns.addMinutes(listedAt, 5), 'yyyy-MM-dd_HH-mm-ss.SSS')}_1920x1080.png`;
+      const lateFilePath = `${yearMonthFolder2024_01}/${lateFileName}`;
+      const lateFileMtime = dateFns.addMinutes(listedAt, 5);
+      let lateFileExists = false;
+      vi.mocked(model.createOrUpdateListVRChatPhotoPath).mockImplementation(
+        async () => {
+          lateFileExists = true;
+          vi.setSystemTime(dateFns.addMinutes(listedAt, 10));
+          return [];
+        },
+      );
+
+      const baseReaddir = vi
+        .mocked(nodefsPromises.readdir)
+        .getMockImplementation();
+      if (!baseReaddir) {
+        throw new Error('readdir mock is not set');
+      }
+      (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+        (async (dirPath: PathLike, options?: unknown) => {
+          const base = await (
+            baseReaddir as (p: PathLike, o?: unknown) => Promise<unknown[]>
+          )(dirPath, options);
+          if (
+            !lateFileExists ||
+            dirPath.toString() !== yearMonthFolder2024_01
+          ) {
+            return base;
+          }
+          const withFileTypes =
+            typeof options === 'object' &&
+            options !== null &&
+            'withFileTypes' in options;
+          return [
+            ...base,
+            withFileTypes
+              ? createMockDirent(lateFileName, false)
+              : lateFileName,
+          ];
+        }) as never,
+      );
+      const baseStat = vi.mocked(nodefsPromises.stat).getMockImplementation();
+      if (!baseStat) {
+        throw new Error('stat mock is not set');
+      }
+      vi.mocked(nodefsPromises.stat).mockImplementation(async (filePath) => {
+        if (filePath.toString() === lateFilePath) {
+          return {
+            isFile: () => true,
+            isDirectory: () => false,
+            mtime: lateFileMtime,
+          } as unknown as Awaited<ReturnType<typeof nodefsPromises.stat>>;
+        }
+        return baseStat(filePath);
+      });
+
+      await service.createVRChatPhotoPathIndex(true);
+
+      // 保存される時刻は登録の終了時刻ではなく、一覧を取った時刻
+      expect(savedScanStates[yearMonthFolder2024_01].lastScannedAt).toBe(
+        listedAt.toISOString(),
+      );
+
+      vi.mocked(model.createOrUpdateListVRChatPhotoPath).mockClear();
+      await service.createVRChatPhotoPathIndex(true);
+
+      const savedPaths = vi
+        .mocked(model.createOrUpdateListVRChatPhotoPath)
+        .mock.calls.flatMap((call) => call[0])
+        .map((d) => d.photoPath);
+      expect(savedPaths).toEqual([lateFilePath]);
+    });
+  });
 });

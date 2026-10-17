@@ -1,7 +1,12 @@
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
+import { match } from 'ts-pattern';
 
 import { logger } from '../../lib/logger';
-import { emitProgress, emitStageStart } from '../initProgress/emitter';
+import {
+  beginInitProgressRun,
+  type InitProgressRun,
+} from '../initProgress/emitter';
+import type { InitLaunch } from '../initProgress/schema';
 import type { LogInfoError } from '../logInfo/error';
 import type { LogInfoServiceError } from '../logInfo/errors';
 import { loadLogInfoIndexFromVRChatLog } from '../logInfo/service';
@@ -45,17 +50,46 @@ export const LOG_SYNC_MODE = {
 export type LogSyncMode = (typeof LOG_SYNC_MODE)[keyof typeof LOG_SYNC_MODE];
 
 /**
+ * ログ同期モードを進捗ストリームの起動種別の表記に変換する。
+ */
+export const toInitSyncMode = (mode: LogSyncMode): InitLaunch['syncMode'] =>
+  match(mode)
+    .with(LOG_SYNC_MODE.FULL, () => 'full' as const)
+    .with(LOG_SYNC_MODE.INCREMENTAL, () => 'incremental' as const)
+    .exhaustive();
+
+/**
  * ログ同期の並行実行を直列化するセマフォ (permit=1)。
  *
  * logSyncController の定期バックグラウンド同期と、ユーザー操作による FULL/INCREMENTAL 同期が
  * 同時に走ると、appendLoglines → loadLogInfo の順序前提が崩れ、DB 二重書き込みやキャッシュ不整合を
  * 招く (ADR-001)。モジュールスコープで単一インスタンスを保持し、全ての syncLogs 呼び出しを直列化する。
+ * 進捗ストリームの実行（initProgress/emitter.ts）も permit を持っている間に開始・終了するので、
+ * 実行が重なることは無い。
  *
  * 生の boolean フラグ（共有可変状態）ではなく Semaphore を使う理由:
  * withPermits は Effect の完了時（成功・失敗・中断のいずれでも）permit を必ず解放するため、
  * フラグの戻し忘れやエラー経路での取りこぼしによるデッドロックが構造的に起きない。
  */
 const syncMutex = Effect.runSync(Effect.makeSemaphore(1));
+
+/**
+ * syncMutex の permit を持っていることを示す値。runWithLogSyncLock だけが作れるので、
+ * これを要求する関数は permit を持たない呼び出し元から呼べない。
+ * permit は再入できないため、permit を持ったまま syncLogs を呼ぶと待ち続けてしまう。
+ * その場合は syncLogsHoldingLock を使う。
+ */
+class LogSyncLockToken {
+  /** private メンバーを持たせて構造的に同じ形の値と区別する（実行時には存在しない） */
+  declare private readonly brand: never;
+}
+export type LogSyncLock = LogSyncLockToken;
+
+type SyncLogsError =
+  | VRChatLogFileError
+  | VRChatLogError
+  | LogInfoError
+  | LogInfoServiceError;
 
 /**
  * ログの同期処理を統一的に実行するサービス
@@ -65,73 +99,129 @@ const syncMutex = Effect.runSync(Effect.makeSemaphore(1));
  * 2. loadLogInfo: 保存されたログをデータベースに読み込む
  *
  * 並行呼び出しは syncMutex により直列化され、同時実行による順序崩れを防ぐ。
+ * 単独の同期として進捗ストリームの実行（`sync`）を permit の内側で開始・終了する。
  *
  * @param mode 同期モード (FULL: 全件処理, INCREMENTAL: 差分処理)
  * @returns 処理結果（作成されたログ情報を含む）
  */
 export function syncLogs(
   mode: LogSyncMode,
-): Effect.Effect<
-  LogSyncResults,
-  VRChatLogFileError | VRChatLogError | LogInfoError | LogInfoServiceError
-> {
-  return syncMutex.withPermits(1)(
-    Effect.gen(function* () {
-      const isFullSync = mode === LOG_SYNC_MODE.FULL;
-
-      logger.info(`Starting log sync with mode: ${mode}`);
-
-      // Step 1: VRChatログファイルから新しいログ行を抽出・保存
-      emitStageStart('log_append', 'VRChatログファイルを読み込んでいます...');
-      const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
-        try: () => appendLoglinesToFileFromLogFilePathList(isFullSync),
-        catch: (error) => {
-          logger.error({
-            message: 'Failed to append log lines',
-            details: {
-              error: error instanceof Error ? error.message : String(error),
-            },
-          });
-          if (error instanceof VRChatLogFileError) {
-            return error;
-          }
-          return new VRChatLogFileError({
-            code: 'UNKNOWN',
-            message: error instanceof Error ? error.message : String(error),
-          });
-        },
-      });
-      emitProgress({
-        stage: 'log_append',
-        progress: 100,
-        message: 'VRChatログファイルの読み込みが完了しました',
-      });
-
-      // Step 2: 保存されたログをデータベースに読み込む
-      // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
-      // logStore ファイルの再読み込みをスキップする
-      emitStageStart('log_load', 'ログデータをデータベースに保存しています...');
-      const loadResult = yield* loadLogInfoIndexFromVRChatLog({
-        excludeOldLogLoad: !isFullSync,
-        preLoadedLogLines: isFullSync
-          ? undefined
-          : appendResult.processedLogLines,
-      });
-      emitProgress({
-        stage: 'log_load',
-        progress: 100,
-        message: 'ログデータの保存が完了しました',
-      });
-
-      logger.info(`Log sync completed successfully with mode: ${mode}`);
-
-      // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
-      triggerWorldJoinImageGeneration();
-
-      return loadResult;
-    }),
-  );
+): Effect.Effect<LogSyncResults, SyncLogsError> {
+  return syncMutex.withPermits(1)(withOwnSyncRun(mode));
 }
+
+/**
+ * permit を既に持っている呼び出し元（起動時の初期化）からログ同期を行う。
+ * 進捗は呼び出し元の実行へ送る。実行は呼び出し元が持っているので、開始も終了もしない。
+ *
+ * @param _lock runWithLogSyncLock から受け取った値。permit を持っていることの証明にだけ使う
+ * @param progress 進捗の送り先（起動時の初期化の実行のハンドル）
+ */
+export function syncLogsHoldingLock(
+  _lock: LogSyncLock,
+  mode: LogSyncMode,
+  progress: InitProgressRun,
+): Effect.Effect<LogSyncResults, SyncLogsError> {
+  return runSync(mode, progress);
+}
+
+/**
+ * syncMutex の permit を取ってから task を実行し、完了（成功・失敗とも）で permit を返す。
+ * 起動時の初期化が、進捗ストリームの実行の開始から終了までを単独の同期と重ならないようにするために使う。
+ * task の reject はそのまま呼び出し元へ伝える。
+ */
+export const runWithLogSyncLock = async <T>(
+  task: (lock: LogSyncLock) => Promise<T>,
+): Promise<T> => {
+  const exit = await Effect.runPromiseExit(
+    syncMutex.withPermits(1)(
+      Effect.promise(() => task(new LogSyncLockToken())),
+    ),
+  );
+  return Exit.match(exit, {
+    onSuccess: (value) => value,
+    onFailure: (cause) => {
+      throw Cause.squash(cause);
+    },
+  });
+};
+
+/**
+ * appendLoglines → loadLogInfo を順に実行する本体。permit の取得は呼び出し側が行う。
+ */
+const runSync = (
+  mode: LogSyncMode,
+  progress: InitProgressRun,
+): Effect.Effect<LogSyncResults, SyncLogsError> =>
+  Effect.gen(function* () {
+    const isFullSync = mode === LOG_SYNC_MODE.FULL;
+
+    logger.info(`Starting log sync with mode: ${mode}`);
+
+    // Step 1: VRChatログファイルから新しいログ行を抽出・保存
+    // ファイル単位の進捗は appendLoglinesToFileFromLogFilePathList 内で送られる
+    progress.stage('log_append', 0);
+    const appendResult: AppendLoglinesResult = yield* Effect.tryPromise({
+      try: () => appendLoglinesToFileFromLogFilePathList(isFullSync, progress),
+      catch: (error) => {
+        logger.error({
+          message: 'Failed to append log lines',
+          details: {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+        if (error instanceof VRChatLogFileError) {
+          return error;
+        }
+        return new VRChatLogFileError({
+          code: 'UNKNOWN',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      },
+    });
+    progress.stage('log_append', 100);
+
+    // Step 2: 保存されたログをデータベースに読み込む
+    // INCREMENTAL モードでは step1 で処理済みのログ行を直接渡し、
+    // logStore ファイルの再読み込みをスキップする
+    // log_load 以降（写真インデックスまで）の進捗は loadLogInfoIndexFromVRChatLog 内で送られる
+    const loadResult = yield* loadLogInfoIndexFromVRChatLog({
+      excludeOldLogLoad: !isFullSync,
+      preLoadedLogLines: isFullSync
+        ? undefined
+        : appendResult.processedLogLines,
+      progress,
+    });
+
+    logger.info(`Log sync completed successfully with mode: ${mode}`);
+
+    // Fire-and-forget: ワールド参加画像の自動生成（syncLogs の結果をブロックしない）
+    triggerWorldJoinImageGeneration();
+
+    return loadResult;
+  });
+
+/**
+ * 単独のログ同期（手動更新・バックグラウンド同期など）を、自分の進捗ストリームの実行で行う。
+ * syncMutex の permit の内側で呼ぶので、他の実行と重ならない。
+ * 種類は `sync` なので、起動画面はこの実行を表示せず、統計の集計も行われない。
+ */
+const withOwnSyncRun = (
+  mode: LogSyncMode,
+): Effect.Effect<LogSyncResults, SyncLogsError> =>
+  Effect.suspend(() => {
+    const run = beginInitProgressRun('sync', {
+      syncMode: toInitSyncMode(mode),
+      isFirstLaunch: false,
+    });
+    return runSync(mode, run).pipe(
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          run.end(exit._tag === 'Success' ? 'completed' : 'error');
+        }),
+      ),
+    );
+  });
 
 /**
  * 設定が有効な場合、未生成の World Join 画像を生成する
@@ -176,7 +266,7 @@ function triggerWorldJoinImageGeneration(): void {
  */
 export function syncLogsInBackground(): Effect.Effect<
   LogSyncResults,
-  VRChatLogFileError | VRChatLogError | LogInfoError | LogInfoServiceError
+  SyncLogsError
 > {
   return syncLogs(LOG_SYNC_MODE.INCREMENTAL);
 }

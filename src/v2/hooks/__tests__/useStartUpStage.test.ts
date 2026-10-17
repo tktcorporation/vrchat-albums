@@ -218,28 +218,6 @@ describe('useStartupStage - simplified implementation', () => {
     expect(result.current.errorMessage).toBe('Test initialization error');
   });
 
-  it('重複実行エラーの場合は無視される', async () => {
-    const { result } = renderHook(() =>
-      useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),
-    );
-
-    const mutationOptions =
-      mockTrpcReact.settings.initializeAppData.useMutation.mock.calls[0][0];
-    const duplicateError = new Error('初期化処理が既に実行中です');
-
-    act(() => {
-      mutationOptions.onMutate();
-    });
-
-    act(() => {
-      mutationOptions.onError(duplicateError);
-    });
-
-    // エラー状態にならないことを確認
-    expect(result.current.stages.initialization).toBe('inProgress');
-    expect(result.current.errorMessage).toBe('');
-  });
-
   it('LOG_DIRECTORY_ERROR エラーは適切にハンドリングされる', async () => {
     const { result } = renderHook(() =>
       useStartupStage({ ...mockCallbacks, isSubscriptionReady: true }),

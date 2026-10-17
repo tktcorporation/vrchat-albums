@@ -9,15 +9,28 @@ import {
 } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
-import { emitProgress, emitStageStart } from '../initProgress/emitter';
-import { LOG_SYNC_MODE, type LogSyncMode, syncLogs } from '../logSync/service';
+import { beginInitProgressRun } from '../initProgress/emitter';
+import {
+  LOG_SYNC_MODE,
+  type LogSyncLock,
+  type LogSyncMode,
+  runWithLogSyncLock,
+  syncLogsHoldingLock,
+  toInitSyncMode,
+} from '../logSync/service';
 import { getSettingStore } from '../settingStore';
 import * as vrchatWorldJoinLogService from '../vrchatWorldJoinLog/service';
 import { procedure, router as trpcRouter } from './../../trpc';
 import * as settingService from './service';
 
-// 初期化処理の重複実行を防ぐためのフラグ
-let isInitializing = false;
+/**
+ * 実行中の初期化処理。重複した呼び出しは新しく走らせず、これに合流して同じ結果を受け取る。
+ *
+ * 開発時の React StrictMode の二重マウントや、subscription 接続待ちのタイムアウトと接続完了が
+ * 重なると、レンダラーから初期化が 2 回呼ばれることがある。2 回目に「成功」を即答すると、
+ * レンダラーは DB の準備前にギャラリーを開いてしまうため、1 回目の完了まで待たせる。
+ */
+let inFlightInitialization: Promise<{ success: true }> | null = null;
 
 // 前回の PhotoPath を記録しておくための変数
 let lastKnownPhotoPath: string | null = null;
@@ -45,6 +58,247 @@ const hasPhotoPathChanged = (): boolean => {
   }
 
   return hasChanged;
+};
+
+/**
+ * アプリケーション起動時の初期化処理。
+ * 進捗ストリームの実行を最初から最後まで、ログ同期のセマフォの permit を持ったまま進める。
+ * permit の外で開始すると、初期化中に始まった単独のログ同期（バックグラウンド同期・インポート後の同期など）が
+ * 初期化の実行を置き換えたり閉じたりしてしまうため。単独の同期は初期化が終わるまで待つ。
+ */
+const runInitialization = (): Promise<{ success: true }> =>
+  runWithLogSyncLock((lock) => runInitializationHoldingLock(lock));
+
+/**
+ * 初期化処理の本体。データベース初期化、初回起動判定、ログ同期を順に実行し、進捗を init-progress へ送る。
+ */
+const runInitializationHoldingLock = async (
+  lock: LogSyncLock,
+): Promise<{ success: true }> => {
+  // 起動種別は DB の準備ができるまで判定できないため、null で実行を始めて Step 2 で設定する
+  const run = beginInitProgressRun('startup', null);
+
+  // effect-lint-allow-try-catch: 200行超の処理全体を Effect.gen に変換するのは大規模リファクタリングが必要。
+  // catch はエラーの分類（UserFacingError はそのまま、それ以外は cause 付きで包む）と再スローのみ。
+  try {
+    logger.info('=== Starting application data initialization ===');
+
+    // Step 1: データベース同期
+    // VRChat ログディレクトリの存在確認は事前に行わず、ログ同期のエラーで判定する
+    logger.info('Step 1: Syncing database schema...');
+    run.stage('database_sync', 0);
+    await sequelizeClient.syncRDBClient();
+    run.stage('database_sync', 100);
+
+    // Step 2: 初回起動判定とPhotoPath変更確認
+    logger.info('Step 2: Checking if this is first launch...');
+    let isFirstLaunch = true;
+    let syncMode: LogSyncMode = LOG_SYNC_MODE.FULL;
+
+    await vrchatWorldJoinLogService
+      .findVRChatWorldJoinLogList({
+        orderByJoinDateTime: 'desc',
+      })
+      .then(
+        (existingLogs) => {
+          isFirstLaunch = existingLogs.length === 0;
+
+          // PhotoPath変更の確認
+          const photoPathChanged = hasPhotoPathChanged();
+
+          // 同期モード決定: 初回起動 OR PhotoPath変更時は FULL モード
+          syncMode =
+            isFirstLaunch || photoPathChanged
+              ? LOG_SYNC_MODE.FULL
+              : LOG_SYNC_MODE.INCREMENTAL;
+
+          logger.info(`Found ${existingLogs.length} existing logs`);
+          if (photoPathChanged) {
+            logger.info(
+              'PhotoPath change detected, forcing FULL sync mode for photo re-indexing',
+            );
+          }
+        },
+        (error) => {
+          // データベースエラー（テーブル未作成など）の場合は初回起動として扱う
+          logger.info(
+            'Database error detected, treating as first launch:',
+            error,
+          );
+          isFirstLaunch = true;
+          syncMode = LOG_SYNC_MODE.FULL;
+        },
+      );
+
+    logger.info(
+      `Detected ${
+        isFirstLaunch ? 'first launch' : 'regular launch'
+      }, using ${syncMode} sync mode`,
+    );
+    run.setLaunch({
+      syncMode: toInitSyncMode(syncMode),
+      isFirstLaunch,
+    });
+    // 差分起動では登録済みの写真の月別枚数をここで送り、ログ同期の前にグラフを埋めておく
+    await run.flushStats();
+
+    // Step 2.5: 自動起動設定の初期化・復元（テスト時はスキップ）
+    // 初回起動時: 自動起動を有効化し、意図を settingStore に保存
+    // アップデート後: settingStore の意図と OS 状態が不一致なら再登録
+    //   （electron-updater で exe パスが変わると OS のログインアイテム登録が無効になるため）
+    if (!process.env.PLAYWRIGHT_TEST) {
+      const settingStore = getSettingStore();
+      const savedAutoStartIntent = settingStore.getAutoStartEnabled();
+
+      if (isFirstLaunch) {
+        logger.info(
+          'Step 2.5: Setting default auto-start enabled for first launch...',
+        );
+        await import('electron')
+          .then(({ app }) => {
+            app.setLoginItemSettings({
+              openAtLogin: true,
+            });
+            settingStore.setAutoStartEnabled(true);
+            logger.info(
+              'Auto-start enabled by default for first launch and saved to settingStore',
+            );
+          })
+          .catch((error) => {
+            logger.warn('Failed to set default auto-start:', error);
+            // 自動起動の設定に失敗してもアプリの初期化は続行
+          });
+      } else if (savedAutoStartIntent !== null) {
+        // 通常起動: settingStore に保存された意図と OS 状態を比較
+        await import('electron')
+          .then(({ app }) => {
+            const currentOsSetting = app.getLoginItemSettings().openAtLogin;
+            if (savedAutoStartIntent && !currentOsSetting) {
+              // ユーザーは有効にしていたが OS 側が無効 → アップデートでリセットされた可能性
+              logger.info(
+                'Step 2.5: Auto-start was enabled by user but OS reports disabled. Re-registering login item (likely due to app update changing exe path).',
+              );
+              app.setLoginItemSettings({
+                openAtLogin: true,
+              });
+              logger.info('Auto-start re-registered successfully after update');
+            }
+          })
+          .catch((error) => {
+            logger.warn(
+              'Failed to restore auto-start setting after update:',
+              error,
+            );
+          });
+      }
+    } else if (isFirstLaunch) {
+      logger.info('Step 2.5: Skipping auto-start setup in Playwright test');
+    }
+
+    // Step 3: ログ同期実行
+    // log_append 以降のステージの進捗は、ログ同期がこの実行へ送る
+    logger.info('Step 3: Starting log sync...');
+    const logSyncExit = await Effect.runPromiseExit(
+      syncLogsHoldingLock(lock, syncMode, run),
+    );
+
+    if (Exit.isFailure(logSyncExit)) {
+      const failOpt = Cause.failureOption(logSyncExit.cause);
+      if (Option.isSome(failOpt)) {
+        const logSyncError = failOpt.value;
+        // ログ同期エラーの場合、詳細なエラータイプを特定
+        // Data.TaggedError は _tag、旧エラークラスは code を持つ
+        const errorTag = (() => {
+          if ('_tag' in logSyncError) {
+            return logSyncError._tag;
+          }
+          if ('code' in logSyncError) {
+            return (logSyncError as { code: string }).code;
+          }
+          return 'UNKNOWN';
+        })();
+
+        // VRChatログディレクトリが見つからない場合は、設定が必要なエラーとして処理
+        const isSetupRequired = match(errorTag)
+          .with('LOG_FILE_DIR_NOT_FOUND', () => true)
+          .with('LOG_FILES_NOT_FOUND', () => true)
+          .with('LogFileDirNotFound', () => true)
+          .with('LogFilesNotFound', () => true)
+          .otherwise(() => false);
+
+        if (isSetupRequired) {
+          logger.info(
+            'VRChat directory setup required - throwing UserFacingError to trigger setup screen',
+          );
+
+          const setupError = UserFacingError.withStructuredInfo({
+            code: ERROR_CODES.VRCHAT_DIRECTORY_SETUP_REQUIRED,
+            category: ERROR_CATEGORIES.SETUP_REQUIRED,
+            message: 'VRChat directory not found',
+            userMessage:
+              'VRChatのログディレクトリが見つかりません。初期設定が必要です。',
+            details: {
+              syncError: logSyncError,
+            },
+          });
+
+          throw setupError;
+        }
+
+        // その他のエラーは警告として記録（Sentry で追跡）
+        logger.warnWithSentry({
+          message: `Log sync failed: ${
+            logSyncError.message || 'Unknown error'
+          }`,
+          details: { errorTag },
+        });
+      } else {
+        // Defect: re-throw して Sentry で捕捉
+        const dieOpt = Cause.dieOption(logSyncExit.cause);
+        if (Option.isSome(dieOpt)) {
+          throw dieOpt.value;
+        }
+        // Interrupt やその他の未知の Cause
+        throw new Error(
+          'Effect was interrupted or failed with an unknown cause',
+        );
+      }
+    } else {
+      logger.info('Log sync completed successfully');
+    }
+
+    // 初期化完了を通知（最終の統計を届けてから終端イベントを送る）
+    await run.flushStats();
+    run.end('completed');
+
+    logger.info('=== Application data initialization completed ===');
+    return { success: true };
+  } catch (error) {
+    logger.error({
+      message: 'Application data initialization failed',
+      stack: error instanceof Error ? error : undefined,
+    });
+
+    // エラーメッセージを抽出
+    const errorMessage = match(error)
+      .with(P.instanceOf(Error), (err) => err.message)
+      .otherwise(() => 'Unknown initialization error');
+
+    // エラーの内容は mutation のエラーとしてレンダラーへ届くため、進捗ストリームには終端だけを送る
+    run.end('error');
+
+    // UserFacingErrorの場合は構造化情報を保持して再スロー
+    if (error instanceof UserFacingError) {
+      throw error;
+    }
+
+    // その他のエラーの場合は新しいUserFacingErrorでラップ（元のスタックトレースを保持）
+    throw new UserFacingError(
+      `初期化に失敗しました: ${errorMessage}`,
+      undefined,
+      { cause: error instanceof Error ? error : undefined },
+    );
+  }
 };
 
 export const settingsRouter = () =>
@@ -92,261 +346,17 @@ export const settingsRouter = () =>
      * データベース初期化、同期、ログ同期まで順次実行される。
      */
     initializeAppData: procedure.mutation(async () => {
-      // 重複実行をチェック
-      if (isInitializing) {
-        logger.debug(
-          'Initialization already in progress, skipping duplicate request',
-        );
-        // Sentryに送信しないよう、debugレベルでログ記録
-        return { success: false, message: '初期化処理が既に実行中です' };
-      }
-
-      isInitializing = true;
-
-      // effect-lint-allow-try-catch: tRPC mutation 内の200行超の処理全体を Effect.gen に変換するのは
-      // 大規模リファクタリングが必要。finally は isInitializing フラグのリセットのみ。
-      try {
-        logger.info('=== Starting application data initialization ===');
-
-        // Step 1: データベース同期
-        logger.info('Step 1: Syncing database schema...');
-        emitStageStart('database_sync', 'データベースを初期化しています...');
-        await sequelizeClient.syncRDBClient();
-        emitProgress({
-          stage: 'database_sync',
-          progress: 100,
-          message: 'データベースの初期化が完了しました',
-        });
-
-        // Step 2: ディレクトリチェック
-        logger.info('Step 2: Checking VRChat directories...');
-        emitStageStart(
-          'directory_check',
-          'VRChatディレクトリを確認しています...',
-        );
-
-        // VRChatログディレクトリの存在確認は、ログ同期時のエラーで判定する
-        // 事前チェックは省略し、ログ同期エラーで詳細なエラーを提供
-        emitProgress({
-          stage: 'directory_check',
-          progress: 100,
-          message: 'VRChatディレクトリの確認が完了しました',
-        });
-
-        // Step 3: 初回起動判定とPhotoPath変更確認
-        logger.info('Step 3: Checking if this is first launch...');
-        let isFirstLaunch = true;
-        let syncMode: LogSyncMode = LOG_SYNC_MODE.FULL;
-
-        await vrchatWorldJoinLogService
-          .findVRChatWorldJoinLogList({
-            orderByJoinDateTime: 'desc',
-          })
-          .then(
-            (existingLogs) => {
-              isFirstLaunch = existingLogs.length === 0;
-
-              // PhotoPath変更の確認
-              const photoPathChanged = hasPhotoPathChanged();
-
-              // 同期モード決定: 初回起動 OR PhotoPath変更時は FULL モード
-              syncMode =
-                isFirstLaunch || photoPathChanged
-                  ? LOG_SYNC_MODE.FULL
-                  : LOG_SYNC_MODE.INCREMENTAL;
-
-              logger.info(`Found ${existingLogs.length} existing logs`);
-              if (photoPathChanged) {
-                logger.info(
-                  'PhotoPath change detected, forcing FULL sync mode for photo re-indexing',
-                );
-              }
-            },
-            (error) => {
-              // データベースエラー（テーブル未作成など）の場合は初回起動として扱う
-              logger.info(
-                'Database error detected, treating as first launch:',
-                error,
-              );
-              isFirstLaunch = true;
-              syncMode = LOG_SYNC_MODE.FULL;
-            },
-          );
-
+      if (inFlightInitialization) {
         logger.info(
-          `Detected ${
-            isFirstLaunch ? 'first launch' : 'regular launch'
-          }, using ${syncMode} sync mode`,
+          'Initialization already in progress, joining the running initialization',
         );
-
-        // Step 3.5: 自動起動設定の初期化・復元（テスト時はスキップ）
-        // 初回起動時: 自動起動を有効化し、意図を settingStore に保存
-        // アップデート後: settingStore の意図と OS 状態が不一致なら再登録
-        //   （electron-updater で exe パスが変わると OS のログインアイテム登録が無効になるため）
-        if (!process.env.PLAYWRIGHT_TEST) {
-          const settingStore = getSettingStore();
-          const savedAutoStartIntent = settingStore.getAutoStartEnabled();
-
-          if (isFirstLaunch) {
-            logger.info(
-              'Step 3.5: Setting default auto-start enabled for first launch...',
-            );
-            await import('electron')
-              .then(({ app }) => {
-                app.setLoginItemSettings({
-                  openAtLogin: true,
-                });
-                settingStore.setAutoStartEnabled(true);
-                logger.info(
-                  'Auto-start enabled by default for first launch and saved to settingStore',
-                );
-              })
-              .catch((error) => {
-                logger.warn('Failed to set default auto-start:', error);
-                // 自動起動の設定に失敗してもアプリの初期化は続行
-              });
-          } else if (savedAutoStartIntent !== null) {
-            // 通常起動: settingStore に保存された意図と OS 状態を比較
-            await import('electron')
-              .then(({ app }) => {
-                const currentOsSetting = app.getLoginItemSettings().openAtLogin;
-                if (savedAutoStartIntent && !currentOsSetting) {
-                  // ユーザーは有効にしていたが OS 側が無効 → アップデートでリセットされた可能性
-                  logger.info(
-                    'Step 3.5: Auto-start was enabled by user but OS reports disabled. Re-registering login item (likely due to app update changing exe path).',
-                  );
-                  app.setLoginItemSettings({
-                    openAtLogin: true,
-                  });
-                  logger.info(
-                    'Auto-start re-registered successfully after update',
-                  );
-                }
-              })
-              .catch((error) => {
-                logger.warn(
-                  'Failed to restore auto-start setting after update:',
-                  error,
-                );
-              });
-          }
-        } else if (isFirstLaunch) {
-          logger.info('Step 3.5: Skipping auto-start setup in Playwright test');
-        }
-
-        // Step 4: ログ同期実行
-        // emitStageStart は syncLogs 内で行われる
-        logger.info('Step 4: Starting log sync...');
-        const logSyncExit = await Effect.runPromiseExit(syncLogs(syncMode));
-
-        if (Exit.isFailure(logSyncExit)) {
-          const failOpt = Cause.failureOption(logSyncExit.cause);
-          if (Option.isSome(failOpt)) {
-            const logSyncError = failOpt.value;
-            // ログ同期エラーの場合、詳細なエラータイプを特定
-            // Data.TaggedError は _tag、旧エラークラスは code を持つ
-            const errorTag = (() => {
-              if ('_tag' in logSyncError) {
-                return logSyncError._tag;
-              }
-              if ('code' in logSyncError) {
-                return (logSyncError as { code: string }).code;
-              }
-              return 'UNKNOWN';
-            })();
-
-            // VRChatログディレクトリが見つからない場合は、設定が必要なエラーとして処理
-            const isSetupRequired = match(errorTag)
-              .with('LOG_FILE_DIR_NOT_FOUND', () => true)
-              .with('LOG_FILES_NOT_FOUND', () => true)
-              .with('LogFileDirNotFound', () => true)
-              .with('LogFilesNotFound', () => true)
-              .otherwise(() => false);
-
-            if (isSetupRequired) {
-              logger.info(
-                'VRChat directory setup required - throwing UserFacingError to trigger setup screen',
-              );
-
-              const setupError = UserFacingError.withStructuredInfo({
-                code: ERROR_CODES.VRCHAT_DIRECTORY_SETUP_REQUIRED,
-                category: ERROR_CATEGORIES.SETUP_REQUIRED,
-                message: 'VRChat directory not found',
-                userMessage:
-                  'VRChatのログディレクトリが見つかりません。初期設定が必要です。',
-                details: {
-                  syncError: logSyncError,
-                },
-              });
-
-              throw setupError;
-            }
-
-            // その他のエラーは警告として記録（Sentry で追跡）
-            logger.warnWithSentry({
-              message: `Log sync failed: ${
-                logSyncError.message || 'Unknown error'
-              }`,
-              details: { errorTag },
-            });
-          } else {
-            // Defect: re-throw して Sentry で捕捉
-            const dieOpt = Cause.dieOption(logSyncExit.cause);
-            if (Option.isSome(dieOpt)) {
-              throw dieOpt.value;
-            }
-            // Interrupt やその他の未知の Cause
-            throw new Error(
-              'Effect was interrupted or failed with an unknown cause',
-            );
-          }
-        } else {
-          logger.info('Log sync completed successfully');
-        }
-
-        // 初期化完了を通知
-        emitProgress({
-          stage: 'completed',
-          progress: 100,
-          message: '初期化が完了しました',
-        });
-
-        logger.info('=== Application data initialization completed ===');
-        return { success: true };
-      } catch (error) {
-        logger.error({
-          message: 'Application data initialization failed',
-          stack: error instanceof Error ? error : undefined,
-        });
-
-        // エラーメッセージを抽出
-        const errorMessage = match(error)
-          .with(P.instanceOf(Error), (err) => err.message)
-          .otherwise(() => 'Unknown initialization error');
-
-        // エラーステージをemit
-        emitProgress({
-          stage: 'error',
-          progress: 0,
-          message: '初期化に失敗しました',
-          details: { currentItem: errorMessage },
-        });
-
-        // UserFacingErrorの場合は構造化情報を保持して再スロー
-        if (error instanceof UserFacingError) {
-          throw error;
-        }
-
-        // その他のエラーの場合は新しいUserFacingErrorでラップ（元のスタックトレースを保持）
-        throw new UserFacingError(
-          `初期化に失敗しました: ${errorMessage}`,
-          undefined,
-          { cause: error instanceof Error ? error : undefined },
-        );
-      } finally {
-        // 処理完了後にフラグをリセット
-        isInitializing = false;
+        return inFlightInitialization;
       }
+      const initialization = runInitialization().finally(() => {
+        inFlightInitialization = null;
+      });
+      inFlightInitialization = initialization;
+      return initialization;
     }),
 
     /**

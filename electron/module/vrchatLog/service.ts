@@ -148,12 +148,17 @@ export type LogInfoPartialSuccessResult = PartialSuccessResult<
  */
 export const getVRChaLogInfoByLogFilePathListWithPartialSuccess = (
   logFilePathList: (VRChatLogFilePath | VRChatLogStoreFilePath)[],
+  options?: {
+    /** ファイルを読み終えるたびに、読み終えたファイル数と総ファイル数を受け取る（進捗表示用） */
+    onFilesRead?: (filesRead: number, totalFiles: number) => void;
+  },
 ): Effect.Effect<LogInfoPartialSuccessResult> =>
   Effect.tryPromise({
     try: async (): Promise<LogInfoPartialSuccessResult> => {
       const logLineListResult =
         await getLogLinesByLogFilePathListWithPartialSuccess({
           logFilePathList,
+          onFilesRead: options?.onFilesRead,
           includesList: [
             ...new Set([...FILTER_PATTERNS, ...DETECTION_BROAD_PATTERNS]),
           ],

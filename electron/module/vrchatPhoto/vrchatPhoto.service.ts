@@ -12,7 +12,6 @@ import { xxhash128 } from 'hash-wasm';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
 
-import { emitProgress } from '../initProgress/emitter';
 import { getSettingStore, type PhotoFolderScanStates } from '../settingStore';
 import {
   type FolderDigest,
@@ -1108,6 +1107,18 @@ async function processPhotoBatch(
 }
 
 /**
+ * 写真インデックス作成の進捗。
+ */
+interface PhotoIndexProgress {
+  /** 処理済みのファイル数（画像として読めずに登録しなかったファイルも含む） */
+  handled: number;
+  /** 登録対象の新規ファイルの総数 */
+  total: number;
+  /** 直前に登録した写真の撮影月（ローカルタイムの `YYYY-MM`）。まだ登録していなければ undefined */
+  currentMonth?: string;
+}
+
+/**
  * 写真ディレクトリを走査してインデックスを更新する
  * logSync などから呼び出される
  *
@@ -1122,8 +1133,13 @@ async function processPhotoBatch(
  * - バッチ間でキャッシュをクリア
  *
  * @param isIncremental true: 差分スキャン（ダイジェスト・mtime使用）、false: フルスキャン
+ * @param onProgress 登録対象の総数が確定したときと、バッチを 1 つ処理するたびに呼ばれる（進捗表示用）。
+ *                   登録対象が 1 件も無ければ呼ばれない
  */
-export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
+export const createVRChatPhotoPathIndex = async (
+  isIncremental = true,
+  onProgress?: (progress: PhotoIndexProgress) => void,
+) => {
   const startTime = performance.now();
   const targetDir = getVRChatPhotoDirPath();
   const settingStore = getSettingStore();
@@ -1167,9 +1183,24 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
   // effect-lint-allow-try-catch: 140行超のループ処理（continue/mutable state多用）を Effect.gen に変換するのは
   // 大規模リファクタリングが必要。finally はスキャン状態の永続化のみ。
   try {
-    // 各ディレクトリを順番に処理
+    // Stage 1〜2 を全ディレクトリ分先に済ませ、登録対象の総数を確定させてから Stage 3 に進む。
+    // 総数が分からないまま登録を始めると、進捗を割合で示せないため。
+    const pendingFolders: {
+      folderPathStr: string;
+      currentDigest: FolderDigest;
+      newFiles: string[];
+      /** このフォルダを含むディレクトリ（配下のフォルダを含む）の一覧を取り始める直前の時刻。lastScannedAt として保存する */
+      scannedAt: Date;
+    }[] = [];
+
     for (const dir of allDirs) {
       logger.debug(`Processing photos from directory: ${dir.value}`);
+
+      // lastScannedAt には、Stage 3 の終了時刻ではなくファイル一覧を取る直前の時刻を保存する。
+      // 一覧を取った後に作られたファイルは今回の対象に入らないが、mtime がこの時刻より新しいので
+      // 次回の差分スキャンで拾われる。終了時刻を保存すると、登録中に作られたファイルの mtime が
+      // lastScannedAt より古くなり、以後の差分スキャンで永久に除外される。
+      const scannedAt = new Date();
 
       // Stage 1: フォルダダイジェストチェック
       const { changedFolders, skipStats } = await getChangedFoldersWithFiles(
@@ -1196,7 +1227,6 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
         `Found ${changedFolders.length} changed folders in: ${dir.value}`,
       );
 
-      // 各変更フォルダを処理
       for (const changedFolder of changedFolders) {
         // ブランド型をstringにキャストしてストレージアクセス（パスのみ）
         const folderPathStr = changedFolder.folderPath as string;
@@ -1229,7 +1259,7 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
           // ダイジェストは更新する
           updatedStates[folderPathStr] = {
             digest: currentDigest,
-            lastScannedAt: new Date().toISOString(),
+            lastScannedAt: scannedAt.toISOString(),
           };
           continue;
         }
@@ -1237,74 +1267,99 @@ export const createVRChatPhotoPathIndex = async (isIncremental = true) => {
         logger.debug(
           `Found ${newFiles.length} new files in: ${changedFolder.folderPath}`,
         );
+        pendingFolders.push({
+          folderPathStr,
+          currentDigest,
+          newFiles,
+          scannedAt,
+        });
+      }
+    }
 
-        // Stage 3: バッチ処理（画像処理 + DB保存）
-        for (let i = 0; i < newFiles.length; i += PHOTO_METADATA_BATCH_SIZE) {
-          const batch = newFiles.slice(i, i + PHOTO_METADATA_BATCH_SIZE);
-          batchNumber++;
+    const totalNewFiles = pendingFolders.reduce(
+      (sum, folder) => sum + folder.newFiles.length,
+      0,
+    );
+    let handledFiles = 0;
+    // 新規ファイルが無ければ件数を送らない。「0 / 0 枚」と表示しても伝わる情報が無いため
+    if (totalNewFiles > 0) {
+      onProgress?.({ handled: 0, total: totalNewFiles });
+    }
 
-          // バッチ処理前にメモリをチェック
-          await memoryMonitor.checkMemory(`batch ${batchNumber} start`);
+    for (const {
+      folderPathStr,
+      currentDigest,
+      newFiles,
+      scannedAt,
+    } of pendingFolders) {
+      // Stage 3: バッチ処理（画像処理 + DB保存）
+      for (let i = 0; i < newFiles.length; i += PHOTO_METADATA_BATCH_SIZE) {
+        const batch = newFiles.slice(i, i + PHOTO_METADATA_BATCH_SIZE);
+        batchNumber++;
 
-          const batchStartTime = performance.now();
-          const processedBatch = await processPhotoBatch(batch);
+        // バッチ処理前にメモリをチェック
+        await memoryMonitor.checkMemory(`batch ${batchNumber} start`);
 
-          if (processedBatch.length > 0) {
-            const dbStartTime = performance.now();
-            // DBエラーは予期しないエラーとしてSentryに送信
-            // batch情報をログに記録してから再スロー
-            let createdModels: model.VRChatPhotoPathModel[];
-            // effect-lint-allow-try-catch: エラー情報補強してから再スロー（Sentry送信用）
-            try {
-              createdModels = await model.createOrUpdateListVRChatPhotoPath(
-                processedBatch.map((photo) => ({
-                  photoPath: photo.photoPath,
-                  photoTakenAt: photo.takenAt,
-                  width: photo.width,
-                  height: photo.height,
-                })),
-              );
-            } catch (dbError) {
-              logger.error({
-                message: `Database error saving photo batch ${batchNumber}`,
-                stack:
-                  dbError instanceof Error
-                    ? dbError
-                    : new Error(String(dbError)),
-                details: {
-                  batchNumber,
-                  batchSize: processedBatch.length,
-                  folderPath: folderPathStr,
-                  firstPhotoPath: processedBatch[0]?.photoPath,
-                },
-              });
-              throw dbError;
-            }
-            const dbEndTime = performance.now();
+        const batchStartTime = performance.now();
+        const processedBatch = await processPhotoBatch(batch);
 
-            allCreatedModels.push(...createdModels);
-            totalProcessed += processedBatch.length;
-
-            // 途中経過を報告（総数不明のため中間値を使用）
-            emitProgress({
-              stage: 'photo_index',
-              progress: 50,
-              message: `写真をインデックス中... (${totalProcessed} 件処理済み)`,
-            });
-
-            const batchEndTime = performance.now();
-            logger.debug(
-              `Batch ${batchNumber}: Processed ${processedBatch.length} photos in ${(batchEndTime - batchStartTime).toFixed(2)} ms (metadata: ${(dbStartTime - batchStartTime).toFixed(2)} ms, DB: ${(dbEndTime - dbStartTime).toFixed(2)} ms)`,
+        if (processedBatch.length > 0) {
+          const dbStartTime = performance.now();
+          // DBエラーは予期しないエラーとしてSentryに送信
+          // batch情報をログに記録してから再スロー
+          let createdModels: model.VRChatPhotoPathModel[];
+          // effect-lint-allow-try-catch: エラー情報補強してから再スロー（Sentry送信用）
+          try {
+            createdModels = await model.createOrUpdateListVRChatPhotoPath(
+              processedBatch.map((photo) => ({
+                photoPath: photo.photoPath,
+                photoTakenAt: photo.takenAt,
+                width: photo.width,
+                height: photo.height,
+              })),
             );
+          } catch (dbError) {
+            logger.error({
+              message: `Database error saving photo batch ${batchNumber}`,
+              stack:
+                dbError instanceof Error ? dbError : new Error(String(dbError)),
+              details: {
+                batchNumber,
+                batchSize: processedBatch.length,
+                folderPath: folderPathStr,
+                firstPhotoPath: processedBatch[0]?.photoPath,
+              },
+            });
+            throw dbError;
           }
+          const dbEndTime = performance.now();
+
+          allCreatedModels.push(...createdModels);
+          totalProcessed += processedBatch.length;
+
+          const batchEndTime = performance.now();
+          logger.debug(
+            `Batch ${batchNumber}: Processed ${processedBatch.length} photos in ${(batchEndTime - batchStartTime).toFixed(2)} ms (metadata: ${(dbStartTime - batchStartTime).toFixed(2)} ms, DB: ${(dbEndTime - dbStartTime).toFixed(2)} ms)`,
+          );
         }
 
-        // フォルダスキャン状態を更新
-        updatedStates[folderPathStr] = {
-          digest: currentDigest,
-          lastScannedAt: new Date().toISOString(),
-        };
+        // 画像として処理できなかったファイルも「処理済み」に数える（数えないと 100% に届かない）
+        handledFiles += batch.length;
+        const lastPhoto = processedBatch.at(-1);
+        onProgress?.({
+          handled: handledFiles,
+          total: totalNewFiles,
+          currentMonth: lastPhoto
+            ? dateFns.format(lastPhoto.takenAt, 'yyyy-MM')
+            : undefined,
+        });
       }
+
+      // フォルダスキャン状態を更新（時刻は一覧を取った時点のもの。scannedAt の説明を参照）
+      updatedStates[folderPathStr] = {
+        digest: currentDigest,
+        lastScannedAt: scannedAt.toISOString(),
+      };
     }
   } finally {
     // エラー発生時も途中経過を保存（次回スキャンで未処理分が再処理される）

@@ -9,10 +9,6 @@ vi.mock('../../lib/wrappedExifTool');
 vi.mock('../../lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-vi.mock('../initProgress/emitter', () => ({
-  emitProgress: vi.fn(),
-  emitStageStart: vi.fn(),
-}));
 vi.mock('ofetch', () => ({
   ofetch: vi.fn(),
 }));

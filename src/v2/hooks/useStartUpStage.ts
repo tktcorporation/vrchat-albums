@@ -126,20 +126,6 @@ export const useStartupStage = (options?: UseStartupStageOptions) => {
         callbacks?.onComplete?.();
       },
       onError: (syncError: unknown) => {
-        // 重複実行エラーの場合は無視
-        const shouldIgnore = match(syncError)
-          .when(
-            (e) =>
-              e instanceof Error &&
-              e.message.includes('初期化処理が既に実行中'),
-            () => true,
-          )
-          .otherwise(() => false);
-
-        if (shouldIgnore) {
-          return;
-        }
-
         const errorMessage = match(syncError)
           .with(P.instanceOf(Error), (e) => e.message)
           .otherwise(() => 'アプリケーション初期化に失敗しました');

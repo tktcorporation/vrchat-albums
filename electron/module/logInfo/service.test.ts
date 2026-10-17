@@ -509,7 +509,9 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
       // getVRChaLogInfoByLogFilePathList に渡されるパスを確認
       expect(
         vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
-      ).toHaveBeenCalledWith([rangeLogPath1, rangeLogPath2]);
+      ).toHaveBeenCalledWith([rangeLogPath1, rangeLogPath2], {
+        onFilesRead: expect.any(Function),
+      });
     } finally {
       vi.useRealTimers();
     }
@@ -544,7 +546,9 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
       // getVRChaLogInfoByLogFilePathList に渡されるパスを確認 (legacy + range)
       expect(
         vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
-      ).toHaveBeenCalledWith([legacyLogPath, rangeLogPath1, rangeLogPath2]);
+      ).toHaveBeenCalledWith([legacyLogPath, rangeLogPath1, rangeLogPath2], {
+        onFilesRead: expect.any(Function),
+      });
     } finally {
       vi.useRealTimers();
     }
@@ -579,7 +583,9 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
       // getVRChaLogInfoByLogFilePathList に渡されるパスを確認 (range のみ)
       expect(
         vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
-      ).toHaveBeenCalledWith([rangeLogPath1, rangeLogPath2]);
+      ).toHaveBeenCalledWith([rangeLogPath1, rangeLogPath2], {
+        onFilesRead: expect.any(Function),
+      });
     } finally {
       vi.useRealTimers();
     }
@@ -630,7 +636,9 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
       // getVRChaLogInfoByLogFilePathList に渡されるパスを確認 (range のみ)
       expect(
         vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
-      ).toHaveBeenCalledWith([rangeLogPath1, rangeLogPath2]); // モックの rangeLogPath が渡される
+      ).toHaveBeenCalledWith([rangeLogPath1, rangeLogPath2], {
+        onFilesRead: expect.any(Function),
+      }); // モックの rangeLogPath が渡される
     } finally {
       vi.useRealTimers();
     }

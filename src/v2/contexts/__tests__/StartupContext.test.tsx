@@ -21,23 +21,18 @@ vi.mock('../../hooks/useInitProgress', () => ({
   useInitProgress: vi.fn(() => ({
     isSubscriptionReady: true,
     progress: null,
+    stage: null,
     overallProgress: 0,
-    message: '',
+    details: null,
+    syncMode: null,
+    isFirstLaunch: null,
+    stats: null,
     error: null,
     reset: vi.fn(),
   })),
-  STAGE_LABELS: {
-    ready: '接続完了',
-    database_sync: 'データベース初期化',
-    directory_check: 'ディレクトリ確認',
-    log_append: 'ログファイル読み込み',
-    log_load: 'ログデータ保存',
-    photo_index: '写真インデックス',
-    photo_metadata: '写真メタデータ抽出',
-    completed: '完了',
-  },
 }));
 
+import { useInitProgress } from '../../hooks/useInitProgress';
 import { useStartupStage } from '../../hooks/useStartUpStage';
 
 const mockUseStartupStageHook = useStartupStage as ReturnType<typeof vi.fn>;
@@ -217,5 +212,15 @@ describe('StartupContext', () => {
     );
 
     expect(screen.getByTestId('isReady').textContent).toBe('true');
+  });
+
+  it('起動時の初期化の実行だけを購読し、単独の同期の進捗は受け取らない', () => {
+    render(
+      <StartupProvider>
+        <TestComponent />
+      </StartupProvider>,
+    );
+
+    expect(useInitProgress).toHaveBeenCalledWith({ runKind: 'startup' });
   });
 });

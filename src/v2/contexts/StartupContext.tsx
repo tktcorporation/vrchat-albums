@@ -2,7 +2,10 @@ import type React from 'react';
 import { createContext, useCallback, useContext, useMemo } from 'react';
 
 import {
-  type InitProgressPayload,
+  type InitLaunch,
+  type InitProgressDetails,
+  type InitRunPayload,
+  type InitStats,
   useInitProgress,
 } from '../hooks/useInitProgress';
 import { useStartupStage } from '../hooks/useStartUpStage';
@@ -16,11 +19,17 @@ interface StartupContextValue {
   isReady: boolean;
   retry: () => void;
   /** 初期化進捗情報 */
-  progress: InitProgressPayload | null;
-  /** 進捗メッセージ */
-  progressMessage: string;
-  /** 進捗パーセント (0-100) */
+  progress: InitRunPayload | null;
+  /** 進捗パーセント (0-100)。同じ実行の中では減らない */
   progressPercent: number;
+  /** 現在のステージの実件数 */
+  progressDetails: InitProgressDetails | null;
+  /** 同期モード。DB の準備前は null */
+  syncMode: InitLaunch['syncMode'] | null;
+  /** 初回起動か。DB の準備前は null */
+  isFirstLaunch: boolean | null;
+  /** 写真枚数・ワールド数・人数・月別枚数 */
+  stats: InitStats | null;
 }
 
 const StartupContext = createContext<StartupContextValue | null>(null);
@@ -36,13 +45,17 @@ interface StartupProviderProps {
 export const StartupProvider: React.FC<StartupProviderProps> = ({
   children,
 }) => {
+  // 起動後の手動更新・バックグラウンド同期の進捗で起動画面を動かさないよう、起動時の初期化の実行だけを見る
   const {
     isSubscriptionReady,
     progress,
-    message,
     overallProgress,
+    details,
+    syncMode,
+    isFirstLaunch,
+    stats,
     reset: resetProgress,
-  } = useInitProgress();
+  } = useInitProgress({ runKind: 'startup' });
 
   const { stages, errorMessage, originalError, retryProcess, completed } =
     useStartupStage({ isSubscriptionReady });
@@ -79,8 +92,11 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       isReady: completed,
       retry: handleRetry,
       progress,
-      progressMessage: message,
       progressPercent: overallProgress,
+      progressDetails: details,
+      syncMode,
+      isFirstLaunch,
+      stats,
     }),
     [
       stage,
@@ -89,8 +105,11 @@ export const StartupProvider: React.FC<StartupProviderProps> = ({
       completed,
       handleRetry,
       progress,
-      message,
       overallProgress,
+      details,
+      syncMode,
+      isFirstLaunch,
+      stats,
     ],
   );
 

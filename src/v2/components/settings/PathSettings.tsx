@@ -26,7 +26,15 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
   const { t } = useI18n();
 
   // 進捗情報を購読
-  const { progress, message: progressMessage } = useInitProgress();
+  const {
+    stage: progressStage,
+    overallProgress,
+    details: progressDetails,
+    reset: resetProgress,
+  } = useInitProgress();
+  const progressMessage = progressStage
+    ? t(`initProgress.stage.${progressStage}`)
+    : '';
 
   // ログ同期フックを使用
   const { sync: syncLogs, isLoading: isRefreshing } = useLogSync({
@@ -160,6 +168,8 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
 
   const handleRefreshAll = async () => {
     if (!isRefreshing) {
+      // 前回の同期の「完了 100%」を残したまま新しい同期の表示を始めない
+      resetProgress();
       await syncLogs(LOG_SYNC_MODE.FULL);
     }
   };
@@ -288,7 +298,7 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
                   <div
                     className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
                     style={{
-                      width: `${Math.max(progress?.progress ?? 0, 5)}%`,
+                      width: `${Math.max(overallProgress, 5)}%`,
                     }}
                   />
                 </div>
@@ -296,11 +306,8 @@ const PathSettingsComponent = memo(({ showRefreshAll }: PathSettingsProps) => {
                   className={`${TYPOGRAPHY.caption.default} ${TEXT_COLOR.secondary}`}
                 >
                   {progressMessage || t('pullToRefresh.refreshing')}
-                  {progress?.details?.current !== null &&
-                    progress?.details?.current !== undefined &&
-                    progress?.details?.total !== null &&
-                    progress?.details?.total !== undefined &&
-                    ` (${progress.details.current}/${progress.details.total})`}
+                  {progressDetails &&
+                    ` (${progressDetails.current}/${progressDetails.total})`}
                 </p>
               </div>
             )}

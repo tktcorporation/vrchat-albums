@@ -4,7 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ERROR_CODES, UserFacingError } from '../../../lib/errors';
 import { logger } from '../../../lib/logger';
 import * as sequelizeClient from '../../../lib/sequelize';
-import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
+import {
+  beginInitProgressRun,
+  type InitProgressRun,
+} from '../../initProgress/emitter';
+import {
+  LOG_SYNC_MODE,
+  type LogSyncLock,
+  runWithLogSyncLock,
+  syncLogsHoldingLock,
+} from '../../logSync/service';
 import * as settingStore from '../../settingStore';
 import * as vrchatWorldJoinLogService from '../../vrchatWorldJoinLog/service';
 
@@ -38,7 +47,10 @@ const mockSequelizeClient = sequelizeClient as unknown as {
   syncRDBClient: ReturnType<typeof vi.fn>;
 };
 
-const mockSyncLogs = syncLogs as ReturnType<typeof vi.fn>;
+const mockSyncLogs = syncLogsHoldingLock as ReturnType<typeof vi.fn>;
+
+/** runWithLogSyncLock が task に渡す値の代わり（中身は使われない） */
+const lockStub = {} as LogSyncLock;
 
 const mockVrchatWorldJoinLogService = vrchatWorldJoinLogService as unknown as {
   findVRChatWorldJoinLogList: ReturnType<typeof vi.fn>;
@@ -47,6 +59,20 @@ const mockVrchatWorldJoinLogService = vrchatWorldJoinLogService as unknown as {
 const mockSettingStore = settingStore as unknown as {
   getSettingStore: ReturnType<typeof vi.fn>;
 };
+
+/** beginInitProgressRun が返すハンドルの代わり。操作は呼び出しを記録するだけ */
+const createRunStub = (
+  runId: number,
+  onEnd: (outcome: 'completed' | 'error') => void = () => {},
+): InitProgressRun => ({
+  kind: 'startup',
+  runId,
+  stage: vi.fn(),
+  dbUpdated: vi.fn(),
+  setLaunch: vi.fn(),
+  flushStats: vi.fn(() => Promise.resolve()),
+  end: vi.fn(onEnd),
+});
 
 // settingsControllerから initializeAppData を取得するためのヘルパー
 async function getInitializeAppDataFunction() {
@@ -69,9 +95,7 @@ async function getInitializeAppDataFunction() {
 }
 
 describe('settingsController.initializeAppData', () => {
-  let initializeAppData:
-    | (() => Promise<{ success: boolean; message?: string }>)
-    | undefined;
+  let initializeAppData: (() => Promise<{ success: boolean }>) | undefined;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -91,6 +115,8 @@ describe('settingsController.initializeAppData', () => {
 
     // syncLogs returns Effect, not Promise
     mockSyncLogs.mockReturnValue(Effect.succeed({ success: true }));
+    vi.mocked(runWithLogSyncLock).mockImplementation((task) => task(lockStub));
+    vi.mocked(beginInitProgressRun).mockImplementation(() => createRunStub(1));
 
     // getSettingStoreのモック
     mockSettingStore.getSettingStore = vi.fn().mockReturnValue({
@@ -120,15 +146,19 @@ describe('settingsController.initializeAppData', () => {
     );
     expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalled();
     expect(mockLogger.info).toHaveBeenCalledWith(
-      'Step 3: Checking if this is first launch...',
+      'Step 2: Checking if this is first launch...',
     );
     expect(
       mockVrchatWorldJoinLogService.findVRChatWorldJoinLogList,
     ).toHaveBeenCalled();
     expect(mockLogger.info).toHaveBeenCalledWith(
-      'Step 4: Starting log sync...',
+      'Step 3: Starting log sync...',
     );
-    expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
+    expect(mockSyncLogs).toHaveBeenCalledWith(
+      lockStub,
+      LOG_SYNC_MODE.FULL,
+      expect.objectContaining({ kind: 'startup' }),
+    );
     expect(mockLogger.info).toHaveBeenCalledWith(
       '=== Application data initialization completed ===',
     );
@@ -145,7 +175,11 @@ describe('settingsController.initializeAppData', () => {
     }
     await initializeAppData();
 
-    expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
+    expect(mockSyncLogs).toHaveBeenCalledWith(
+      lockStub,
+      LOG_SYNC_MODE.FULL,
+      expect.objectContaining({ kind: 'startup' }),
+    );
     expect(mockLogger.info).toHaveBeenCalledWith('Found 0 existing logs');
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Detected first launch, using FULL sync mode',
@@ -167,7 +201,11 @@ describe('settingsController.initializeAppData', () => {
     }
     await initializeAppData();
 
-    expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.INCREMENTAL);
+    expect(mockSyncLogs).toHaveBeenCalledWith(
+      lockStub,
+      LOG_SYNC_MODE.INCREMENTAL,
+      expect.objectContaining({ kind: 'startup' }),
+    );
     expect(mockLogger.info).toHaveBeenCalledWith('Found 2 existing logs');
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Detected regular launch, using INCREMENTAL sync mode',
@@ -185,7 +223,11 @@ describe('settingsController.initializeAppData', () => {
     }
     await initializeAppData();
 
-    expect(mockSyncLogs).toHaveBeenCalledWith(LOG_SYNC_MODE.FULL);
+    expect(mockSyncLogs).toHaveBeenCalledWith(
+      lockStub,
+      LOG_SYNC_MODE.FULL,
+      expect.objectContaining({ kind: 'startup' }),
+    );
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Database error detected, treating as first launch:',
       expect.any(Error),
@@ -339,31 +381,43 @@ describe('settingsController.initializeAppData', () => {
     );
   });
 
-  it('重複実行防止が機能する', async () => {
-    // 最初の実行
+  it('実行中に重複して呼ばれたら、実行中の初期化に合流して同じ結果を返す', async () => {
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
     }
     const firstPromise = initializeAppData();
+    const secondPromise = initializeAppData();
 
-    // 2回目の実行（重複）
+    const [firstResult, secondResult] = await Promise.all([
+      firstPromise,
+      secondPromise,
+    ]);
+
+    // 2 回目は即答せず、1 回目の完了を待って同じ結果を受け取る
+    expect(firstResult).toEqual({ success: true });
+    expect(secondResult).toEqual({ success: true });
+    // 初期化本体は 1 回しか走らない
+    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(1);
+    expect(mockSyncLogs).toHaveBeenCalledTimes(1);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      'Initialization already in progress, joining the running initialization',
+    );
+  });
+
+  it('実行中の初期化が失敗したら、合流した呼び出しにも同じエラーが届く', async () => {
+    mockSequelizeClient.syncRDBClient.mockRejectedValue(
+      new Error('Database sync failed'),
+    );
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
     }
-    const secondResult = await initializeAppData();
+    const results = await Promise.allSettled([
+      initializeAppData(),
+      initializeAppData(),
+    ]);
 
-    // 2回目は重複として処理される
-    expect(secondResult).toEqual({
-      success: false,
-      message: '初期化処理が既に実行中です',
-    });
-    expect(mockLogger.debug).toHaveBeenCalledWith(
-      'Initialization already in progress, skipping duplicate request',
-    );
-
-    // 最初の実行は正常に完了
-    const firstResult = await firstPromise;
-    expect(firstResult).toEqual({ success: true });
+    expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
+    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(1);
   });
 
   it('正常完了後はフラグがリセットされる', async () => {
@@ -403,5 +457,83 @@ describe('settingsController.initializeAppData', () => {
     }
     const result = await initializeAppData();
     expect(result).toEqual({ success: true });
+  });
+
+  it('初期化はログ同期のセマフォの permit を持ったまま、進捗の実行を開始から終了まで進める', async () => {
+    const order: string[] = [];
+    vi.mocked(runWithLogSyncLock).mockImplementation(async (task) => {
+      order.push('lock:acquire');
+      const result = await task(lockStub);
+      order.push('lock:release');
+      return result;
+    });
+    let flushes = 0;
+    const run = createRunStub(1, (outcome) => {
+      order.push(`run:${outcome}(flushes=${flushes})`);
+    });
+    vi.mocked(run.flushStats).mockImplementation(() => {
+      flushes += 1;
+      return Promise.resolve();
+    });
+    vi.mocked(beginInitProgressRun).mockImplementation(() => {
+      order.push('run:begin');
+      return run;
+    });
+
+    if (!initializeAppData) {
+      throw new Error('initializeAppData not initialized');
+    }
+    await initializeAppData();
+
+    // DB 準備後と終了直前の 2 回、統計を届けてから completed を送る
+    expect(order).toEqual([
+      'lock:acquire',
+      'run:begin',
+      'run:completed(flushes=2)',
+      'lock:release',
+    ]);
+    expect(beginInitProgressRun).toHaveBeenCalledTimes(1);
+    expect(beginInitProgressRun).toHaveBeenCalledWith('startup', null);
+    expect(run.setLaunch).toHaveBeenCalledWith(
+      expect.objectContaining({ isFirstLaunch: true }),
+    );
+    // ログ同期の進捗は初期化の実行へ送らせる
+    expect(mockSyncLogs).toHaveBeenCalledWith(
+      lockStub,
+      LOG_SYNC_MODE.FULL,
+      run,
+    );
+  });
+
+  it('失敗した初期化の後の再呼び出しは、新しい進捗の実行で始め直す', async () => {
+    const failedRun = createRunStub(1);
+    const retryRun = createRunStub(2);
+    vi.mocked(beginInitProgressRun)
+      .mockReturnValueOnce(failedRun)
+      .mockReturnValueOnce(retryRun);
+    mockSequelizeClient.syncRDBClient.mockRejectedValueOnce(
+      new Error('Database sync failed'),
+    );
+
+    if (!initializeAppData) {
+      throw new Error('initializeAppData not initialized');
+    }
+    await expect(initializeAppData()).rejects.toBeDefined();
+    const result = await initializeAppData();
+
+    expect(result).toEqual({ success: true });
+    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(2);
+    expect(beginInitProgressRun).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(failedRun.end).mock.calls).toEqual([['error']]);
+    expect(vi.mocked(retryRun.end).mock.calls).toEqual([['completed']]);
+    // 再試行の進捗と統計は新しい実行にだけ送られ、失敗した実行には何も送られない
+    expect(failedRun.flushStats).not.toHaveBeenCalled();
+    expect(retryRun.flushStats).toHaveBeenCalledTimes(2);
+    expect(mockSyncLogs).toHaveBeenCalledTimes(1);
+    expect(mockSyncLogs).toHaveBeenCalledWith(
+      lockStub,
+      expect.anything(),
+      retryRun,
+    );
   });
 });
