@@ -9,7 +9,7 @@ on:
     types: [completed]
     branches:
       - main
-  # 失敗した実行のやり直し用。手動実行では main の先頭コミットに付ける
+  # 失敗した実行のやり直し用。手動実行は main の先頭コミットに、テストの結果を確かめずに付ける
   workflow_dispatch:
 
 permissions:
