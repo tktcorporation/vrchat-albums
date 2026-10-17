@@ -38,4 +38,11 @@ const result = spawnSync(
   },
 );
 
+// 終了コードが無い失敗（起動失敗・OOM killer 等によるシグナル終了）は理由を出してから失敗させる
+if (result.error) {
+  console.error(result.error);
+} else if (result.status === null) {
+  console.error(`vitest がシグナル ${result.signal} で終了しました`);
+}
+
 process.exit(result.status ?? 1);
