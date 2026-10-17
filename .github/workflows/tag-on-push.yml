@@ -1,38 +1,35 @@
 name: Tag on Push to Main
 
+# main の lint とテスト（Lint and Test Cross）が通ったコミットにだけ版タグを付ける。
+# 版タグの push が upload-build-files.yml の配布ビルドと公開を起動するので、
+# テストが落ちたコミットは配布されない。
 on:
-  push:
+  workflow_run:
+    workflows: ['Lint and Test Cross']
+    types: [completed]
     branches:
       - main
+  # 失敗した実行のやり直し用。手動実行では main の先頭コミットに付ける
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  lint:
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node and Install Dependencies
-        uses: ./.github/actions/setup-node-and-install
-        with:
-          # lint は committed types のみで通るので native binding 不要
-          include-native: 'false'
-
-      - name: lint
-        run: pnpm lint
-
   create_tag:
-    needs: lint
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-22.04
 
     steps:
       - name: checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
+          # 版タグの push で upload-build-files.yml を起動するため、GITHUB_TOKEN ではなく PAT で push する
           token: ${{ secrets.MY_PERSONAL_ACCESS_TOKEN }}
 
       - name: Get current version from package.json
@@ -48,10 +45,13 @@ jobs:
       - name: Check if version differs from latest tag
         id: check_version
         run: |
-          if [ "v${{ steps.get_version.outputs.package_version }}" != "${{ steps.get_version.outputs.latest_release_tag }}" ]; then
-            echo "new_version=true" >> $GITHUB_OUTPUT
-          else
+          tag="v${{ steps.get_version.outputs.package_version }}"
+          # 公開前の版タグが既にあれば付け直さない（連続した main への push で同じ版を二重に作らない）
+          if [ "$tag" = "${{ steps.get_version.outputs.latest_release_tag }}" ] \
+            || git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
             echo "new_version=false" >> $GITHUB_OUTPUT
+          else
+            echo "new_version=true" >> $GITHUB_OUTPUT
           fi
         shell: bash
 
@@ -62,12 +62,3 @@ jobs:
           git config --local user.name "GitHub Action"
           git tag "v${{ steps.get_version.outputs.package_version }}"
           git push origin "v${{ steps.get_version.outputs.package_version }}"
-
-      - name: Create Tag for Draft release
-        if: steps.check_version.outputs.new_version != 'true'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          tag_string="build-$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::8}"
-          git tag "$tag_string"
-          git push origin "$tag_string"

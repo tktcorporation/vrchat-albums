@@ -37,7 +37,7 @@ runs:
     # incremental 成果物の自動 prune も入る。
     - name: Cache Rust build (cargo registry / target)
       if: inputs.include-native == 'true'
-      uses: Swatinem/rust-cache@v2
+      uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       with:
         workspaces: 'packages/exif-native -> target'
 

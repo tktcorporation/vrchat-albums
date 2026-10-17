@@ -135,7 +135,7 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: Comment with screenshot
-        uses: thollander/actions-comment-pull-request@v2
+        uses: thollander/actions-comment-pull-request@fabd468d3a1a0b97feee5f6b9e499eab0dd903f6 # v2
         with:
           message: ${{ steps.publish_screenshots.outputs.screenshot_comment_body }}
           pr_number: ${{ github.event.pull_request.number }}
