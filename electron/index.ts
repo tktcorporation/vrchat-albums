@@ -23,6 +23,7 @@ import { logger } from './lib/logger';
 import * as sequelizeClient from './lib/sequelize';
 import { getAppUserDataPath } from './lib/wrappedApp';
 import { getBackgroundUsecase } from './module/backGroundUsecase';
+import { startBackgroundSyncTimer } from './module/logSync/backgroundTimer';
 import { initSettingStore } from './module/settingStore';
 import { hasAcceptedCurrentTerms } from './module/terms/consent';
 
@@ -179,7 +180,7 @@ app.on('window-all-closed', () => {
   }
   // background処理が有効になっている場合は終了しない
   if (backgroundUsecase.getIsEnabledBackgroundProcess()) {
-    electronUtil.setTimeEventEmitter(settingStore);
+    startBackgroundSyncTimer(settingStore);
     return;
   }
   app.quit();

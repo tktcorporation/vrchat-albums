@@ -9,11 +9,11 @@ import {
   BrowserWindow,
   ipcMain,
   Menu,
-  Notification,
   screen, // Ensure screen is imported
   shell,
   Tray,
 } from 'electron';
+import { match } from 'ts-pattern';
 
 // electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
 // Electron ネイティブの app.isPackaged を使用
@@ -538,102 +538,6 @@ const setTray = () => {
   return createTray();
 };
 
-import { match } from 'ts-pattern';
-
-import { syncLogsInBackground } from './module/logSync/service';
-import { hasAcceptedCurrentTerms } from './module/terms/consent';
-
-/**
- * 一定間隔でログ処理を実行するタイマーイベントを設定する。
- * バックグラウンド処理が有効な場合のみログを読み込み通知を送る。
- */
-const setTimeEventEmitter = (
-  passedSettingStore: ReturnType<typeof getSettingStore>,
-) => {
-  const intervalEventTarget = new EventTarget();
-  // 6時間ごとに実行
-  setInterval(
-    () => {
-      intervalEventTarget.dispatchEvent(
-        new CustomEvent('time', { detail: new Date() }),
-      );
-    },
-    1000 * 60 * 60 * 6,
-  );
-
-  intervalEventTarget.addEventListener('time', (event) => {
-    const now = (event as CustomEvent<Date>).detail;
-    void (async () => {
-      if (!passedSettingStore.getBackgroundFileCreateFlag()) {
-        // Use passedSettingStore
-        logger.debug('バックグラウンド処理が無効になっています');
-        return;
-      }
-      // 規約の更新後、同意し直す前にウィンドウを閉じても、ログや写真を読まない
-      if (!hasAcceptedCurrentTerms(passedSettingStore)) {
-        logger.debug(
-          '現在の版の利用規約に未同意のため、バックグラウンド同期を行いません',
-        );
-        return;
-      }
-
-      const either = await Effect.runPromise(
-        Effect.either(syncLogsInBackground()),
-      );
-
-      if (either._tag === 'Left') {
-        const error = either.left;
-        const errorMessage = match(error)
-          .with(
-            { code: 'LOG_FILE_NOT_FOUND' },
-            () => 'VRChatのログファイルが見つかりませんでした',
-          )
-          .with(
-            { code: 'LOG_FILE_DIR_NOT_FOUND' },
-            () => 'VRChatのログディレクトリが見つかりませんでした',
-          )
-          .with(
-            { code: 'LOG_FILES_NOT_FOUND' },
-            () => 'VRChatのログファイルが存在しません',
-          )
-          .with({ code: 'UNKNOWN' }, () => '不明なエラーが発生しました')
-          .otherwise(() => '予期せぬエラーが発生しました');
-
-        logger.error({ message: error });
-
-        new Notification({
-          title: `joinの記録に失敗しました: ${now.toString()}`,
-          body: errorMessage,
-        }).show();
-
-        return;
-      }
-
-      const {
-        createdVRChatPhotoPathModelList,
-        createdWorldJoinLogModelList,
-        createdPlayerJoinLogModelList,
-      } = either.right;
-      if (
-        createdVRChatPhotoPathModelList.length === 0 &&
-        createdWorldJoinLogModelList.length === 0 &&
-        createdPlayerJoinLogModelList.length === 0
-      ) {
-        return;
-      }
-
-      const photoCount = createdVRChatPhotoPathModelList.length;
-      const worldJoinCount = createdWorldJoinLogModelList.length;
-      const playerJoinCount = createdPlayerJoinLogModelList.length;
-
-      new Notification({
-        title: `joinの記録に成功しました: ${now.toString()}`,
-        body: `${photoCount}枚の新しい写真を記録しました\n${worldJoinCount}件のワールド参加を記録しました\n${playerJoinCount}件のプレイヤー参加を記録しました`,
-      }).show();
-    })();
-  });
-};
-
 /**
  * メインウィンドウをリロードする。
  * ウィンドウが存在しない場合は何もしない。
@@ -645,7 +549,7 @@ export const reloadMainWindow = (): void => {
   }
 };
 
-export { setTray, createOrGetWindow, revealWindow, setTimeEventEmitter };
+export { setTray, createOrGetWindow, revealWindow };
 
 /**
  * 他モジュールから設定ストアを利用できるよう初期化する。
