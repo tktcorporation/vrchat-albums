@@ -15,11 +15,6 @@ import {
   type VRChatWorldJoinLog,
   type WorldJoinParseError,
 } from './worldJoinParser';
-import {
-  extractWorldLeaveInfoFromLog,
-  inferWorldLeaveEvents,
-  type VRChatWorldLeaveLog,
-} from './worldLeaveParser';
 
 /**
  * VRChatログのパース機能をまとめたモジュール
@@ -31,19 +26,14 @@ import {
 export interface ParseErrorInfo {
   line: string;
   error: string;
-  type: 'player_join' | 'player_leave' | 'world_join' | 'world_leave';
+  type: 'player_join' | 'player_leave' | 'world_join';
 }
 
 /**
  * パース処理の結果
  */
 export interface ParseResult {
-  logInfos: (
-    | VRChatWorldJoinLog
-    | VRChatWorldLeaveLog
-    | VRChatPlayerJoinLog
-    | VRChatPlayerLeaveLog
-  )[];
+  logInfos: (VRChatWorldJoinLog | VRChatPlayerJoinLog | VRChatPlayerLeaveLog)[];
   errors: ParseErrorInfo[];
 }
 
@@ -68,7 +58,7 @@ const extractFailure = <E>(exit: Exit.Exit<unknown, E>): E | null => {
 };
 
 /**
- * ログ行の配列をワールド参加・退出・プレイヤー参加/退出情報に変換
+ * ログ行の配列をワールド参加・プレイヤー参加/退出情報に変換
  * @param logLines パース対象のログ行
  * @returns 抽出されたログ情報とエラー情報
  */
@@ -80,7 +70,6 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
   // | VRChatAppExitLog
   const logInfos: (
     | VRChatWorldJoinLog
-    | VRChatWorldLeaveLog
     | VRChatPlayerJoinLog
     | VRChatPlayerLeaveLog
   )[] =
@@ -91,8 +80,6 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
 
   const errors: ParseErrorInfo[] = [];
 
-  const worldJoinIndices: number[] = [];
-
   for (const [index, l] of logLines.entries()) {
     // TODO: アプリイベントの処理は今後実装
     // // アプリ開始ログ (VRC Analytics Initialized)
@@ -102,7 +89,7 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
     // }
 
     // アプリ終了ログ (VRCApplication: HandleApplicationQuit)
-    // このパターンはworldLeaveParserで処理される
+    // 生のログ行は logStore に保存されるが、イベントとしては解釈しない
     // const appExitInfo = extractAppExitInfoFromLog(l);
     // if (appExitInfo) {
     //   logInfos.push(appExitInfo);
@@ -116,7 +103,6 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
 
       if (Exit.isSuccess(exit)) {
         logInfos.push(exit.value);
-        worldJoinIndices.push(index);
       } else {
         const worldError = extractFailure<WorldJoinParseError>(exit);
         if (!worldError) {
@@ -180,12 +166,6 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
             });
           });
       }
-    }
-
-    // ワールド退出ログ（明示的なパターン）
-    const leaveInfo = extractWorldLeaveInfoFromLog(l);
-    if (leaveInfo) {
-      logInfos.push(leaveInfo);
     }
 
     // プレイヤー参加ログ
@@ -313,10 +293,6 @@ export const convertLogLinesToWorldAndPlayerJoinLogInfos = (
     }
   }
 
-  // 推測されたワールド退出イベントを追加
-  const inferredLeaves = inferWorldLeaveEvents(logLines, worldJoinIndices);
-  logInfos.push(...inferredLeaves);
-
   return {
     logInfos,
     errors,
@@ -337,4 +313,3 @@ export type {
 export { extractPlayerJoinInfoFromLog } from './playerActionParser';
 // 型定義の再エクスポート
 export type { VRChatWorldJoinLog } from './worldJoinParser';
-export type { VRChatWorldLeaveLog } from './worldLeaveParser';

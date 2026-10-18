@@ -33,7 +33,6 @@ import {
   type VRChatPlayerJoinLog,
   type VRChatPlayerLeaveLog,
   type VRChatWorldJoinLog,
-  type VRChatWorldLeaveLog,
 } from './parsers';
 // TODO: アプリイベントの型は今後実装
 // import type {
@@ -56,12 +55,7 @@ import type { PartialSuccessResult } from './types/partialSuccess';
 export const getVRChaLogInfoFromLogPath = (
   logFilesDir: VRChatLogFilesDirPath,
 ): Effect.Effect<
-  (
-    | VRChatWorldJoinLog
-    | VRChatWorldLeaveLog
-    | VRChatPlayerJoinLog
-    | VRChatPlayerLeaveLog
-  )[],
+  (VRChatWorldJoinLog | VRChatPlayerJoinLog | VRChatPlayerLeaveLog)[],
   // TODO: アプリイベントの型は今後実装
   // | VRChatAppStartLog
   // | VRChatAppExitLog
@@ -98,12 +92,7 @@ export const getVRChaLogInfoFromLogPath = (
 export const getVRChaLogInfoByLogFilePathList = (
   logFilePathList: (VRChatLogFilePath | VRChatLogStoreFilePath)[],
 ): Effect.Effect<
-  (
-    | VRChatWorldJoinLog
-    | VRChatWorldLeaveLog
-    | VRChatPlayerJoinLog
-    | VRChatPlayerLeaveLog
-  )[],
+  (VRChatWorldJoinLog | VRChatPlayerJoinLog | VRChatPlayerLeaveLog)[],
   // TODO: アプリイベントの型は今後実装
   // | VRChatAppStartLog
   // | VRChatAppExitLog
@@ -131,12 +120,7 @@ export const getVRChaLogInfoByLogFilePathList = (
   });
 
 export type LogInfoPartialSuccessResult = PartialSuccessResult<
-  (
-    | VRChatWorldJoinLog
-    | VRChatWorldLeaveLog
-    | VRChatPlayerJoinLog
-    | VRChatPlayerLeaveLog
-  )[],
+  (VRChatWorldJoinLog | VRChatPlayerJoinLog | VRChatPlayerLeaveLog)[],
   { path: string; error: VRChatLogFileError | VRChatLogError }
 >;
 
@@ -198,7 +182,6 @@ export {
 // 型定義の再エクスポート
 export type {
   VRChatWorldJoinLog,
-  VRChatWorldLeaveLog,
   VRChatPlayerJoinLog,
   VRChatPlayerLeaveLog,
   // TODO: アプリイベントの型は今後実装

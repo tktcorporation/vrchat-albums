@@ -51,7 +51,6 @@ export interface LogRecord {
   type: 'worldJoin' | 'playerJoin' | 'playerLeave'; // TODO: 'appEvent' は今後実装
   record: DBLogRecord | PlayerJoinLogRecord | PlayerLeaveLogRecord;
   // TODO: | AppEventLogRecord;
-  // NOTE: worldLeaveはDBに保存されないため、LogRecordには含まれない
 }
 
 /**

@@ -362,9 +362,6 @@ export function loadLogInfoIndexFromVRChatLog({
                   !latestPlayerLeaveDate ||
                   log.leaveDate > latestPlayerLeaveDate.leaveDateTime
                 );
-              case 'worldLeave':
-                // ワールド退出はDBに保存しないのでスキップ
-                return false;
               // TODO: アプリイベントの処理は今後実装
               // case 'appStart':
               // case 'appExit':
