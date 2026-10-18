@@ -18,7 +18,7 @@ npm-debug.log*
 test-app.log
 
 # dev debug
-debug
+/debug
 !debug/*.sh
 !debug/db/.gitkeep
 debug/sequelize.sqlite
