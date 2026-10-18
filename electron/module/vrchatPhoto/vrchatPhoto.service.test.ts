@@ -863,9 +863,43 @@ describe('createVRChatPhotoPathIndex', () => {
           totalFolders: 3,
         })),
       );
-      // 走査の進捗はすべて登録の進捗より前に届く
-      const firstRegister = progress.findIndex((p) => p.phase === 'register');
-      expect(firstRegister).toBe(scan.length);
+      // 進捗は探索・走査・登録の順に届き、段階が戻らない
+      const phaseOrder = { list: 0, scan: 1, register: 2 } as const;
+      const phases = progress.map((p) => phaseOrder[p.phase]);
+      expect(phases).toEqual(phases.toSorted((a, b) => a - b));
+      expect(phases.at(-1)).toBe(phaseOrder.register);
+    });
+
+    it('フォルダ一覧の探索中は、ディレクトリと直下のサブディレクトリの単位で進捗を通知する', async () => {
+      const progress: PhotoIndexProgress[] = [];
+
+      await service.createVRChatPhotoPathIndex(false, (p) => {
+        progress.push(p);
+      });
+
+      // メインは直下に 2024-01・2024-02、追加ディレクトリは直下に 2024-01 を持つ
+      const list = progress.filter((p) => p.phase === 'list');
+      expect(list).toEqual(
+        (
+          [
+            [0, 0, 2],
+            [0, 1, 2],
+            [0, 2, 2],
+            [1, 0, 0],
+            [1, 0, 1],
+            [1, 1, 1],
+            [2, 0, 0],
+          ] as const
+        ).map(([dirsListed, topLevelListed, topLevelTotal]) => ({
+          phase: 'list',
+          dirsListed,
+          dirCount: 2,
+          topLevelListed,
+          topLevelTotal,
+        })),
+      );
+      // 探索の進捗はすべて走査の進捗より前に届く
+      expect(progress.findIndex((p) => p.phase === 'scan')).toBe(list.length);
     });
 
     it('画像として読めないファイルも処理済みに数え、最後に handled が total に届く', async () => {
@@ -910,7 +944,7 @@ describe('createVRChatPhotoPathIndex', () => {
         progress.push(p);
       });
 
-      expect(progress.every((p) => p.phase === 'scan')).toBe(true);
+      expect(progress.some((p) => p.phase === 'register')).toBe(false);
       expect(progress.at(-1)).toEqual({
         phase: 'scan',
         foldersScanned: 3,
@@ -1001,6 +1035,49 @@ describe('createVRChatPhotoPathIndex', () => {
         .mock.calls.flatMap((call) => call[0])
         .map((d) => d.photoPath);
       expect(savedPaths).toEqual([lateFilePath]);
+    });
+
+    it('追加ディレクトリのフォルダには、そのディレクトリの一覧を取り始める直前の時刻を保存する', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const mainListedAt = dateFns.addMinutes(now, 1);
+      const extraListedAt = dateFns.addMinutes(now, 2);
+      const afterExtraListing = dateFns.addMinutes(now, 3);
+      vi.setSystemTime(mainListedAt);
+
+      // メインの最後のフォルダを読んだところで時刻を進め、追加ディレクトリの直下を読んだところでさらに進める
+      const baseReaddir = vi
+        .mocked(nodefsPromises.readdir)
+        .getMockImplementation();
+      if (!baseReaddir) {
+        throw new Error('readdir mock is not set');
+      }
+      (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+        (async (dirPath: PathLike, options?: unknown) => {
+          const result = await (
+            baseReaddir as (p: PathLike, o?: unknown) => Promise<unknown[]>
+          )(dirPath, options);
+          const isListing =
+            typeof options === 'object' &&
+            options !== null &&
+            'withFileTypes' in options;
+          if (isListing && dirPath.toString() === yearMonthFolder2024_02) {
+            vi.setSystemTime(extraListedAt);
+          }
+          if (isListing && dirPath.toString() === mockExtraDir.value) {
+            vi.setSystemTime(afterExtraListing);
+          }
+          return result;
+        }) as never,
+      );
+
+      await service.createVRChatPhotoPathIndex(false);
+
+      expect(savedScanStates[yearMonthFolder2024_01].lastScannedAt).toBe(
+        mainListedAt.toISOString(),
+      );
+      expect(savedScanStates[extraYearMonthFolder].lastScannedAt).toBe(
+        extraListedAt.toISOString(),
+      );
     });
   });
 });

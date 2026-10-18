@@ -143,12 +143,10 @@ const runInitializationHoldingLock = async (
       syncMode: toInitSyncMode(syncMode),
       isFirstLaunch,
     });
-    // 差分起動では登録済みの写真の月別枚数をここで送り、ログ同期の前にグラフを埋めておく。
-    // 完了を待たないのは、集計（写真テーブル全体の GROUP BY と重複除去の COUNT）の間、
-    // 進捗バーが止まって見えるため。統計は表示のためだけの値で、ログ同期の結果には影響しない。
-    // 集計は統計ランナーが直列に流すので、同期中の集計要求や終了直前の flush と重なっても順に処理され、
-    // end の後に届いた結果は実行が閉じているので送られない。
-    // 集計の失敗はコレクターが記録して resolve するため、ここで reject を受けるのは想定外の失敗だけになる
+    // 差分起動では登録済みの写真の月別枚数をログ同期と並行して集計し、集計が終わりしだいグラフに反映する。
+    // 完了を待たないのは、集計（写真テーブル全体の GROUP BY と重複除去の COUNT）の間、進捗バーが止まって見えるため。
+    // 集計は統計ランナーが直列に流し、end の後に届いた結果は送られない。
+    // 集計の失敗はコレクターが記録して resolve するため、reject は想定外の失敗に限られる
     void run.flushStats().catch((error: unknown) => {
       logger.error({
         message: 'Failed to flush init progress stats before log sync',

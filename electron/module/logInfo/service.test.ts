@@ -782,9 +782,22 @@ describe('loadLogInfoIndexFromVRChatLog の photo_index 進捗', () => {
     vi.mocked(nodeFs.existsSync).mockReturnValue(false);
   });
 
-  it('フォルダの走査をステージの前半に、新規写真の登録を後半に割り当て、進捗を戻さない', async () => {
+  it('フォルダ一覧の探索・フォルダの走査・新規写真の登録の順に割り当て、進捗を戻さない', async () => {
     vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockImplementation(
       async (_isIncremental, onProgress) => {
+        const list = (dirsListed: number, listed: number, total: number) => {
+          onProgress?.({
+            phase: 'list',
+            dirsListed,
+            dirCount: 1,
+            topLevelListed: listed,
+            topLevelTotal: total,
+          });
+        };
+        list(0, 0, 2);
+        list(0, 1, 2);
+        list(0, 2, 2);
+        list(1, 0, 0);
         onProgress?.({ phase: 'scan', foldersScanned: 0, totalFolders: 2 });
         onProgress?.({ phase: 'scan', foldersScanned: 1, totalFolders: 2 });
         onProgress?.({ phase: 'scan', foldersScanned: 2, totalFolders: 2 });
@@ -817,10 +830,14 @@ describe('loadLogInfoIndexFromVRChatLog の photo_index 進捗', () => {
       .mocked(run.stage)
       .mock.calls.filter(([stage]) => stage === 'photo_index')
       .map(([, progress, details]) => ({ progress, details }));
+    // 探索 0→10、走査 10→30、登録 30→100。探索の最後（ディレクトリ完了）は割合が変わらないので送らない
     expect(photoIndexCalls).toEqual([
       { progress: 0, details: undefined },
-      { progress: 0, details: { current: 0, total: 2, unit: 'folders' } },
-      { progress: 15, details: { current: 1, total: 2, unit: 'folders' } },
+      { progress: 0, details: undefined },
+      { progress: 5, details: undefined },
+      { progress: 10, details: undefined },
+      { progress: 10, details: { current: 0, total: 2, unit: 'folders' } },
+      { progress: 20, details: { current: 1, total: 2, unit: 'folders' } },
       { progress: 30, details: { current: 2, total: 2, unit: 'folders' } },
       { progress: 30, details: { current: 0, total: 4, unit: 'photos' } },
       {
@@ -841,6 +858,63 @@ describe('loadLogInfoIndexFromVRChatLog の photo_index 進捗', () => {
         .mocked(run.dbUpdated)
         .mock.calls.filter(([change]) => !change.logsChanged),
     ).toHaveLength(3);
+  });
+
+  it('探索と走査は送る割合が変わったときだけ送り、走査の最後のフォルダは必ず送る', async () => {
+    const totalFolders = 1000;
+    vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockImplementation(
+      async (_isIncremental, onProgress) => {
+        for (let listed = 0; listed <= 500; listed++) {
+          onProgress?.({
+            phase: 'list',
+            dirsListed: 0,
+            dirCount: 1,
+            topLevelListed: listed,
+            topLevelTotal: 500,
+          });
+        }
+        for (let scanned = 0; scanned <= totalFolders; scanned++) {
+          onProgress?.({
+            phase: 'scan',
+            foldersScanned: scanned,
+            totalFolders,
+          });
+        }
+        return [];
+      },
+    );
+    const run: InitProgressRun = {
+      runId: 1,
+      kind: 'startup',
+      stage: vi.fn(),
+      setLaunch: vi.fn(),
+      dbUpdated: vi.fn(),
+      flushStats: vi.fn(() => Promise.resolve()),
+      end: vi.fn(),
+    };
+
+    await Effect.runPromise(
+      loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true, progress: run }),
+    );
+
+    const calls = vi
+      .mocked(run.stage)
+      .mock.calls.filter(([stage]) => stage === 'photo_index');
+    const listCalls = calls.filter(
+      ([, progress, details]) => details === undefined && progress <= 10,
+    );
+    const scanCalls = calls.filter(
+      ([, , details]) => details?.unit === 'folders',
+    );
+    // 探索は 0〜10%（とステージ開始の 0%）、走査は 10〜30% の整数値ごとに 1 回まで。
+    // 走査の最後は割合が同じでも件数を「1,000 / 1,000」にするため 1 回多く送る
+    expect(listCalls.length).toBeLessThanOrEqual(1 + 11);
+    expect(scanCalls.length).toBeLessThanOrEqual(21 + 1);
+    expect(scanCalls.at(-1)).toEqual([
+      'photo_index',
+      30,
+      { current: totalFolders, total: totalFolders, unit: 'folders' },
+    ]);
   });
 
   it('走査するフォルダが無ければ件数を付けずに走査分まで進める', async () => {

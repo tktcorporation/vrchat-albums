@@ -56,6 +56,37 @@ describe('extractAndSaveMetadataBatch の進捗', () => {
     expect(events).toEqual(['progress:0/2', 'write', 'progress:2/2']);
   });
 
+  it('読み取りを分けた途中の区切りでは進捗を報告し、総件数は DB への保存の後に報告する', async () => {
+    // XMP の読み取りは 500 件ずつに分かれる。1,200 件なら 500・1,000 で途中の進捗が出る
+    const manyPaths = Array.from(
+      { length: 1200 },
+      (_, i) =>
+        `/photos/VRChat_2025-06-01_10-00-00.${String(i).padStart(3, '0')}_${i}.png`,
+    );
+    const events: string[] = [];
+    vi.mocked(createOrUpdatePhotoMetadataBatch).mockImplementation(() => {
+      events.push('write');
+      return Promise.resolve([]);
+    });
+
+    await Effect.runPromise(
+      extractAndSaveMetadataBatch(manyPaths, {
+        onProgress: (processed, total) => {
+          events.push(`progress:${processed}/${total}`);
+        },
+      }),
+    );
+
+    expect(readXmpTagsBatch).toHaveBeenCalledTimes(3);
+    expect(events).toEqual([
+      'progress:0/1200',
+      'progress:500/1200',
+      'progress:1000/1200',
+      'write',
+      'progress:1200/1200',
+    ]);
+  });
+
   it('DB への保存に失敗したら総件数を報告しない', async () => {
     const reported: number[] = [];
     vi.mocked(createOrUpdatePhotoMetadataBatch).mockRejectedValue(

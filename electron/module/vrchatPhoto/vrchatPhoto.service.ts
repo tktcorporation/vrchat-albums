@@ -788,14 +788,22 @@ const computeFolderDigest = (
  * ユーザーが独自のフォルダ分けをしている場合にも対応
  *
  * @param basePath ユーザー設定のベースディレクトリ
+ * @param onTopLevelListed 進捗表示用。ベースディレクトリ直下のサブディレクトリ数が分かったときに
+ *        (0, 総数) で、直下のサブディレクトリ 1 つの配下を探索し終えるたびに (探索済み数, 総数) で呼ばれる。
+ *        VRChat の写真ディレクトリは直下に月ごとのフォルダを持つため、直下の単位で数えると
+ *        探索の進み具合をほぼ均等な刻みで示せる。ベースディレクトリを読めなければ呼ばれない
  * @returns VRChat写真を含むフォルダパスの配列（ブランド型）
  */
 const getPhotoFolders = async (
   basePath: VRChatPhotoDirPath,
+  onTopLevelListed?: (listed: number, total: number) => void,
 ): Promise<VRChatPhotoContainingFolderPath[]> => {
   const photoFolders: string[] = [];
 
-  const scanDir = async (dirPath: string): Promise<void> => {
+  const scanDir = async (
+    dirPath: string,
+    onSubDirListed?: (listed: number, total: number) => void,
+  ): Promise<void> => {
     let entries: Dirent[];
     // effect-lint-allow-try-catch: ts-patternでエラー分類し予期しないエラーを再スロー
     try {
@@ -832,15 +840,16 @@ const getPhotoFolders = async (
       photoFolders.push(dirPath);
     }
 
-    // サブディレクトリを再帰探索（async/await制御のためif文を使用）
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        await scanDir(path.join(dirPath, entry.name));
-      }
+    // サブディレクトリを再帰探索
+    const subDirs = entries.filter((entry) => entry.isDirectory());
+    onSubDirListed?.(0, subDirs.length);
+    for (const [index, entry] of subDirs.entries()) {
+      await scanDir(path.join(dirPath, entry.name));
+      onSubDirListed?.(index + 1, subDirs.length);
     }
   };
 
-  await scanDir(basePath.value);
+  await scanDir(basePath.value, onTopLevelListed);
   // 発見したフォルダパスをブランド型に変換
   return photoFolders.map((p) =>
     VRChatPhotoContainingFolderPathSchema.parse(p),
@@ -1175,13 +1184,26 @@ async function processPhotoBatch(
 /**
  * 写真インデックス作成の進捗。
  *
+ * - `list`: Stage 1〜2 の前に、VRChat 写真を含むフォルダを全ディレクトリ分再帰的に探す。
+ *   フォルダの総数はこの段階が終わるまで分からないため、ディレクトリと直下のサブディレクトリの単位で進捗を示す
  * - `scan`: Stage 1〜2（フォルダのダイジェスト比較と、変更フォルダ内のファイルの mtime 確認）。
  *   登録対象の総数はこの段階が終わるまで分からないため、走査したフォルダ数で進捗を示す
  * - `register`: Stage 3（画像サイズの読み取りと DB 登録）。登録対象の新規ファイル数で進捗を示す
  *
- * `scan` はすべて `register` より先に届き、`register` は登録対象が 1 件以上あるときだけ届く。
+ * `list`・`scan`・`register` の順に届き、`register` は登録対象が 1 件以上あるときだけ届く。
  */
 export type PhotoIndexProgress =
+  | {
+      phase: 'list';
+      /** 一覧を取り終えたディレクトリ数（メインと追加ディレクトリを合わせて数える） */
+      dirsListed: number;
+      /** 一覧を取るディレクトリの総数 */
+      dirCount: number;
+      /** 一覧を取っている途中のディレクトリで、直下のサブディレクトリを探索し終えた数。途中のディレクトリが無ければ 0 */
+      topLevelListed: number;
+      /** 一覧を取っている途中のディレクトリの、直下のサブディレクトリ数。途中のディレクトリが無ければ 0 */
+      topLevelTotal: number;
+    }
   | {
       phase: 'scan';
       /** ダイジェスト比較と（変更があれば）mtime 確認まで終えたフォルダ数 */
@@ -1214,7 +1236,9 @@ export type PhotoIndexProgress =
  * - バッチ間でキャッシュをクリア
  *
  * @param isIncremental true: 差分スキャン（ダイジェスト・mtime使用）、false: フルスキャン
- * @param onProgress 進捗表示用。フォルダの総数が確定したときとフォルダを 1 つ走査するたびに `scan` で、
+ * @param onProgress 進捗表示用。フォルダ一覧の探索中は直下のサブディレクトリ 1 つごとと
+ *                   ディレクトリ 1 つごとに `list` で、
+ *                   フォルダの総数が確定したときとフォルダを 1 つ走査するたびに `scan` で、
  *                   登録対象の総数が確定したときとバッチを 1 つ処理するたびに `register` で呼ばれる。
  *                   登録対象が 1 件も無ければ `register` では呼ばれない
  */
@@ -1282,14 +1306,31 @@ export const createVRChatPhotoPathIndex = async (
       folders: VRChatPhotoContainingFolderPath[];
       scannedAt: Date;
     }[] = [];
-    for (const dir of allDirs) {
+    const dirCount = allDirs.length;
+    for (const [dirIndex, dir] of allDirs.entries()) {
       logger.debug(`Listing photo folders in directory: ${dir.value}`);
       // lastScannedAt には、Stage 3 の終了時刻ではなくファイル一覧を取る直前の時刻を保存する。
       // 一覧を取った後に作られたファイルは今回の対象に入らないが、mtime がこの時刻より新しいので
       // 次回の差分スキャンで拾われる。終了時刻を保存すると、登録中に作られたファイルの mtime が
       // lastScannedAt より古くなり、以後の差分スキャンで永久に除外される。
       const scannedAt = new Date();
-      foldersPerDir.push({ folders: await getPhotoFolders(dir), scannedAt });
+      const folders = await getPhotoFolders(dir, (listed, total) => {
+        onProgress?.({
+          phase: 'list',
+          dirsListed: dirIndex,
+          dirCount,
+          topLevelListed: listed,
+          topLevelTotal: total,
+        });
+      });
+      foldersPerDir.push({ folders, scannedAt });
+      onProgress?.({
+        phase: 'list',
+        dirsListed: dirIndex + 1,
+        dirCount,
+        topLevelListed: 0,
+        topLevelTotal: 0,
+      });
     }
     const totalFolders = foldersPerDir.reduce(
       (sum, { folders }) => sum + folders.length,
