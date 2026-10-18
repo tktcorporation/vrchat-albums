@@ -18,7 +18,6 @@ export const electronExternal = [
   '@sentry/electron',
   '@sentry/electron/main',
   '@sentry/electron/preload',
-  '@sentry/vite-plugin',
   // Electron 関連のモジュール
   'electron',
   'electron-log',

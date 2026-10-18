@@ -4,11 +4,14 @@
  * 実際の createVRChatPhotoPathIndex 関数を使用して、
  * 初回起動時の大量写真処理におけるメモリ使用状況をテストします。
  *
+ * 4K の写真を数百枚生成するため 1 回に数分かかる。通常の `pnpm test` では飛ばし、
+ * MEMORY_PROFILE=1 のときだけ走らせる（CI では専用のジョブで毎回走らせる）。
+ *
  * 実行方法:
- *   pnpm test electron/module/vrchatPhoto/vrchatPhoto.memory.integration.test.ts
+ *   pnpm test:memory
  *
  * 大量写真でテスト（時間がかかります）:
- *   PHOTO_COUNT=1000 pnpm test electron/module/vrchatPhoto/vrchatPhoto.memory.integration.test.ts
+ *   PHOTO_COUNT=1000 pnpm test:memory
  */
 
 import * as fs from 'node:fs/promises';
@@ -52,6 +55,9 @@ interface MemoryReport {
   /** Heap差分（JSメモリリークの検知に使用） */
   heapGrowth: number;
 }
+
+const describeWhenProfiling =
+  process.env.MEMORY_PROFILE === '1' ? describe : describe.skip;
 
 // テスト写真の枚数（環境変数で上書き可能）
 const PHOTO_COUNT = Number.parseInt(process.env.PHOTO_COUNT ?? '500', 10);
@@ -116,7 +122,7 @@ const generateTestImage = async (
   await fs.writeFile(filePath, imageBuffer);
 };
 
-describe('写真インデックス作成のメモリプロファイリング', () => {
+describeWhenProfiling('写真インデックス作成のメモリプロファイリング', () => {
   let testDir: string;
   let testPhotosDir: string;
   let originalEnv: NodeJS.ProcessEnv;

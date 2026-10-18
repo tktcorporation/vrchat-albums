@@ -166,6 +166,9 @@ export interface Translations {
         downloaded: string;
         installAndRestart: string;
         checkFailed: string;
+        openDownloadPage: string;
+        installUpdate: string;
+        availableOpenDownloadPage: string;
       };
       licenses: {
         title: string;

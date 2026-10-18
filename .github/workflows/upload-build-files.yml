@@ -56,7 +56,7 @@ jobs:
 
       - name: Get version from tag
         id: get-version
-        uses: battila7/get-version-action@v2
+        uses: battila7/get-version-action@d97fbc34ceb64d1f5d95f4dfd6dce33521ccccf5 # v2.3.0
 
       - name: Extract release notes from CHANGELOG.md
         id: release-notes
@@ -96,13 +96,13 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Delete drafts
-        uses: hugo19941994/delete-draft-releases@v1.0.0
+        uses: hugo19941994/delete-draft-releases@f962e497fe892965a04b2266b3b865e1a59ecd06 # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.github_token }}
 
       - name: Create Release Draft
         id: create-release-draft
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           draft: true
           # v0.0.0 or ref
@@ -176,7 +176,7 @@ jobs:
     if: ${{ needs.vars.outputs.is-semver-tag == 'true' }}
     steps:
       - name: Publish Release
-        uses: eregon/publish-release@v1
+        uses: eregon/publish-release@01df127f5e9a3c26935118e22e738d95b59d10ce # v1.0.6
         with:
           release_id: ${{ needs.draft-release.outputs.release_id }}
         env:

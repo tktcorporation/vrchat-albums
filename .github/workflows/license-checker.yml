@@ -8,6 +8,9 @@ on:
     # 1/1month
     - cron: '0 0 1 * *'
 
+permissions:
+  contents: read
+
 jobs:
   license-checker:
       runs-on: ubuntu-22.04
