@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  calculateVisiblePlayerCount,
-  calculateVisiblePlayersForRows,
-} from './textMeasurement';
+import { calculateVisiblePlayerCount } from './textMeasurement';
 
 describe('calculateVisiblePlayerCount', () => {
   /** 固定幅で計測する簡易 mock（1文字 = 8px） */
@@ -97,84 +94,5 @@ describe('calculateVisiblePlayerCount', () => {
       minVisible: 0,
     });
     expect(result).toBe(2);
-  });
-});
-
-describe('calculateVisiblePlayersForRows', () => {
-  /** バッジ幅 = テキスト幅 + padding(24px) */
-  const fixedWidthMeasure = (text: string) => text.length * 8;
-
-  it('全プレイヤーが1行に収まる場合、全員を返す', () => {
-    const names = ['A', 'B', 'C'];
-    // Badge widths: A=(8+24)=32, B=32, C=32
-    // With gap: 32+8+32+8+32 = 112 < 300
-    const result = calculateVisiblePlayersForRows(
-      names,
-      300,
-      fixedWidthMeasure,
-    );
-    expect(result).toEqual({ visibleCount: 3, hiddenCount: 0 });
-  });
-
-  it('2行に折り返す場合、2行分のプレイヤーを返す', () => {
-    const names = ['Alice', 'Bob', 'Charlie', 'Dave', 'Eve'];
-    // Badge widths: Alice=(40+24)=64, Bob=(24+24)=48, Charlie=(56+24)=80, Dave=(32+24)=56, Eve=(24+24)=48
-    // Row 1 width 200: 64+8+48+8+80 = 208 > 200 → Charlie overflows
-    //   → 64+8+48 = 120 fits, then 120+8+80 = 208 > 200 → row1 = [Alice, Bob]
-    // Row 2: Charlie=80+8+56 = 144, +8+48 = 200 fits
-    //   80+8+56 = 144 < 200, 144+8+48 = 200 ≤ 200 → row2 = [Charlie, Dave, Eve]
-    // maxRows=2 → all visible in 2 rows
-    const result = calculateVisiblePlayersForRows(
-      names,
-      200,
-      fixedWidthMeasure,
-    );
-    expect(result).toEqual({ visibleCount: 5, hiddenCount: 0 });
-  });
-
-  it('maxRows を超えるプレイヤーは非表示にする', () => {
-    // 各バッジ幅 = 32+24 = 56px, gap=8, container=120
-    // 1行に収まるバッジ数: 56, 56+8+56=120 → 2個/行
-    // maxRows=2 → 4個表示可能
-    const names = ['AA', 'BB', 'CC', 'DD', 'EE', 'FF'];
-    const result = calculateVisiblePlayersForRows(
-      names,
-      120,
-      fixedWidthMeasure,
-      { maxRows: 2 },
-    );
-    expect(result).toEqual({ visibleCount: 4, hiddenCount: 2 });
-  });
-
-  it('空配列では 0 を返す', () => {
-    const result = calculateVisiblePlayersForRows([], 200, fixedWidthMeasure);
-    expect(result).toEqual({ visibleCount: 0, hiddenCount: 0 });
-  });
-
-  it('padding オプションを反映する', () => {
-    const names = ['Alice'];
-    // Badge: text=40 + padding=40 = 80
-    const result = calculateVisiblePlayersForRows(
-      names,
-      200,
-      fixedWidthMeasure,
-      { padding: 40 },
-    );
-    expect(result).toEqual({ visibleCount: 1, hiddenCount: 0 });
-  });
-
-  it('gap オプションを反映する', () => {
-    const names = ['AA', 'BB', 'CC'];
-    // Badge widths: 16+24=40 each, gap=20
-    // 40+20+40 = 100 < 120, 100+20+40 = 160 > 120
-    // Row 1: [AA, BB] → width = 100
-    // Row 2: [CC]
-    const result = calculateVisiblePlayersForRows(
-      names,
-      120,
-      fixedWidthMeasure,
-      { gap: 20 },
-    );
-    expect(result).toEqual({ visibleCount: 3, hiddenCount: 0 });
   });
 });

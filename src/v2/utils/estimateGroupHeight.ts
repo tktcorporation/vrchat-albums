@@ -74,35 +74,3 @@ export function estimateGroupHeight(
     source: 'calculated',
   };
 }
-
-/**
- * 複数グループの高さを一括で事前計算する
- *
- * 初回レンダリング時に全グループの高さを計算してキャッシュを初期化するのに使用。
- * これにより、一気にスクロールした際のレイアウトシフトを軽減できる。
- *
- * @param groups - グループの配列（[key, photos] のタプル）
- * @param containerWidth - コンテナの幅
- * @param existingCache - 既存のキャッシュ（更新される）
- * @returns 更新されたキャッシュ
- */
-export function precomputeGroupHeights(
-  groups: { key: string; photos: Photo[] }[],
-  containerWidth: number,
-  existingCache = new Map<string, number>(),
-): Map<string, number> {
-  // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
-  const calculator = new JustifiedLayoutCalculator();
-
-  for (const { key, photos } of groups) {
-    // 既にキャッシュにある場合はスキップ
-    if (existingCache.has(key)) {
-      continue;
-    }
-
-    const height = calculator.calculateTotalHeight(photos, containerWidth);
-    existingCache.set(key, height);
-  }
-
-  return existingCache;
-}

@@ -1539,15 +1539,6 @@ export const getVRChatPhotoItemData = (params: {
   });
 
 /**
- * データベース内で最新の写真日時を取得する
- * ログ同期の開始位置判定に用いる
- */
-export const getLatestPhotoDate = async (): Promise<Date | null> => {
-  const latestPhoto = await model.getLatestVRChatPhoto();
-  return latestPhoto?.photoTakenAt ?? null;
-};
-
-/**
  * 軽量メタデータのみ取得する（初回クエリ用）
  * photoPath を含まないことでメモリ使用量を大幅に削減
  *

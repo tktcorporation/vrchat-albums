@@ -85,7 +85,6 @@ vi.mock('../VRChatPlayerLeaveLogModel/playerLeaveLog.service', () => ({
 
 vi.mock('../vrchatPhoto/vrchatPhoto.service', () => ({
   getVRChatPhotoDirPath: vi.fn().mockResolvedValue({ value: '/mock/photos' }),
-  getLatestPhotoDate: vi.fn().mockResolvedValue(null),
   createVRChatPhotoPathIndex: vi.fn().mockResolvedValue([]),
 }));
 
@@ -477,7 +476,6 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     vi.mocked(
       vrchatLogService.importLogLinesFromLogPhotoDirPath,
     ).mockResolvedValue(undefined);
-    vi.mocked(vrchatPhotoService.getLatestPhotoDate).mockResolvedValue(null);
     vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockResolvedValue(
       [],
     );

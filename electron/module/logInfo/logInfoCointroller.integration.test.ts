@@ -10,7 +10,6 @@ import {
   vi,
 } from 'vitest';
 
-import { clearAllCaches } from '../../lib/queryCache';
 import * as client from '../../lib/sequelize';
 import { VRChatPlayerNameSchema } from '../vrchatLog/model';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
@@ -22,7 +21,6 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
 
   beforeEach(async () => {
     await client.__forceSyncRDBClient();
-    clearAllCaches(); // キャッシュをクリア
     // このテストファイル内でのみモックを無効化
     vi.doUnmock('../logInfo/service');
     vi.doUnmock('../VRChatPlayerJoinLogModel/playerJoinLog.service');

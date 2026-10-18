@@ -126,25 +126,6 @@ export const getVRChatPlayerJoinLogListByJoinDateTime = (props: {
 };
 
 /**
- * 最新の検出日時を取得する
- * @returns 最新の検出日時（ISO文字列）
- */
-export const getLatestDetectedDate = (): Effect.Effect<
-  string | null,
-  PlayerJoinLogServiceError
-> => {
-  return enqueueTask(() => model.findLatestPlayerJoinLog()).pipe(
-    Effect.mapError(
-      (e) =>
-        new PlayerJoinLogDatabaseError({
-          message: `最新の検出日時の取得に失敗しました: ${e.message}`,
-        }),
-    ),
-    Effect.map((latestLog) => latestLog?.joinDateTime.toISOString() ?? null),
-  );
-};
-
-/**
  * 複数の日時範囲のプレイヤー参加ログを一度に取得する（効率的なバッチクエリ）
  * @param dateRanges 日時範囲の配列 { start: Date, end: Date, key: string }
  * @returns 日時範囲ごとのプレイヤー参加ログのマップ

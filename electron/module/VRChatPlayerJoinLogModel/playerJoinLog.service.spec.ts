@@ -192,31 +192,6 @@ describe('VRChatPlayerJoinLogModel', () => {
       ]);
     });
 
-    it('should return latest detected date', async () => {
-      const playerJoinLogList = [
-        {
-          joinDate: datefns.parseISO('2021-01-01T00:00:00Z'),
-          playerName: VRChatPlayerNameSchema.parse('player1'),
-          logType: 'playerJoin' as const,
-          playerId: null,
-        },
-        {
-          joinDate: datefns.parseISO('2021-01-02T00:00:00Z'),
-          playerName: VRChatPlayerNameSchema.parse('player2'),
-          logType: 'playerJoin' as const,
-          playerId: null,
-        },
-      ];
-      await Effect.runPromise(
-        service.createVRChatPlayerJoinLogModel(playerJoinLogList),
-      );
-
-      const value = await Effect.runPromise(service.getLatestDetectedDate());
-
-      // 最新の日時（2021-01-02）が返されることを確認
-      expect(value).toBe('2021-01-02T00:00:00.000Z');
-    });
-
     it('should find latest player join log', async () => {
       const playerJoinLogList = [
         {

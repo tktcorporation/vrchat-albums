@@ -40,10 +40,6 @@ const DEFAULT_COLORS: DominantColors = (() => {
 /**
  * RGBAピクセルデータから主要な色を計算する。
  *
- * 背景: src/v2/utils/colorExtractor.ts の calcColors を
- * Canvas API なしで動作するようポートしたもの。
- * ロジックは同一で、ピクセルデータの取得方法のみ異なる。
- *
  * アルゴリズム:
  * 1. ピクセルを step 間隔でサンプリング（パフォーマンス最適化）
  * 2. RGB を 5 刻みで量子化してバケットに集約
@@ -119,9 +115,8 @@ function calcColors(data: Buffer, step: number): DominantColors {
 /**
  * 画像バッファ（PNG/JPEG等）から主要な色を抽出する。
  *
- * 背景: src/v2/utils/colorExtractor.ts はブラウザ Canvas API に依存するため
- * Electron メインプロセスでは使用できない。この関数は @napi-rs/image の
- * Transformer を使って同等の処理を行う。
+ * 背景: Electron メインプロセスには Canvas API が無いため、
+ * @napi-rs/image の Transformer でピクセルデータを取得する。
  *
  * 呼び出し元: imageGenerator サービス（ワールド参加プレビュー画像生成時）
  * 色が抽出できない場合はデフォルトのテーマカラーを返す（エラーにはならない）。

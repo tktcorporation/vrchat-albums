@@ -11,14 +11,6 @@ export const PLAYER_LIST_FONT =
   "12px 'Noto Sans CJK JP', 'Noto Sans JP', sans-serif";
 
 /**
- * シェアプレビュー（BoldPreview）で使用するフォント指定。
- *
- * 背景: BoldPreviewSvg のプレイヤーバッジは fontSize=14px, fontWeight=500 で描画される。
- */
-export const BOLD_PREVIEW_FONT =
-  "500 14px 'Noto Sans CJK JP', 'Noto Sans JP', sans-serif";
-
-/**
  * フォント指定からピクセルサイズを抽出する。
  * Canvas font shorthand（例: "12px ...", "500 14px ..."）からサイズ部分を取り出す。
  */
@@ -117,61 +109,4 @@ export function calculateVisiblePlayerCount(
   }
 
   return Math.max(minVisible, maxPlayers);
-}
-
-/**
- * 行折り返しで収まるプレイヤー数を算出する純粋関数。
- *
- * 背景: BoldPreviewSvg でシェア画像のプレイヤーバッジ配置に使用。
- * 各プレイヤー名をバッジ（テキスト幅 + padding）として扱い、
- * 指定行数に収まるプレイヤー数を計算する。
- *
- * @param playerNames - プレイヤー名の配列
- * @param containerWidth - コンテナの幅（px）
- * @param measureFn - テキスト幅を返す関数
- * @param options.padding - バッジの水平パディング合計（デフォルト 24px = 左12+右12）
- * @param options.gap - バッジ間の gap（デフォルト 8px）
- * @param options.maxRows - 最大行数（デフォルト 2）
- */
-export function calculateVisiblePlayersForRows(
-  playerNames: string[],
-  containerWidth: number,
-  measureFn: (text: string) => number,
-  options?: {
-    padding?: number;
-    gap?: number;
-    maxRows?: number;
-  },
-): { visibleCount: number; hiddenCount: number } {
-  const { padding = 24, gap = 8, maxRows = 2 } = options ?? {};
-
-  let currentRow = 0;
-  let currentWidth = 0;
-  let visibleCount = 0;
-
-  for (const name of playerNames) {
-    const badgeWidth = measureFn(name) + padding;
-
-    if (currentWidth === 0) {
-      // 行の最初のバッジ
-      currentWidth = badgeWidth;
-    } else if (currentWidth + gap + badgeWidth > containerWidth) {
-      // 現在の行に収まらない → 次の行へ
-      currentRow++;
-      currentWidth = badgeWidth;
-    } else {
-      currentWidth += gap + badgeWidth;
-    }
-
-    if (currentRow >= maxRows) {
-      break;
-    }
-
-    visibleCount++;
-  }
-
-  return {
-    visibleCount,
-    hiddenCount: playerNames.length - visibleCount,
-  };
 }

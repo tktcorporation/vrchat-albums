@@ -177,22 +177,8 @@ export const getPhotoCountPerLocalMonth = async (): Promise<
   return z.array(PhotoCountPerMonthRowSchema).parse(rows);
 };
 
-/** 最新の写真レコードを取得する */
-export const getLatestVRChatPhoto = async () => {
-  return VRChatPhotoPathModel.findOne({
-    order: [['photoTakenAt', 'DESC']],
-  });
-};
-
 /**
  * 軽量メタデータ型（ハイブリッドローディング用）
- *
- * フロントエンド側に同等の型 PhotoMetadata が存在する。
- * tRPC 経由で転送時に Date→string 変換されるため、
- * 各レイヤーで専用の型定義を維持している。
- * 両方の型を変更する場合は、もう一方も更新すること。
- *
- * @see src/v2/types/photo.ts - PhotoMetadata（フロントエンド側）
  */
 export interface VRChatPhotoMetadata {
   id: string;
