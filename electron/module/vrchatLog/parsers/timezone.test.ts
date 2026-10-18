@@ -8,7 +8,6 @@ import {
   extractPlayerJoinInfoFromLog,
   extractPlayerLeaveInfoFromLog,
 } from './playerActionParser';
-import { extractWorldLeaveInfoFromLog } from './worldLeaveParser';
 
 describe('タイムゾーン処理の検証', () => {
   it('parseLogDateTime は local time として解釈する', () => {
@@ -126,12 +125,6 @@ describe('タイムゾーン処理の検証', () => {
     );
     const leave = Effect.runSync(extractPlayerLeaveInfoFromLog(leaveLine));
     expect(leave.leaveDate.getTime()).toBe(expected.getTime());
-
-    const worldLeaveLine = VRChatLogLineSchema.parse(
-      '2024.01.07 23:25:34 Log        -  VRCApplication: HandleApplicationQuit',
-    );
-    const worldLeave = extractWorldLeaveInfoFromLog(worldLeaveLine);
-    expect(worldLeave?.leaveDate.getTime()).toBe(expected.getTime());
   });
 
   it('境界ケース: 月末・年末の日時処理', () => {

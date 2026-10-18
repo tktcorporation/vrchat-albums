@@ -11,7 +11,7 @@ This document describes the planned enhancement for supporting VRChat applicatio
 1. **World Join**: `[Behaviour] Joining `
 2. **Player Join**: `[Behaviour] OnPlayerJoined `
 3. **Player Leave**: `[Behaviour] OnPlayerLeft `
-4. **App Exit** (partial): `VRCApplication: HandleApplicationQuit` - Detected as world leave event
+4. **App Exit** (partial): `VRCApplication: HandleApplicationQuit` - Raw line kept in the logStore, not parsed
 
 ### TODO: Future Implementation
 
@@ -21,7 +21,7 @@ This document describes the planned enhancement for supporting VRChat applicatio
    - Will indicate when VRChat application started
 
 2. **App Exit Events** (full implementation)
-   - Current: Only `HandleApplicationQuit` is detected as world leave
+   - Current: Only the raw `HandleApplicationQuit` line is kept in the logStore
    - Removed patterns (not in actual VRChat logs):
      - `OnApplicationPause`
      - `OnApplicationQuit`
@@ -41,18 +41,17 @@ This document describes the planned enhancement for supporting VRChat applicatio
 - All filter patterns are defined in one place to ensure consistency
 - Pattern handling status is tracked via TypeScript types
 
-### World Leave Detection
+### Application Quit Lines
 
-- `VRCApplication: HandleApplicationQuit` is detected by `worldLeaveParser`
-- Treated as an application quit reason for world leave
-- Uses ts-pattern for type-safe pattern matching
+- The raw `VRCApplication: HandleApplicationQuit` line is kept in the logStore because `FILTER_PATTERNS` includes `LOG_PATTERNS.APP_EXIT`
+- No parser consumes it, so it is not stored in the database as an event
 
 ### Export/Import Process
 
 - Export: Currently exports world joins, player joins, and player leaves
 - Import: Parses supported patterns and stores them in the database
 - App events (start/version) are filtered but not processed (TODO)
-- `HandleApplicationQuit` is processed as a world leave event
+- `HandleApplicationQuit` lines are kept in the logStore but not parsed into events
 
 ## Design Principles
 
