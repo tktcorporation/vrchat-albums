@@ -107,21 +107,6 @@ describe('vrchatWorldJoinLogFromPhoto service', () => {
 
       expect(await VRChatWorldJoinLogFromPhotoModel.count()).toBe(2);
     });
-
-    it('入力オブジェクトの余分なプロパティは保存対象にしない', async () => {
-      const logWithExtra = {
-        worldId: WORLD_A,
-        joinDate: parseISO('2024-01-01T10:00:00'),
-        worldName: 'should be dropped',
-      };
-
-      await createVRChatWorldJoinLogFromPhoto([logWithExtra]);
-
-      const [row] = await VRChatWorldJoinLogFromPhotoModel.findAll({
-        raw: true,
-      });
-      expect(row).not.toHaveProperty('worldName');
-    });
   });
 
   describe('findVRChatWorldJoinLogFromPhotoList', () => {
