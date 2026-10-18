@@ -1,6 +1,6 @@
 /// <reference types="bun" />
 import { describe, expect, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -143,4 +143,15 @@ describe('アダプター経由で hook が落ちたとき・入出力を読め�
     },
     SPAWN_TEST_TIMEOUT_MS,
   );
+
+  test('Cursor の設定で、PR 作成ゲートだけを、起動できない・時間切れのときも拒否に倒す', async () => {
+    // アダプターが動く前に bun の起動失敗やタイムアウトが起きると、Cursor は既定で操作を通す。
+    const config: { hooks: Record<string, { command: string; failClosed?: boolean }[]> } =
+      JSON.parse(await readFile(join(import.meta.dir, '../../.cursor/hooks.json'), 'utf8'));
+    const entries = Object.values(config.hooks).flat();
+    const failClosed = entries.filter((entry) => entry.failClosed === true);
+    expect(failClosed.map((entry) => entry.command)).toEqual([
+      'bun .cursor/run-shared-hook.ts .claude/hooks/require-pr-self-review-mcp.ts',
+    ]);
+  });
 });

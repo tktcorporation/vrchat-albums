@@ -219,7 +219,8 @@
       },
       "cursor": {
         "event": "preToolUse",
-        "matcher": "^MCP:(?:github_)?create_pull_request$"
+        "matcher": "^MCP:(?:github_)?create_pull_request$",
+        "failClosed": true
       },
       "codex": {
         "event": "PreToolUse",

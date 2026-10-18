@@ -38,6 +38,8 @@ interface RuntimeBinding {
   event: string;
   matcher?: string;
   loopLimit?: null;
+  /** Cursor は hook の異常終了・タイムアウトを既定で許可扱いにする。拒否に倒す hook だけ true にする */
+  failClosed?: boolean;
 }
 
 interface ManifestHook {
@@ -147,6 +149,7 @@ function buildCursorHooks(hooks: ManifestHook[]): {
     };
     if (hook.cursor.matcher) entry.matcher = hook.cursor.matcher;
     if ('loopLimit' in hook.cursor) entry.loop_limit = hook.cursor.loopLimit;
+    if (hook.cursor.failClosed) entry.failClosed = true;
     list.push(entry);
     byEvent.set(hook.cursor.event, list);
   }
