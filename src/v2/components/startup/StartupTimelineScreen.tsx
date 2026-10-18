@@ -5,11 +5,14 @@ import { cn } from '@/components/lib/utils';
 
 import type { RunStage } from '../../../../electron/module/initProgress/schema';
 import { TEXT_COLOR, TYPOGRAPHY } from '../../constants/ui';
+import { useCountUp } from '../../hooks/useCountUp';
 import type {
   InitLaunch,
   InitProgressDetails,
   InitStats,
 } from '../../hooks/useInitProgress';
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
+import { useStalled } from '../../hooks/useStalled';
 import { useI18n } from '../../i18n/store';
 import type { StartupLaunchVariant } from '../../i18n/types';
 import { AppHeader } from '../AppHeader';
@@ -117,6 +120,31 @@ export const StartupTimelineScreen = ({
     [stats, month, highlightMonth],
   );
   const geometry = useMemo(() => ringGeometry(rings.length), [rings.length]);
+
+  // メインプロセスの進捗は数秒届かないことも、まとめて届くこともある。届いた値を超えない範囲で
+  // 表示値を数え上げ、待っている間も処理が続いていると分かる動きを足す
+  const reducedMotion = usePrefersReducedMotion();
+  const shownProgress = useCountUp(overallProgress, {
+    disabled: reducedMotion,
+  });
+  const running = match(runStage)
+    .with(P.union('completed', 'error'), () => false)
+    .with(
+      P.union(
+        null,
+        'database_sync',
+        'log_append',
+        'log_load',
+        'photo_index',
+        'photo_metadata',
+        'photo_log_import',
+      ),
+      () => true,
+    )
+    .exhaustive();
+  // 動きを減らす設定では、光と待ちの帯を出さず静止したバーだけにする
+  const animating = running && !reducedMotion;
+  const stalled = useStalled(overallProgress, { active: animating });
   const centerYear = centerYearOf(rings, highlightMonth);
 
   const phaseLabel = match(runStage)
@@ -275,20 +303,42 @@ export const StartupTimelineScreen = ({
               {phaseLabel}
             </span>
             <div className="flex items-center gap-2">
+              {/* aria-valuenow と data-progress は届いた実際の値を持ち、見た目だけを数え上げる */}
               <div
                 role="progressbar"
                 aria-label={t('initProgress.timeline.progressLabel')}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={overallProgress}
-                className="h-0.5 flex-1 overflow-hidden rounded-full bg-muted-foreground/20"
+                className="relative h-0.5 flex-1 overflow-hidden rounded-full bg-muted-foreground/20"
+                data-stalled={stalled}
               >
                 <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out motion-reduce:transition-none"
-                  style={{ width: `${overallProgress}%` }}
+                  className="relative h-full overflow-hidden rounded-full bg-primary"
+                  style={{ width: `${shownProgress}%` }}
                   data-testid="progress-bar"
                   data-progress={overallProgress}
-                />
+                >
+                  {/* 塗られた部分を薄い光が通り続け、値が動かない間も止まって見えないようにする */}
+                  {animating && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 w-1/2 animate-progress-sheen bg-gradient-to-r from-transparent via-primary-foreground/60 to-transparent"
+                      data-testid="progress-sheen"
+                    />
+                  )}
+                </div>
+                {/* 進捗が止まっている間だけ、残り部分に帯を流して待ち状態を示す。値は作らない */}
+                {stalled && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 right-0 overflow-hidden"
+                    style={{ left: `${shownProgress}%` }}
+                    data-testid="progress-pending"
+                  >
+                    <span className="absolute inset-y-0 left-0 w-1/3 animate-progress-pending bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+                  </span>
+                )}
               </div>
               <span
                 className={cn(
@@ -298,7 +348,7 @@ export const StartupTimelineScreen = ({
                 )}
                 data-testid="progress-percent"
               >
-                {`${overallProgress}%`}
+                {`${shownProgress}%`}
               </span>
             </div>
             <span

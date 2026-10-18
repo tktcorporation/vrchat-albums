@@ -117,11 +117,23 @@ module.exports = {
             'background-position': 'right center',
           },
         },
+        // 幅の 1/2 の光を、親の左外から右外まで通す（起動画面の進捗バーの塗られた部分）
+        'progress-sheen': {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(200%)' },
+        },
+        // 幅の 1/3 の帯を、親の左外から右外まで通す（進捗が止まっている間の残り部分）
+        'progress-pending': {
+          from: { transform: 'translateX(-100%)' },
+          to: { transform: 'translateX(300%)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'gradient-x': 'gradient-x 3s ease infinite',
+        'progress-sheen': 'progress-sheen 2.4s ease-in-out infinite',
+        'progress-pending': 'progress-pending 1.8s ease-in-out infinite',
       },
       backdropBlur: {
         xs: '2px',

@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useI18n } from '../../../i18n/store';
 import { StartupTimelineScreen } from '../StartupTimelineScreen';
@@ -268,5 +269,145 @@ describe('StartupTimelineScreen', () => {
     expect(tones.at(0)).toEqual(['2017-01', 'current']);
     // 2017 年から 2025 年までの 9 周
     expect(tones).toHaveLength(9 * 12);
+  });
+
+  describe('進捗バーの動き', () => {
+    const baseProps = {
+      runStage: 'log_load',
+      overallProgress: 50,
+      details: null,
+      syncMode: 'incremental',
+      isFirstLaunch: false,
+      stats,
+      currentMonth: '2025-04',
+    } satisfies ComponentProps<typeof StartupTimelineScreen>;
+
+    const advance = (ms: number) => {
+      act(() => {
+        vi.advanceTimersByTime(ms);
+      });
+    };
+
+    const percentText = () =>
+      screen.getByTestId('progress-percent').textContent;
+    const isStalled = () =>
+      screen.getByRole('progressbar').getAttribute('data-stalled') === 'true';
+
+    const mockReducedMotion = (matches: boolean) => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn().mockImplementation((query: string) => ({
+          matches,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        })),
+      );
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers({
+        toFake: [
+          'setTimeout',
+          'clearTimeout',
+          'requestAnimationFrame',
+          'cancelAnimationFrame',
+          'performance',
+        ],
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it('進捗がまとめて進んだら表示の割合を数え上げ、aria-valuenow は届いた値をすぐ持つ', () => {
+      const { rerender } = render(<StartupTimelineScreen {...baseProps} />);
+      expect(percentText()).toBe('50%');
+
+      rerender(<StartupTimelineScreen {...baseProps} overallProgress={95} />);
+      expect(
+        screen.getByRole('progressbar').getAttribute('aria-valuenow'),
+      ).toBe('95');
+      expect(
+        screen.getByTestId('progress-bar').getAttribute('data-progress'),
+      ).toBe('95');
+      expect(percentText()).toBe('50%');
+
+      advance(200);
+      const midway = Number.parseInt(percentText() ?? '', 10);
+      expect(midway).toBeGreaterThan(50);
+      expect(midway).toBeLessThan(95);
+      expect(screen.getByTestId('progress-bar').style.width).toBe(`${midway}%`);
+
+      advance(800);
+      expect(percentText()).toBe('95%');
+      expect(screen.getByTestId('progress-bar').style.width).toBe('95%');
+    });
+
+    it('処理中は塗られた部分に光を流し、完了したら止める', () => {
+      const { rerender } = render(<StartupTimelineScreen {...baseProps} />);
+      expect(screen.getByTestId('progress-sheen')).toBeTruthy();
+
+      rerender(
+        <StartupTimelineScreen
+          {...baseProps}
+          runStage="completed"
+          overallProgress={100}
+        />,
+      );
+      expect(screen.queryByTestId('progress-sheen')).toBeNull();
+    });
+
+    it('進捗が 1.5 秒動かなければ残り部分に待ちの帯を出し、進んだら消す', () => {
+      const { rerender } = render(<StartupTimelineScreen {...baseProps} />);
+      advance(1400);
+      expect(isStalled()).toBe(false);
+      expect(screen.queryByTestId('progress-pending')).toBeNull();
+
+      advance(100);
+      expect(isStalled()).toBe(true);
+      expect(screen.getByTestId('progress-pending')).toBeTruthy();
+
+      rerender(<StartupTimelineScreen {...baseProps} overallProgress={60} />);
+      expect(isStalled()).toBe(false);
+      expect(screen.queryByTestId('progress-pending')).toBeNull();
+    });
+
+    it('完了やエラーで実行が終わったら待ちの帯を消し、その後も出さない', () => {
+      const { rerender } = render(<StartupTimelineScreen {...baseProps} />);
+      advance(1500);
+      expect(screen.getByTestId('progress-pending')).toBeTruthy();
+
+      rerender(<StartupTimelineScreen {...baseProps} runStage="error" />);
+      expect(screen.queryByTestId('progress-pending')).toBeNull();
+      advance(5000);
+      expect(screen.queryByTestId('progress-pending')).toBeNull();
+
+      rerender(
+        <StartupTimelineScreen
+          {...baseProps}
+          runStage="completed"
+          overallProgress={100}
+        />,
+      );
+      advance(5000);
+      expect(screen.queryByTestId('progress-pending')).toBeNull();
+    });
+
+    it('動きを減らす設定では数え上げずに割合を切り替え、光も待ちの帯も出さない', () => {
+      mockReducedMotion(true);
+      const { rerender } = render(<StartupTimelineScreen {...baseProps} />);
+      expect(screen.queryByTestId('progress-sheen')).toBeNull();
+
+      rerender(<StartupTimelineScreen {...baseProps} overallProgress={85} />);
+      expect(percentText()).toBe('85%');
+      expect(screen.getByTestId('progress-bar').style.width).toBe('85%');
+
+      advance(5000);
+      expect(isStalled()).toBe(false);
+      expect(screen.queryByTestId('progress-pending')).toBeNull();
+    });
   });
 });
