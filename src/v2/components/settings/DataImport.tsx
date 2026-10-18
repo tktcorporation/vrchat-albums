@@ -11,6 +11,7 @@ import {
   BORDER,
   SPACING,
   STATUS_BADGE,
+  STATUS_COLOR,
   TEXT_COLOR,
   TYPOGRAPHY,
 } from '../../constants/ui';
@@ -54,6 +55,7 @@ const DataImport = memo(() => {
   const {
     data: importHistory,
     isLoading: isLoadingHistory,
+    error: historyError,
     refetch: refetchHistory,
   } = trpcReact.vrchatLog.getImportBackupHistory.useQuery();
 
@@ -338,6 +340,17 @@ const DataImport = memo(() => {
             return (
               <div className={cn(TYPOGRAPHY.body.small, TEXT_COLOR.muted)}>
                 履歴を読み込み中...
+              </div>
+            );
+          }
+          // 権限不足などで履歴を読めないとき、空の履歴と誤認させない
+          if (historyError) {
+            return (
+              <div
+                role="alert"
+                className={cn(TYPOGRAPHY.body.small, STATUS_COLOR.error.text)}
+              >
+                {t('settings.dataImport.historyLoadFailed')}
               </div>
             );
           }

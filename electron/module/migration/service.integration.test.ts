@@ -219,6 +219,35 @@ describe('migration service integration', () => {
       expect(importService['importLogStoreFiles']).not.toHaveBeenCalled();
     });
 
+    it('should not write the migration marker when the logStore check fails, so the next launch retries', async () => {
+      await nodeFsPromises.writeFile(
+        path.join(mockOldAppPath, 'config.json'),
+        '{"key": "value"}',
+      );
+      await nodeFsPromises.mkdir(path.join(mockOldAppPath, 'logStore'), {
+        recursive: true,
+      });
+      denyAccessTo('logStore');
+
+      const value = await Effect.runPromise(
+        migrationService.performMigration(),
+      );
+
+      expect(value.details.settings).toBe(true);
+      expect(value.migrated).toBe(false);
+      expect(
+        nodeFs.existsSync(
+          path.join(mockCurrentAppPath, '.migration-completed'),
+        ),
+      ).toBe(false);
+
+      migrationService.clearMigrationCache();
+      const needed = await Effect.runPromise(
+        migrationService.isMigrationNeeded(),
+      );
+      expect(needed).toBe(true);
+    });
+
     it('should handle partial migration when some files are missing', async () => {
       // Only create settings file (no logStore)
       await nodeFsPromises.writeFile(
@@ -392,6 +421,15 @@ describe('migration service integration', () => {
 
       // Should succeed (Result type with void value)
       await Effect.runPromise(migrationService.performMigrationIfNeeded());
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Migration completed with errors'),
+        expect.objectContaining({ errors: expect.any(Array) }),
+      );
+      expect(logger.info).not.toHaveBeenCalledWith(
+        'Migration completed successfully',
+        expect.anything(),
+      );
     });
   });
 });

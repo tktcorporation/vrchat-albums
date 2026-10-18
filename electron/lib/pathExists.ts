@@ -4,7 +4,11 @@ import typeUtils from 'node:util/types';
 import { Data, Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 
-const isNodeError = (error: unknown): error is NodeJS.ErrnoException =>
+/**
+ * Node.js のエラーオブジェクトかどうかを判定する。
+ * fs を読み込み時に呼ばないこのモジュールに置き、wrappedFs など他のファイル操作ヘルパーからも使う。
+ */
+export const isNodeError = (error: unknown): error is NodeJS.ErrnoException =>
   typeUtils.isNativeError(error);
 
 /**

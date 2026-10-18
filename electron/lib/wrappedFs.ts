@@ -1,17 +1,10 @@
 import * as fs from 'node:fs';
 import { promisify } from 'node:util';
-import typeUtils from 'node:util/types';
 
 import { Effect } from 'effect';
 import { match, P } from 'ts-pattern';
 
-/**
- * Node.js のエラーオブジェクトかどうかを判定するユーティリティ。
- * ファイル操作ヘルパー群から内部的に利用される。
- */
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return typeUtils.isNativeError(error);
-}
+import { isNodeError } from './pathExists';
 
 /**
  * 同期的にファイルを読み込み、存在しない場合はエラー情報を返す。

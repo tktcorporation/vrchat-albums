@@ -201,9 +201,16 @@ export const performMigrationIfNeeded = (): Effect.Effect<void> => {
       logger.info('Migration needed, starting migration process...');
       return performMigration().pipe(
         Effect.tap((result) =>
-          Effect.sync(() =>
-            logger.info('Migration completed successfully', result),
-          ),
+          Effect.sync(() => {
+            if (result.errors.length > 0) {
+              logger.warn(
+                `Migration completed with errors: ${result.errors.join(', ')}`,
+                result,
+              );
+              return;
+            }
+            logger.info('Migration completed successfully', result);
+          }),
         ),
         Effect.asVoid,
       );
@@ -308,10 +315,15 @@ export const performMigration = (): Effect.Effect<MigrationResult> => {
       }
 
       // 3. Create migration marker if any migration was successful
+      // logStore の存在確認自体が失敗した場合はマーカーを書かず、次回に再試行させる。
+      // 再実行しても config.json の再コピーは旧アプリの同じファイルで上書きするだけで、
+      // アプリの設定は v0-settings.json 側にあるため現在の設定を失わない
+      const logStoreAccessFailed = Either.isLeft(logStoreExists);
       if (
-        result.details.settings ||
-        result.details.logStore ||
-        result.details.database
+        !logStoreAccessFailed &&
+        (result.details.settings ||
+          result.details.logStore ||
+          result.details.database)
       ) {
         const markerPath = path.join(currentAppPath, '.migration-completed');
         const markerContent = JSON.stringify(
