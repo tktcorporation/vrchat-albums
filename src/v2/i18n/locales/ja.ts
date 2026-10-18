@@ -175,6 +175,7 @@ const ja: Translations = {
         photosInMonth: '{month}　{current} / {total}枚',
         photos: '{current} / {total}枚',
         files: '{current} / {total} ファイル',
+        folders: '{current} / {total} フォルダ',
         logs: '{current} / {total} 件',
       },
     },

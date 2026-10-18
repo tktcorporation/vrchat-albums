@@ -45,7 +45,8 @@ const XMP_READ_CHUNK_SIZE = 500;
  * 呼び出しの途中では進捗を受け取れず、写真が多いと進捗表示が長く止まって見えるため。
  *
  * @param options.onProgress 処理済み件数と総件数（= photoPaths.length）を受け取る。
- *        抽出対象から外した写真（抽出済み・対象外の日付や形式）は処理済みに数える
+ *        抽出対象から外した写真（抽出済み・対象外の日付や形式）は処理済みに数える。
+ *        処理済みが総件数に達するのは DB への保存が終わった後（保存に失敗した場合は届かない）
  * @returns 新たに抽出・保存したメタデータの件数
  */
 export const extractAndSaveMetadataBatch = (
@@ -72,6 +73,7 @@ export const extractAndSaveMetadataBatch = (
     });
 
     if (newPaths.length === 0) {
+      reportProgress(photoPaths.length);
       return 0;
     }
 
@@ -129,7 +131,12 @@ export const extractAndSaveMetadataBatch = (
       for (let j = 0; j < chunk.length; j++) {
         batchResults.push(chunkResults[j]);
       }
-      reportProgress(skippedCount + i + chunk.length);
+      // 最後のチャンクの分は DB 保存の後に報告する。ここで総数に届かせると、
+      // 保存が終わる前にステージが 100% になり、保存の間バーが満杯のまま止まって見えるため
+      const readCount = skippedCount + i + chunk.length;
+      if (readCount < photoPaths.length) {
+        reportProgress(readCount);
+      }
     }
 
     // Rust の結果を Zod バリデーション付きでパース。
@@ -198,6 +205,7 @@ export const extractAndSaveMetadataBatch = (
     }
 
     if (attributes.length === 0) {
+      reportProgress(photoPaths.length);
       return 0;
     }
 
@@ -209,6 +217,7 @@ export const extractAndSaveMetadataBatch = (
           message: `Failed to save metadata: ${e instanceof Error ? e.message : String(e)}`,
         }),
     });
+    reportProgress(photoPaths.length);
 
     // 読み取り結果のサマリー（XMP の各フィールドが正しく取れているか確認用）
     const withWorldId = attributes.filter((a) => a.worldId !== null).length;

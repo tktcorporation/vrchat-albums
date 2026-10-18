@@ -788,14 +788,22 @@ const computeFolderDigest = (
  * ユーザーが独自のフォルダ分けをしている場合にも対応
  *
  * @param basePath ユーザー設定のベースディレクトリ
+ * @param onTopLevelListed 進捗表示用。ベースディレクトリ直下のサブディレクトリ数が分かったときに
+ *        (0, 総数) で、直下のサブディレクトリ 1 つの配下を探索し終えるたびに (探索済み数, 総数) で呼ばれる。
+ *        VRChat の写真ディレクトリは直下に月ごとのフォルダを持つため、直下の単位で数えると
+ *        探索の進み具合をほぼ均等な刻みで示せる。ベースディレクトリを読めなければ呼ばれない
  * @returns VRChat写真を含むフォルダパスの配列（ブランド型）
  */
 const getPhotoFolders = async (
   basePath: VRChatPhotoDirPath,
+  onTopLevelListed?: (listed: number, total: number) => void,
 ): Promise<VRChatPhotoContainingFolderPath[]> => {
   const photoFolders: string[] = [];
 
-  const scanDir = async (dirPath: string): Promise<void> => {
+  const scanDir = async (
+    dirPath: string,
+    onSubDirListed?: (listed: number, total: number) => void,
+  ): Promise<void> => {
     let entries: Dirent[];
     // effect-lint-allow-try-catch: ts-patternでエラー分類し予期しないエラーを再スロー
     try {
@@ -832,15 +840,16 @@ const getPhotoFolders = async (
       photoFolders.push(dirPath);
     }
 
-    // サブディレクトリを再帰探索（async/await制御のためif文を使用）
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        await scanDir(path.join(dirPath, entry.name));
-      }
+    // サブディレクトリを再帰探索
+    const subDirs = entries.filter((entry) => entry.isDirectory());
+    onSubDirListed?.(0, subDirs.length);
+    for (const [index, entry] of subDirs.entries()) {
+      await scanDir(path.join(dirPath, entry.name));
+      onSubDirListed?.(index + 1, subDirs.length);
     }
   };
 
-  await scanDir(basePath.value);
+  await scanDir(basePath.value, onTopLevelListed);
   // 発見したフォルダパスをブランド型に変換
   return photoFolders.map((p) =>
     VRChatPhotoContainingFolderPathSchema.parse(p),
@@ -876,131 +885,114 @@ interface SkipStatistics {
 }
 
 /**
- * getChangedFoldersWithFiles の戻り値
+ * Stage 1: 1 フォルダのダイジェストを前回の走査結果と比べ、変更があればファイル一覧を添えて返す。
+ * 変更が無いとき、またはダイジェスト計算・一覧取得が想定内のエラーで失敗したときは null を返す
+ * （失敗は skipStats に数える）。
+ * フォルダ単位で呼ぶのは、呼び出し側が 1 フォルダ走査するたびに進捗を報告できるようにするため。
  */
-interface ChangedFoldersResult {
-  changedFolders: ChangedFolder[];
-  skipStats: SkipStatistics;
-}
-
-const getChangedFoldersWithFiles = async (
-  basePath: VRChatPhotoDirPath,
+const getChangedFolder = async (
+  folderPath: VRChatPhotoContainingFolderPath,
   savedStates: PhotoFolderScanStates,
-): Promise<ChangedFoldersResult> => {
-  // VRChat写真を含むフォルダを全て探索（再帰的）
-  const folders = await getPhotoFolders(basePath);
-  const changedFolders: ChangedFolder[] = [];
-  const skipStats: SkipStatistics = {
-    digestErrors: { folderNotFound: 0, permissionDenied: 0 },
-    readdirErrors: { folderNotFound: 0, permissionDenied: 0 },
-    statErrors: { fileNotFound: 0, permissionDenied: 0 },
-  };
+  skipStats: SkipStatistics,
+): Promise<ChangedFolder | null> => {
+  // hash-wasm でダイジェスト計算（エラー時はスキップ）
+  const digestEither = await Effect.runPromise(
+    Effect.either(computeFolderDigest(folderPath)),
+  );
 
-  for (const folderPath of folders) {
-    // hash-wasm でダイジェスト計算（エラー時はスキップ）
-    const digestEither = await Effect.runPromise(
-      Effect.either(computeFolderDigest(folderPath)),
-    );
-
-    if (digestEither._tag === 'Left') {
-      // FOLDER_NOT_FOUND/PERMISSION_DENIED はログ済み、統計を記録してスキップ
-      match(digestEither.left.type)
-        .with('FOLDER_NOT_FOUND', () => {
-          skipStats.digestErrors.folderNotFound++;
-        })
-        .with('PERMISSION_DENIED', () => {
-          skipStats.digestErrors.permissionDenied++;
-        })
-        .exhaustive();
-      continue;
-    }
-
-    const currentDigest = digestEither.right;
-
-    // ブランド型から生のstring値を取得して比較（オブジェクトキーアクセス用）
-    const savedState = savedStates[folderPath as string];
-
-    // デバッグ: savedState lookup 結果
-    logger.debug(
-      `[DigestCheck] folder=${folderPath}, savedStateExists=${Boolean(savedState)}, savedDigest=${savedState?.digest ?? 'none'}, currentDigest=${currentDigest}`,
-    );
-
-    // ダイジェストが一致すればスキップ（FolderDigest同士は直接比較可能）
-    if (savedState && savedState.digest === currentDigest) {
-      logger.debug(`[DigestCheck] MATCH - skipping folder: ${folderPath}`);
-      continue;
-    }
-    logger.debug(
-      `[DigestCheck] MISMATCH - folder will be processed: ${folderPath}`,
-    );
-
-    // 変更があったフォルダのファイル一覧を取得（エラー時はスキップ）
-    const fileNamesEither = await Effect.runPromise(
-      Effect.either(
-        Effect.tryPromise({
-          try: () => fsPromises.readdir(folderPath as string),
-          catch: (
-            error,
-          ): { type: 'READDIR_ERROR'; code: string | undefined } => {
-            const nodeError = error as NodeJS.ErrnoException;
-            return match(nodeError.code)
-              .with('ENOENT', () => {
-                logger.debug(`Folder deleted during scan: ${folderPath}`);
-                return {
-                  type: 'READDIR_ERROR' as const,
-                  code: nodeError.code,
-                };
-              })
-              .with(P.union('EACCES', 'EPERM'), () => {
-                logger.warn({
-                  message: `Permission denied reading folder: ${folderPath}`,
-                  stack:
-                    error instanceof Error ? error : new Error(String(error)),
-                });
-                return {
-                  type: 'READDIR_ERROR' as const,
-                  code: nodeError.code,
-                };
-              })
-              .otherwise(() => {
-                // 想定外エラー → Sentry送信のため再スロー
-                throw error;
-              });
-          },
-        }),
-      ),
-    );
-
-    if (fileNamesEither._tag === 'Left') {
-      // 統計を記録してスキップ
-      match(fileNamesEither.left.code)
-        .with('ENOENT', () => {
-          skipStats.readdirErrors.folderNotFound++;
-        })
-        .with(P.union('EACCES', 'EPERM'), () => {
-          skipStats.readdirErrors.permissionDenied++;
-        })
-        .otherwise((code) => {
-          // 上記のreaddirエラーマッパーで想定外エラーはre-throwされるため、
-          // このブランチは到達不能のはず。到達した場合は調査が必要
-          logger.warn({
-            message:
-              'Unexpected readdir error code reached statistics tracking',
-            details: { code },
-          });
-        });
-      continue;
-    }
-
-    const fileNames = fileNamesEither.right;
-
-    logger.debug(
-      `Folder changed: ${folderPath} (saved: ${savedState?.digest ?? 'none'}, current: ${currentDigest})`,
-    );
-    changedFolders.push({ folderPath, fileNames, currentDigest });
+  if (digestEither._tag === 'Left') {
+    // FOLDER_NOT_FOUND/PERMISSION_DENIED はログ済み、統計を記録してスキップ
+    match(digestEither.left.type)
+      .with('FOLDER_NOT_FOUND', () => {
+        skipStats.digestErrors.folderNotFound++;
+      })
+      .with('PERMISSION_DENIED', () => {
+        skipStats.digestErrors.permissionDenied++;
+      })
+      .exhaustive();
+    return null;
   }
 
-  return { changedFolders, skipStats };
+  const currentDigest = digestEither.right;
+
+  // ブランド型から生のstring値を取得して比較（オブジェクトキーアクセス用）
+  const savedState = savedStates[folderPath as string];
+
+  // デバッグ: savedState lookup 結果
+  logger.debug(
+    `[DigestCheck] folder=${folderPath}, savedStateExists=${Boolean(savedState)}, savedDigest=${savedState?.digest ?? 'none'}, currentDigest=${currentDigest}`,
+  );
+
+  // ダイジェストが一致すればスキップ（FolderDigest同士は直接比較可能）
+  if (savedState && savedState.digest === currentDigest) {
+    logger.debug(`[DigestCheck] MATCH - skipping folder: ${folderPath}`);
+    return null;
+  }
+  logger.debug(
+    `[DigestCheck] MISMATCH - folder will be processed: ${folderPath}`,
+  );
+
+  // 変更があったフォルダのファイル一覧を取得（エラー時はスキップ）
+  const fileNamesEither = await Effect.runPromise(
+    Effect.either(
+      Effect.tryPromise({
+        try: () => fsPromises.readdir(folderPath as string),
+        catch: (error): { type: 'READDIR_ERROR'; code: string | undefined } => {
+          const nodeError = error as NodeJS.ErrnoException;
+          return match(nodeError.code)
+            .with('ENOENT', () => {
+              logger.debug(`Folder deleted during scan: ${folderPath}`);
+              return {
+                type: 'READDIR_ERROR' as const,
+                code: nodeError.code,
+              };
+            })
+            .with(P.union('EACCES', 'EPERM'), () => {
+              logger.warn({
+                message: `Permission denied reading folder: ${folderPath}`,
+                stack:
+                  error instanceof Error ? error : new Error(String(error)),
+              });
+              return {
+                type: 'READDIR_ERROR' as const,
+                code: nodeError.code,
+              };
+            })
+            .otherwise(() => {
+              // 想定外エラー → Sentry送信のため再スロー
+              throw error;
+            });
+        },
+      }),
+    ),
+  );
+
+  if (fileNamesEither._tag === 'Left') {
+    // 統計を記録してスキップ
+    match(fileNamesEither.left.code)
+      .with('ENOENT', () => {
+        skipStats.readdirErrors.folderNotFound++;
+      })
+      .with(P.union('EACCES', 'EPERM'), () => {
+        skipStats.readdirErrors.permissionDenied++;
+      })
+      .otherwise((code) => {
+        // 上記のreaddirエラーマッパーで想定外エラーはre-throwされるため、
+        // このブランチは到達不能のはず。到達した場合は調査が必要
+        logger.warn({
+          message: 'Unexpected readdir error code reached statistics tracking',
+          details: { code },
+        });
+      });
+    return null;
+  }
+
+  const fileNames = fileNamesEither.right;
+
+  logger.debug(
+    `Folder changed: ${folderPath} (saved: ${savedState?.digest ?? 'none'}, current: ${currentDigest})`,
+  );
+  return { folderPath, fileNames, currentDigest };
 };
 
 /**
@@ -1191,15 +1183,43 @@ async function processPhotoBatch(
 
 /**
  * 写真インデックス作成の進捗。
+ *
+ * - `list`: Stage 1〜2 の前に、VRChat 写真を含むフォルダを全ディレクトリ分再帰的に探す。
+ *   フォルダの総数はこの段階が終わるまで分からないため、ディレクトリと直下のサブディレクトリの単位で進捗を示す
+ * - `scan`: Stage 1〜2（フォルダのダイジェスト比較と、変更フォルダ内のファイルの mtime 確認）。
+ *   登録対象の総数はこの段階が終わるまで分からないため、走査したフォルダ数で進捗を示す
+ * - `register`: Stage 3（画像サイズの読み取りと DB 登録）。登録対象の新規ファイル数で進捗を示す
+ *
+ * `list`・`scan`・`register` の順に届き、`register` は登録対象が 1 件以上あるときだけ届く。
  */
-interface PhotoIndexProgress {
-  /** 処理済みのファイル数（画像として読めずに登録しなかったファイルも含む） */
-  handled: number;
-  /** 登録対象の新規ファイルの総数 */
-  total: number;
-  /** 直前に登録した写真の撮影月（ローカルタイムの `YYYY-MM`）。まだ登録していなければ undefined */
-  currentMonth?: string;
-}
+export type PhotoIndexProgress =
+  | {
+      phase: 'list';
+      /** 一覧を取り終えたディレクトリ数（メインと追加ディレクトリを合わせて数える） */
+      dirsListed: number;
+      /** 一覧を取るディレクトリの総数 */
+      dirCount: number;
+      /** 一覧を取っている途中のディレクトリで、直下のサブディレクトリを探索し終えた数。途中のディレクトリが無ければ 0 */
+      topLevelListed: number;
+      /** 一覧を取っている途中のディレクトリの、直下のサブディレクトリ数。途中のディレクトリが無ければ 0 */
+      topLevelTotal: number;
+    }
+  | {
+      phase: 'scan';
+      /** ダイジェスト比較と（変更があれば）mtime 確認まで終えたフォルダ数 */
+      foldersScanned: number;
+      /** 全ディレクトリで走査するフォルダ（VRChat 写真を含むフォルダ）の総数 */
+      totalFolders: number;
+    }
+  | {
+      phase: 'register';
+      /** 処理済みのファイル数（画像として読めずに登録しなかったファイルも含む） */
+      handled: number;
+      /** 登録対象の新規ファイルの総数 */
+      total: number;
+      /** 直前に登録した写真の撮影月（ローカルタイムの `YYYY-MM`）。まだ登録していなければ undefined */
+      currentMonth?: string;
+    };
 
 /**
  * 写真ディレクトリを走査してインデックスを更新する
@@ -1216,8 +1236,11 @@ interface PhotoIndexProgress {
  * - バッチ間でキャッシュをクリア
  *
  * @param isIncremental true: 差分スキャン（ダイジェスト・mtime使用）、false: フルスキャン
- * @param onProgress 登録対象の総数が確定したときと、バッチを 1 つ処理するたびに呼ばれる（進捗表示用）。
- *                   登録対象が 1 件も無ければ呼ばれない
+ * @param onProgress 進捗表示用。フォルダ一覧の探索中は直下のサブディレクトリ 1 つごとと
+ *                   ディレクトリ 1 つごとに `list` で、
+ *                   フォルダの総数が確定したときとフォルダを 1 つ走査するたびに `scan` で、
+ *                   登録対象の総数が確定したときとバッチを 1 つ処理するたびに `register` で呼ばれる。
+ *                   登録対象が 1 件も無ければ `register` では呼ばれない
  */
 export const createVRChatPhotoPathIndex = async (
   isIncremental = true,
@@ -1276,86 +1299,110 @@ export const createVRChatPhotoPathIndex = async (
       scannedAt: Date;
     }[] = [];
 
-    for (const dir of allDirs) {
-      logger.debug(`Processing photos from directory: ${dir.value}`);
-
+    // Stage 1〜2 に入る前に全ディレクトリのフォルダ一覧を取り、走査するフォルダの総数を確定させる。
+    // ディレクトリごとに総数を数え直すと、2 つ目のディレクトリに入ったところで割合が下がり、
+    // 進捗が逆行するため。
+    const foldersPerDir: {
+      folders: VRChatPhotoContainingFolderPath[];
+      scannedAt: Date;
+    }[] = [];
+    const dirCount = allDirs.length;
+    for (const [dirIndex, dir] of allDirs.entries()) {
+      logger.debug(`Listing photo folders in directory: ${dir.value}`);
       // lastScannedAt には、Stage 3 の終了時刻ではなくファイル一覧を取る直前の時刻を保存する。
       // 一覧を取った後に作られたファイルは今回の対象に入らないが、mtime がこの時刻より新しいので
       // 次回の差分スキャンで拾われる。終了時刻を保存すると、登録中に作られたファイルの mtime が
       // lastScannedAt より古くなり、以後の差分スキャンで永久に除外される。
       const scannedAt = new Date();
+      const folders = await getPhotoFolders(dir, (listed, total) => {
+        onProgress?.({
+          phase: 'list',
+          dirsListed: dirIndex,
+          dirCount,
+          topLevelListed: listed,
+          topLevelTotal: total,
+        });
+      });
+      foldersPerDir.push({ folders, scannedAt });
+      onProgress?.({
+        phase: 'list',
+        dirsListed: dirIndex + 1,
+        dirCount,
+        topLevelListed: 0,
+        topLevelTotal: 0,
+      });
+    }
+    const totalFolders = foldersPerDir.reduce(
+      (sum, { folders }) => sum + folders.length,
+      0,
+    );
+    let foldersScanned = 0;
+    onProgress?.({ phase: 'scan', foldersScanned, totalFolders });
 
+    /** Stage 1〜2 を 1 フォルダ分行い、登録対象があれば pendingFolders に積む */
+    const scanFolder = async (
+      folderPath: VRChatPhotoContainingFolderPath,
+      scannedAt: Date,
+    ): Promise<void> => {
       // Stage 1: フォルダダイジェストチェック
-      const { changedFolders, skipStats } = await getChangedFoldersWithFiles(
-        dir,
+      const changedFolder = await getChangedFolder(
+        folderPath,
         savedStates,
+        totalSkipStats,
       );
-
-      // スキップ統計を集計
-      totalSkipStats.digestErrors.folderNotFound +=
-        skipStats.digestErrors.folderNotFound;
-      totalSkipStats.digestErrors.permissionDenied +=
-        skipStats.digestErrors.permissionDenied;
-      totalSkipStats.readdirErrors.folderNotFound +=
-        skipStats.readdirErrors.folderNotFound;
-      totalSkipStats.readdirErrors.permissionDenied +=
-        skipStats.readdirErrors.permissionDenied;
-
-      if (changedFolders.length === 0) {
-        logger.debug(`No changed folders in: ${dir.value}`);
-        continue;
+      if (changedFolder === null) {
+        return;
       }
 
-      logger.debug(
-        `Found ${changedFolders.length} changed folders in: ${dir.value}`,
+      // ブランド型をstringにキャストしてストレージアクセス（パスのみ）
+      const folderPathStr = folderPath as string;
+      // digestはFolderDigest型のまま保持（FolderScanStateSchema.digestと型統一）
+      const { currentDigest } = changedFolder;
+
+      const savedState = savedStates[folderPathStr];
+      const lastScannedAt = savedState
+        ? new Date(savedState.lastScannedAt)
+        : null;
+
+      // Stage 2: ファイルmtimeチェック
+      const { newFiles, statErrors } = await filterNewFilesByMtime(
+        changedFolder,
+        lastScannedAt,
       );
 
-      for (const changedFolder of changedFolders) {
-        // ブランド型をstringにキャストしてストレージアクセス（パスのみ）
-        const folderPathStr = changedFolder.folderPath as string;
-        // digestはFolderDigest型のまま保持（FolderScanStateSchema.digestと型統一）
-        const { currentDigest } = changedFolder;
+      // デバッグ: mtime フィルタ結果
+      logger.debug(
+        `[MtimeFilter] folder=${folderPathStr}, lastScannedAt=${lastScannedAt?.toISOString() ?? 'null'}, totalFiles=${changedFolder.fileNames.length}, newFiles=${newFiles.length}`,
+      );
 
-        const savedState = savedStates[folderPathStr];
-        const lastScannedAt = savedState
-          ? new Date(savedState.lastScannedAt)
-          : null;
+      // stat統計を集計
+      totalSkipStats.statErrors.fileNotFound += statErrors.fileNotFound;
+      totalSkipStats.statErrors.permissionDenied += statErrors.permissionDenied;
 
-        // Stage 2: ファイルmtimeチェック
-        const { newFiles, statErrors } = await filterNewFilesByMtime(
-          changedFolder,
-          lastScannedAt,
-        );
+      if (newFiles.length === 0) {
+        // ファイル削除のみの場合など（ダイジェスト変更だがmtimeでフィルタ後0件）
+        // ダイジェストは更新する
+        updatedStates[folderPathStr] = {
+          digest: currentDigest,
+          lastScannedAt: scannedAt.toISOString(),
+        };
+        return;
+      }
 
-        // デバッグ: mtime フィルタ結果
-        logger.debug(
-          `[MtimeFilter] folder=${folderPathStr}, lastScannedAt=${lastScannedAt?.toISOString() ?? 'null'}, totalFiles=${changedFolder.fileNames.length}, newFiles=${newFiles.length}`,
-        );
+      logger.debug(`Found ${newFiles.length} new files in: ${folderPathStr}`);
+      pendingFolders.push({
+        folderPathStr,
+        currentDigest,
+        newFiles,
+        scannedAt,
+      });
+    };
 
-        // stat統計を集計
-        totalSkipStats.statErrors.fileNotFound += statErrors.fileNotFound;
-        totalSkipStats.statErrors.permissionDenied +=
-          statErrors.permissionDenied;
-
-        if (newFiles.length === 0) {
-          // ファイル削除のみの場合など（ダイジェスト変更だがmtimeでフィルタ後0件）
-          // ダイジェストは更新する
-          updatedStates[folderPathStr] = {
-            digest: currentDigest,
-            lastScannedAt: scannedAt.toISOString(),
-          };
-          continue;
-        }
-
-        logger.debug(
-          `Found ${newFiles.length} new files in: ${changedFolder.folderPath}`,
-        );
-        pendingFolders.push({
-          folderPathStr,
-          currentDigest,
-          newFiles,
-          scannedAt,
-        });
+    for (const { folders, scannedAt } of foldersPerDir) {
+      for (const folderPath of folders) {
+        await scanFolder(folderPath, scannedAt);
+        foldersScanned++;
+        onProgress?.({ phase: 'scan', foldersScanned, totalFolders });
       }
     }
 
@@ -1366,7 +1413,7 @@ export const createVRChatPhotoPathIndex = async (
     let handledFiles = 0;
     // 新規ファイルが無ければ件数を送らない。「0 / 0 枚」と表示しても伝わる情報が無いため
     if (totalNewFiles > 0) {
-      onProgress?.({ handled: 0, total: totalNewFiles });
+      onProgress?.({ phase: 'register', handled: 0, total: totalNewFiles });
     }
 
     for (const {
@@ -1430,6 +1477,7 @@ export const createVRChatPhotoPathIndex = async (
         handledFiles += batch.length;
         const lastPhoto = processedBatch.at(-1);
         onProgress?.({
+          phase: 'register',
           handled: handledFiles,
           total: totalNewFiles,
           currentMonth: lastPhoto

@@ -171,6 +171,7 @@ export const StartupTimelineScreen = ({
           photosInMonth: t('initProgress.timeline.detail.photosInMonth'),
           photos: t('initProgress.timeline.detail.photos'),
           files: t('initProgress.timeline.detail.files'),
+          folders: t('initProgress.timeline.detail.folders'),
           logs: t('initProgress.timeline.detail.logs'),
         });
 

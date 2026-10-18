@@ -9,6 +9,7 @@ import { match } from 'ts-pattern';
 import { getDBQueue } from '../../lib/dbQueue';
 import { logger } from '../../lib/logger';
 import type { InitProgressRun } from '../initProgress/emitter';
+import type { InitProgressDetails } from '../initProgress/schema';
 import type { VRChatLogFileError } from '../vrchatLog/error';
 import type { VRChatLogError } from '../vrchatLog/errors';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../vrchatLog/model';
@@ -20,6 +21,7 @@ import type {
 import * as vrchatLogService from '../vrchatLog/service';
 import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.model';
 import * as vrchatPhotoService from '../vrchatPhoto/vrchatPhoto.service';
+import type { PhotoIndexProgress } from '../vrchatPhoto/vrchatPhoto.service';
 import * as metadataService from '../vrchatPhotoMetadata/service';
 import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
@@ -37,6 +39,102 @@ import { type LogInfoServiceError, LogInfoUnknownError } from './errors';
  * 書き込みの方が重いため、書き込みに多く割り当てる。
  */
 const LOG_LOAD_READ_SHARE_PERCENT = 40;
+
+/**
+ * photo_index ステージの進捗の配分（%）。フォルダ一覧の探索・フォルダの走査（ダイジェスト比較と mtime 確認）・
+ * 新規写真の登録の順に割り当てる。差分起動では新規写真が少なく探索と走査がステージの大半を占めるが、
+ * 初回起動では全写真の画像サイズ読み取りと DB 登録の方が重いため、登録に多く割り当てる。
+ * 探索は 1 フォルダあたり readdir 1 回で、走査（ダイジェスト計算と stat）より軽いため、走査より少なく割り当てる。
+ */
+const PHOTO_INDEX_LIST_SHARE_PERCENT = 10;
+const PHOTO_INDEX_SCAN_SHARE_PERCENT = 20;
+const PHOTO_INDEX_REGISTER_SHARE_PERCENT =
+  100 - PHOTO_INDEX_LIST_SHARE_PERCENT - PHOTO_INDEX_SCAN_SHARE_PERCENT;
+
+/**
+ * createVRChatPhotoPathIndex の進捗を photo_index ステージの進捗へ変換して送る関数を作る。
+ *
+ * 探索と走査はフォルダ 1 つごとに通知されるため、写真フォルダが数千あると同じ割合のイベントが
+ * 数千回送られる。そこで探索と走査は、送る割合（整数に丸めた値）が変わったときと段階が切り替わったとき、
+ * 走査の最後のフォルダのときだけ送る。登録はバッチ単位で回数が少なく、撮影月の表示を毎回更新したいので間引かない。
+ */
+const createPhotoIndexProgressReporter = (progress: InitProgressRun) => {
+  let lastSent: { phase: PhotoIndexProgress['phase']; percent: number } | null =
+    null;
+  const send = (
+    phase: PhotoIndexProgress['phase'],
+    percent: number,
+    details: InitProgressDetails | undefined,
+    force: boolean,
+  ) => {
+    const rounded = Math.round(percent);
+    if (
+      !force &&
+      lastSent !== null &&
+      lastSent.phase === phase &&
+      lastSent.percent === rounded
+    ) {
+      return;
+    }
+    lastSent = { phase, percent: rounded };
+    progress.stage('photo_index', percent, details);
+  };
+
+  return (photoProgress: PhotoIndexProgress): void => {
+    match(photoProgress)
+      .with(
+        { phase: 'list' },
+        ({ dirsListed, dirCount, topLevelListed, topLevelTotal }) => {
+          // 探索中はフォルダの総数がまだ分からず、正直な件数を出せないので件数は送らない
+          const dirsDone =
+            dirsListed +
+            (topLevelTotal > 0 ? topLevelListed / topLevelTotal : 0);
+          send(
+            'list',
+            dirCount > 0
+              ? (dirsDone / dirCount) * PHOTO_INDEX_LIST_SHARE_PERCENT
+              : PHOTO_INDEX_LIST_SHARE_PERCENT,
+            undefined,
+            false,
+          );
+        },
+      )
+      .with({ phase: 'scan' }, ({ foldersScanned, totalFolders }) => {
+        send(
+          'scan',
+          PHOTO_INDEX_LIST_SHARE_PERCENT +
+            (totalFolders > 0 ? foldersScanned / totalFolders : 1) *
+              PHOTO_INDEX_SCAN_SHARE_PERCENT,
+          // フォルダが 1 つも無ければ件数を送らない。「0 / 0 フォルダ」と表示しても伝わる情報が無いため
+          totalFolders > 0
+            ? { current: foldersScanned, total: totalFolders, unit: 'folders' }
+            : undefined,
+          foldersScanned === totalFolders,
+        );
+      })
+      .with({ phase: 'register' }, ({ handled, total, currentMonth }) => {
+        send(
+          'register',
+          PHOTO_INDEX_LIST_SHARE_PERCENT +
+            PHOTO_INDEX_SCAN_SHARE_PERCENT +
+            (total > 0 ? handled / total : 1) *
+              PHOTO_INDEX_REGISTER_SHARE_PERCENT,
+          {
+            current: handled,
+            total,
+            unit: 'photos',
+            ...(currentMonth === undefined
+              ? {}
+              : { currentItem: currentMonth }),
+          },
+          true,
+        );
+        // バッチを登録するたびに月別グラフを伸ばす（送信は stats 側で間引かれる）
+        progress.dbUpdated({ logsChanged: false });
+      })
+      .exhaustive();
+  };
+};
 
 interface LogProcessingResults {
   createdWorldJoinLogModelList: VRChatWorldJoinLogModel[];
@@ -486,22 +584,9 @@ export function loadLogInfoIndexFromVRChatLog({
     const photoResults = yield* Effect.promise(() =>
       vrchatPhotoService.createVRChatPhotoPathIndex(
         excludeOldLogLoad,
-        ({ handled, total, currentMonth }) => {
-          progress?.stage(
-            'photo_index',
-            total > 0 ? (handled / total) * 100 : 100,
-            {
-              current: handled,
-              total,
-              unit: 'photos',
-              ...(currentMonth === undefined
-                ? {}
-                : { currentItem: currentMonth }),
-            },
-          );
-          // バッチを登録するたびに月別グラフを伸ばす（送信は stats 側で間引かれる）
-          progress?.dbUpdated({ logsChanged: false });
-        },
+        progress === undefined
+          ? undefined
+          : createPhotoIndexProgressReporter(progress),
       ),
     );
     results.createdVRChatPhotoPathModelList = photoResults ?? [];

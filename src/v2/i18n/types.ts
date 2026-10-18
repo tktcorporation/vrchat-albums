@@ -205,6 +205,7 @@ export interface Translations {
         photosInMonth: string;
         photos: string;
         files: string;
+        folders: string;
         logs: string;
       };
     };

@@ -58,6 +58,16 @@ describe('formatProgressDetail', () => {
     );
   });
 
+  it('写真フォルダの走査はフォルダ数で出す', () => {
+    const details = { current: 40, total: 1310, unit: 'folders' } as const;
+    expect(formatProgressDetail(details, 'ja', jaTemplates)).toBe(
+      '40 / 1,310 フォルダ',
+    );
+    expect(formatProgressDetail(details, 'en', enTemplates)).toBe(
+      '40 / 1,310 folders',
+    );
+  });
+
   it('ログの件数は件で出す', () => {
     const details = { current: 1500, total: 20000, unit: 'logs' } as const;
     expect(formatProgressDetail(details, 'ja', jaTemplates)).toBe(

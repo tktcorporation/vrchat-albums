@@ -175,6 +175,7 @@ const en: Translations = {
         photosInMonth: '{month}   {current} / {total}',
         photos: '{current} / {total} photos',
         files: '{current} / {total} files',
+        folders: '{current} / {total} folders',
         logs: '{current} / {total} records',
       },
     },
