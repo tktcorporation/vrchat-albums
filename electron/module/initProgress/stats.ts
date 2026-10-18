@@ -188,6 +188,15 @@ export const createInitStatsCollector = (
    */
   let logCounts: { readonly worlds: number; readonly people: number } | null =
     null;
+  /**
+   * logCounts を捨てるたびに進める番号。集計中に捨てられたら、その集計が数えた値は捨てる前の
+   * ログに基づくので logCounts に書き戻さない。書き戻すと次の集計が古い値を使い回す
+   */
+  let logCountsGeneration = 0;
+  const invalidateLogCounts = (): void => {
+    logCounts = null;
+    logCountsGeneration++;
+  };
 
   const reportFailure = (error: InitStatsQueryError): void => {
     if (failureReported) {
@@ -200,6 +209,7 @@ export const createInitStatsCollector = (
 
   const collect = (): Promise<void> => {
     const cached = logCounts;
+    const generation = logCountsGeneration;
     return Effect.runPromise(
       Effect.tryPromise({
         try: async () => {
@@ -211,7 +221,9 @@ export const createInitStatsCollector = (
                 countDistinctPlayerNames(),
               ]).then(([worlds, people]) => ({ worlds, people })),
           ]);
-          logCounts = counts;
+          if (generation === logCountsGeneration) {
+            logCounts = counts;
+          }
           return toInitStats({
             months,
             worlds: counts.worlds,
@@ -236,12 +248,12 @@ export const createInitStatsCollector = (
   return {
     request: ({ logsChanged }) => {
       if (logsChanged) {
-        logCounts = null;
+        invalidateLogCounts();
       }
       runner.request();
     },
     flush: () => {
-      logCounts = null;
+      invalidateLogCounts();
       return runner.flush();
     },
     close: runner.close,

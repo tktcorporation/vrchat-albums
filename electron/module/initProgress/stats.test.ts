@@ -304,6 +304,31 @@ describe('統計のコレクター', () => {
     collector.close();
   });
 
+  it('集計中にログが登録されたら、その集計が数えたワールド数・人数を次の集計で使い回さない', async () => {
+    const deliver = vi.fn();
+    const collector = createInitStatsCollector(deliver);
+    let resolveSlowWorlds: (worlds: number) => void = () => {};
+    const slowWorlds = new Promise<number>((resolve) => {
+      resolveSlowWorlds = resolve;
+    });
+    vi.mocked(countDistinctVisitedWorlds).mockReturnValueOnce(slowWorlds);
+
+    const firstFlush = collector.flush();
+    await settle();
+    // ログ同期の結果を登録した。集計中の値は登録前のログを数えている
+    collector.request({ logsChanged: true });
+    vi.mocked(countDistinctVisitedWorlds).mockResolvedValue(7);
+    resolveSlowWorlds(3);
+    await firstFlush;
+    await waitForThrottle();
+
+    expect(countDistinctVisitedWorlds).toHaveBeenCalledTimes(2);
+    expect(deliver).toHaveBeenLastCalledWith(
+      expect.objectContaining({ worlds: 7 }),
+    );
+    collector.close();
+  });
+
   it('ワールド数・人数の数え直しに失敗したら、次の集計で改めて数え直す', async () => {
     const deliver = vi.fn();
     const collector = createInitStatsCollector(deliver);
