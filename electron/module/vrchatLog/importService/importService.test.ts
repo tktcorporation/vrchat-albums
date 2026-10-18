@@ -168,7 +168,7 @@ describe('importService', () => {
           path: '',
           parentPath: '',
         },
-      ] as unknown as Dirent<Buffer>[]);
+      ] as unknown as Dirent<NonSharedBuffer>[]);
       vi.mocked(fs.readFile).mockResolvedValue(
         '2023-10-08 18:57:27 Log        -  [Behaviour] Joining or Creating Room: Test World',
       );
@@ -322,7 +322,7 @@ describe('importService', () => {
               isDirectory: () => false,
             },
             { name: 'subdir', isFile: () => false, isDirectory: () => true },
-          ] as unknown as Dirent<Buffer>[];
+          ] as unknown as Dirent<NonSharedBuffer>[];
         }
         if (dir.toString().includes('subdir')) {
           return [
@@ -331,7 +331,7 @@ describe('importService', () => {
               isFile: () => true,
               isDirectory: () => false,
             },
-          ] as unknown as Dirent<Buffer>[];
+          ] as unknown as Dirent<NonSharedBuffer>[];
         }
         return [];
       });
@@ -498,7 +498,7 @@ describe('importService', () => {
           path: '',
           parentPath: '',
         },
-      ] as unknown as Dirent<Buffer>[]);
+      ] as unknown as Dirent<NonSharedBuffer>[]);
       vi.mocked(fs.readFile).mockResolvedValue(
         '2023-10-08 18:57:27 Log        -  [Behaviour] Joining or Creating Room: Test World',
       );

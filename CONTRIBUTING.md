@@ -10,7 +10,7 @@
   - [https://github.com/features/codespaces](https://github.com/features/codespaces)
   - ref: [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)
     - linux
-    - nodejs (Node.js 22.22.2 以上の 22 系が必須です)
+    - nodejs (Node.js 24.21.0 以上の 24 系が必須です。Electron に同梱される Node と同じ 24 系で、同梱版以上の版を使います)
 
 1.  **リポジトリのクローン**:
 

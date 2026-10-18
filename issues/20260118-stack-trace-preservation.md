@@ -115,4 +115,4 @@ function checkStackTracePreservation(node: ts.CatchClause): void {
 ## 備考
 
 - ES2022の `Error.cause` プロパティはNode.js 16.9+でサポート
-- このプロジェクトはNode.js 22 LTSを使用しているため問題なし
+- このプロジェクトの engines.node はこの条件を満たすため問題なし

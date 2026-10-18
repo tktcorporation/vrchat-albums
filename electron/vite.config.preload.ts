@@ -23,7 +23,7 @@ export default defineConfig({
     outDir: join(__dirname, '../main'),
     // main process の出力を消さない
     emptyOutDir: false,
-    target: 'node20',
+    target: 'node24',
     lib: {
       entry: { preload: join(__dirname, 'preload.ts') },
       formats: ['cjs'],
