@@ -26,10 +26,3 @@ export const NormalizedPathArraySchema = z
   .transform((paths): NormalizedPath[] => {
     return paths.map((p) => normalize(p) as NormalizedPath);
   });
-
-/**
- * 正規化されたパスかどうかを判定
- */
-export const isNormalizedPath = (p: string): p is NormalizedPath => {
-  return !p.includes('\\');
-};
