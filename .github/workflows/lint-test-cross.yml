@@ -29,6 +29,38 @@ jobs:
       - name: lint
         run: pnpm lint
 
+  # packages/exif-native の Rust コードを rustfmt / clippy で検査する。
+  # Node の依存は不要なので setup-node-and-install を使わず、Rust toolchain だけを入れる。
+  # toolchain は test job と同じく floating stable のため、新しい stable で追加された clippy lint が
+  # Rust 側の変更なしに失敗を起こすことがある。その場合は lint に従って修正する。
+  rust-lint:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        # SHA で固定すると ref 名から toolchain を読めないので、stable を明示する
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Cache Rust build (cargo registry / target)
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: 'packages/exif-native -> target'
+
+      - name: cargo fmt
+        working-directory: packages/exif-native
+        run: cargo fmt --check
+
+      - name: cargo clippy
+        working-directory: packages/exif-native
+        run: cargo clippy --all-targets -- -D warnings
+
   test:
     strategy:
       matrix:

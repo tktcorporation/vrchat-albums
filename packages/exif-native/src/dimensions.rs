@@ -144,8 +144,8 @@ pub fn read_jpeg_dimensions(data: &[u8]) -> Result<ImageDimensions, String> {
 /// JPEG: 先頭 64KB を読み込み → SOF マーカースキャン
 /// 不明なフォーマットはエラーを返す。
 pub fn read_image_dimensions_from_file(file_path: &str) -> Result<ImageDimensions, String> {
-    let mut file = File::open(file_path)
-        .map_err(|e| format!("Failed to open file {file_path}: {e}"))?;
+    let mut file =
+        File::open(file_path).map_err(|e| format!("Failed to open file {file_path}: {e}"))?;
 
     // まず先頭 8 バイトを読んでフォーマット判定
     let mut header = [0u8; 8];
@@ -180,9 +180,7 @@ pub fn read_image_dimensions_from_file(file_path: &str) -> Result<ImageDimension
                 Err(e) => Err(e), // ファイルが 64KB 未満で見つからなかった → 本当にない
             }
         }
-        ImageFormat::Unknown => {
-            Err(format!("Unknown image format: {file_path}"))
-        }
+        ImageFormat::Unknown => Err(format!("Unknown image format: {file_path}")),
     }
 }
 
@@ -328,7 +326,13 @@ mod tests {
     fn reads_png_1x1() {
         let data = build_png_header(1, 1);
         let dim = read_png_dimensions(&data).unwrap();
-        assert_eq!(dim, ImageDimensions { width: 1, height: 1 });
+        assert_eq!(
+            dim,
+            ImageDimensions {
+                width: 1,
+                height: 1
+            }
+        );
     }
 
     #[test]
@@ -450,12 +454,7 @@ mod tests {
         // APP0 (JFIF) + APP1 (EXIF placeholder) の後に SOF0
         let app0_data = b"JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00";
         let app1_data = vec![0u8; 1000]; // simulate 1KB EXIF data
-        let data = build_jpeg_with_sof(
-            3840,
-            2160,
-            0xC0,
-            &[(0xE0, app0_data), (0xE1, &app1_data)],
-        );
+        let data = build_jpeg_with_sof(3840, 2160, 0xC0, &[(0xE0, app0_data), (0xE1, &app1_data)]);
         let dim = read_jpeg_dimensions(&data).unwrap();
         assert_eq!(
             dim,
@@ -487,6 +486,7 @@ mod tests {
         let mut data = Vec::new();
         data.extend_from_slice(&[0xFF, 0xD8]); // SOI
         data.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xC0]); // padded SOF0
+
         // SOF payload
         let sof_length: u16 = 11;
         data.extend_from_slice(&sof_length.to_be_bytes());
@@ -539,7 +539,13 @@ mod tests {
         // 0x0 画像は PNG 仕様上は不正だが、パーサーはバイトをそのまま読む
         let data = build_png_header(0, 0);
         let dim = read_png_dimensions(&data).unwrap();
-        assert_eq!(dim, ImageDimensions { width: 0, height: 0 });
+        assert_eq!(
+            dim,
+            ImageDimensions {
+                width: 0,
+                height: 0
+            }
+        );
     }
 
     #[test]
@@ -548,7 +554,13 @@ mod tests {
         // パーサーは height=0 をそのまま返す
         let data = build_jpeg_with_sof(1920, 0, 0xC0, &[]);
         let dim = read_jpeg_dimensions(&data).unwrap();
-        assert_eq!(dim, ImageDimensions { width: 1920, height: 0 });
+        assert_eq!(
+            dim,
+            ImageDimensions {
+                width: 1920,
+                height: 0
+            }
+        );
     }
 
     #[test]
@@ -556,10 +568,12 @@ mod tests {
         // 0xC8 (JPG extension) は SOF ではない — length 付きマーカーとしてスキップされる
         let mut data = Vec::new();
         data.extend_from_slice(&[0xFF, 0xD8]); // SOI
+
         // 0xC8 marker with dummy payload
         data.extend_from_slice(&[0xFF, 0xC8]);
         data.extend_from_slice(&[0x00, 0x04]); // length=4 (2 for length + 2 dummy)
         data.extend_from_slice(&[0x00, 0x00]); // dummy data
+
         // SOF0
         data.push(0xFF);
         data.push(0xC0);

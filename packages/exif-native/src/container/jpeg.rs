@@ -131,9 +131,9 @@ mod tests {
     fn extract_xmp_returns_none_for_jpeg_without_xmp_app1() {
         let jpeg_bytes = minimal_jpeg();
         let result = extract_xmp_from_jpeg(&jpeg_bytes);
-        match result {
-            Ok(xmp) => assert!(xmp.is_none(), "Expected None XMP for JPEG without XMP APP1"),
-            Err(_) => {} // Parse error on minimal JPEG is acceptable
+        // Parse error on minimal JPEG is acceptable
+        if let Ok(xmp) = result {
+            assert!(xmp.is_none(), "Expected None XMP for JPEG without XMP APP1");
         }
     }
 
