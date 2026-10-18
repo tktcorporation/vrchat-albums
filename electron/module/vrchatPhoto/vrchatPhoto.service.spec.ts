@@ -223,7 +223,7 @@ describe('vrchatPhoto.service', () => {
   });
 
   describe('cleanupThumbnailCache', () => {
-    // MAX_CACHE_SIZE_MB = 500, CACHE_CLEANUP_THRESHOLD = 0.9
+    // THUMBNAIL_CACHE_LIMITS: 上限 500MB、その 90% を超えたら削除を始め、50% まで減らす
     // つまり 450MB を超えたらクリーンアップ開始、250MBまで削減
     const mockReaddir = vi.mocked(fsPromises.readdir);
     const mockStat = vi.mocked(fsPromises.stat);
