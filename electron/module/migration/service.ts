@@ -1,9 +1,10 @@
 import * as nodeFsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Either, Exit, Option } from 'effect';
 
 import { logger } from '../../lib/logger';
+import { pathExistsAsync } from '../../lib/pathExists';
 
 export interface MigrationResult {
   migrated: boolean;
@@ -61,10 +62,11 @@ export const isMigrationNeeded = (): Effect.Effect<boolean> => {
         });
 
         // Check if old app directory exists
-        const oldAppExists = await nodeFsPromises
-          .access(oldAppPath)
-          .then(() => true)
-          .catch(() => false);
+        // 確認自体の失敗（権限不足など）は reject され、下の catch でログに残して
+        // 「移行不要」として扱う。存在しないとみなして分岐を進めないため
+        const oldAppExists = await Effect.runPromise(
+          pathExistsAsync(oldAppPath),
+        );
 
         if (!oldAppExists) {
           logger.debug('No old app data found, migration not needed');
@@ -82,10 +84,9 @@ export const isMigrationNeeded = (): Effect.Effect<boolean> => {
           currentAppPath,
           '.migration-completed',
         );
-        const markerExists = await nodeFsPromises
-          .access(migrationMarkerPath)
-          .then(() => true)
-          .catch(() => false);
+        const markerExists = await Effect.runPromise(
+          pathExistsAsync(migrationMarkerPath),
+        );
 
         if (markerExists) {
           logger.debug('Migration already completed, skipping');
@@ -162,11 +163,18 @@ const getOldAppUserDataPath = (): Effect.Effect<string> => {
         try: async () => {
           for (const appName of possibleOldAppNames) {
             const possiblePath = path.join(parentDir, appName);
-            const accessible = await nodeFsPromises
-              .access(possiblePath)
-              .then(() => true)
-              .catch(() => false);
-            if (accessible) {
+            const existsResult = await Effect.runPromise(
+              Effect.either(pathExistsAsync(possiblePath)),
+            );
+            if (Either.isLeft(existsResult)) {
+              // 候補が使えないだけで移行全体は止めない。存在しない場合と区別してログに残す
+              logger.error({
+                message: `Failed to check old app directory: ${possiblePath}`,
+                stack: existsResult.left,
+              });
+              continue;
+            }
+            if (existsResult.right) {
               return possiblePath;
             }
           }
@@ -193,9 +201,16 @@ export const performMigrationIfNeeded = (): Effect.Effect<void> => {
       logger.info('Migration needed, starting migration process...');
       return performMigration().pipe(
         Effect.tap((result) =>
-          Effect.sync(() =>
-            logger.info('Migration completed successfully', result),
-          ),
+          Effect.sync(() => {
+            if (result.errors.length > 0) {
+              logger.warn(
+                `Migration completed with errors: ${result.errors.join(', ')}`,
+                result,
+              );
+              return;
+            }
+            logger.info('Migration completed successfully', result);
+          }),
         ),
         Effect.asVoid,
       );
@@ -253,49 +268,62 @@ export const performMigration = (): Effect.Effect<MigrationResult> => {
       const oldLogStorePath = path.join(oldAppPath, 'logStore');
 
       // Check if logStore directory exists, then migrate
-      await nodeFsPromises.access(oldLogStorePath).then(
-        async () => {
-          const { importService } =
-            await import('../vrchatLog/importService/importService');
-          const importExit = await Effect.runPromiseExit(
-            importService.importLogStoreFiles([oldLogStorePath], async () => {
-              // DBLogProvider is not needed for migration
-              return [];
-            }),
-          );
-          if (Exit.isSuccess(importExit)) {
-            result.details.logStore = true;
-            logger.info('LogStore migrated successfully');
-          } else {
-            const failOpt = Cause.failureOption(importExit.cause);
-            if (Option.isSome(failOpt)) {
-              const importError = failOpt.value;
-              result.errors.push(`LogStore import failed: ${importError._tag}`);
-            } else {
-              // Unexpected error (defect)
-              const dieOpt = Cause.dieOption(importExit.cause);
-              const errorMsg = (() => {
-                if (!Option.isSome(dieOpt)) {
-                  return 'Unknown error';
-                }
-                return dieOpt.value instanceof Error
-                  ? dieOpt.value.message
-                  : String(dieOpt.value);
-              })();
-              result.errors.push(`LogStore import failed: ${errorMsg}`);
-            }
-          }
-        },
-        (error) => {
-          logger.warn('LogStore migration skipped:', error);
-        },
+      const logStoreExists = await Effect.runPromise(
+        Effect.either(pathExistsAsync(oldLogStorePath)),
       );
+      if (Either.isLeft(logStoreExists)) {
+        logger.error({
+          message: `Failed to check logStore directory: ${oldLogStorePath}`,
+          stack: logStoreExists.left,
+        });
+        result.errors.push(
+          `LogStore access failed: ${logStoreExists.left.message}`,
+        );
+      } else if (!logStoreExists.right) {
+        logger.warn(`LogStore migration skipped: not found ${oldLogStorePath}`);
+      } else {
+        const { importService } =
+          await import('../vrchatLog/importService/importService');
+        const importExit = await Effect.runPromiseExit(
+          importService.importLogStoreFiles([oldLogStorePath], async () => {
+            // DBLogProvider is not needed for migration
+            return [];
+          }),
+        );
+        if (Exit.isSuccess(importExit)) {
+          result.details.logStore = true;
+          logger.info('LogStore migrated successfully');
+        } else {
+          const failOpt = Cause.failureOption(importExit.cause);
+          if (Option.isSome(failOpt)) {
+            const importError = failOpt.value;
+            result.errors.push(`LogStore import failed: ${importError._tag}`);
+          } else {
+            // Unexpected error (defect)
+            const dieOpt = Cause.dieOption(importExit.cause);
+            const errorMsg = (() => {
+              if (!Option.isSome(dieOpt)) {
+                return 'Unknown error';
+              }
+              return dieOpt.value instanceof Error
+                ? dieOpt.value.message
+                : String(dieOpt.value);
+            })();
+            result.errors.push(`LogStore import failed: ${errorMsg}`);
+          }
+        }
+      }
 
       // 3. Create migration marker if any migration was successful
+      // logStore の存在確認自体が失敗した場合はマーカーを書かず、次回に再試行させる。
+      // 再実行しても config.json の再コピーは旧アプリの同じファイルで上書きするだけで、
+      // アプリの設定は v0-settings.json 側にあるため現在の設定を失わない
+      const logStoreAccessFailed = Either.isLeft(logStoreExists);
       if (
-        result.details.settings ||
-        result.details.logStore ||
-        result.details.database
+        !logStoreAccessFailed &&
+        (result.details.settings ||
+          result.details.logStore ||
+          result.details.database)
       ) {
         const markerPath = path.join(currentAppPath, '.migration-completed');
         const markerContent = JSON.stringify(

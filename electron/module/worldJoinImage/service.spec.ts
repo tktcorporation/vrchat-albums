@@ -6,6 +6,10 @@ vi.mock('../imageGenerator/service');
 vi.mock('../vrchatApi/service');
 vi.mock('../vrchatWorldJoinLog/service');
 vi.mock('../../lib/wrappedExifTool');
+vi.mock('../../lib/pathExists', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/pathExists')>()),
+  pathExistsAsync: vi.fn(),
+}));
 vi.mock('../../lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -17,6 +21,10 @@ import * as fsPromises from 'node:fs/promises';
 
 import { ofetch } from 'ofetch';
 
+import {
+  PathExistenceCheckFailed,
+  pathExistsAsync,
+} from '../../lib/pathExists';
 import { setExifToBuffer } from '../../lib/wrappedExifTool';
 import { generateWorldJoinImage } from '../imageGenerator/service';
 import { VRChatApiWorldNotFound } from '../vrchatApi/errors';
@@ -83,7 +91,7 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fsPromises.access).mockResolvedValue(undefined);
+    vi.mocked(pathExistsAsync).mockReturnValue(Effect.succeed(true));
 
     const result = await Effect.runPromise(
       generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
@@ -91,6 +99,29 @@ describe('generateMissingWorldJoinImages', () => {
 
     expect(result.generated).toBe(0);
     expect(result.skipped).toBe(1);
+  });
+
+  it('should count existence check failures as errors without regenerating', async () => {
+    vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
+      makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
+    ]);
+    vi.mocked(pathExistsAsync).mockReturnValue(
+      Effect.fail(
+        new PathExistenceCheckFailed({
+          path: '/photos/x.jpeg',
+          code: 'EACCES',
+          message: 'permission denied',
+          cause: new Error('EACCES'),
+        }),
+      ),
+    );
+
+    const result = await Effect.runPromise(
+      generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
+    );
+
+    expect(result).toEqual({ generated: 0, skipped: 0, errors: 1 });
+    expect(generateWorldJoinImage).not.toHaveBeenCalled();
   });
 
   it('should return 0 when photoDirPath is empty', async () => {
@@ -116,9 +147,7 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fsPromises.access).mockRejectedValue(
-      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
-    );
+    vi.mocked(pathExistsAsync).mockReturnValue(Effect.succeed(false));
     vi.mocked(getVrcWorldInfoByWorldId).mockReturnValue(
       Effect.succeed(makeWorldInfo()),
     );
@@ -173,9 +202,7 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fsPromises.access).mockRejectedValue(
-      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
-    );
+    vi.mocked(pathExistsAsync).mockReturnValue(Effect.succeed(false));
     vi.mocked(getVrcWorldInfoByWorldId).mockReturnValue(
       Effect.fail(
         new VRChatApiWorldNotFound({
@@ -196,9 +223,7 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fsPromises.access).mockRejectedValue(
-      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
-    );
+    vi.mocked(pathExistsAsync).mockReturnValue(Effect.succeed(false));
     vi.mocked(getVrcWorldInfoByWorldId).mockReturnValue(
       Effect.succeed(makeWorldInfo()),
     );
@@ -218,9 +243,7 @@ describe('generateMissingWorldJoinImages', () => {
     vi.mocked(findVRChatWorldJoinLogList).mockResolvedValue([
       makeJoinLog('wrld_12345678-1234-1234-1234-123456789abc'),
     ]);
-    vi.mocked(fsPromises.access).mockRejectedValue(
-      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
-    );
+    vi.mocked(pathExistsAsync).mockReturnValue(Effect.succeed(false));
     vi.mocked(getVrcWorldInfoByWorldId).mockReturnValue(
       Effect.succeed(makeWorldInfo()),
     );

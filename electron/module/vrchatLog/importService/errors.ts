@@ -21,6 +21,15 @@ export class ImportFileNotFound extends Data.TaggedError('ImportFileNotFound')<{
   path: string;
 }> {}
 
+/** インポート対象パスの存在確認に失敗（権限不足・I/O エラーなど） */
+export class ImportFileAccessFailed extends Data.TaggedError(
+  'ImportFileAccessFailed',
+)<{
+  path: string;
+  message: string;
+  cause: unknown;
+}> {}
+
 /** インポート後のDB同期に失敗 */
 export class ImportDbSyncFailed extends Data.TaggedError('ImportDbSyncFailed')<{
   message: string;
@@ -38,5 +47,6 @@ export type ImportServiceError =
   | ImportNoFilesFound
   | ImportBackupFailed
   | ImportFileNotFound
+  | ImportFileAccessFailed
   | ImportDbSyncFailed
   | ImportLogstoreIntegrationFailed;

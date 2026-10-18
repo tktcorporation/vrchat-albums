@@ -1,12 +1,13 @@
 import * as fsPromises from 'node:fs/promises';
 
 import * as datefns from 'date-fns';
-import { Effect } from 'effect';
+import { Effect, Either } from 'effect';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
 
 import { VRChatWorldIdSchema } from '../../lib/brandedTypes';
 import { logger } from '../../lib/logger';
+import { pathExistsAsync } from '../../lib/pathExists';
 import { setExifToBuffer } from '../../lib/wrappedExifTool';
 import type { ImageGenerationError } from '../imageGenerator/errors';
 import { generateWorldJoinImage } from '../imageGenerator/service';
@@ -220,35 +221,45 @@ const generateMissingWorldJoinImagesInternal = (params: {
     );
 
     // 2. 未生成のものをフィルタ（非同期ファイル存在チェック）
-    const existenceChecks = yield* Effect.promise(() =>
-      Promise.all(
-        joins.map(async (join) => {
-          const imagePath = generateWorldJoinImagePath(
-            photoDirPath,
-            join.joinDateTime,
-            join.worldId,
-          );
-          const exists = await fsPromises
-            .access(imagePath)
-            .then(() => true)
-            .catch(() => false);
-          return { join, exists };
-        }),
-      ),
+    // 存在確認に失敗した画像（権限不足など）は生成し直さず errors に数える。
+    // 「存在しない」とみなすと、書き込めない場所への生成と API 呼び出しを毎回繰り返すため
+    const existenceChecks = yield* Effect.forEach(
+      joins,
+      (join) => {
+        const imagePath = generateWorldJoinImagePath(
+          photoDirPath,
+          join.joinDateTime,
+          join.worldId,
+        );
+        return Effect.either(pathExistsAsync(imagePath)).pipe(
+          Effect.map((exists) => ({ join, exists })),
+        );
+      },
+      { concurrency: 'unbounded' },
     );
     const missingJoins = existenceChecks
-      .filter((check) => !check.exists)
+      .filter((check) => Either.isRight(check.exists) && !check.exists.right)
       .map((check) => check.join);
+    const checkFailures = existenceChecks.flatMap((check) =>
+      Either.isLeft(check.exists) ? [check.exists.left] : [],
+    );
+    for (const failure of checkFailures) {
+      logger.warn(failure.message, failure.cause);
+    }
 
     if (missingJoins.length === 0) {
-      return { generated: 0, skipped: joins.length, errors: 0 };
+      return {
+        generated: 0,
+        skipped: joins.length - checkFailures.length,
+        errors: checkFailures.length,
+      };
     }
 
     // 起動時の進捗（init-progress）には載せない。ログ同期の完了後に裏で走り、起動の完了を待たせないため
     logger.info(`Found ${missingJoins.length} world joins without images`);
 
     let generated = 0;
-    let errors = 0;
+    let errors = checkFailures.length;
 
     for (const [index, join] of missingJoins.entries()) {
       // API レート制限回避: 1 秒間隔でリクエスト
@@ -280,7 +291,7 @@ const generateMissingWorldJoinImagesInternal = (params: {
     );
     return {
       generated,
-      skipped: joins.length - missingJoins.length,
+      skipped: joins.length - missingJoins.length - checkFailures.length,
       errors,
     };
   });

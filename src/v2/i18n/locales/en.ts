@@ -107,6 +107,8 @@ const en: Translations = {
     },
     dataImport: {
       historyDescription: 'Undo a past import and restore the previous state',
+      historyLoadFailed:
+        'Could not load the import history. Check the access permissions of the backup folder.',
     },
     info: {
       title: 'App Info',

@@ -209,7 +209,9 @@ describe('importService', () => {
     it('logStoreファイルが見つからない場合はエラーを返す', async () => {
       const filePaths = ['/path/to/nonexistent.txt'];
 
-      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      );
 
       const exit = await Effect.runPromiseExit(
         importService.importLogStoreFiles(filePaths, mockGetDBLogs),
@@ -225,6 +227,33 @@ describe('importService', () => {
           );
         }
       }
+    });
+
+    it('対象パスの存在確認が権限エラーなら ImportFileAccessFailed を返す', async () => {
+      const filePaths = ['/path/to/locked/logStore-2023-11.txt'];
+
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('EACCES'), { code: 'EACCES' }),
+      );
+
+      const exit = await Effect.runPromiseExit(
+        importService.importLogStoreFiles(filePaths, mockGetDBLogs),
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value._tag).toBe('ImportFileAccessFailed');
+          expect(getImportErrorMessage(failOpt.value)).toContain(
+            'ファイルにアクセスできません',
+          );
+        }
+      }
+      expect(
+        backupServiceModule.backupService.createPreImportBackup,
+      ).not.toHaveBeenCalled();
     });
 
     it('バックアップ作成に失敗した場合はエラーを返す', async () => {

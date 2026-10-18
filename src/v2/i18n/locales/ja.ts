@@ -113,6 +113,8 @@ const ja: Translations = {
     },
     dataImport: {
       historyDescription: '過去のインポートを取り消して元の状態へ戻せます',
+      historyLoadFailed:
+        'インポート履歴を読み込めませんでした。バックアップフォルダのアクセス権限を確認してください',
     },
     info: {
       title: 'アプリ情報',

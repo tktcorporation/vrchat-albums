@@ -166,10 +166,33 @@ describe('backupService', () => {
 
   describe('getBackupHistory', () => {
     it('バックアップディレクトリが存在しない場合は空配列を返す', async () => {
-      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      );
 
       const value = await Effect.runPromise(backupService.getBackupHistory());
       expect(value).toEqual([]);
+    });
+
+    it('バックアップディレクトリの存在確認が権限エラーなら BackupHistoryReadFailed を返す', async () => {
+      vi.mocked(fs.access).mockRejectedValue(
+        Object.assign(new Error('EACCES'), { code: 'EACCES' }),
+      );
+
+      const exit = await Effect.runPromiseExit(
+        backupService.getBackupHistory(),
+      );
+
+      expect(Exit.isFailure(exit)).toBe(true);
+      if (Exit.isFailure(exit)) {
+        const failOpt = Cause.failureOption(exit.cause);
+        expect(Option.isSome(failOpt)).toBe(true);
+        if (Option.isSome(failOpt)) {
+          expect(failOpt.value._tag).toBe('BackupHistoryReadFailed');
+          expect(getBackupErrorMessage(failOpt.value)).toContain('EACCES');
+        }
+      }
+      expect(fs.readdir).not.toHaveBeenCalled();
     });
 
     it('バックアップ履歴を取得できる', async () => {

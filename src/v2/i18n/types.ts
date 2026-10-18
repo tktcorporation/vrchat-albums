@@ -151,6 +151,7 @@ export interface Translations {
     };
     dataImport: {
       historyDescription: string;
+      historyLoadFailed: string;
     };
     info: {
       title: string;

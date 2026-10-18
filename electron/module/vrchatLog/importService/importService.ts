@@ -4,10 +4,11 @@ import * as path from 'node:path';
 
 type NodeDirent = Dirent;
 
-import { Effect } from 'effect';
-import { match } from 'ts-pattern';
+import { Effect, Either } from 'effect';
+import { match, P } from 'ts-pattern';
 
 import { logger } from '../../../lib/logger';
+import { pathExistsAsync } from '../../../lib/pathExists';
 import { LOG_SYNC_MODE, syncLogs } from '../../logSync/service';
 import {
   backupService,
@@ -19,6 +20,7 @@ import { type VRChatLogLine, VRChatLogLineSchema } from '../model';
 import {
   ImportBackupFailed,
   ImportDbSyncFailed,
+  ImportFileAccessFailed,
   ImportFileNotFound,
   ImportNoFilesFound,
   type ImportServiceError,
@@ -40,6 +42,10 @@ export const getImportErrorMessage = (error: ImportServiceError): string =>
     .with(
       { _tag: 'ImportFileNotFound' },
       (e) => `ファイルが見つかりません: ${e.path}`,
+    )
+    .with(
+      { _tag: 'ImportFileAccessFailed' },
+      (e) => `ファイルにアクセスできません: ${e.path} (${e.message})`,
     )
     .with(
       { _tag: 'ImportDbSyncFailed' },
@@ -86,11 +92,16 @@ export class ImportService {
       // 1. パスからlogStoreファイルを収集（ディレクトリも対応）
       const filePaths = yield* Effect.tryPromise({
         try: () => this.collectLogStoreFiles(paths),
-        catch: (e) => {
-          // Unexpected errors should propagate
-          throw e;
-        },
-      }) as Effect.Effect<string[], ImportServiceError>;
+        catch: (e): ImportServiceError =>
+          match(e)
+            .with(P.instanceOf(ImportFileAccessFailed), (accessError) => {
+              return accessError;
+            })
+            .otherwise((unexpected) => {
+              // Unexpected errors should propagate
+              throw unexpected;
+            }),
+      });
 
       if (filePaths.length === 0) {
         return yield* Effect.fail(new ImportNoFilesFound({ paths }));
@@ -166,10 +177,7 @@ export class ImportService {
 
     for (const targetPath of paths) {
       // パスの存在確認
-      const accessExists = await fs
-        .access(targetPath)
-        .then(() => true)
-        .catch(() => false);
+      const accessExists = await this.checkPathExists(targetPath);
       if (!accessExists) {
         logger.warn(`Path not found, skipping: ${targetPath}`);
         continue;
@@ -207,6 +215,24 @@ export class ImportService {
     );
 
     return uniqueFiles;
+  }
+
+  /**
+   * パスの存在を確認する（Promise 版の内部実装から使う）
+   * 存在確認自体の失敗は「存在しない」と区別し、ImportFileAccessFailed を throw する
+   */
+  private async checkPathExists(targetPath: string): Promise<boolean> {
+    const result = await Effect.runPromise(
+      Effect.either(pathExistsAsync(targetPath)),
+    );
+    if (Either.isLeft(result)) {
+      throw new ImportFileAccessFailed({
+        path: targetPath,
+        message: result.left.code ?? String(result.left.cause),
+        cause: result.left,
+      });
+    }
+    return result.right;
   }
 
   /**
@@ -273,10 +299,7 @@ export class ImportService {
   ): Promise<void> {
     for (const filePath of filePaths) {
       // ファイル存在確認
-      const accessExists = await fs
-        .access(filePath)
-        .then(() => true)
-        .catch(() => false);
+      const accessExists = await this.checkPathExists(filePath);
       if (!accessExists) {
         throw new ImportFileNotFound({ path: filePath });
       }

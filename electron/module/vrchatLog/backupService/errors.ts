@@ -34,6 +34,7 @@ export class BackupHistoryReadFailed extends Data.TaggedError(
   'BackupHistoryReadFailed',
 )<{
   message: string;
+  cause?: unknown;
 }> {}
 
 /** 指定されたバックアップが見つからない */
