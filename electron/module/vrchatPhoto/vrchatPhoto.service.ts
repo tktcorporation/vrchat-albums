@@ -539,7 +539,7 @@ export const selectThumbnailCacheFilesToDelete = (
   entries: readonly ThumbnailCacheEntry[],
   nowMs: number,
   limits: ThumbnailCacheLimits = THUMBNAIL_CACHE_LIMITS,
-): string[] => {
+): ThumbnailCacheEntry[] => {
   const isTempFile = (entry: ThumbnailCacheEntry) =>
     entry.filePath.endsWith(TEMP_FILE_SUFFIX);
   const isObsolete = (entry: ThumbnailCacheEntry) =>
@@ -552,7 +552,7 @@ export const selectThumbnailCacheFilesToDelete = (
 
   let keptBytes = kept.reduce((sum, entry) => sum + entry.size, 0);
   if (keptBytes < limits.maxBytes * limits.cleanupThreshold) {
-    return obsolete.map((entry) => entry.filePath);
+    return obsolete;
   }
 
   const targetBytes = limits.maxBytes * limits.targetRatio;
@@ -567,7 +567,7 @@ export const selectThumbnailCacheFilesToDelete = (
     keptBytes -= entry.size;
   }
 
-  return [...obsolete, ...evicted].map((entry) => entry.filePath);
+  return [...obsolete, ...evicted];
 };
 
 /**
@@ -620,20 +620,23 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
     return;
   }
 
-  const entryByPath = new Map(entries.map((e) => [e.filePath, e]));
   let freedBytes = 0;
   let deletedCount = 0;
-  for (const filePath of toDelete) {
+  let regeneratedCount = 0;
+  for (const selected of toDelete) {
     // 選定から削除までの間にリクエストが同じパスへ再生成していることがあるため、
     // 選定時と mtime が変わったファイルは新しいキャッシュとみなして残す
-    const current = await Effect.runPromise(statCacheFileForCleanup(filePath));
-    if (
-      current === null ||
-      current.mtime !== entryByPath.get(filePath)?.mtimeMs
-    ) {
+    const current = await Effect.runPromise(
+      statCacheFileForCleanup(selected.filePath),
+    );
+    if (current === null) {
       continue;
     }
-    const deleted = await Effect.runPromise(unlinkCacheFile(filePath));
+    if (current.mtime !== selected.mtimeMs) {
+      regeneratedCount++;
+      continue;
+    }
+    const deleted = await Effect.runPromise(unlinkCacheFile(selected.filePath));
     if (deleted) {
       deletedCount++;
       freedBytes += current.size;
@@ -641,7 +644,7 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
   }
 
   logger.info(
-    `Thumbnail cache cleanup completed. Deleted ${deletedCount}/${toDelete.length} files, freed ${(freedBytes / 1024 / 1024).toFixed(2)}MB`,
+    `Thumbnail cache cleanup completed. Deleted ${deletedCount}/${toDelete.length} files (kept ${regeneratedCount} regenerated), freed ${(freedBytes / 1024 / 1024).toFixed(2)}MB`,
   );
 };
 

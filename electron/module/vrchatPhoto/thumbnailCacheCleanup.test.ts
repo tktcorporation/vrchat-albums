@@ -59,10 +59,15 @@ const entry = (
   mtimeMs: NOW - ageMs,
 });
 
+const selectPaths = (entries: readonly ThumbnailCacheEntry[]) =>
+  selectThumbnailCacheFilesToDelete(entries, NOW, limits).map(
+    (e) => e.filePath,
+  );
+
 describe('selectThumbnailCacheFilesToDelete', () => {
   it('閾値未満で期限内のファイルだけなら何も消さない', () => {
     const entries = [entry('a.webp', 40, HOUR), entry('b.webp', 49, 2 * HOUR)];
-    expect(selectThumbnailCacheFilesToDelete(entries, NOW, limits)).toEqual([]);
+    expect(selectPaths(entries)).toEqual([]);
   });
 
   it('有効期限切れのサムネイルは容量に関係なく消す', () => {
@@ -70,9 +75,7 @@ describe('selectThumbnailCacheFilesToDelete', () => {
       entry('fresh.webp', 1, DAY),
       entry('expired.webp', 1, limits.expiryMs + 1),
     ];
-    expect(selectThumbnailCacheFilesToDelete(entries, NOW, limits)).toEqual([
-      '/cache/expired.webp',
-    ]);
+    expect(selectPaths(entries)).toEqual(['/cache/expired.webp']);
   });
 
   it('取り残された一時ファイルは消し、書き込み中の可能性がある新しい一時ファイルは残す', () => {
@@ -80,9 +83,7 @@ describe('selectThumbnailCacheFilesToDelete', () => {
       entry('old.webp.tmp', 1, limits.staleTempFileMs + 1),
       entry('writing.webp.tmp', 1, 1000),
     ];
-    expect(selectThumbnailCacheFilesToDelete(entries, NOW, limits)).toEqual([
-      '/cache/old.webp.tmp',
-    ]);
+    expect(selectPaths(entries)).toEqual(['/cache/old.webp.tmp']);
   });
 
   it('閾値以上なら mtime が古い順に目標サイズ以下まで消す', () => {
@@ -93,7 +94,7 @@ describe('selectThumbnailCacheFilesToDelete', () => {
       entry('newer.webp', 25, 2 * HOUR),
       entry('older.webp', 25, 3 * HOUR),
     ];
-    expect(selectThumbnailCacheFilesToDelete(entries, NOW, limits)).toEqual([
+    expect(selectPaths(entries)).toEqual([
       '/cache/oldest.webp',
       '/cache/older.webp',
     ]);
@@ -105,9 +106,7 @@ describe('selectThumbnailCacheFilesToDelete', () => {
       entry('a.webp', 40, HOUR),
       entry('b.webp', 40, 2 * HOUR),
     ];
-    expect(selectThumbnailCacheFilesToDelete(entries, NOW, limits)).toEqual([
-      '/cache/expired.webp',
-    ]);
+    expect(selectPaths(entries)).toEqual(['/cache/expired.webp']);
   });
 
   it('容量超過の削減でも新しい一時ファイルは消さない', () => {
@@ -115,9 +114,7 @@ describe('selectThumbnailCacheFilesToDelete', () => {
       entry('writing.webp.tmp', 60, 1000),
       entry('a.webp', 40, HOUR),
     ];
-    expect(selectThumbnailCacheFilesToDelete(entries, NOW, limits)).toEqual([
-      '/cache/a.webp',
-    ]);
+    expect(selectPaths(entries)).toEqual(['/cache/a.webp']);
   });
 });
 
