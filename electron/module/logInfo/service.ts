@@ -581,23 +581,24 @@ export function loadLogInfoIndexFromVRChatLog({
     logger.info('start photo index creation');
     progress?.stage('photo_index', 0);
     const photoIndexStartTime = performance.now();
-    const photoResults = yield* Effect.promise(() =>
-      vrchatPhotoService.createVRChatPhotoPathIndex(
-        excludeOldLogLoad,
-        progress === undefined
-          ? undefined
-          : createPhotoIndexProgressReporter(progress),
-      ),
-    );
-    results.createdVRChatPhotoPathModelList = photoResults ?? [];
+    const { createdModels: photoResults, worldJoinPhotoPaths } =
+      yield* Effect.promise(() =>
+        vrchatPhotoService.createVRChatPhotoPathIndex(
+          excludeOldLogLoad,
+          progress === undefined
+            ? undefined
+            : createPhotoIndexProgressReporter(progress),
+        ),
+      );
+    results.createdVRChatPhotoPathModelList = photoResults;
     progress?.stage('photo_index', 100);
     const photoIndexEndTime = performance.now();
     logger.info(
-      `done photo index creation: ${photoResults?.length ?? 0} photos (${(photoIndexEndTime - photoIndexStartTime).toFixed(0)} ms)`,
+      `done photo index creation: ${photoResults.length} photos (${(photoIndexEndTime - photoIndexStartTime).toFixed(0)} ms)`,
     );
 
     // 6.5. 写真メタデータ抽出 (VRChat公式XMP)
-    if (photoResults && photoResults.length > 0) {
+    if (photoResults.length > 0) {
       logger.info(
         `start photo metadata extraction: ${photoResults.length} photos`,
       );
@@ -639,14 +640,12 @@ export function loadLogInfoIndexFromVRChatLog({
     logger.info('start photo dir log import');
     progress?.stage('photo_log_import', 0);
     const importLogPhotoStartTime = performance.now();
-    const vrChatPhotoDirPath = vrchatPhotoService.getVRChatPhotoDirPath();
-    if (vrChatPhotoDirPath) {
-      yield* Effect.promise(() =>
-        vrchatLogService.importLogLinesFromLogPhotoDirPath({
-          vrChatPhotoDirPath,
-        }),
-      );
-    }
+    // 写真フォルダを辿り直さず、写真インデックス作成の探索で集めたパスを使う
+    yield* Effect.promise(() =>
+      vrchatLogService.importLogLinesFromPhotoPaths({
+        photoPaths: worldJoinPhotoPaths,
+      }),
+    );
     progress?.stage('photo_log_import', 100);
     const importLogPhotoEndTime = performance.now();
     logger.info(

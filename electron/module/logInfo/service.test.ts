@@ -22,7 +22,7 @@ import { loadLogInfoIndexFromVRChatLog } from './service';
 
 // 必要最小限のモックを設定
 vi.mock('../vrchatLog/service', () => ({
-  importLogLinesFromLogPhotoDirPath: vi.fn().mockResolvedValue(undefined),
+  importLogLinesFromPhotoPaths: vi.fn().mockResolvedValue(undefined),
   getLogStoreFilePathsInRange: vi
     .fn()
     .mockImplementation(async (startDate, _currentDate) => {
@@ -86,7 +86,9 @@ vi.mock('../VRChatPlayerLeaveLogModel/playerLeaveLog.service', () => ({
 
 vi.mock('../vrchatPhoto/vrchatPhoto.service', () => ({
   getVRChatPhotoDirPath: vi.fn().mockResolvedValue({ value: '/mock/photos' }),
-  createVRChatPhotoPathIndex: vi.fn().mockResolvedValue([]),
+  createVRChatPhotoPathIndex: vi
+    .fn()
+    .mockResolvedValue({ createdModels: [], worldJoinPhotoPaths: [] }),
 }));
 
 vi.mock('../vrchatPhotoMetadata/service', () => ({
@@ -474,12 +476,13 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     vi.mocked(vrchatPhotoService.getVRChatPhotoDirPath).mockResolvedValue(
       VRChatPhotoDirPathSchema.parse('/mock/photos'),
     );
-    vi.mocked(
-      vrchatLogService.importLogLinesFromLogPhotoDirPath,
-    ).mockResolvedValue(undefined);
-    vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockResolvedValue(
-      [],
+    vi.mocked(vrchatLogService.importLogLinesFromPhotoPaths).mockResolvedValue(
+      undefined,
     );
+    vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockResolvedValue({
+      createdModels: [],
+      worldJoinPhotoPaths: [],
+    });
     // node:fs の existsSync をデフォルトで false に
     vi.mocked(nodeFs.existsSync).mockReturnValue(false);
   });
@@ -588,6 +591,45 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('写真インデックス作成が返したパスを写真ファイル名からのログ取り込みへ渡す', async () => {
+    const worldJoinPhotoPaths = [
+      '/mock/photos/2024-01/VRChat_2024-01-01_12-00-00.000_wrld_00000000-0000-0000-0000-000000000000.png',
+    ];
+    vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockResolvedValue({
+      createdModels: [],
+      worldJoinPhotoPaths,
+    });
+
+    await Effect.runPromise(
+      loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true }),
+    );
+
+    expect(vrchatLogService.importLogLinesFromPhotoPaths).toHaveBeenCalledWith({
+      photoPaths: worldJoinPhotoPaths,
+    });
+    // 写真インデックス作成の後に取り込む
+    const indexOrder = vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex)
+      .mock.invocationCallOrder[0];
+    const importOrder = vi.mocked(vrchatLogService.importLogLinesFromPhotoPaths)
+      .mock.invocationCallOrder[0];
+    expect(indexOrder).toBeLessThan(importOrder);
+  });
+
+  it('写真インデックス作成が失敗したら写真ファイル名からのログ取り込みは行わない', async () => {
+    vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockRejectedValue(
+      new Error('unexpected'),
+    );
+
+    await expect(
+      Effect.runPromise(
+        loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true }),
+      ),
+    ).rejects.toThrow('unexpected');
+    expect(
+      vrchatLogService.importLogLinesFromPhotoPaths,
+    ).not.toHaveBeenCalled();
   });
 
   it('excludeOldLogLoad が true で DB に最新ログがある場合、その日付以降の range のみ取得する', async () => {
@@ -809,7 +851,7 @@ describe('loadLogInfoIndexFromVRChatLog の photo_index 進捗', () => {
           currentMonth: '2024-08',
         });
         onProgress?.({ phase: 'register', handled: 4, total: 4 });
-        return [];
+        return { createdModels: [], worldJoinPhotoPaths: [] };
       },
     );
     const run: InitProgressRun = {
@@ -880,7 +922,7 @@ describe('loadLogInfoIndexFromVRChatLog の photo_index 進捗', () => {
             totalFolders,
           });
         }
-        return [];
+        return { createdModels: [], worldJoinPhotoPaths: [] };
       },
     );
     const run: InitProgressRun = {
@@ -921,7 +963,7 @@ describe('loadLogInfoIndexFromVRChatLog の photo_index 進捗', () => {
     vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockImplementation(
       async (_isIncremental, onProgress) => {
         onProgress?.({ phase: 'scan', foldersScanned: 0, totalFolders: 0 });
-        return [];
+        return { createdModels: [], worldJoinPhotoPaths: [] };
       },
     );
     const run: InitProgressRun = {

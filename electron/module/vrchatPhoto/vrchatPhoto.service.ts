@@ -47,6 +47,21 @@ export const isVRChatPhotoFile = (filename: string): boolean =>
   filename.startsWith('VRChat_') &&
   (filename.endsWith('.png') || filename.endsWith('.jpeg'));
 
+const WORLD_JOIN_PHOTO_PREFIX = 'VRChat_';
+
+/**
+ * ファイル名にワールドIDと参加日時を含む写真（`VRChat_*_wrld_*`）の候補かどうか判定する
+ *
+ * 写真ファイル名からワールド参加ログを復元する処理に渡す候補を、フォルダ探索のついでに集めるために使う。
+ * ここでは名前の形だけを見て拡張子は問わない。日時やワールドIDとして読めるかは
+ * 取り込み側の extractPhotoInfo が判定し、読めない名前はそこで落とす。
+ * `_wrld_` は接頭辞の後ろから探す。接頭辞の末尾の `_` と重ねて数えると、
+ * `VRChat_wrld_...` のように接頭辞の直後に `wrld_` が続く名前まで候補に入ってしまうため。
+ */
+const isWorldJoinPhotoFileName = (filename: string): boolean =>
+  filename.startsWith(WORLD_JOIN_PHOTO_PREFIX) &&
+  filename.includes('_wrld_', WORLD_JOIN_PHOTO_PREFIX.length);
+
 // サムネイルキャッシュの設定
 const THUMBNAIL_CACHE_DIR_NAME = 'vrchat-albums-thumbnails';
 const CACHE_EXPIRY_DAYS = 7; // キャッシュの有効期限（日数）。超えたものは読み取り時にミス扱いになる
@@ -784,21 +799,40 @@ const computeFolderDigest = (
   });
 
 /**
+ * getPhotoFolders の探索結果
+ */
+interface PhotoFolderScanResult {
+  /** VRChat写真を含むフォルダ */
+  folders: VRChatPhotoContainingFolderPath[];
+  /** 探索した全ディレクトリにある、ファイル名にワールドIDを含む写真の候補（isWorldJoinPhotoFileName）の絶対パス */
+  worldJoinPhotoPaths: string[];
+}
+
+/**
  * VRChat写真を含むフォルダを全て探索（再帰的）
  * ユーザーが独自のフォルダ分けをしている場合にも対応
+ *
+ * 全ディレクトリの全エントリを読むので、ファイル名にワールドIDを含む写真の候補もここで集める。
+ * 写真フォルダを丸ごと辿る処理を 1 回で済ませ、ワールド参加ログの取り込みが同じ木をもう一度辿らないようにするため。
+ * 候補はフォルダのダイジェストやファイルの mtime に関係なく全件集める。取り込み側は、
+ * 走査済みのフォルダへ古い mtime のまま後からコピーされた写真も受け取る必要があるため。
+ *
+ * ドット始まりのディレクトリにも入り、シンボリックリンクのディレクトリは辿らない。
+ * どちらも写真の登録対象を探す範囲と揃え、取り込み側だけ別の範囲を見ないようにするため。
  *
  * @param basePath ユーザー設定のベースディレクトリ
  * @param onTopLevelListed 進捗表示用。ベースディレクトリ直下のサブディレクトリ数が分かったときに
  *        (0, 総数) で、直下のサブディレクトリ 1 つの配下を探索し終えるたびに (探索済み数, 総数) で呼ばれる。
  *        VRChat の写真ディレクトリは直下に月ごとのフォルダを持つため、直下の単位で数えると
  *        探索の進み具合をほぼ均等な刻みで示せる。ベースディレクトリを読めなければ呼ばれない
- * @returns VRChat写真を含むフォルダパスの配列（ブランド型）
+ * @returns VRChat写真を含むフォルダパス（ブランド型）と、ワールドIDを含む写真の候補のパス
  */
 const getPhotoFolders = async (
   basePath: VRChatPhotoDirPath,
   onTopLevelListed?: (listed: number, total: number) => void,
-): Promise<VRChatPhotoContainingFolderPath[]> => {
+): Promise<PhotoFolderScanResult> => {
   const photoFolders: string[] = [];
+  const worldJoinPhotoPaths: string[] = [];
 
   const scanDir = async (
     dirPath: string,
@@ -840,6 +874,12 @@ const getPhotoFolders = async (
       photoFolders.push(dirPath);
     }
 
+    for (const entry of entries) {
+      if (entry.isFile() && isWorldJoinPhotoFileName(entry.name)) {
+        worldJoinPhotoPaths.push(path.join(dirPath, entry.name));
+      }
+    }
+
     // サブディレクトリを再帰探索
     const subDirs = entries.filter((entry) => entry.isDirectory());
     onSubDirListed?.(0, subDirs.length);
@@ -850,10 +890,13 @@ const getPhotoFolders = async (
   };
 
   await scanDir(basePath.value, onTopLevelListed);
-  // 発見したフォルダパスをブランド型に変換
-  return photoFolders.map((p) =>
-    VRChatPhotoContainingFolderPathSchema.parse(p),
-  );
+  return {
+    // 発見したフォルダパスをブランド型に変換
+    folders: photoFolders.map((p) =>
+      VRChatPhotoContainingFolderPathSchema.parse(p),
+    ),
+    worldJoinPhotoPaths,
+  };
 };
 
 /**
@@ -1222,6 +1265,21 @@ export type PhotoIndexProgress =
     };
 
 /**
+ * createVRChatPhotoPathIndex の結果
+ */
+export interface PhotoIndexResult {
+  /** 今回新たに登録した写真のモデル。登録対象が無ければ空 */
+  createdModels: model.VRChatPhotoPathModel[];
+  /**
+   * メインの写真ディレクトリ（getVRChatPhotoDirPath）配下にある、ファイル名にワールドIDを含む写真の候補の絶対パス。
+   * 差分スキャンでも、ダイジェストや mtime で登録対象から外れたファイルを含めて全件を返す。
+   * 追加の写真ディレクトリは含めない。写真ファイル名からのワールド参加ログの取り込みは、
+   * メインの写真ディレクトリだけを対象にするため
+   */
+  worldJoinPhotoPaths: string[];
+}
+
+/**
  * 写真ディレクトリを走査してインデックスを更新する
  * logSync などから呼び出される
  *
@@ -1241,11 +1299,12 @@ export type PhotoIndexProgress =
  *                   フォルダの総数が確定したときとフォルダを 1 つ走査するたびに `scan` で、
  *                   登録対象の総数が確定したときとバッチを 1 つ処理するたびに `register` で呼ばれる。
  *                   登録対象が 1 件も無ければ `register` では呼ばれない
+ * @returns 登録した写真のモデルと、メインの写真ディレクトリにあるワールドIDを含む写真の候補のパス
  */
 export const createVRChatPhotoPathIndex = async (
   isIncremental = true,
   onProgress?: (progress: PhotoIndexProgress) => void,
-) => {
+): Promise<PhotoIndexResult> => {
   const startTime = performance.now();
   const targetDir = getVRChatPhotoDirPath();
   const settingStore = getSettingStore();
@@ -1268,6 +1327,7 @@ export const createVRChatPhotoPathIndex = async (
   let totalProcessed = 0;
   let batchNumber = 0;
   const allCreatedModels: model.VRChatPhotoPathModel[] = [];
+  let worldJoinPhotoPaths: string[] = [];
 
   // スキップ統計の集計用
   const totalSkipStats: SkipStatistics = {
@@ -1314,16 +1374,21 @@ export const createVRChatPhotoPathIndex = async (
       // 次回の差分スキャンで拾われる。終了時刻を保存すると、登録中に作られたファイルの mtime が
       // lastScannedAt より古くなり、以後の差分スキャンで永久に除外される。
       const scannedAt = new Date();
-      const folders = await getPhotoFolders(dir, (listed, total) => {
-        onProgress?.({
-          phase: 'list',
-          dirsListed: dirIndex,
-          dirCount,
-          topLevelListed: listed,
-          topLevelTotal: total,
+      const { folders, worldJoinPhotoPaths: dirWorldJoinPhotoPaths } =
+        await getPhotoFolders(dir, (listed, total) => {
+          onProgress?.({
+            phase: 'list',
+            dirsListed: dirIndex,
+            dirCount,
+            topLevelListed: listed,
+            topLevelTotal: total,
+          });
         });
-      });
       foldersPerDir.push({ folders, scannedAt });
+      // 追加の写真ディレクトリ側の候補は捨てる（PhotoIndexResult.worldJoinPhotoPaths を参照）
+      if (dir === targetDir) {
+        worldJoinPhotoPaths = dirWorldJoinPhotoPaths;
+      }
       onProgress?.({
         phase: 'list',
         dirsListed: dirIndex + 1,
@@ -1545,7 +1610,7 @@ export const createVRChatPhotoPathIndex = async (
 
   if (totalProcessed === 0) {
     logger.debug('No new photos found to index.');
-    return [];
+    return { createdModels: [], worldJoinPhotoPaths };
   }
 
   // メモリ使用状況のサマリーをログ出力
@@ -1555,7 +1620,7 @@ export const createVRChatPhotoPathIndex = async (
     `Photo index creation completed: ${totalProcessed} photos processed in ${(totalEndTime - startTime).toFixed(2)} ms (${batchNumber} batches, peak RSS: ${memoryMonitor.getPeakRssMB().toFixed(0)}MB)`,
   );
 
-  return allCreatedModels;
+  return { createdModels: allCreatedModels, worldJoinPhotoPaths };
 };
 
 /**

@@ -1080,4 +1080,149 @@ describe('createVRChatPhotoPathIndex', () => {
       );
     });
   });
+
+  describe('ワールドIDを含む写真のパス（worldJoinPhotoPaths）', () => {
+    const worldId = 'wrld_12345678-1234-1234-1234-123456789abc';
+    const wrldPngName = `VRChat_2024-01-05_10-00-00.000_${worldId}.png`;
+    const wrldJpgName = `VRChat_2024-02-05_10-00-00.000_${worldId}.jpg`;
+    const extraWrldName = `VRChat_2024-01-06_10-00-00.000_${worldId}.png`;
+    // 接頭辞の直後に wrld_ が続く名前は `VRChat_*_wrld_*` に合わない
+    const prefixOnlyName = `VRChat_${worldId}.png`;
+    const nestedFolder = `${yearMonthFolder2024_02}/nested`;
+
+    const wrldPngPath = `${yearMonthFolder2024_01}/${wrldPngName}`;
+    const wrldJpgPath = `${nestedFolder}/${wrldJpgName}`;
+    const extraWrldPath = `${extraYearMonthFolder}/${extraWrldName}`;
+
+    const folder2024_01Files = [
+      file1Name,
+      wrldPngName,
+      prefixOnlyName,
+      'not-a-vrchat-file.txt',
+    ];
+
+    beforeEach(() => {
+      const listing: Record<string, Partial<Dirent>[]> = {
+        [mockPhotoDir.value]: [
+          createMockDirent('2024-01', true),
+          createMockDirent('2024-02', true),
+        ],
+        [yearMonthFolder2024_01]: folder2024_01Files.map((name) =>
+          createMockDirent(name, false),
+        ),
+        [yearMonthFolder2024_02]: [
+          createMockDirent(file2Name, false),
+          createMockDirent('nested', true),
+        ],
+        [nestedFolder]: [createMockDirent(wrldJpgName, false)],
+        [mockExtraDir.value]: [createMockDirent('2024-01', true)],
+        [extraYearMonthFolder]: [createMockDirent(extraWrldName, false)],
+      };
+      (nodefsPromises.readdir as ReturnType<typeof vi.fn>).mockImplementation(
+        (async (dirPath: PathLike, options?: unknown) => {
+          const entries = listing[dirPath.toString()] ?? [];
+          const withFileTypes =
+            typeof options === 'object' &&
+            options !== null &&
+            'withFileTypes' in options;
+          return withFileTypes
+            ? (entries as Dirent[])
+            : entries.map((entry) => entry.name);
+        }) as never,
+      );
+    });
+
+    it('メインの写真ディレクトリ配下を入れ子のフォルダまで含めて返し、拡張子は問わない', async () => {
+      const result = await service.createVRChatPhotoPathIndex(false);
+
+      expect(result.worldJoinPhotoPaths.toSorted()).toStrictEqual(
+        [wrldPngPath, wrldJpgPath].toSorted(),
+      );
+    });
+
+    it('追加の写真ディレクトリのファイルは含めない', async () => {
+      const result = await service.createVRChatPhotoPathIndex(false);
+
+      expect(result.worldJoinPhotoPaths).not.toContain(extraWrldPath);
+    });
+
+    it('差分スキャンでダイジェストが変わっていないフォルダのファイルも返す', async () => {
+      savedScanStates = {
+        [yearMonthFolder2024_01]: {
+          digest: computeExpectedDigestForFolder(folder2024_01Files),
+          lastScannedAt: twoHoursAgo.toISOString(),
+        },
+      };
+
+      const result = await service.createVRChatPhotoPathIndex(true);
+
+      // ダイジェスト一致でファイルの mtime は見ていない
+      const statCalls = vi
+        .mocked(nodefsPromises.stat)
+        .mock.calls.map((call) => call[0].toString());
+      expect(statCalls).not.toContain(wrldPngPath);
+      expect(result.worldJoinPhotoPaths).toContain(wrldPngPath);
+    });
+
+    it('走査済みのフォルダへ古い mtime のままコピーされたファイルも返す', async () => {
+      savedScanStates = {
+        [yearMonthFolder2024_01]: {
+          // コピー前のファイル一覧のダイジェスト
+          digest: computeExpectedDigestForFolder([
+            file1Name,
+            'not-a-vrchat-file.txt',
+          ]),
+          lastScannedAt: twoHoursAgo.toISOString(),
+        },
+      };
+      // コピーで mtime が保たれ、前回スキャンより古い
+      const mtimes = new Map<string, Date>([
+        [file1Path, oneHourAgo],
+        [wrldPngPath, threeHoursAgo],
+      ]);
+      vi.mocked(nodefsPromises.stat).mockImplementation(
+        async (filePath) =>
+          ({
+            isFile: () => true,
+            isDirectory: () => false,
+            mtime: mtimes.get(filePath.toString()) ?? now,
+          }) as unknown as Awaited<ReturnType<typeof nodefsPromises.stat>>,
+      );
+
+      const result = await service.createVRChatPhotoPathIndex(true);
+
+      // mtime が前回スキャンより古いので登録対象からは外れる
+      const savedPaths = vi
+        .mocked(model.createOrUpdateListVRChatPhotoPath)
+        .mock.calls.flatMap((call) => call[0])
+        .map((d) => d.photoPath);
+      expect(savedPaths).not.toContain(wrldPngPath);
+      expect(result.worldJoinPhotoPaths).toContain(wrldPngPath);
+    });
+
+    it('全フォルダのダイジェストが変わらず登録対象が無くてもパスを返す', async () => {
+      savedScanStates = {
+        [yearMonthFolder2024_01]: {
+          digest: computeExpectedDigestForFolder(folder2024_01Files),
+          lastScannedAt: twoHoursAgo.toISOString(),
+        },
+        [yearMonthFolder2024_02]: {
+          digest: computeExpectedDigestForFolder([file2Name, 'nested']),
+          lastScannedAt: twoHoursAgo.toISOString(),
+        },
+        [extraYearMonthFolder]: {
+          digest: computeExpectedDigestForFolder([extraWrldName]),
+          lastScannedAt: twoHoursAgo.toISOString(),
+        },
+      };
+
+      const result = await service.createVRChatPhotoPathIndex(true);
+
+      expect(model.createOrUpdateListVRChatPhotoPath).not.toHaveBeenCalled();
+      expect(result.createdModels).toStrictEqual([]);
+      expect(result.worldJoinPhotoPaths.toSorted()).toStrictEqual(
+        [wrldPngPath, wrldJpgPath].toSorted(),
+      );
+    });
+  });
 });

@@ -160,17 +160,6 @@ class VRChatPhotoPathObject extends PathObject {
   // @ts-expect-error TS1338
   private readonly [opaqueSymbol]: 'VRChatPhotoPathObject';
   /**
-   * VRChat写真用のglobパターンを生成
-   * @param pattern 写真ファイルのパターン（デフォルト: 'VRChat_*_wrld_*'）
-   * @returns glob用のパターン文字列
-   */
-  toPhotoGlobPattern(pattern = 'VRChat_*_wrld_*'): string {
-    // パスをフォワードスラッシュに正規化し、再帰的な検索パターンを追加
-    const basePath = this.toGlobPattern();
-    return `${basePath}/**/${pattern}`;
-  }
-
-  /**
    * 写真ファイル名からワールドIDと日時を抽出
    * @param filePath 写真ファイルのパス
    * @returns ワールドIDと参加日時、または null
