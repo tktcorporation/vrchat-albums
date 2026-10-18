@@ -94,7 +94,7 @@ pub struct JsExifWriteParams {
 pub fn read_vrc_xmp(file_path: String) -> Result<Option<JsVrcXmpMetadata>> {
     read_xmp_from_file(&file_path)
         .map(|opt| opt.map(JsVrcXmpMetadata::from))
-        .map_err(|e| Error::from_reason(e))
+        .map_err(Error::from_reason)
 }
 
 /// バッファから VRChat XMP メタデータを読み取る。
@@ -108,7 +108,7 @@ pub fn read_vrc_xmp_from_buffer(buffer: Buffer) -> Result<Option<JsVrcXmpMetadat
 /// AsyncTask::compute() は libuv スレッドプール上で実行されるため、
 /// 結果は Send である必要がある。JsVrcXmpBatchResult は napi オブジェクトなので
 /// この中間型を経由し、resolve() でメインスレッド上に変換する。
-struct XmpBatchResultInner {
+pub struct XmpBatchResultInner {
     data: Option<VrcXmpMetadata>,
     error: Option<String>,
 }
@@ -117,7 +117,7 @@ struct XmpBatchResultInner {
 ///
 /// libuv スレッドプール上で Rayon 並列処理を実行する。
 /// メインスレッドをブロックしないため、Electron の IPC が停止しない。
-struct XmpBatchTask {
+pub struct XmpBatchTask {
     file_paths: Vec<String>,
 }
 
@@ -201,9 +201,8 @@ pub fn write_exif(file_path: String, params: JsExifWriteParams) -> Result<()> {
             .map(|d| d.subsec_nanos())
             .unwrap_or(0)
     );
-    fs::write(&tmp_path, &result).map_err(|e| {
-        Error::from_reason(format!("Failed to write temp file {tmp_path}: {e}"))
-    })?;
+    fs::write(&tmp_path, &result)
+        .map_err(|e| Error::from_reason(format!("Failed to write temp file {tmp_path}: {e}")))?;
     fs::rename(&tmp_path, &file_path).map_err(|e| {
         // rename に失敗した場合、一時ファイルを削除して元のファイルを保護
         let _ = fs::remove_file(&tmp_path);
@@ -258,7 +257,7 @@ pub fn read_image_dimensions(file_path: String) -> Option<JsImageDimensions> {
 ///
 /// libuv スレッドプール上で Rayon 並列処理を実行する。
 /// メインスレッドをブロックしないため、Electron の IPC が停止しない。
-struct DimensionsBatchTask {
+pub struct DimensionsBatchTask {
     file_paths: Vec<String>,
 }
 
@@ -284,7 +283,12 @@ impl Task for DimensionsBatchTask {
     fn resolve(&mut self, _env: napi::Env, output: Self::Output) -> Result<Self::JsValue> {
         Ok(output
             .into_iter()
-            .map(|opt| opt.map(|(w, h)| JsImageDimensions { width: w, height: h }))
+            .map(|opt| {
+                opt.map(|(w, h)| JsImageDimensions {
+                    width: w,
+                    height: h,
+                })
+            })
             .collect())
     }
 }
@@ -306,10 +310,8 @@ pub fn read_image_dimensions_batch(file_paths: Vec<String>) -> AsyncTask<Dimensi
 
 fn read_vrc_xmp_from_bytes(data: &[u8]) -> Result<Option<JsVrcXmpMetadata>> {
     let xmp_xml = match detect_image_format(data) {
-        ImageFormat::Png => png::extract_xmp_from_png(data)
-            .map_err(|e| Error::from_reason(e))?,
-        ImageFormat::Jpeg => jpeg::extract_xmp_from_jpeg(data)
-            .map_err(|e| Error::from_reason(e))?,
+        ImageFormat::Png => png::extract_xmp_from_png(data).map_err(Error::from_reason)?,
+        ImageFormat::Jpeg => jpeg::extract_xmp_from_jpeg(data).map_err(Error::from_reason)?,
         ImageFormat::Unknown => return Ok(None),
     };
 
@@ -325,42 +327,37 @@ fn write_exif_to_bytes(data: &[u8], params: &JsExifWriteParams) -> Result<Vec<u8
         date_time_original: params.date_time_original.clone(),
         timezone_offset: params.timezone_offset.clone(),
     })
-    .map_err(|e| Error::from_reason(e))?;
+    .map_err(Error::from_reason)?;
 
     match detect_image_format(data) {
         ImageFormat::Png => {
             // PNG: eXIf チャンクに EXIF を書き込む
-            let with_exif = png::set_exif_in_png(data, &exif_bytes)
-                .map_err(|e| Error::from_reason(e))?;
+            let with_exif = png::set_exif_in_png(data, &exif_bytes).map_err(Error::from_reason)?;
 
             // 既存 XMP がある場合（VRChat の vrc:* フィールド等）は保護し、XMP 書き込みをスキップ。
             // EXIF の ImageDescription だけで Description は十分。
             // 既存 XMP がなければ、互換性のため dc:description を XMP にも書く。
-            let existing_xmp = png::extract_xmp_from_png(data)
-                .map_err(|e| Error::from_reason(e))?;
+            let existing_xmp = png::extract_xmp_from_png(data).map_err(Error::from_reason)?;
             if existing_xmp.is_some() {
                 Ok(with_exif)
             } else {
                 let xmp_xml = build_description_xmp(&params.description);
-                png::set_xmp_in_png(&with_exif, &xmp_xml)
-                    .map_err(|e| Error::from_reason(e))
+                png::set_xmp_in_png(&with_exif, &xmp_xml).map_err(Error::from_reason)
             }
         }
         ImageFormat::Jpeg => {
             // JPEG: APP1 セグメントに EXIF を書き込む
-            let with_exif = jpeg::set_exif_in_jpeg(data, &exif_bytes)
-                .map_err(|e| Error::from_reason(e))?;
+            let with_exif =
+                jpeg::set_exif_in_jpeg(data, &exif_bytes).map_err(Error::from_reason)?;
 
             // 既存 XMP がある場合は保護（VRChat の vrc:* フィールドを上書きしない）。
             // 既存 XMP がなければ、互換性のため dc:description を XMP にも書く。
-            let existing_xmp = jpeg::extract_xmp_from_jpeg(data)
-                .map_err(|e| Error::from_reason(e))?;
+            let existing_xmp = jpeg::extract_xmp_from_jpeg(data).map_err(Error::from_reason)?;
             if existing_xmp.is_some() {
                 Ok(with_exif)
             } else {
                 let xmp_xml = build_description_xmp(&params.description);
-                jpeg::set_xmp_in_jpeg(&with_exif, &xmp_xml)
-                    .map_err(|e| Error::from_reason(e))
+                jpeg::set_xmp_in_jpeg(&with_exif, &xmp_xml).map_err(Error::from_reason)
             }
         }
         ImageFormat::Unknown => Err(Error::from_reason(

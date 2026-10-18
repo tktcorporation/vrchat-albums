@@ -26,8 +26,7 @@ const BUF_READER_CAPACITY: usize = 65536;
 /// PNG / JPEG いずれもファイル全体を読まず、チャンク/セグメントヘッダーを
 /// 走査して XMP データだけを読み取る。XMP が存在しなければ None を返す。
 pub fn read_xmp_from_file(path: &str) -> Result<Option<VrcXmpMetadata>, String> {
-    let file =
-        File::open(path).map_err(|e| format!("Failed to open {path}: {e}"))?;
+    let file = File::open(path).map_err(|e| format!("Failed to open {path}: {e}"))?;
     let mut reader = BufReader::with_capacity(BUF_READER_CAPACITY, file);
 
     // フォーマット判定: 先頭 8 バイトを確実に読む（BufReader から提供）。
@@ -59,10 +58,13 @@ pub fn read_xmp_from_file(path: &str) -> Result<Option<VrcXmpMetadata>, String> 
 /// SOS (0xDA) / EOI (0xD9) に到達したら打ち切り（XMP は SOS の前に格納される）。
 ///
 /// reader は read_xmp_from_file でフォーマット判定後の状態。絶対シークで開始位置に移動する。
-fn read_xmp_from_jpeg_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXmpMetadata>, String> {
+fn read_xmp_from_jpeg_stream(
+    reader: &mut BufReader<File>,
+) -> Result<Option<VrcXmpMetadata>, String> {
     // read_xmp_from_file がフォーマット判定で先頭 8B を読むため
     // オフセットが不定。絶対シークで SOI 直後 (offset 2) に移動する。
-    reader.seek(SeekFrom::Start(2))
+    reader
+        .seek(SeekFrom::Start(2))
         .map_err(|e| format!("Failed to seek past SOI: {e}"))?;
 
     const XMP_PREFIX: &[u8] = b"http://ns.adobe.com/xap/1.0/\0";
@@ -87,15 +89,16 @@ fn read_xmp_from_jpeg_stream(reader: &mut BufReader<File>) -> Result<Option<VrcX
         // fill bytes (0xFF の連続) をスキップして実際のマーカー種別を取得。
         // JPEG spec では 0xFF の後に任意個の 0xFF fill bytes を挿入できる。
         // BufReader により、1バイトずつの read_exact はバッファから提供される。
-        let marker_type;
+
         loop {
-            reader.read_exact(&mut byte)
+            reader
+                .read_exact(&mut byte)
                 .map_err(|e| format!("Failed to read JPEG marker type: {e}"))?;
             if byte[0] != 0xFF {
                 break;
             }
         }
-        marker_type = byte[0];
+        let marker_type = byte[0];
 
         // 0xFF 0x00 はバイトスタッフィング（SOS 以降のスキャンデータ内で使われる）。
         // ヘッダー領域では出現しないはずだが、不正なファイルの場合はスキップする。
@@ -115,7 +118,8 @@ fn read_xmp_from_jpeg_stream(reader: &mut BufReader<File>) -> Result<Option<VrcX
 
         // セグメント長 (2 bytes, big-endian, 自身を含む)
         let mut len_bytes = [0u8; 2];
-        reader.read_exact(&mut len_bytes)
+        reader
+            .read_exact(&mut len_bytes)
             .map_err(|e| format!("Failed to read segment length: {e}"))?;
         let seg_len = u16::from_be_bytes(len_bytes) as usize;
 
@@ -129,14 +133,16 @@ fn read_xmp_from_jpeg_stream(reader: &mut BufReader<File>) -> Result<Option<VrcX
         if marker_type == 0xE1 && data_len > XMP_PREFIX.len() {
             // プレフィックスだけ読んで XMP か判定
             let mut prefix_buf = vec![0u8; XMP_PREFIX.len()];
-            reader.read_exact(&mut prefix_buf)
+            reader
+                .read_exact(&mut prefix_buf)
                 .map_err(|e| format!("Failed to read APP1 prefix: {e}"))?;
 
             if prefix_buf == XMP_PREFIX {
                 // XMP データ本体だけ読み取り
                 let xmp_len = data_len - XMP_PREFIX.len();
                 let mut xmp_buf = vec![0u8; xmp_len];
-                reader.read_exact(&mut xmp_buf)
+                reader
+                    .read_exact(&mut xmp_buf)
                     .map_err(|e| format!("Failed to read XMP data: {e}"))?;
 
                 let xml_text = match String::from_utf8(xmp_buf) {
@@ -148,11 +154,13 @@ fn read_xmp_from_jpeg_stream(reader: &mut BufReader<File>) -> Result<Option<VrcX
 
             // XMP ではない APP1 — 残りをスキップ
             let remaining = (data_len - XMP_PREFIX.len()) as i64;
-            reader.seek(SeekFrom::Current(remaining))
+            reader
+                .seek(SeekFrom::Current(remaining))
                 .map_err(|e| format!("Failed to skip non-XMP APP1: {e}"))?;
         } else {
             // APP1 以外のセグメント — スキップ
-            reader.seek(SeekFrom::Current(data_len as i64))
+            reader
+                .seek(SeekFrom::Current(data_len as i64))
                 .map_err(|e| format!("Failed to skip segment: {e}"))?;
         }
     }
@@ -170,10 +178,13 @@ fn read_xmp_from_jpeg_stream(reader: &mut BufReader<File>) -> Result<Option<VrcX
 /// 破棄・再充填されて膨大な I/O が発生する（3,210 ファイルで約 100GB）。
 ///
 /// reader は read_xmp_from_file でフォーマット判定後の状態。絶対シークで開始位置に移動する。
-fn read_xmp_from_png_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXmpMetadata>, String> {
+fn read_xmp_from_png_stream(
+    reader: &mut BufReader<File>,
+) -> Result<Option<VrcXmpMetadata>, String> {
     // read_xmp_from_file がフォーマット判定で先頭 8B を読むため
     // オフセットが不定。絶対シークでシグネチャ直後 (offset 8) に移動する。
-    reader.seek(SeekFrom::Start(8))
+    reader
+        .seek(SeekFrom::Start(8))
         .map_err(|e| format!("Failed to seek past PNG signature: {e}"))?;
 
     const XMP_KEYWORD: &[u8] = b"XML:com.adobe.xmp";
@@ -194,8 +205,7 @@ fn read_xmp_from_png_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXm
             }
         }
 
-        let chunk_len =
-            u32::from_be_bytes([header[0], header[1], header[2], header[3]]) as usize;
+        let chunk_len = u32::from_be_bytes([header[0], header[1], header[2], header[3]]) as usize;
         let chunk_type = [header[4], header[5], header[6], header[7]];
 
         // IEND — ファイル末尾なので打ち切り
@@ -214,17 +224,20 @@ fn read_xmp_from_png_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXm
             // サイズ上限チェック: 異常に大きい iTXt はスキップ（OOM 防止）
             if chunk_len > MAX_ITXT_CHUNK_SIZE {
                 let skip = chunk_len as i64 + 4; // data + CRC
-                reader.seek(SeekFrom::Current(skip))
+                reader
+                    .seek(SeekFrom::Current(skip))
                     .map_err(|e| format!("Failed to skip oversized iTXt chunk: {e}"))?;
                 continue;
             }
             // iTXt チャンクデータを読み取り
             let mut chunk_data = vec![0u8; chunk_len];
-            reader.read_exact(&mut chunk_data)
+            reader
+                .read_exact(&mut chunk_data)
                 .map_err(|e| format!("Failed to read iTXt chunk: {e}"))?;
 
             // CRC (4B) をスキップ
-            reader.seek(SeekFrom::Current(4))
+            reader
+                .seek(SeekFrom::Current(4))
                 .map_err(|e| format!("Failed to skip CRC: {e}"))?;
 
             // keyword チェック (null-terminated)
@@ -272,7 +285,8 @@ fn read_xmp_from_png_stream(reader: &mut BufReader<File>) -> Result<Option<VrcXm
         } else {
             // iTXt 以外のチャンク — データ + CRC (4B) をスキップ
             let skip = chunk_len as i64 + 4;
-            reader.seek(SeekFrom::Current(skip))
+            reader
+                .seek(SeekFrom::Current(skip))
                 .map_err(|e| format!("Failed to skip chunk: {e}"))?;
         }
     }
@@ -461,10 +475,7 @@ mod tests {
             meta.world_id.as_deref(),
             Some("wrld_b7280487-a1bc-41e2-80f2-942a72e7d2c7")
         );
-        assert_eq!(
-            meta.world_display_name.as_deref(),
-            Some("Hanami Days")
-        );
+        assert_eq!(meta.world_display_name.as_deref(), Some("Hanami Days"));
     }
 
     #[test]
@@ -648,7 +659,10 @@ mod tests {
         let result = read_xmp_from_file(tmp.path().to_str().unwrap());
         assert!(result.is_ok());
         // IDAT 到達で打ち切り → XMP なし
-        assert!(result.unwrap().is_none(), "XMP after IDAT should not be found (early termination)");
+        assert!(
+            result.unwrap().is_none(),
+            "XMP after IDAT should not be found (early termination)"
+        );
     }
 
     #[test]
@@ -658,7 +672,9 @@ mod tests {
         let tmp = write_temp_file(&data);
         let result = read_xmp_from_file(tmp.path().to_str().unwrap());
         assert!(result.is_ok());
-        let meta = result.unwrap().expect("Expected Some metadata for XMP before IDAT");
+        let meta = result
+            .unwrap()
+            .expect("Expected Some metadata for XMP before IDAT");
         assert_eq!(
             meta.world_id.as_deref(),
             Some("wrld_b7280487-a1bc-41e2-80f2-942a72e7d2c7")
@@ -779,5 +795,4 @@ mod tests {
             Some("Hanami Days 花見の日")
         );
     }
-
 }

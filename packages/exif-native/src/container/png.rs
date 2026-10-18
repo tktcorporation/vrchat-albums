@@ -5,8 +5,8 @@
 use img_parts::png::{Png, PngChunk};
 use img_parts::{Bytes, ImageEXIF};
 
-const CHUNK_ITXT: [u8; 4] = [b'i', b'T', b'X', b't'];
-const CHUNK_IDAT: [u8; 4] = [b'I', b'D', b'A', b'T'];
+const CHUNK_ITXT: [u8; 4] = *b"iTXt";
+const CHUNK_IDAT: [u8; 4] = *b"IDAT";
 const XMP_KEYWORD: &[u8] = b"XML:com.adobe.xmp";
 
 /// PNG iTXt チャンクから XMP XML 文字列を抽出する。
@@ -157,16 +157,20 @@ mod tests {
         let ihdr_data: [u8; 13] = [
             0, 0, 0, 1, // width = 1
             0, 0, 0, 1, // height = 1
-            8,  // bit depth = 8
-            0,  // color type = grayscale
-            0,  // compression method
-            0,  // filter method
-            0,  // interlace method
+            8, // bit depth = 8
+            0, // color type = grayscale
+            0, // compression method
+            0, // filter method
+            0, // interlace method
         ];
         write_png_chunk(&mut buf, b"IHDR", &ihdr_data);
 
         // IDAT chunk: minimal zlib-compressed data
-        write_png_chunk(&mut buf, b"IDAT", &[0x78, 0x01, 0x62, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01]);
+        write_png_chunk(
+            &mut buf,
+            b"IDAT",
+            &[0x78, 0x01, 0x62, 0x60, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01],
+        );
 
         // IEND chunk (empty)
         write_png_chunk(&mut buf, b"IEND", &[]);
@@ -209,9 +213,11 @@ mod tests {
         // img_parts may accept or reject our minimal PNG.
         // If it parses successfully, XMP should be None (no iTXt chunk).
         // If it rejects due to invalid zlib data, that's also acceptable.
-        match result {
-            Ok(xmp) => assert!(xmp.is_none(), "Expected None XMP for PNG without iTXt chunk"),
-            Err(_) => {} // Parse error on minimal PNG is acceptable
+        if let Ok(xmp) = result {
+            assert!(
+                xmp.is_none(),
+                "Expected None XMP for PNG without iTXt chunk"
+            );
         }
     }
 

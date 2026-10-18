@@ -1,18 +1,18 @@
-/// EXIF IFD バイト列の構築。
-///
-/// World Join Image に埋め込む 6 フィールドをサポート:
-///   IFD0: ImageDescription (0x010E)
-///   Exif SubIFD: DateTimeOriginal (0x9003), DateTimeDigitized (0x9004),
-///                OffsetTimeOriginal (0x9011), OffsetTimeDigitized (0x9012)
-///
-/// 注: OffsetTime (0x9010) は IFD0 に DateTime (0x0132) がないため書き込まない。
-///      OffsetTime は DateTime に対応するオフセットなので、対になるタグがなければ不要。
-///
-/// TIFF 構造（リトルエンディアン）:
-///   [Byte Order "II"] [Magic 0x002A] [IFD0 Offset]
-///   [IFD0 entries...] [Next IFD offset = 0]
-///   [Exif SubIFD entries...] [Next IFD offset = 0]
-///   [Data area: 文字列値]
+//! EXIF IFD バイト列の構築。
+//!
+//! World Join Image に埋め込む 6 フィールドをサポート:
+//!   IFD0: ImageDescription (0x010E)
+//!   Exif SubIFD: DateTimeOriginal (0x9003), DateTimeDigitized (0x9004),
+//!                OffsetTimeOriginal (0x9011), OffsetTimeDigitized (0x9012)
+//!
+//! 注: OffsetTime (0x9010) は IFD0 に DateTime (0x0132) がないため書き込まない。
+//!      OffsetTime は DateTime に対応するオフセットなので、対になるタグがなければ不要。
+//!
+//! TIFF 構造（リトルエンディアン）:
+//!   [Byte Order "II"] [Magic 0x002A] [IFD0 Offset]
+//!   [IFD0 entries...] [Next IFD offset = 0]
+//!   [Exif SubIFD entries...] [Next IFD offset = 0]
+//!   [Data area: 文字列値]
 
 /// EXIF 書き込みパラメータ
 pub struct ExifWriteParams {
@@ -50,9 +50,7 @@ const TYPE_LONG: u16 = 4;
 /// フィールドが途中で切り詰められ、不正な EXIF が生成される。
 fn validate_no_nul(s: &str, field_name: &str) -> Result<(), String> {
     if s.contains('\0') {
-        return Err(format!(
-            "Invalid {field_name}: must not contain NUL bytes"
-        ));
+        return Err(format!("Invalid {field_name}: must not contain NUL bytes"));
     }
     Ok(())
 }
@@ -423,8 +421,7 @@ mod tests {
         let exif_ifd_offset = ptr_entry.value_offset as usize;
 
         // Exif SubIFD のエントリ数 = 4（OffsetTime は DateTime なしのため除外）
-        let sub_count =
-            u16::from_le_bytes([bytes[exif_ifd_offset], bytes[exif_ifd_offset + 1]]);
+        let sub_count = u16::from_le_bytes([bytes[exif_ifd_offset], bytes[exif_ifd_offset + 1]]);
         assert_eq!(sub_count, 4);
 
         // 全 4 タグが存在する（OffsetTime は除外）
@@ -463,10 +460,16 @@ mod tests {
         let exif_offset = ptr.value_offset as usize;
 
         let dto = find_entry(&bytes, exif_offset, TAG_DATE_TIME_ORIGINAL).unwrap();
-        assert_eq!(read_ascii(&bytes, dto.value_offset, dto.count), "2024:12:31 23:59:59");
+        assert_eq!(
+            read_ascii(&bytes, dto.value_offset, dto.count),
+            "2024:12:31 23:59:59"
+        );
 
         let dtd = find_entry(&bytes, exif_offset, TAG_DATE_TIME_DIGITIZED).unwrap();
-        assert_eq!(read_ascii(&bytes, dtd.value_offset, dtd.count), "2024:12:31 23:59:59");
+        assert_eq!(
+            read_ascii(&bytes, dtd.value_offset, dtd.count),
+            "2024:12:31 23:59:59"
+        );
 
         // OffsetTime は DateTime なしのため書き込まれない
         assert!(find_entry(&bytes, exif_offset, TAG_OFFSET_TIME).is_none());
@@ -503,8 +506,7 @@ mod tests {
         // Exif SubIFD の全エントリも同様
         let ptr = find_entry(&bytes, ifd0_offset, TAG_EXIF_IFD_POINTER).unwrap();
         let exif_offset = ptr.value_offset as usize;
-        let sub_count =
-            u16::from_le_bytes([bytes[exif_offset], bytes[exif_offset + 1]]) as usize;
+        let sub_count = u16::from_le_bytes([bytes[exif_offset], bytes[exif_offset + 1]]) as usize;
         for i in 0..sub_count {
             let entry = read_ifd_entry(&bytes, exif_offset + 2 + i * 12);
             assert!(
@@ -538,7 +540,7 @@ mod tests {
     fn rejects_nul_in_datetime() {
         let params = ExifWriteParams {
             description: "Test".to_string(),
-            date_time_original: "2024:01:01\012:00:00".to_string(),
+            date_time_original: "2024:01:01\x0012:00:00".to_string(),
             timezone_offset: "+09:00".to_string(),
         };
         let result = build_exif_bytes(&params);
