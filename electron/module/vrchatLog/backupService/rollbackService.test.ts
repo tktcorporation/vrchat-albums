@@ -101,7 +101,7 @@ describe('rollbackService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
         {
           name: 'backup-metadata.json',
           isDirectory: () => false,
@@ -113,7 +113,7 @@ describe('rollbackService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
       ]);
 
       // logStoreディレクトリのクリア
@@ -204,7 +204,7 @@ describe('rollbackService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
       ]);
 
       const exit = await Effect.runPromiseExit(
@@ -236,7 +236,7 @@ describe('rollbackService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
       ]);
       vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
@@ -262,7 +262,7 @@ describe('rollbackService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
       ]);
       vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
@@ -353,7 +353,7 @@ describe('rollbackService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
       ]);
 
       const exit = await Effect.runPromiseExit(
@@ -389,7 +389,7 @@ describe('rollbackService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
       ]);
       vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);
@@ -433,7 +433,7 @@ describe('rollbackService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
       ]);
       vi.mocked(fs.rm).mockResolvedValue(undefined as unknown as never);
       vi.mocked(fs.mkdir).mockResolvedValue(undefined as unknown as never);

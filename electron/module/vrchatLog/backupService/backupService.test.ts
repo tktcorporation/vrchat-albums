@@ -43,7 +43,7 @@ vi.mock('../exportService/exportService', () => ({
 //     isSymbolicLink: () => false,
 //     path: '',
 //     parentPath: '',
-//   }) as unknown as Dirent<Buffer>;
+//   }) as unknown as Dirent<NonSharedBuffer>;
 
 describe('backupService', () => {
   beforeEach(() => {
@@ -186,7 +186,7 @@ describe('backupService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
         {
           name: 'vrchat-albums-export_2023-12-02_10-20-30',
           isDirectory: () => true,
@@ -198,7 +198,7 @@ describe('backupService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
+        } as unknown as Dirent<NonSharedBuffer>,
         {
           name: 'not-a-backup',
           isDirectory: () => true,
@@ -210,8 +210,8 @@ describe('backupService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
-      ] as Dirent<Buffer>[]);
+        } as unknown as Dirent<NonSharedBuffer>,
+      ] as Dirent<NonSharedBuffer>[]);
 
       const metadata1: ImportBackupMetadata = {
         id: 'backup_20231201_143045',
@@ -261,8 +261,8 @@ describe('backupService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
-      ] as Dirent<Buffer>[]);
+        } as unknown as Dirent<NonSharedBuffer>,
+      ] as Dirent<NonSharedBuffer>[]);
 
       vi.mocked(fs.readFile).mockRejectedValue(new Error('File not found'));
 
@@ -299,8 +299,8 @@ describe('backupService', () => {
           isSymbolicLink: () => false,
           path: '',
           parentPath: '',
-        } as unknown as Dirent<Buffer>,
-      ] as Dirent<Buffer>[]);
+        } as unknown as Dirent<NonSharedBuffer>,
+      ] as Dirent<NonSharedBuffer>[]);
       vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(metadata));
 
       const value = await Effect.runPromise(backupService.getBackup(targetId));

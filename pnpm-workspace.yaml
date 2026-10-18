@@ -112,8 +112,7 @@ overrides:
   esbuild: '>=0.28.1'
   # @humanfs/node は eslint (pages ワークスペース) の transitive 依存。パッチ版の対応で
   # シンボリックリンク経由のディレクトリ外コピー対策として 0.16.8 以上へ固定。
-  # 0.17.x は Node >=24 を要求し、このリポジトリの engines.node (Node 22 系) と CI の Node バージョンを
-  # 超えるため、eslint が依存範囲 ^0.16.6 で期待する 0.16.x 系に留める。
+  # eslint が依存範囲 ^0.16.6 で 0.16.x 系を期待するため、0.17.x へは上げない。
   '@humanfs/node': '>=0.16.8 <0.17'
 
 # trpc-electron は購読の非同期イテレーターに Symbol.asyncDispose を足し、既にあればエラーにする。
