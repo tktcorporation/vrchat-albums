@@ -408,6 +408,45 @@ describe('connector feedback boundary', () => {
     expect(commands.at(-1)).toContain('rmdir');
   });
 
+  test('cleanup still removes the directory and keeps the gate error when deleting evidence throws', async () => {
+    const commands: string[] = [];
+    const error = await Promise.resolve(
+      cloudPrFeedback(
+        {
+          getUserLogin: async () => ({ structuredContent: { login: 'me' } }),
+          now: async () => ({
+            current_time: currentToolTime(),
+          }),
+          fetch: async ({ url }: { url: string }) => ({
+            structuredContent: {
+              content: JSON.stringify(
+                url.includes('/comments?') ? comments : url.includes('/reviews?') ? reviews : pr,
+              ),
+            },
+          }),
+          exec: async ({ cmd }: { cmd: string }) => {
+            commands.push(cmd);
+            if (cmd.startsWith('mktemp -d'))
+              return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
+            if (cmd.startsWith('rmdir ')) return { exit_code: 0, output: '' };
+            throw new Error('gate crashed');
+          },
+          patch: async (patch: string) => {
+            if (patch.includes('*** Delete File:')) throw new Error('delete rejected');
+            return {};
+          },
+        },
+        { ...options, mode: 'push' },
+      ),
+    ).then(
+      () => '',
+      (reason: unknown) => String(reason),
+    );
+    expect(error).toContain('gate crashed');
+    expect(commands.at(-1)).toContain('rmdir');
+    expect(commands.some((cmd) => cmd.startsWith('git push'))).toBe(false);
+  });
+
   test('push pins the reviewed SHA and refuses a moved local HEAD', async () => {
     const commands: string[] = [];
     const makeTools = (

@@ -144,11 +144,20 @@ module.exports = async function cloudPrFeedback(tools, options) {
   } finally {
     // functions.exec のホストは rm -f / rm -rf の形のコマンドを実行前に拒否する。保存に使った
     // apply_patch で証跡を消し、空になった一時ディレクトリだけを rmdir で消す。
-    const deleted = saved
-      ? await tools.patch(`*** Begin Patch\n*** Delete File: ${snapshotPath}\n*** End Patch`)
-      : undefined;
+    // 削除が例外を投げても rmdir まで進め、try 側の元の例外を上書きしない。
+    let deleteFailed = false;
+    if (saved) {
+      try {
+        const deleted = await tools.patch(
+          `*** Begin Patch\n*** Delete File: ${snapshotPath}\n*** End Patch`,
+        );
+        deleteFailed = Boolean(deleted?.isError);
+      } catch {
+        deleteFailed = true;
+      }
+    }
     const removed = await run(`rmdir -- ${quote(directory)}`, 100);
-    cleanupFailed = Boolean(deleted?.isError) || removed.exit_code !== 0;
+    cleanupFailed = deleteFailed || removed.exit_code !== 0;
   }
   if (cleanupFailed) throw new Error('Could not remove private connector evidence');
   if (check.exit_code !== 0) throw new Error(`Feedback ${mode} gate failed: ${check.output}`);
