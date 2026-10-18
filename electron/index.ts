@@ -26,6 +26,7 @@ import { getBackgroundUsecase } from './module/backGroundUsecase';
 import { startBackgroundSyncTimer } from './module/logSync/backgroundTimer';
 import { initSettingStore } from './module/settingStore';
 import { hasAcceptedCurrentTerms } from './module/terms/consent';
+import { startThumbnailCacheCleanupScheduler } from './module/vrchatPhoto/thumbnailCacheCleanupScheduler';
 
 const settingStore = initSettingStore();
 initializeSettingStoreForUtil();
@@ -143,6 +144,7 @@ const initializeApp = async () => {
     windows: [mainWindow],
   });
   void electronUtil.setTray();
+  startThumbnailCacheCleanupScheduler();
 
   // electron-unhandled は top-level await を含む ESM のため、CJS の main バンドルから
   // require() で読めない。外部モジュールのまま動的 import で読み込む。

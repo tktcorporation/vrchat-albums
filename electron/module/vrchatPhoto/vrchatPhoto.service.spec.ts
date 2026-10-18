@@ -223,7 +223,7 @@ describe('vrchatPhoto.service', () => {
   });
 
   describe('cleanupThumbnailCache', () => {
-    // MAX_CACHE_SIZE_MB = 500, CACHE_CLEANUP_THRESHOLD = 0.9
+    // THUMBNAIL_CACHE_LIMITS: 上限 500MB、その 90% を超えたら削除を始め、50% まで減らす
     // つまり 450MB を超えたらクリーンアップ開始、250MBまで削減
     const mockReaddir = vi.mocked(fsPromises.readdir);
     const mockStat = vi.mocked(fsPromises.stat);
@@ -298,12 +298,12 @@ describe('vrchatPhoto.service', () => {
       mockReaddir.mockResolvedValue(files as any);
 
       const now = Date.now();
-      let callIndex = 0;
-      mockStat.mockImplementation(() => {
-        callIndex++;
+      // 同じファイルは何度 stat しても同じ mtime を返す（削除直前の再確認で再生成と誤判定させない）
+      mockStat.mockImplementation((filePath) => {
+        const index = files.findIndex((f) => String(filePath).endsWith(f));
         return Promise.resolve({
           size: 100 * 1024 * 1024, // 100MB each
-          mtimeMs: now - callIndex * 1000, // それぞれ異なる時刻
+          mtimeMs: now - (index + 1) * 1000, // それぞれ異なる時刻
         }) as unknown as ReturnType<typeof fsPromises.stat>;
       });
 
