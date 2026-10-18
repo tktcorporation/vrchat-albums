@@ -21,6 +21,22 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
+// 選定と削除の間に起きる再生成を再現するため、stat の直後に差し込める口を用意する
+const statHook = vi.hoisted(() => ({
+  afterStat: undefined as ((filePath: string) => void) | undefined,
+}));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...actual,
+    stat: async (...args: Parameters<typeof actual.stat>) => {
+      const result = await actual.stat(...args);
+      statHook.afterStat?.(String(args[0]));
+      return result;
+    },
+  };
+});
+
 const MB = 1024 * 1024;
 const NOW = 1_800_000_000_000;
 const HOUR = 60 * 60 * 1000;
@@ -117,6 +133,7 @@ describe('cleanupThumbnailCache（実ファイルシステム）', () => {
   });
 
   afterEach(() => {
+    statHook.afterStat = undefined;
     fs.rmSync(tmpState.dir, { recursive: true, force: true });
     tmpState.dir = '';
   });
@@ -143,5 +160,25 @@ describe('cleanupThumbnailCache（実ファイルシステム）', () => {
       'fresh.webp',
       'writing.webp.tmp',
     ]);
+  });
+
+  it('選定後に同じパスへ再生成されたサムネイルは消さない', async () => {
+    writeWithAge('expired.webp', THUMBNAIL_CACHE_LIMITS.expiryMs + DAY);
+    const target = path.join(cacheDir, 'expired.webp');
+    let statCount = 0;
+    statHook.afterStat = (filePath) => {
+      if (filePath !== target) {
+        return;
+      }
+      statCount++;
+      // 1 回目は選定時の stat。その後、削除前の再確認までに再生成が割り込んだ状況を作る
+      if (statCount === 1) {
+        fs.writeFileSync(target, 'regenerated');
+      }
+    };
+
+    await cleanupThumbnailCache();
+
+    expect(fs.readFileSync(target, 'utf8')).toBe('regenerated');
   });
 });

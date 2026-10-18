@@ -620,14 +620,23 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
     return;
   }
 
-  const sizeByPath = new Map(entries.map((e) => [e.filePath, e.size]));
+  const entryByPath = new Map(entries.map((e) => [e.filePath, e]));
   let freedBytes = 0;
   let deletedCount = 0;
   for (const filePath of toDelete) {
+    // 選定から削除までの間にリクエストが同じパスへ再生成していることがあるため、
+    // 選定時と mtime が変わったファイルは新しいキャッシュとみなして残す
+    const current = await Effect.runPromise(statCacheFileForCleanup(filePath));
+    if (
+      current === null ||
+      current.mtime !== entryByPath.get(filePath)?.mtimeMs
+    ) {
+      continue;
+    }
     const deleted = await Effect.runPromise(unlinkCacheFile(filePath));
     if (deleted) {
       deletedCount++;
-      freedBytes += sizeByPath.get(filePath) ?? 0;
+      freedBytes += current.size;
     }
   }
 
