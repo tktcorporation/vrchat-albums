@@ -28,8 +28,6 @@ const config: KnipConfig = {
         // package.json の dev:electron / build:electron が -c で渡す vite 設定
         'electron/vite.config.ts',
         'electron/vite.config.preload.ts',
-        // package.json の scripts から tsx / node で直接実行するスクリプト
-        'scripts/*.{ts,mts,mjs}',
         // electron-builder の設定（package.json の electron-dist が --config で渡す）
         'electron-builder.cjs',
       ],
