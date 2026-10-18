@@ -1,9 +1,7 @@
 import { EXTERNAL_REVIEW_LIMIT, newExternalReviewHistory } from './pr-feedback-policy.ts';
 import type { ExternalReviewHistory } from './pr-feedback-policy.ts';
 
-export type ParsedHistory =
-  | { kind: 'ready'; history: ExternalReviewHistory }
-  | { kind: 'invalid' };
+export type ParsedHistory = { kind: 'ready'; history: ExternalReviewHistory } | { kind: 'invalid' };
 
 /** ディスクの JSON を境界で解釈する。PR が変われば新しい履歴、破損なら明示的な失敗。 */
 export function parseExternalReviewHistory(text: string, pr: number): ParsedHistory {

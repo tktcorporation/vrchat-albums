@@ -64,7 +64,10 @@ const view = safeShellJson<{ number?: number; url?: string }>(pr, {});
 const { number, url } = view;
 if (!number) process.exit(0);
 
-const repo = await $`gh repo view --json nameWithOwner --jq .nameWithOwner`.cwd(tree).quiet().nothrow();
+const repo = await $`gh repo view --json nameWithOwner --jq .nameWithOwner`
+  .cwd(tree)
+  .quiet()
+  .nothrow();
 const me = await $`gh api user --jq .login`.quiet().nothrow();
 if (repo.exitCode !== 0 || me.exitCode !== 0) process.exit(0);
 const [owner, name] = repo.text().trim().split('/');
@@ -162,8 +165,12 @@ const fresh = waiting.filter((thread) => !nagged.has(stateOf(thread)));
 const observed = await refreshFeedback(input);
 if (observed.kind !== 'found') {
   if (fresh.length === 0) process.exit(0);
-  console.log(JSON.stringify({ decision: 'block', reason:
-    `PR #${number} の指摘を履歴に記録できませんでした。bun .claude/hooks/observe-pr-feedback.ts を再実行し、成功を確認してからレビューを始めてください。` }));
+  console.log(
+    JSON.stringify({
+      decision: 'block',
+      reason: `PR #${number} の指摘を履歴に記録できませんでした。bun .claude/hooks/observe-pr-feedback.ts を再実行し、成功を確認してからレビューを始めてください。`,
+    }),
+  );
   process.exit(0);
 }
 const freshReviews = observed.history.seenComments
@@ -172,9 +179,10 @@ const freshReviews = observed.history.seenComments
 if (fresh.length === 0 && freshReviews.length === 0) process.exit(0);
 if (naggedPath) {
   await mkdir(dirname(naggedPath), { recursive: true }).catch(() => undefined);
-  await Bun.write(naggedPath, `${[...nagged, ...fresh.map(stateOf), ...freshReviews].join('\n')}\n`).catch(
-    () => undefined,
-  );
+  await Bun.write(
+    naggedPath,
+    `${[...nagged, ...fresh.map(stateOf), ...freshReviews].join('\n')}\n`,
+  ).catch(() => undefined);
 }
 
 const summary = fresh
@@ -184,9 +192,10 @@ const summary = fresh
     return `- ${thread.path}:${thread.line ?? '-'} (${first?.author?.login ?? '?'}): ${head}`;
   })
   .join('\n');
-const reviewSummary = freshReviews.length > 0
-  ? `\n- 変更要求レビュー本文 ${freshReviews.length} 件。gh pr view ${number} --json reviews で本文を確認してください。`
-  : '';
+const reviewSummary =
+  freshReviews.length > 0
+    ? `\n- 変更要求レビュー本文 ${freshReviews.length} 件。gh pr view ${number} --json reviews で本文を確認してください。`
+    : '';
 const guidance =
   '指摘を読み始めるときは bun .claude/hooks/observe-pr-feedback.ts で観測を記録してください。個別の指摘だけを直して push せず、.claude/skills/pr-review-loop/SKILL.md の手順で差分全体を再レビューし、収束させてから push してください。外部指摘が異なる HEAD に 3 回続いた場合は .claude/rules/ci-workflow.md の診断と方針相談を行ってください。';
 console.log(

@@ -11,8 +11,13 @@ const observeScript = join(import.meta.dir, 'observe-pr-feedback.ts');
 const preBash = join(import.meta.dir, 'pre-bash-guard.ts');
 interface FakeThread {
   comments: {
-    nodes: { databaseId: number; author: { login: string }; pullRequestReview: { commit: { oid: string } };
-      pull_request_review_id?: number; in_reply_to_id?: number }[];
+    nodes: {
+      databaseId: number;
+      author: { login: string };
+      pullRequestReview: { commit: { oid: string } };
+      pull_request_review_id?: number;
+      in_reply_to_id?: number;
+    }[];
   };
 }
 
@@ -33,16 +38,18 @@ async function checkPush(
     env: {
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
-      FAKE_COMMENTS: JSON.stringify([comments.flatMap((thread) => thread.comments.nodes.map(
-        (comment) => ({
-          id: comment.databaseId,
-          commit_id: comment.pullRequestReview.commit.oid,
-          created_at: `2026-09-23T00:00:${String(comment.databaseId).padStart(2, '0')}Z`,
-          user: comment.author,
-          pull_request_review_id: comment.pull_request_review_id,
-          in_reply_to_id: comment.in_reply_to_id,
-        }),
-      ))]),
+      FAKE_COMMENTS: JSON.stringify([
+        comments.flatMap((thread) =>
+          thread.comments.nodes.map((comment) => ({
+            id: comment.databaseId,
+            commit_id: comment.pullRequestReview.commit.oid,
+            created_at: `2026-09-23T00:00:${String(comment.databaseId).padStart(2, '0')}Z`,
+            user: comment.author,
+            pull_request_review_id: comment.pull_request_review_id,
+            in_reply_to_id: comment.in_reply_to_id,
+          })),
+        ),
+      ]),
       FAKE_REVIEWS: JSON.stringify([reviews]),
       FAKE_PR_ERROR: prError ? '1' : '',
     },
@@ -76,7 +83,9 @@ describe('外部指摘後の push ガード', () => {
           CLAUDE_PROJECT_DIR: join(import.meta.dir, '../..'),
           FAKE_TARGET: target,
         },
-        stdin: new Blob([JSON.stringify({ cwd: caller, tool_input: { command: `git -C ${target} push` } })]),
+        stdin: new Blob([
+          JSON.stringify({ cwd: caller, tool_input: { command: `git -C ${target} push` } }),
+        ]),
         stdout: 'pipe',
         stderr: 'pipe',
       });
@@ -95,10 +104,16 @@ describe('外部指摘後の push ガード', () => {
       const child = Bun.spawn(['bun', preBash], {
         cwd,
         env: { ...process.env, CLAUDE_PROJECT_DIR: join(import.meta.dir, '../..') },
-        stdin: new Blob([JSON.stringify({ cwd, tool_input: {
-          command: 'git add README && git commit -m fix && git push',
-        } })]),
-        stdout: 'pipe', stderr: 'pipe',
+        stdin: new Blob([
+          JSON.stringify({
+            cwd,
+            tool_input: {
+              command: 'git add README && git commit -m fix && git push',
+            },
+          }),
+        ]),
+        stdout: 'pipe',
+        stderr: 'pipe',
       });
       const [code, error] = await Promise.all([child.exited, new Response(child.stderr).text()]);
       expect(code).toBe(2);
@@ -129,19 +144,27 @@ describe('外部指摘後の push ガード', () => {
       const historyPath = await externalReviewFile({ cwd });
       const comment = (id: number, head: string, isResolved = false, login = 'reviewer') => ({
         isResolved,
-        comments: { nodes: [{
-          databaseId: id,
-          author: { login },
-          pullRequestReview: { commit: { oid: head } },
-        }] },
+        comments: {
+          nodes: [
+            {
+              databaseId: id,
+              author: { login },
+              pullRequestReview: { commit: { oid: head } },
+            },
+          ],
+        },
       });
-      const firstComment = [{
-        ...comment(1, sha),
-        comments: { nodes: [
-          comment(1, sha).comments.nodes[0],
-          comment(99, sha, false, 'testuser').comments.nodes[0],
-        ] },
-      }];
+      const firstComment = [
+        {
+          ...comment(1, sha),
+          comments: {
+            nodes: [
+              comment(1, sha).comments.nodes[0],
+              comment(99, sha, false, 'testuser').comments.nodes[0],
+            ],
+          },
+        },
+      ];
       expect((await checkPush(cwd, bin, [], true)).code).toBe(2);
       expect((await checkPush(cwd, bin, firstComment)).code).toBe(2);
       expect(await Bun.file(historyPath).exists()).toBe(true);
@@ -175,22 +198,33 @@ describe('外部指摘後の push ガード', () => {
       expect((await checkPush(cwd, bin, newComment)).code).toBe(0);
 
       // 自分の返信は指摘に数えず、解決済みでも未観測の外部指摘は検知する。
-      expect((await checkPush(cwd, bin, [comment(4, 'another-head', false, 'testuser')])).code).toBe(0);
+      expect(
+        (await checkPush(cwd, bin, [comment(4, 'another-head', false, 'testuser')])).code,
+      ).toBe(0);
       const multiHead = {
         ...comment(5, 'another-head', true),
-        comments: { nodes: [
-          comment(5, 'another-head').comments.nodes[0],
-          comment(6, 'third-head').comments.nodes[0],
-        ] },
+        comments: {
+          nodes: [
+            comment(5, 'another-head').comments.nodes[0],
+            comment(6, 'third-head').comments.nodes[0],
+          ],
+        },
       };
       expect((await checkPush(cwd, bin, [multiHead])).code).toBe(2);
       expect((await Bun.file(historyPath).json()).heads).toEqual([
-        sha, 'next-head', 'another-head', 'third-head',
+        sha,
+        'next-head',
+        'another-head',
+        'third-head',
       ]);
 
       await Bun.write(
         historyPath,
-        JSON.stringify({ ...history, heads: ['a', 'b', sha], seenComments: ['one', 'two', 'thread:1'] }),
+        JSON.stringify({
+          ...history,
+          heads: ['a', 'b', sha],
+          seenComments: ['one', 'two', 'thread:1'],
+        }),
       );
       const blocked = await checkPush(cwd, bin);
       expect(blocked.code).toBe(2);
@@ -210,7 +244,10 @@ describe('外部指摘後の push ガード', () => {
         }),
       );
       expect((await checkPush(cwd, bin)).code).toBe(2);
-      await writeEntries([...entries, entries[0], entries[1], entries[0], entries[1], entries[0], entries[1]], { cwd });
+      await writeEntries(
+        [...entries, entries[0], entries[1], entries[0], entries[1], entries[0], entries[1]],
+        { cwd },
+      );
       expect((await checkPush(cwd, bin)).code).toBe(0);
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -228,49 +265,108 @@ describe('外部指摘後の push ガード', () => {
       git(cwd, 'commit', '-qm', 'test');
       const bin = join(cwd, 'bin');
       await mkdir(bin);
-      await writeFile(join(bin, 'gh'),
-        '#!/bin/sh\nif [ "$1" = "pr" ]; then printf \'{"number":42}\\n\'; exit 0; fi\nif [ "$1" = "api" ] && [ "$2" = "user" ]; then printf "testuser\\n"; exit 0; fi\nif [ "$1" = "api" ]; then case "$2" in */reviews?*) printf "%s\\n" "$FAKE_REVIEWS";; *) printf "%s\\n" "$FAKE_COMMENTS";; esac; exit 0; fi\nexit 1\n', { mode: 0o755 });
+      await writeFile(
+        join(bin, 'gh'),
+        '#!/bin/sh\nif [ "$1" = "pr" ]; then printf \'{"number":42}\\n\'; exit 0; fi\nif [ "$1" = "api" ] && [ "$2" = "user" ]; then printf "testuser\\n"; exit 0; fi\nif [ "$1" = "api" ]; then case "$2" in */reviews?*) printf "%s\\n" "$FAKE_REVIEWS";; *) printf "%s\\n" "$FAKE_COMMENTS";; esac; exit 0; fi\nexit 1\n',
+        { mode: 0o755 },
+      );
       const review = (id: number, head: string) => ({
-        id, commit_id: head, submitted_at: `2026-09-23T00:00:0${id}Z`,
-        state: 'CHANGES_REQUESTED', body: '設計を見直してください', user: { login: 'reviewer' },
+        id,
+        commit_id: head,
+        submitted_at: `2026-09-23T00:00:0${id}Z`,
+        state: 'CHANGES_REQUESTED',
+        body: '設計を見直してください',
+        user: { login: 'reviewer' },
       });
       const sha = await reviewTargetSha({ cwd });
-      const first = [review(1, sha), review(2, 'head-b'),
-        { ...review(4, 'non-finding'), state: 'COMMENTED', body: 'LGTM' }];
-      const inline: FakeThread[] = [{ comments: { nodes: [
-        { databaseId: 7, author: { login: 'reviewer' },
-          pullRequestReview: { commit: { oid: 'old-line-commit' } }, pull_request_review_id: 1 },
-        { databaseId: 8, author: { login: 'reviewer' },
-          pullRequestReview: { commit: { oid: 'reply-commit' } }, in_reply_to_id: 7 },
-      ] } }];
-      const inlinePayload = [[
-        { id: 7, commit_id: 'old-line-commit', created_at: '2026-09-23T00:00:07Z',
-          user: { login: 'reviewer' }, pull_request_review_id: 1 },
-        { id: 8, commit_id: 'reply-commit', created_at: '2026-09-23T00:00:08Z',
-          user: { login: 'reviewer' }, in_reply_to_id: 7 },
-      ]];
+      const first = [
+        review(1, sha),
+        review(2, 'head-b'),
+        { ...review(4, 'non-finding'), state: 'COMMENTED', body: 'LGTM' },
+      ];
+      const inline: FakeThread[] = [
+        {
+          comments: {
+            nodes: [
+              {
+                databaseId: 7,
+                author: { login: 'reviewer' },
+                pullRequestReview: { commit: { oid: 'old-line-commit' } },
+                pull_request_review_id: 1,
+              },
+              {
+                databaseId: 8,
+                author: { login: 'reviewer' },
+                pullRequestReview: { commit: { oid: 'reply-commit' } },
+                in_reply_to_id: 7,
+              },
+            ],
+          },
+        },
+      ];
+      const inlinePayload = [
+        [
+          {
+            id: 7,
+            commit_id: 'old-line-commit',
+            created_at: '2026-09-23T00:00:07Z',
+            user: { login: 'reviewer' },
+            pull_request_review_id: 1,
+          },
+          {
+            id: 8,
+            commit_id: 'reply-commit',
+            created_at: '2026-09-23T00:00:08Z',
+            user: { login: 'reviewer' },
+            in_reply_to_id: 7,
+          },
+        ],
+      ];
       const observedAtArrival = Bun.spawn(['bun', observeScript], {
-        cwd, env: { ...process.env, PATH: `${bin}:${process.env.PATH}`,
-          FAKE_REVIEWS: JSON.stringify([[...first]]), FAKE_COMMENTS: JSON.stringify(inlinePayload) },
-        stdin: new Blob([JSON.stringify({ cwd })]), stdout: 'pipe', stderr: 'pipe',
+        cwd,
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          FAKE_REVIEWS: JSON.stringify([[...first]]),
+          FAKE_COMMENTS: JSON.stringify(inlinePayload),
+        },
+        stdin: new Blob([JSON.stringify({ cwd })]),
+        stdout: 'pipe',
+        stderr: 'pipe',
       });
       expect(await observedAtArrival.exited).toBe(0);
       const observed = await checkPush(cwd, bin, inline, false, first);
       expect(observed.code).toBe(2);
       const historyPath = await externalReviewFile({ cwd });
       expect((await Bun.file(historyPath).json()).heads).toEqual([sha, 'head-b']);
-      await writeEntries([
-        { kind: 'round', round: { count: 1, sha, reviewer: 'other', accepted: false } },
-        { kind: 'round', round: { count: 0, sha, reviewer: 'codex', accepted: false } },
-      ], { cwd });
+      await writeEntries(
+        [
+          { kind: 'round', round: { count: 1, sha, reviewer: 'other', accepted: false } },
+          { kind: 'round', round: { count: 0, sha, reviewer: 'codex', accepted: false } },
+        ],
+        { cwd },
+      );
       expect((await checkPush(cwd, bin, inline, false, first)).code).toBe(0);
-      const child = Bun.spawn(['bun', record, 'asked', 'レビュー継続の原因は責務の曖昧さにあり、ユーザーは境界と責務を整理してから進む方針を選んだ'], {
-        cwd,
-        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`,
-          FAKE_REVIEWS: JSON.stringify([[...first, review(3, 'head-c')]]),
-          FAKE_COMMENTS: JSON.stringify(inlinePayload) },
-        stdin: new Blob([JSON.stringify({ cwd })]), stdout: 'pipe', stderr: 'pipe',
-      });
+      const child = Bun.spawn(
+        [
+          'bun',
+          record,
+          'asked',
+          'レビュー継続の原因は責務の曖昧さにあり、ユーザーは境界と責務を整理してから進む方針を選んだ',
+        ],
+        {
+          cwd,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            FAKE_REVIEWS: JSON.stringify([[...first, review(3, 'head-c')]]),
+            FAKE_COMMENTS: JSON.stringify(inlinePayload),
+          },
+          stdin: new Blob([JSON.stringify({ cwd })]),
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
       expect(await child.exited).toBe(0);
       const history = await Bun.file(historyPath).json();
       expect(history.heads).toEqual([sha, 'head-b', 'head-c']);

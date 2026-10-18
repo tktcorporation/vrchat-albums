@@ -10,6 +10,12 @@ Claude が作成した PR は、作成直後にセルフレビューを回すと
 
 このゲートは対象を作業ツリーの現在のブランチで判定する。`gh pr create --head <branch>` で別ブランチを PR にする場合は、そのブランチのディレクトリ（worktree）でレビュー・記録してから作成する。**hook はコマンド文字列から `--head` の指定先を読み取らない**（`--title`/`--body` の自由記述に `--head` という文字列が現れるとゲートを誤って通してしまうため、あえて実装していない）。したがって、レビュー済みブランチのディレクトリにいながら `--head` で別の未レビューブランチを指定すれば、この防御は効かない。この経路は仕組みで防いでおらず、`agent-work-discipline.md` が禁じる行為（名指しされた対象をすり替える）に該当する運用上の禁止事項として扱う。
 
+GitHub MCP サーバー経由の PR 作成（`mcp__github__create_pull_request` 等、matcher は `^mcp__.+__(?:github_)?create_pull_request$`。MCP ツールを `MCP:<ツール名>` で渡す Cursor では `^MCP:(?:github_)?create_pull_request$`）は、別の PreToolUse フック（`.claude/hooks/require-pr-self-review-mcp.ts`）が同じ収束条件でブロックする。tool_input の `owner`/`repo`/`head`（`owner:branch` 形式は owner がベースリポジトリの owner と一致する場合だけ受け付ける）が、作業ツリーの origin リモート・現在のブランチと一致し、かつリモートの head ブランチの HEAD がそのブランチでレビュー済みのローカル HEAD と同じコミットを指している場合に限って収束判定へ進む。いずれか一方でも確認できなければ理由を問わず常にブロックする（ローカルの記録を対象にできない呼び出しを通す判断はしない）。対象ブランチをチェックアウトした正しいディレクトリでレビュー・記録し、push してリモートと揃えてから、そのディレクトリを cwd にして呼び出す。
+
+このゲートが塞がないもの: 一度 close した PR を `state: "open"` で reopen する経路（`mcp__github__update_pull_request` 等）は対象外で、reopen 前に head へ push されたレビュー前のコミットを防げない。`gh` の `pr` サブコマンドを経由しない生の API 呼び出し（`gh api -X POST .../pulls` 等）も Bash 側の `isPrCreateCommand` の対象外。MCP 経路の owner/repo 照合は origin リモートの URL から切り出した文字列との一致だけを見ており、その URL のホストが実際に対象の GitHub インスタンスかは確認しない。base/head の owner が異なる本来のフォーク間 PR は、head 側のリポジトリを作業ツリーの origin にできないため、この経路では常にブロックする（`gh pr create` で作成する）。どれも `--head` の運用上の注意（上の段落）と同じ扱いで、意図的な誤用までは仕組みで防いでいない。
+
+Claude Code 以外（Cursor・Codex）での自動発火はホストごとの確認が要る。共有MCPゲートは `owner/repo/head` と `repository_full_name/head`（および対応する別名）を受け付け、矛盾する指定は拒否する。`functions.exec` を使うクラウドでは `.claude/guides/tools/cloud-review.md` の作成ラッパーを使う。ラッパー内で同じ収束判定と証跡の照合を行い、成功時だけコネクタへ進む。別経路のAPIまで禁止するものではない。
+
 ## 手順
 
 PR を作成したいとき、以下を自動的に実行する:
@@ -86,7 +92,7 @@ bun .claude/hooks/record-pr-review.ts checkpoint <continue|replan|asked> "<診�
 ## 注意
 
 - ラウンドの記録はブランチごとに、主チェックアウトの `.git/claude/pr-review/<ブランチ名>.rounds` に置く（`.claude/hooks/review-count.ts`）。worktree から記録しても hook と同じファイルになり、別ブランチの記録とは混ざらない
-- 記録のリセットは `.claude/hooks/reset-pr-review-count.ts`（PostToolUse）が行う。`post-bash-pr.ts` はコマンドの終了コードではなく、`gh pr view` でそのブランチに実際に PR が存在するかを確認してから発火する（終了コードは `|| true` 等で上書きできるため信用しない）
+- 記録のリセットは `.claude/hooks/reset-pr-review-count.ts`（PostToolUse）が行う。`post-bash-pr.ts` はコマンドの終了コードではなく、`gh pr view` でそのブランチに実際に PR が存在するかを確認してから発火する（終了コードは `|| true` 等で上書きできるため信用しない）。MCP 経路（`post-mcp-pr.ts`）は `gh` を使わないため同じ確認ができず、明らかな失敗（`tool_response` の `is_error`/`isError`）以外は呼び出しの成否を問わずリセットする。実際には PR が作られていなかった場合、次の PR 作成でもう一度レビューを求めるだけで安全側に倒れる
 
 ## 既存 PR への追加コミットでは「指摘は外部レビューが見つけてくれる」に頼らない
 

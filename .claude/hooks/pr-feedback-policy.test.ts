@@ -34,7 +34,11 @@ describe('外部レビューの往復', () => {
     );
     expect(history.heads).toHaveLength(EXTERNAL_REVIEW_LIMIT);
     expect(needsUserDecision(history)).toBe(true);
-    const answered = acknowledgeFeedback(history, 'ユーザーに全指摘と設計案を示し、修正の続行を指示された', 3);
+    const answered = acknowledgeFeedback(
+      history,
+      'ユーザーに全指摘と設計案を示し、修正の続行を指示された',
+      3,
+    );
     expect(needsUserDecision(answered)).toBe(false);
     expect(needsUserDecision(observe(answered, 'd', 'comment-4', 4))).toBe(true);
   });
@@ -49,7 +53,10 @@ describe('外部レビューの往復', () => {
 
   test('壊れた履歴と不正なユーザー判断は明示的に拒否する', () => {
     expect(parseExternalReviewHistory('{', 42)).toEqual({ kind: 'invalid' });
-    const invalid = { ...newExternalReviewHistory(42), consultation: { kind: 'answered', through: 3, note: '' } };
+    const invalid = {
+      ...newExternalReviewHistory(42),
+      consultation: { kind: 'answered', through: 3, note: '' },
+    };
     expect(parseExternalReviewHistory(JSON.stringify(invalid), 42)).toEqual({ kind: 'invalid' });
   });
 });
@@ -64,8 +71,17 @@ test('push は最新の指摘後に現在の HEAD で収束した場合だけ通
   expect(judgeExternalPush(history, [...rounds, rounds[1]], 'b')).toBe('review_locally');
   expect(judgeExternalPush(history, [...rounds, rounds[1]], 'a')).toBe('review_locally');
   expect(judgeExternalPush(history, [...rounds, rounds[0], rounds[1]], 'a')).toBe('allow');
-  expect(judgeExternalPush(markFeedbackReviewed(history), [...rounds, rounds[0], rounds[1]], 'new-sha')).toBe('review_locally');
-  expect(judgeExternalPush(markFeedbackReviewed(history), [...rounds, rounds[0], rounds[1]], 'new-sha', true)).toBe('allow');
+  expect(
+    judgeExternalPush(markFeedbackReviewed(history), [...rounds, rounds[0], rounds[1]], 'new-sha'),
+  ).toBe('review_locally');
+  expect(
+    judgeExternalPush(
+      markFeedbackReviewed(history),
+      [...rounds, rounds[0], rounds[1]],
+      'new-sha',
+      true,
+    ),
+  ).toBe('allow');
   const third = observe(observe(history, 'b', 'two', 3), 'c', 'three', 3);
   expect(judgeExternalPush(third, rounds, 'a')).toBe('consult_user');
 });

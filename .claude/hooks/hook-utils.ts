@@ -11,15 +11,32 @@ export interface HookInput {
     path?: string;
     command?: string;
     run_in_background?: boolean;
+    // mcp__*__create_pull_request の対象特定に使う（require-pr-self-review-mcp.ts）
+    owner?: string;
+    repo?: string;
+    head?: string;
+    head_branch?: string;
+    repository_full_name?: string;
+    repo_full_name?: string;
   };
   tool_response?: {
     exit_code?: number;
     exitCode?: number;
     duration_ms?: number;
     interrupted?: boolean;
+    // MCP ツールの失敗表現は未確認（ドキュメントで確認できていない）。複数の
+    // エージェントハーネスで慣用的な is_error 系のキーを両方見ておく
+    // （post-mcp-pr.ts）。存在しなければ判定に使わない。
+    is_error?: boolean;
+    isError?: boolean;
   };
   stop_hook_active?: boolean;
 }
+/** JSON 由来の値をプロパティ参照できる形に絞る（配列と null は含めない）。 */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
  * hook が状態ファイル（レビュー回数など）や設定を読み書きする基準ディレクトリ。
  * Claude Code は CLAUDE_PROJECT_DIR に主チェックアウトを入れて hook を起動する
@@ -56,7 +73,8 @@ export async function gitCommonDir(start: string = process.cwd()): Promise<strin
 /** 現在のブランチ名。detached HEAD ではコミットの短い ID。 */
 export async function currentBranch(start: string = process.cwd()): Promise<string> {
   const name = await $`git -C ${start} rev-parse --abbrev-ref HEAD`.quiet().nothrow();
-  if (name.exitCode === 0 && name.text().trim() !== 'HEAD') return name.text().trim();
+  const branch = name.text().replace(/\r?\n$/, '');
+  if (name.exitCode === 0 && branch !== 'HEAD') return branch;
   return await headSha(start);
 }
 /** 現在の HEAD のフル SHA。作業ツリーの変更（staged/unstaged）は含まない。 */

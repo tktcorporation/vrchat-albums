@@ -22,7 +22,7 @@ export interface Round {
 export const ROUND_FLAGS = ['codex', 'accepted'] as const;
 export type RoundFlag = (typeof ROUND_FLAGS)[number];
 export const isRoundFlag = (value: string): value is RoundFlag =>
-  (ROUND_FLAGS as readonly string[]).includes(value);
+  ROUND_FLAGS.some((flag) => flag === value);
 export const roundFromFlags = (count: number, sha: string, flags: readonly RoundFlag[]): Round => ({
   count,
   sha,
@@ -43,6 +43,8 @@ const flagsOf = (round: Round): RoundFlag[] =>
  */
 export const CHECKPOINT_DECISIONS = ['continue', 'replan', 'asked'] as const;
 export type CheckpointDecision = (typeof CHECKPOINT_DECISIONS)[number];
+export const isCheckpointDecision = (value: string): value is CheckpointDecision =>
+  CHECKPOINT_DECISIONS.some((decision) => decision === value);
 /** ユーザーへの確認が必須のとき、受理される唯一の決定。 */
 export const ASKED = 'asked' satisfies CheckpointDecision;
 
@@ -59,9 +61,7 @@ export const roundsOf = (entries: Entry[]): Round[] =>
 
 // SHA-1(40桁)・SHA-256(64桁)のどちらでも読めるようにする。
 const SHA = '[0-9a-f]{40}|[0-9a-f]{64}';
-const ROUND_LINE = new RegExp(
-  `^(\\d+)\\s+(${SHA})((?:\\s+(?:${ROUND_FLAGS.join('|')}))*)$`,
-);
+const ROUND_LINE = new RegExp(`^(\\d+)\\s+(${SHA})((?:\\s+(?:${ROUND_FLAGS.join('|')}))*)$`);
 const CHECKPOINT_LINE = new RegExp(
   `^checkpoint\\s+(${CHECKPOINT_DECISIONS.join('|')})\\s+(${SHA})(?:\\s+(.+))?$`,
 );
@@ -74,10 +74,10 @@ function parseEntry(line: string): Entry | null {
     return { kind: 'round', round: roundFromFlags(Number(round[1]), round[2], flags) };
   }
   const checkpoint = text.match(CHECKPOINT_LINE);
-  if (checkpoint) {
+  if (checkpoint && isCheckpointDecision(checkpoint[1])) {
     return {
       kind: 'checkpoint',
-      decision: checkpoint[1] as CheckpointDecision,
+      decision: checkpoint[1],
       sha: checkpoint[2],
       note: checkpoint[3] ?? '',
     };
@@ -147,7 +147,9 @@ export function assertNever(value: never): never {
 }
 
 /** 収束していない理由の文言。記録コマンドと PR 作成のゲートが同じ文言を出す。 */
-export function convergenceReason(convergence: Exclude<Convergence, { kind: 'converged' }>): string {
+export function convergenceReason(
+  convergence: Exclude<Convergence, { kind: 'converged' }>,
+): string {
   switch (convergence.kind) {
     case 'too_few':
       return `ラウンドが ${MIN_ROUNDS} 回に達していません（あと ${convergence.missing} ラウンド）`;
@@ -201,8 +203,16 @@ function isStalled(recent: Round[]): boolean {
   return last.count >= Math.min(...recent.slice(0, -1).map((round) => round.count));
 }
 
+/** 末尾から checkpoint エントリを探す。`.claude/hooks/` は root tsconfig の対象外で、`findLastIndex` を解決できる保証が無い。 */
+function lastCheckpointIndex(entries: Entry[]): number {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (entries[index].kind === 'checkpoint') return index;
+  }
+  return -1;
+}
+
 export function checkpointState(entries: Entry[]): CheckpointState {
-  const lastCheckpoint = entries.findLastIndex((entry) => entry.kind === 'checkpoint');
+  const lastCheckpoint = lastCheckpointIndex(entries);
   const window = roundsOf(entries.slice(lastCheckpoint + 1));
   const counts = window.map((round) => round.count);
   const totalRounds = roundsOf(entries).length;

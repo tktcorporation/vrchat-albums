@@ -16,3 +16,7 @@ This entry point is for Cursor, Codex, Claude Code, and other AGENTS.md-aware to
 When a task matches a skill description, read that skill under `.claude/skills/` and follow it.
 When changing code, also apply the relevant files under `.claude/rules/`.
 To change hook wiring or Cursor rule wrappers, edit the SSOT and run `pnpm agent-adapters:generate`.
+
+For cloud sessions using `functions.exec`, read `.claude/guides/tools/cloud-review.md`
+before creating a PR. Use its guarded creation wrapper; repository hook files alone
+do not establish that the host intercepts nested tool calls.

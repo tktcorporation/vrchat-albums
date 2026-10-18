@@ -22,6 +22,10 @@
       {
         "command": "bun .cursor/run-shared-hook.ts .claude/hooks/track-edits.ts",
         "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/require-pr-self-review-mcp.ts",
+        "matcher": "^MCP:(?:github_)?create_pull_request$"
       }
     ],
     "postToolUse": [
@@ -48,6 +52,10 @@
       {
         "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-lint.ts",
         "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
+      },
+      {
+        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-mcp-pr.ts",
+        "matcher": "^MCP:(?:github_)?create_pull_request$"
       }
     ],
     "stop": [

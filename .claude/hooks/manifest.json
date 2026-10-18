@@ -28,7 +28,7 @@
       },
       "codex": {
         "event": "PreToolUse",
-        "matcher": "^Bash$"
+        "matcher": "^(Bash|exec_command)$"
       }
     },
     {
@@ -44,7 +44,7 @@
       },
       "codex": {
         "event": "PreToolUse",
-        "matcher": "^Bash$"
+        "matcher": "^(Bash|exec_command)$"
       }
     },
     {
@@ -93,7 +93,7 @@
       },
       "codex": {
         "event": "PostToolUse",
-        "matcher": "^Bash$"
+        "matcher": "^(Bash|exec_command)$"
       }
     },
     {
@@ -109,7 +109,7 @@
       },
       "codex": {
         "event": "PostToolUse",
-        "matcher": "^Bash$"
+        "matcher": "^(Bash|exec_command)$"
       }
     },
     {
@@ -125,7 +125,7 @@
       },
       "codex": {
         "event": "PostToolUse",
-        "matcher": "^Bash$"
+        "matcher": "^(Bash|exec_command)$"
       }
     },
     {
@@ -208,6 +208,38 @@
       },
       "codex": {
         "event": "Stop"
+      }
+    },
+    {
+      "id": "require-pr-self-review-mcp",
+      "script": ".claude/hooks/require-pr-self-review-mcp.ts",
+      "claude": {
+        "event": "PreToolUse",
+        "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
+      },
+      "cursor": {
+        "event": "preToolUse",
+        "matcher": "^MCP:(?:github_)?create_pull_request$"
+      },
+      "codex": {
+        "event": "PreToolUse",
+        "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
+      }
+    },
+    {
+      "id": "post-mcp-pr",
+      "script": ".claude/hooks/post-mcp-pr.ts",
+      "claude": {
+        "event": "PostToolUse",
+        "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
+      },
+      "cursor": {
+        "event": "postToolUse",
+        "matcher": "^MCP:(?:github_)?create_pull_request$"
+      },
+      "codex": {
+        "event": "PostToolUse",
+        "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
       }
     }
   ]
