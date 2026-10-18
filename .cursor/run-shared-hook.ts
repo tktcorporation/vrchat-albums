@@ -278,4 +278,7 @@ if (status === 2) {
 
 const cursorOutput = toCursorOutput(output);
 if (cursorOutput) console.log(cursorOutput);
+// PR 作成ゲートは failClosed で登録しており、Cursor は出力の無い成功も失敗として拒否する。
+// ゲートが黙って通した（収束を確認した）ときは、許可を明示して返す。
+else if (isPrGate) console.log(JSON.stringify({ permission: 'allow' }));
 process.exit(0);

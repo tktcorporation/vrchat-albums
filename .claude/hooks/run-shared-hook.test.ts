@@ -154,4 +154,23 @@ describe('アダプター経由で hook が落ちたとき・入出力を読め�
       'bun .cursor/run-shared-hook.ts .claude/hooks/require-pr-self-review-mcp.ts',
     ]);
   });
+
+  test(
+    'Cursor のアダプターで、PR 作成ゲートが何も出さずに通したときは、許可を明示して返す',
+    async () => {
+      const result = await runStubHook(
+        'require-pr-self-review-mcp.ts',
+        {
+          hook_event_name: 'preToolUse',
+          tool_name: 'mcp__github__create_pull_request',
+          tool_input: { owner: 'owner', repo: 'repo', head: 'feature', base: 'main' },
+        },
+        cursorAdapter,
+        'process.exit(0);\n',
+      );
+      expect(result.code).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual({ permission: 'allow' });
+    },
+    SPAWN_TEST_TIMEOUT_MS,
+  );
 });
