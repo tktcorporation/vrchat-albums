@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.31.2
+
+### Patch Changes
+
+- [#880](https://github.com/tktcorporation/vrchat-albums/pull/880) [`7b9ef28`](https://github.com/tktcorporation/vrchat-albums/commit/7b9ef28c7ce9953642a477631266c3e3a40630b1) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 開発・CI で使う Node と、メインプロセス・preload のビルド対象を、Electron 44 に同梱される Node 24 系に揃える。ビルド対象が実行環境と一致するため、Node 24 で使える構文を古い形へ書き換えずに出力する。
+
+- [#877](https://github.com/tktcorporation/vrchat-albums/pull/877) [`96e3245`](https://github.com/tktcorporation/vrchat-albums/commit/96e3245ed2d09216d14a583569ae657cc1235f89) Thanks [@tktcorporation](https://github.com/tktcorporation)! - ファイルやフォルダに権限がなく読めないとき、「存在しない」として処理を進めずにエラーとして扱うようにした。インポート履歴が読めないときは空の履歴ではなく読み込み失敗のメッセージを表示し、旧アプリからの移行でログの読み取りに失敗したときは移行を完了扱いにせず次回に再試行する。
+
+- [#879](https://github.com/tktcorporation/vrchat-albums/pull/879) [`b5f6ea7`](https://github.com/tktcorporation/vrchat-albums/commit/b5f6ea76cee839d5a8ac2115a6eafef3b99fce1d) Thanks [@tktcorporation](https://github.com/tktcorporation)! - サムネイルのキャッシュが上限なく増え続けないよう、古いものと期限切れのものを起動後と 1 日ごとに自動で削除するようにしました
+
 ## 0.31.1
 
 ### Patch Changes
