@@ -49,9 +49,33 @@ export const isVRChatPhotoFile = (filename: string): boolean =>
 
 // サムネイルキャッシュの設定
 const THUMBNAIL_CACHE_DIR_NAME = 'vrchat-albums-thumbnails';
-const MAX_CACHE_SIZE_MB = 500; // キャッシュの最大サイズ
-const CACHE_CLEANUP_THRESHOLD = 0.9; // キャッシュサイズがこの割合を超えたらクリーンアップ
-const CACHE_EXPIRY_DAYS = 7; // キャッシュの有効期限（日数）
+const CACHE_EXPIRY_DAYS = 7; // キャッシュの有効期限（日数）。超えたものは読み取り時にミス扱いになる
+
+/**
+ * サムネイルキャッシュの容量制限
+ *
+ * 合計が上限の `cleanupThreshold` 倍に達したら、古いものから `targetRatio` 倍まで削る。
+ * 一度に半分まで削るのは、閾値付近で毎回クリーンアップが走り続けるのを避けるため。
+ */
+export interface ThumbnailCacheLimits {
+  maxBytes: number;
+  cleanupThreshold: number;
+  targetRatio: number;
+  expiryMs: number;
+  staleTempFileMs: number;
+}
+
+export const THUMBNAIL_CACHE_LIMITS: ThumbnailCacheLimits = {
+  maxBytes: 500 * 1024 * 1024,
+  cleanupThreshold: 0.9,
+  targetRatio: 0.5,
+  expiryMs: CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+  // 書き込み途中の一時ファイルを消すと rename が失敗するため、
+  // 一時ファイルはクラッシュ等で取り残されたと判断できる時間を過ぎたものだけ消す
+  staleTempFileMs: 60 * 60 * 1000,
+};
+
+const TEMP_FILE_SUFFIX = '.tmp';
 
 // 書き込み中のキャッシュキーを追跡（競合防止）
 const pendingCacheWrites = new Set<string>();
@@ -353,7 +377,7 @@ const saveThumbnailToCache = async (
     }
 
     const cachePath = path.join(cacheDirEither.right, `${cacheKey}.webp`);
-    const tempPath = `${cachePath}.tmp`;
+    const tempPath = `${cachePath}${TEMP_FILE_SUFFIX}`;
 
     // アトミック書き込み: tmp -> rename
     yield* Effect.tryPromise({
@@ -495,7 +519,61 @@ const readCacheDir = (
   });
 
 /**
- * 古いキャッシュをクリーンアップ（必要に応じて呼び出される）
+ * クリーンアップ判定に使うキャッシュファイルの情報
+ */
+export interface ThumbnailCacheEntry {
+  filePath: string;
+  size: number;
+  mtimeMs: number;
+}
+
+/**
+ * 削除すべきキャッシュファイルを選ぶ（副作用なし）
+ *
+ * 1. 有効期限切れのサムネイルは読み取り時に必ずミスになるため、容量に関係なく消す
+ * 2. 取り残された一時ファイルも消す。書き込み中の可能性がある新しい一時ファイルは残す
+ * 3. 残りの合計が閾値以上なら、mtime が古い順に目標サイズまで消す
+ *    （mtime は書き込み時刻。読み取りでは更新されないため、古い順 = 先に期限切れになる順）
+ */
+export const selectThumbnailCacheFilesToDelete = (
+  entries: readonly ThumbnailCacheEntry[],
+  nowMs: number,
+  limits: ThumbnailCacheLimits = THUMBNAIL_CACHE_LIMITS,
+): string[] => {
+  const isTempFile = (entry: ThumbnailCacheEntry) =>
+    entry.filePath.endsWith(TEMP_FILE_SUFFIX);
+  const isObsolete = (entry: ThumbnailCacheEntry) =>
+    isTempFile(entry)
+      ? nowMs - entry.mtimeMs > limits.staleTempFileMs
+      : nowMs - entry.mtimeMs > limits.expiryMs;
+
+  const obsolete = entries.filter(isObsolete);
+  const kept = entries.filter((entry) => !isObsolete(entry));
+
+  let keptBytes = kept.reduce((sum, entry) => sum + entry.size, 0);
+  if (keptBytes < limits.maxBytes * limits.cleanupThreshold) {
+    return obsolete.map((entry) => entry.filePath);
+  }
+
+  const targetBytes = limits.maxBytes * limits.targetRatio;
+  const evicted: ThumbnailCacheEntry[] = [];
+  for (const entry of kept
+    .filter((e) => !isTempFile(e))
+    .toSorted((a, b) => a.mtimeMs - b.mtimeMs)) {
+    if (keptBytes <= targetBytes) {
+      break;
+    }
+    evicted.push(entry);
+    keptBytes -= entry.size;
+  }
+
+  return [...obsolete, ...evicted].map((entry) => entry.filePath);
+};
+
+/**
+ * サムネイルキャッシュを容量制限と有効期限に従って削減する
+ *
+ * 失敗はログに残して終える（キャッシュは再生成できるため、アプリを止める理由にならない）。
  */
 export const cleanupThumbnailCache = async (): Promise<void> => {
   const cacheDirEither = await Effect.runPromise(
@@ -522,46 +600,39 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
     return;
   }
 
-  const files = filesEither.right;
   const fileStats = await Promise.all(
-    files.map((file) => {
-      const filePath = path.join(cacheDir, file);
-      return Effect.runPromise(statCacheFileForCleanup(filePath));
-    }),
+    filesEither.right.map((file) =>
+      Effect.runPromise(statCacheFileForCleanup(path.join(cacheDir, file))),
+    ),
   );
+  const entries = fileStats
+    .filter((f): f is NonNullable<CacheFileStatResult> => f !== null)
+    .map(
+      (f): ThumbnailCacheEntry => ({
+        filePath: f.filePath,
+        size: f.size,
+        mtimeMs: f.mtime,
+      }),
+    );
 
-  const validFiles = fileStats.filter(
-    (f): f is NonNullable<CacheFileStatResult> => f !== null,
-  );
-  const totalSizeMB =
-    validFiles.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
-
-  // キャッシュサイズがしきい値を超えている場合のみクリーンアップ
-  if (totalSizeMB < MAX_CACHE_SIZE_MB * CACHE_CLEANUP_THRESHOLD) {
+  const toDelete = selectThumbnailCacheFilesToDelete(entries, Date.now());
+  if (toDelete.length === 0) {
     return;
   }
 
-  logger.info(
-    `Cleaning up thumbnail cache. Current size: ${totalSizeMB.toFixed(2)}MB`,
-  );
-
-  // 古いファイルから削除
-  const sortedFiles = validFiles.toSorted((a, b) => a.mtime - b.mtime);
-  let currentSize = totalSizeMB;
-  const targetSize = MAX_CACHE_SIZE_MB * 0.5; // 50%まで削減
-
-  for (const file of sortedFiles) {
-    if (currentSize <= targetSize) {
-      break;
-    }
-    const deleted = await Effect.runPromise(unlinkCacheFile(file.filePath));
+  const sizeByPath = new Map(entries.map((e) => [e.filePath, e.size]));
+  let freedBytes = 0;
+  let deletedCount = 0;
+  for (const filePath of toDelete) {
+    const deleted = await Effect.runPromise(unlinkCacheFile(filePath));
     if (deleted) {
-      currentSize -= file.size / 1024 / 1024;
+      deletedCount++;
+      freedBytes += sizeByPath.get(filePath) ?? 0;
     }
   }
 
   logger.info(
-    `Thumbnail cache cleanup completed. New size: ${currentSize.toFixed(2)}MB`,
+    `Thumbnail cache cleanup completed. Deleted ${deletedCount}/${toDelete.length} files, freed ${(freedBytes / 1024 / 1024).toFixed(2)}MB`,
   );
 };
 
