@@ -243,7 +243,7 @@ describe('connector feedback boundary', () => {
           exec: async ({ cmd }: { cmd: string }) => {
             if (cmd.startsWith('mktemp -d'))
               return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
-            if (cmd.startsWith('rm -rf')) return { exit_code: 0, output: '' };
+            if (cmd.startsWith('rmdir ')) return { exit_code: 0, output: '' };
             return {
               exit_code: 0,
               output: JSON.stringify({
@@ -290,7 +290,7 @@ describe('connector feedback boundary', () => {
           commands.push(cmd);
           if (cmd.startsWith('mktemp -d'))
             return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
-          if (cmd.startsWith('rm -rf')) return { exit_code: 0, output: '' };
+          if (cmd.startsWith('rmdir ')) return { exit_code: 0, output: '' };
           return {
             exit_code: 0,
             output: JSON.stringify({
@@ -338,9 +338,12 @@ describe('connector feedback boundary', () => {
         evidence.reviews,
       ).kind,
     ).toBe('found');
-    expect(patches).toHaveLength(1);
+    // 証跡は保存と同じ apply_patch で消す。functions.exec のホストは rm -f / rm -rf を拒否する。
+    expect(patches).toHaveLength(2);
+    expect(patches[1]).toContain('*** Delete File: /tmp/codex-pr-feedback.abc123/evidence.json');
+    expect(commands.some((cmd) => /^rm\s/.test(cmd))).toBe(false);
     expect(commands[1]).toContain('<');
-    expect(commands.at(-1)).toContain('rm -rf');
+    expect(commands.at(-1)).toContain('rmdir');
     expect(Math.abs(nowMs() - (parseIsoUtcMs(evidence.observedAt) ?? Number.NaN))).toBeLessThan(
       10_000,
     );
@@ -389,7 +392,7 @@ describe('connector feedback boundary', () => {
             commands.push(cmd);
             if (cmd.startsWith('mktemp -d'))
               return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
-            if (cmd.startsWith('rm -rf')) return { exit_code: 0, output: '' };
+            if (cmd.startsWith('rmdir ')) return { exit_code: 0, output: '' };
             return { exit_code: 2, output: 'review_locally' };
           },
           patch: async () => ({}),
@@ -402,7 +405,7 @@ describe('connector feedback boundary', () => {
     );
     expect(gateError).toContain('Feedback push gate failed');
     expect(commands.some((cmd) => cmd.startsWith('git push'))).toBe(false);
-    expect(commands.at(-1)).toContain('rm -rf');
+    expect(commands.at(-1)).toContain('rmdir');
   });
 
   test('push pins the reviewed SHA and refuses a moved local HEAD', async () => {
@@ -429,7 +432,7 @@ describe('connector feedback boundary', () => {
         commands.push(cmd);
         if (cmd.startsWith('mktemp -d'))
           return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
-        if (cmd.startsWith('rm -rf')) return { exit_code: 0, output: '' };
+        if (cmd.startsWith('rmdir ')) return { exit_code: 0, output: '' };
         if (cmd.includes('cloud-pr-feedback.ts'))
           return {
             exit_code: 0,
@@ -517,7 +520,7 @@ describe('connector feedback boundary', () => {
             commands.push(cmd);
             if (cmd.startsWith('mktemp -d'))
               return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
-            if (cmd.startsWith('rm -rf')) return { exit_code: 0, output: '' };
+            if (cmd.startsWith('rmdir ')) return { exit_code: 0, output: '' };
             if (cmd.includes('cloud-pr-feedback.ts'))
               return {
                 exit_code: 0,
@@ -566,14 +569,14 @@ describe('connector feedback boundary', () => {
           },
         }),
         patch: async (patch: string) => {
-          expect(patch).toContain(note);
+          if (patch.includes('*** Add File:')) expect(patch).toContain(note);
           return {};
         },
         exec: async ({ cmd }: { cmd: string }) => {
           commands.push(cmd);
           if (cmd.startsWith('mktemp -d'))
             return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
-          if (cmd.startsWith('rm -rf')) return { exit_code: 0, output: '' };
+          if (cmd.startsWith('rmdir ')) return { exit_code: 0, output: '' };
           return {
             exit_code: 0,
             output: JSON.stringify({

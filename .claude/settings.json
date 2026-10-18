@@ -68,7 +68,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/require-pr-self-review-mcp.ts"
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/require-pr-self-review-mcp.ts",
+            "onFailure": "block"
           }
         ]
       }

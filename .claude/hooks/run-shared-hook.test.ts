@@ -155,6 +155,26 @@ describe('アダプター経由で hook が落ちたとき・入出力を読め�
     ]);
   });
 
+  test('Claude Code の設定で、PR 作成ゲートだけを、起動できない・時間切れのときも拒否に倒す', async () => {
+    // onFailure が無いと、Claude Code も起動失敗やタイムアウトを許可扱いにして操作を通す。
+    const settings: {
+      hooks: Record<string, { hooks: { command: string; onFailure?: string }[] }[]>;
+    } = JSON.parse(await readFile(join(import.meta.dir, '../settings.json'), 'utf8'));
+    const entries = Object.values(settings.hooks).flatMap((groups) =>
+      groups.flatMap((group) => group.hooks),
+    );
+    expect(
+      entries
+        .filter((entry) => entry.onFailure !== undefined)
+        .map((entry) => [entry.command, entry.onFailure]),
+    ).toEqual([
+      [
+        'bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/require-pr-self-review-mcp.ts',
+        'block',
+      ],
+    ]);
+  });
+
   test(
     'Cursor のアダプターで、PR 作成ゲートが何も出さずに通したときは、許可を明示して返す',
     async () => {

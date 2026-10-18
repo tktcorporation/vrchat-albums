@@ -215,7 +215,8 @@
       "script": ".claude/hooks/require-pr-self-review-mcp.ts",
       "claude": {
         "event": "PreToolUse",
-        "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
+        "matcher": "^mcp__.+__(?:github_)?create_pull_request$",
+        "onFailure": "block"
       },
       "cursor": {
         "event": "preToolUse",
