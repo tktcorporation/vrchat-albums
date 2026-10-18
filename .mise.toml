@@ -1,5 +1,5 @@
 [tools]
-node = ["24", "22"]
+node = "24"
 uv = "latest"
 python = "3.14"
 pnpm = "11"
