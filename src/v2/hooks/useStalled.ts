@@ -13,22 +13,31 @@ interface UseStalledOptions {
  * `value` が `thresholdMs` の間変わらなかったら true を返す。値が変わるか `active` が false に
  * なった時点で false に戻る。
  *
- * どの値で止まったかを覚えておき、現在の値と一致するときだけ true にする。値が変わった描画で
- * すぐ false になり、タイマーの張り直しを待たない。
+ * 解除は描画中に行い、値が変わったその描画で false にする。タイマーの張り直しを待つと、
+ * 以前止まった値へ戻ったとき（新しい実行が同じ値から始まったときなど）にしきい値を待たず
+ * true になってしまうため。
  */
 export const useStalled = (
   value: number,
   { thresholdMs = DEFAULT_THRESHOLD_MS, active }: UseStalledOptions,
 ): boolean => {
-  const [stalledAt, setStalledAt] = useState<number | null>(null);
+  const [stalled, setStalled] = useState(false);
+  const [prevValue, setPrevValue] = useState(value);
+  if (prevValue !== value) {
+    setPrevValue(value);
+    setStalled(false);
+  }
+  if (!active && stalled) {
+    setStalled(false);
+  }
 
   useEffect(() => {
     if (!active) {
       return;
     }
-    const timer = setTimeout(() => setStalledAt(value), thresholdMs);
+    const timer = setTimeout(() => setStalled(true), thresholdMs);
     return () => clearTimeout(timer);
   }, [value, active, thresholdMs]);
 
-  return active && stalledAt === value;
+  return active && stalled;
 };

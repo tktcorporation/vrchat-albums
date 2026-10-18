@@ -27,6 +27,11 @@ export const useCountUp = (
   }: UseCountUpOptions = {},
 ): number => {
   const [animated, setAnimated] = useState(target);
+  // 減ったときと動きを止めるときは描画中に揃える。次のフレームまで古い値を持つと、
+  // その間に目標値が再び増えたとき、古い値から数え直して表示が逆向きに動くため
+  if (disabled ? animated !== target : target < animated) {
+    setAnimated(target);
+  }
   // 描画をまたいで「いま画面に出している値」を数え直しの起点にするため ref でも持つ
   const shownRef = useRef(target);
 
@@ -34,10 +39,8 @@ export const useCountUp = (
     const from = Math.min(shownRef.current, target);
     shownRef.current = from;
     if (disabled || from === target) {
-      // 減った・変わらない・動きを止める場合は、次の描画で目標値に揃えるだけにする
       shownRef.current = target;
-      const frame = requestAnimationFrame(() => setAnimated(target));
-      return () => cancelAnimationFrame(frame);
+      return;
     }
 
     let frame = 0;

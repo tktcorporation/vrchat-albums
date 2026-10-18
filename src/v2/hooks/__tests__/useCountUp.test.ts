@@ -100,6 +100,25 @@ describe('useCountUp', () => {
     expect(result.current).toBe(20);
   });
 
+  it('減った直後に同じフレーム内で増えても、表示は逆向きに動かない', () => {
+    const { result, rerender } = renderHook(
+      ({ target }) => useCountUp(target, { durationMs: 600 }),
+      { initialProps: { target: 80 } },
+    );
+
+    rerender({ target: 5 });
+    rerender({ target: 20 });
+    const seen: number[] = [result.current];
+    for (let elapsed = 0; elapsed < 800; elapsed += FRAME_MS) {
+      advanceFrames(FRAME_MS);
+      seen.push(result.current);
+    }
+    for (const [i, value] of seen.entries()) {
+      expect(value).toBeGreaterThanOrEqual(seen[i - 1] ?? value);
+    }
+    expect(result.current).toBe(20);
+  });
+
   it('disabled のときは数え上げずに目標値を即座に出す', () => {
     const { result, rerender } = renderHook(
       ({ target }) => useCountUp(target, { disabled: true }),

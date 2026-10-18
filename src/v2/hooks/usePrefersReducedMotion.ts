@@ -20,7 +20,7 @@ const subscribe = (onChange: () => void): (() => void) => {
 const getSnapshot = (): boolean => mediaQueryList()?.matches ?? false;
 
 /**
- * OS の「視差効果を減らす」設定が有効か。設定が変わったら再描画する。
+ * OS で動きを減らす設定（prefers-reduced-motion）が有効か。設定が変わったら再描画する。
  */
 export const usePrefersReducedMotion = (): boolean =>
   useSyncExternalStore(subscribe, getSnapshot, () => false);

@@ -28,6 +28,23 @@ describe('useStalled', () => {
     expect(result.current).toBe(true);
   });
 
+  it('以前止まった値に戻っても、しきい値を待ってから止まっているとみなす', () => {
+    const { result, rerender } = renderHook(
+      ({ value }) => useStalled(value, { thresholdMs: 1500, active: true }),
+      { initialProps: { value: 50 } },
+    );
+    advance(1500);
+    expect(result.current).toBe(true);
+
+    rerender({ value: 60 });
+    rerender({ value: 50 });
+    expect(result.current).toBe(false);
+    advance(1499);
+    expect(result.current).toBe(false);
+    advance(1);
+    expect(result.current).toBe(true);
+  });
+
   it('値が動いたらすぐに解除し、新しい値でしきい値を数え直す', () => {
     const { result, rerender } = renderHook(
       ({ value }) => useStalled(value, { thresholdMs: 1500, active: true }),
