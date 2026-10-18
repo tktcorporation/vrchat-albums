@@ -79,7 +79,6 @@ module.exports = async function cloudPrFeedback(tools, options) {
       commit_id: review?.commit_id,
       submitted_at: review?.submitted_at,
       state: review?.state,
-      body: typeof review?.body === 'string' ? '' : review?.body,
       user: review?.user === null ? null : { login: review?.user?.login },
     })),
     ...(mode === 'consult' ? { consultationNote } : {}),

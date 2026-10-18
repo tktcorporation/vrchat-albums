@@ -26,7 +26,6 @@ interface ReviewSubmission {
   commit_id: string;
   submitted_at: string | null;
   state: string;
-  body: string;
   user: { login: string } | null;
 }
 
@@ -69,9 +68,7 @@ function isReviewSubmission(value: unknown): value is ReviewSubmission {
         'login' in value.user &&
         typeof value.user.login === 'string')) &&
     'state' in value &&
-    typeof value.state === 'string' &&
-    'body' in value &&
-    typeof value.body === 'string'
+    typeof value.state === 'string'
   );
 }
 
@@ -108,7 +105,7 @@ export function parseGitHubFeedback(
     return { kind: 'unavailable', reason: 'レビューコメントの項目が不足しています' };
   }
   if (!Array.isArray(reviews) || !reviews.every(isReviewSubmission)) {
-    return { kind: 'unavailable', reason: 'レビュー本文の項目が不足しています' };
+    return { kind: 'unavailable', reason: 'レビューの項目が不足しています' };
   }
   const login = viewerLogin.trim().toLowerCase();
   const reviewedHeads = new Map(reviews.map((review) => [review.id, review.commit_id]));

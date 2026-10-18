@@ -93,6 +93,12 @@ describe('connector feedback boundary', () => {
   });
 
   test('reviewed commit, exact comment ID and author filter are preserved', () => {
+    // gh CLI 経路は生の行を渡す。本文の無いレビュー（body: null）でも観測できる。
+    expect(
+      parseGitHubFeedback({ number: 42, headRefOid: head }, 'me', comments, [
+        { ...reviews[0], body: null },
+      ]).kind,
+    ).toBe('found');
     expect(parseGitHubFeedback({ number: 42, headRefOid: head }, 'me', comments, reviews)).toEqual({
       kind: 'found',
       pr: 42,
@@ -276,7 +282,7 @@ describe('connector feedback boundary', () => {
           const body = url.includes('/comments?')
             ? comments
             : url.includes('/reviews?')
-              ? reviews
+              ? [...reviews, { ...reviews[0], id: 10, state: 'APPROVED', body: null }]
               : pr;
           return { structuredContent: { content: JSON.stringify(body) } };
         },
@@ -321,7 +327,17 @@ describe('connector feedback boundary', () => {
       viewerLogin: 'me',
       comments,
     });
-    expect(evidence.reviews[0]).toMatchObject({ id: 9, commit_id: reviewed, body: '' });
+    // 判定は state で行うので本文は渡さない。本文の無いレビュー（GitHub は body: null で返す）も検証を通る。
+    expect(evidence.reviews[0]).toMatchObject({ id: 9, commit_id: reviewed });
+    expect(evidence.reviews.every((review: object) => !('body' in review))).toBe(true);
+    expect(
+      parseGitHubFeedback(
+        { number: 42, headRefOid: head },
+        'me',
+        evidence.comments,
+        evidence.reviews,
+      ).kind,
+    ).toBe('found');
     expect(patches).toHaveLength(1);
     expect(commands[1]).toContain('<');
     expect(commands.at(-1)).toContain('rm -rf');
