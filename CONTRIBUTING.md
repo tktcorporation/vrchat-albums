@@ -143,12 +143,13 @@
 
 ## ブランチ戦略
 
-- `main`: 最新のリリースバージョンです。
-- `develop`: 次期リリースのための開発ブランチです。
+- `main`: 開発の統合先です。リリースもここから行います（下の「リリースプロセス」を参照）。
 - フィーチャーブランチ: `feature/issue-number-description` (例: `feature/123-add-new-button`)
 - バグフィックスブランチ: `fix/issue-number-description` (例: `fix/456-fix-login-error`)
 
-プルリクエストは `develop` ブランチに対して作成してください。
+プルリクエストは `main` ブランチに対して作成してください。
+
+`src/`・`electron/`・`package.json` などコードに関わるファイルを変更するプルリクエストには、changeset（`.changeset/*.md`）を 1 つ追加してください。`pnpm changeset` で作成できます。バージョンを上げない変更（テスト・リファクタリングなど）は `pnpm changeset --empty` で空の changeset を作ります。CI（[.github/workflows/changeset-check.yml](.github/workflows/changeset-check.yml)）が追加の有無を確認します。
 
 ## Issue トラッキング
 
@@ -166,9 +167,11 @@
 
 ## リリースプロセス
 
-このプロジェクトでは、以下の GitHub Actions ワークフローによってリリースプロセスの一部が自動化されています。
+リリースは changeset と GitHub Actions ワークフローで次の順に進みます。
 
-- **自動タグ付け**: `main` ブランチへのプッシュ時に、`package.json` のバージョンに基づいたタグが自動的に作成されます。
+- **リリース PR**: `main` へのプッシュ時に、未消費の changeset からバージョンと CHANGELOG を更新するプルリクエスト（`changeset-release/main` ブランチ、タイトル `chore: release`）が作成・更新されます。
+  - 参照: [.github/workflows/changeset-release.yml](.github/workflows/changeset-release.yml)
+- **自動タグ付け**: リリース PR のマージなどで `package.json` のバージョンが上がると、`main` の lint とテスト（Lint and Test Cross）が通ったコミットにそのバージョンのタグ（`v<version>`）が自動的に作成されます。
   - 参照: [.github/workflows/tag-on-push.yml](.github/workflows/tag-on-push.yml)
 - **ビルドとリリース**: 新しいタグがプッシュされると、アプリケーションがビルドされ、GitHub Releases に成果物がアップロードされます。
   - 参照: [.github/workflows/upload-build-files.yml](.github/workflows/upload-build-files.yml)
