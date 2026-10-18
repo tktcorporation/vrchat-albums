@@ -29,7 +29,12 @@ const hasCursorNative = existsSync(join(projectDir, '.cursor/hooks.json'));
 if (!viaAdapter && input.cursor_version && hasCursorNative) process.exit(0);
 
 const tree = await workingTree();
-const executable = isAbsolute(hookPath) ? hookPath : join(tree, hookPath);
+// スクリプト本体は主チェックアウト（projectDir）から解決する。tree（セッションの cwd が
+// 指す作業ツリー）から解決すると、hook 定義を追加したばかりのコミットがまだ届いていない
+// worktree / ブランチでは "Module not found" で失敗する。Claude Code の PreToolUse hook は
+// 非 2 の非ゼロ終了コードを非ブロッキング扱いにするため、この失敗はガードなしで
+// ツール呼び出しを通してしまう（pre-bash-guard.ts の run() も同じく projectDir から解決する）。
+const executable = isAbsolute(hookPath) ? hookPath : join(projectDir, hookPath);
 const command = hookPath.endsWith('.ts') ? ['bun', executable] : [executable];
 const processHandle = Bun.spawn(command, {
   cwd: tree,

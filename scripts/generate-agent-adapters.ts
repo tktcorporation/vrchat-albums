@@ -38,6 +38,10 @@ interface RuntimeBinding {
   event: string;
   matcher?: string;
   loopLimit?: null;
+  /** Cursor は hook の異常終了・タイムアウトを既定で許可扱いにする。拒否に倒す hook だけ true にする */
+  failClosed?: boolean;
+  /** Claude Code も起動失敗・タイムアウトを既定で許可扱いにする。拒否に倒す hook だけ 'block' にする */
+  onFailure?: 'block';
 }
 
 interface ManifestHook {
@@ -128,6 +132,7 @@ function buildClaudeHooks(hooks: ManifestHook[]): Record<string, unknown[]> {
           command: `bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/run-or-skip-for-cursor.ts ${hook.script}`,
         };
         if (hook.statusMessage) entry.statusMessage = hook.statusMessage;
+        if (hook.claude.onFailure) entry.onFailure = hook.claude.onFailure;
         return entry;
       }),
     }));
@@ -147,6 +152,7 @@ function buildCursorHooks(hooks: ManifestHook[]): {
     };
     if (hook.cursor.matcher) entry.matcher = hook.cursor.matcher;
     if ('loopLimit' in hook.cursor) entry.loop_limit = hook.cursor.loopLimit;
+    if (hook.cursor.failClosed) entry.failClosed = true;
     list.push(entry);
     byEvent.set(hook.cursor.event, list);
   }

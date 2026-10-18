@@ -11,19 +11,24 @@ test('未解決スレッドがなくてもレビュー本文の変更要求を�
     await Promise.all([mkdir(bin), mkdir(state)]);
     const git = Bun.spawnSync(['git', 'init', '-q'], { cwd });
     expect(git.exitCode).toBe(0);
-    await writeFile(join(bin, 'gh'), `#!/bin/sh
+    await writeFile(
+      join(bin, 'gh'),
+      `#!/bin/sh
 if [ "$1" = "pr" ]; then printf '{"number":42,"url":"https://example.test/pr/42","headRefOid":"head"}\\n'; exit 0; fi
 if [ "$1" = "repo" ]; then printf 'owner/repo\\n'; exit 0; fi
 if [ "$1" = "api" ] && [ "$2" = "user" ]; then printf 'author\\n'; exit 0; fi
 if [ "$1" = "api" ] && [ "$2" = "graphql" ]; then printf '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}}\\n'; exit 0; fi
 if [ "$1" = "api" ]; then case "$2" in */reviews?*) printf '[[{"id":9,"commit_id":"head","submitted_at":"2026-09-23T00:00:00Z","state":"CHANGES_REQUESTED","body":"設計を見直す","user":{"login":"reviewer"}}]]\\n';; *) printf '[[]]\\n';; esac; exit 0; fi
 exit 1
-`, { mode: 0o755 });
+`,
+      { mode: 0o755 },
+    );
     const child = Bun.spawn(['bun', join(import.meta.dir, 'stop-pr-comments.ts')], {
       cwd,
       env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, XDG_STATE_HOME: state },
       stdin: new Blob([JSON.stringify({ cwd, session_id: 'review-body' })]),
-      stdout: 'pipe', stderr: 'pipe',
+      stdout: 'pipe',
+      stderr: 'pipe',
     });
     const [code, output] = await Promise.all([child.exited, new Response(child.stdout).text()]);
     expect(code).toBe(0);

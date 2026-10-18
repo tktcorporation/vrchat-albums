@@ -57,7 +57,8 @@ export function observeFeedbackBatch(
   roundCount: number,
 ): ExternalReviewHistory {
   return observations.reduce(
-    (current, observation) => observeFeedback(current, { ...observation, roundsAtFeedback: roundCount }),
+    (current, observation) =>
+      observeFeedback(current, { ...observation, roundsAtFeedback: roundCount }),
     history,
   );
 }
@@ -97,8 +98,11 @@ export function judgeExternalPush(
   if (needsUserDecision(history)) return 'consult_user';
   // 成功した push の後は通常の追加コミットを再レビュー対象にしない。
   // push 失敗後に HEAD が変わった場合は、未公開の通過記録を流用しない。
-  if (history.reviewedCommentCount >= history.seenComments.length &&
-      (rounds.at(-1)?.sha === currentSha || reviewedHeadPublished)) return 'allow';
+  if (
+    history.reviewedCommentCount >= history.seenComments.length &&
+    (rounds.at(-1)?.sha === currentSha || reviewedHeadPublished)
+  )
+    return 'allow';
   const baseline = Math.max(
     history.roundsAtLastFeedback,
     history.consultation.kind === 'answered' ? history.consultation.roundsAtConsultation : 0,

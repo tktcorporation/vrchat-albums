@@ -1,9 +1,23 @@
 #!/usr/bin/env bun
-import { isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 import { projectDirectory, workingTree } from '../.claude/hooks/hook-utils.ts';
 
 const hookPath = process.argv[2];
 if (!hookPath) throw new Error('shared hook path is required');
+// MCP 経由の PR 作成ゲートは、落ちたときも作成を通さない（対象は PR 作成の呼び出しだけ）。
+// 全コマンドで動く pre-bash-guard.ts は対象にしない。落ちたときに拒否へ倒すと、解析用の依存を
+// 入れられない環境（オフライン、依存の lockfile を読めない古い Bun）で全コマンドが止まり続ける。
+const isPrGate = basename(hookPath) === 'require-pr-self-review-mcp.ts';
+function refuse(detail: string): never {
+  process.stderr.write(`shared hook blocked: ${hookPath}: ${detail}\n`);
+  process.exit(2);
+}
+/** 想定外の入力。PR 作成ゲートは作成を通さず、それ以外の hook は実行せずに元の処理を続ける。 */
+function invalidInput(detail: string): never {
+  if (isPrGate) refuse(detail);
+  process.stderr.write(`shared hook skipped: ${hookPath}: ${detail}\n`);
+  process.exit(0);
+}
 // Claude Code が hook に渡すものと同じ形にする: CLAUDE_PROJECT_DIR は状態ファイル用の
 // 主チェックアウト、入力の cwd は lint / 検証の対象になる作業ツリー（worktree）。
 process.env.CLAUDE_PROJECT_DIR = await projectDirectory();
@@ -12,21 +26,43 @@ const inputText = await Bun.stdin.text();
 interface HookPayload {
   cwd?: string;
   hook_event_name?: string;
-  tool_input?: string | { file_path?: string };
+  tool_name?: string;
+  tool_input?: string | { file_path?: string; cmd?: string; command?: string; workdir?: string };
   hookSpecificOutput?: { additionalContext?: string };
   [key: string]: unknown;
 }
 let input: HookPayload;
 try {
-  input = JSON.parse(inputText);
+  const parsed: HookPayload = JSON.parse(inputText);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('hook input must be an object');
+  }
+  input = parsed;
 } catch {
-  process.exit(0);
+  invalidInput('invalid hook input JSON');
+}
+if (input.tool_name === 'exec_command') {
+  const shell = input.tool_input;
+  if (!shell || typeof shell !== 'object' || typeof shell.cmd !== 'string') {
+    invalidInput('exec_command requires tool_input.cmd');
+  }
+  if (shell.command !== undefined && shell.command !== shell.cmd) {
+    invalidInput('conflicting tool_input.cmd and command');
+  }
+  if (shell.workdir !== undefined && typeof shell.workdir !== 'string') {
+    invalidInput('invalid tool_input.workdir');
+  }
+  // Host cwd identifies the session; workdir identifies the actual command.
+  // Resolve relative paths against the host process, like exec_command does.
+  input.cwd = shell.workdir === undefined ? (input.cwd ?? tree) : resolve(shell.workdir);
+  input.tool_input = { ...shell, command: shell.cmd };
 }
 input.cwd ??= tree;
 
 /** Codex に返す、意図しない hook 失敗の診断。exit 2 以外は実行を止める指示ではない。 */
 function unexpectedFailure(status: number, stderr: string): string {
   const detail = stderr.trim().slice(0, 4_000);
+  if (isPrGate) refuse(`exit ${status}: ${detail}`);
   const lines = [
     `⚠️ shared hook failed: \`${hookPath}\` (exit ${status})。`,
     'この失敗は明示的なブロックではないため、元のツール実行は継続した。hook の修正が必要か確認すること。',
@@ -41,6 +77,10 @@ function unexpectedFailure(status: number, stderr: string): string {
 }
 
 const runHook = async (payload: unknown): Promise<string> => {
+  // スクリプト本体は tree（Codex が開いているワークスペース）から解決する。Codex は
+  // ワークスペース自体を worktree 直下に開くことがあり、その worktree だけに存在する
+  // hook 定義（他 worktree /main checkout にまだ無いコミット）を、CLAUDE_PROJECT_DIR
+  // （常に主チェックアウトを指す）から解決すると見つけられない。
   const executable = isAbsolute(hookPath) ? hookPath : join(tree, hookPath);
   const command = hookPath.endsWith('.ts') ? ['bun', executable] : [executable];
   let output: string;
@@ -68,7 +108,7 @@ const runHook = async (payload: unknown): Promise<string> => {
   // exit 2 は pre-bash-guard のような明示的な拒否。ここで 0 にすると安全上の block を
   // すり抜ける。0 / 2 以外は未処理例外・外部コマンド失敗・シグナル終了などの異常終了で、
   // Codex が hook 名も stderr も表示せず「Hook failed」だけを繰り返すので、診断を注入して
-  // fail-open にする。
+  // fail-open にする（PR 作成ゲートだけは unexpectedFailure が拒否する）。
   if (status !== 0 && status !== 2) return unexpectedFailure(status, stderr);
   if (status === 2) {
     if (stderr) process.stderr.write(stderr);

@@ -54,7 +54,13 @@ describe('checkpointState', () => {
   });
 
   test('振り返りが複数あっても、窓は最後の振り返り以降だけを数える', () => {
-    const entries = [...rounds(9, 8, 7), checkpoint, ...rounds(6, 5, 4), checkpoint, ...rounds(9, 8)];
+    const entries = [
+      ...rounds(9, 8, 7),
+      checkpoint,
+      ...rounds(6, 5, 4),
+      checkpoint,
+      ...rounds(9, 8),
+    ];
     expect(checkpointState(entries)).toEqual({ status: 'clear', counts: [9, 8], totalRounds: 8 });
   });
 
@@ -182,9 +188,7 @@ describe('judgeCheckpoint', () => {
     expect(judgeCheckpoint(rounds(8, 6, 4), 'continue', 'あ'.repeat(29), head)).toMatchObject({
       rejection: { kind: 'note_too_short' },
     });
-    expect(judgeCheckpoint(rounds(8, 6, 4), 'continue', 'あ'.repeat(30), head).kind).toBe(
-      'accept',
-    );
+    expect(judgeCheckpoint(rounds(8, 6, 4), 'continue', 'あ'.repeat(30), head).kind).toBe('accept');
   });
 
   test('メモの前後の空白は取り除く', () => {

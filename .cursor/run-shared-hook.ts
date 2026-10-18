@@ -9,7 +9,7 @@
  * 二重実行スキップ（run-or-skip-for-cursor.ts）に吸われない。
  */
 import { existsSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import { projectDirectory, workingTree } from '../.claude/hooks/hook-utils.ts';
 
 const args = process.argv.slice(2);
@@ -21,6 +21,14 @@ for (const arg of args) {
 }
 const hookPath = hookArgs[0];
 if (!hookPath) throw new Error('shared hook path is required');
+// MCP 経由の PR 作成ゲートは、落ちたとき・入力や出力を読めないときも作成を通さない。Cursor は
+// exit 2 か permission:deny でしか止めないため、ほかの hook と同じ fail-open にすると素通りする。
+const isPrGate = basename(hookPath) === 'require-pr-self-review-mcp.ts';
+function deny(reason: string): never {
+  process.stderr.write(`shared hook blocked: ${hookPath}: ${reason}\n`);
+  console.log(JSON.stringify({ permission: 'deny', user_message: reason, agent_message: reason }));
+  process.exit(2);
+}
 
 process.env.CLAUDE_PROJECT_DIR = await projectDirectory();
 process.env.CURSOR_HOOK_VIA_ADAPTER = '1';
@@ -66,8 +74,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 let cursorInput: CursorHookInput;
 try {
   const parsed: CursorHookInput = JSON.parse(inputText);
+  if (!isRecord(parsed)) throw new Error('hook input must be an object');
   cursorInput = parsed;
 } catch {
+  if (isPrGate) deny('invalid hook input JSON');
   process.exit(0);
 }
 
@@ -134,9 +144,10 @@ function toClaudePayload(input: CursorHookInput): ClaudePayload {
   };
 }
 
-/** Cursor に返す、意図しない hook 失敗の診断。exit 2 以外は実行を止めない。 */
+/** Cursor に返す、意図しない hook 失敗の診断。exit 2 以外は実行を止めない（PR 作成ゲートは拒否する）。 */
 function unexpectedFailure(status: number, stderr: string): string {
   const detail = stderr.trim().slice(0, 4_000);
+  if (isPrGate) deny(detail ? `exit ${status}: ${detail}` : `exit ${status}`);
   const lines = [
     `⚠️ shared hook failed: \`${hookPath}\` (exit ${status})。`,
     'この失敗は明示的なブロックではないため、元のツール実行は継続した。hook の修正が必要か確認すること。',
@@ -207,6 +218,10 @@ function toCursorOutput(output: string): string {
 const runHook = async (
   payload: ClaudePayload,
 ): Promise<{ output: string; status: number; stderr: string }> => {
+  // スクリプト本体は tree（Cursor が開いているワークスペース）から解決する。Cursor は
+  // ワークスペース自体を worktree 直下に開くことがあり、その worktree だけに存在する
+  // hook 定義（他 worktree /main checkout にまだ無いコミット）を、CLAUDE_PROJECT_DIR
+  // （常に主チェックアウトを指す）から解決すると見つけられない。
   const executable = isAbsolute(hookPath) ? hookPath : join(tree, hookPath);
   if (!existsSync(executable) && !isAbsolute(hookPath)) {
     return {
@@ -242,7 +257,7 @@ const runHook = async (
 const payload = toClaudePayload(cursorInput);
 const { output, status, stderr } = await runHook(payload);
 
-// exit 2 は明示的な拒否。0 / 2 以外は診断を注入して fail-open。
+// exit 2 は明示的な拒否。0 / 2 以外は診断を注入して fail-open（PR 作成ゲートは unexpectedFailure が拒否する）。
 if (status !== 0 && status !== 2) {
   console.log(unexpectedFailure(status, stderr));
   process.exit(0);
@@ -263,4 +278,7 @@ if (status === 2) {
 
 const cursorOutput = toCursorOutput(output);
 if (cursorOutput) console.log(cursorOutput);
+// PR 作成ゲートは failClosed で登録しており、Cursor は出力の無い成功も失敗として拒否する。
+// ゲートが黙って通した（収束を確認した）ときは、許可を明示して返す。
+else if (isPrGate) console.log(JSON.stringify({ permission: 'allow' }));
 process.exit(0);
