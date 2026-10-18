@@ -540,6 +540,53 @@ describe('settingsController.initializeAppData', () => {
     );
   });
 
+  it('DB 準備直後の統計の集計を待たずにログ同期を始める', async () => {
+    const run = createRunStub(1);
+    let resolveFirstFlush: () => void = () => {};
+    vi.mocked(run.flushStats)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveFirstFlush = resolve;
+          }),
+      )
+      .mockImplementation(() => Promise.resolve());
+    vi.mocked(beginInitProgressRun).mockImplementation(() => run);
+
+    if (!initializeAppData) {
+      throw new Error('initializeAppData not initialized');
+    }
+    const result = await initializeAppData();
+
+    // 1 回目の集計が終わっていなくても、ログ同期と終了直前の集計まで進む
+    expect(result).toEqual({ success: true });
+    expect(mockSyncLogs).toHaveBeenCalledTimes(1);
+    expect(run.flushStats).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(run.end).mock.calls).toEqual([['completed']]);
+    resolveFirstFlush();
+  });
+
+  it('DB 準備直後の統計の集計が reject しても初期化は続け、エラーを記録する', async () => {
+    const run = createRunStub(1);
+    vi.mocked(run.flushStats)
+      .mockImplementationOnce(() => Promise.reject(new Error('flush failed')))
+      .mockImplementation(() => Promise.resolve());
+    vi.mocked(beginInitProgressRun).mockImplementation(() => run);
+
+    if (!initializeAppData) {
+      throw new Error('initializeAppData not initialized');
+    }
+    const result = await initializeAppData();
+
+    expect(result).toEqual({ success: true });
+    expect(vi.mocked(run.end).mock.calls).toEqual([['completed']]);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Failed to flush init progress stats before log sync',
+      }),
+    );
+  });
+
   it('失敗した初期化の後の再呼び出しは、新しい進捗の実行で始め直す', async () => {
     const failedRun = createRunStub(1);
     const retryRun = createRunStub(2);

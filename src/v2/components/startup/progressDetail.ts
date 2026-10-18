@@ -88,6 +88,7 @@ export const formatProgressDetail = (
     )
     .with({ unit: 'photos' }, () => fillTemplate(templates.photos, values))
     .with({ unit: 'files' }, () => fillTemplate(templates.files, values))
+    .with({ unit: 'folders' }, () => fillTemplate(templates.folders, values))
     .with({ unit: 'logs' }, () => fillTemplate(templates.logs, values))
     .exhaustive();
 };

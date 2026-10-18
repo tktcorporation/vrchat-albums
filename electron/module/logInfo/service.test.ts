@@ -6,6 +6,7 @@ import { Effect, Exit } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getAppUserDataPath } from '../../lib/wrappedApp';
+import type { InitProgressRun } from '../initProgress/emitter';
 import { VRChatLogStoreFilePathSchema } from '../vrchatLog/model';
 // import type { VRChatWorldJoinLog } from '../vrchatLog/service';
 import * as vrchatLogService from '../vrchatLog/service';
@@ -763,3 +764,114 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
 //     expect(result[2]).toBe('PlayerC');
 //   });
 // });
+
+describe('loadLogInfoIndexFromVRChatLog の photo_index 進捗', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(
+      vrchatLogService.getVRChaLogInfoByLogFilePathListWithPartialSuccess,
+    ).mockImplementation(() =>
+      Effect.succeed({
+        data: [],
+        errors: [],
+        totalProcessed: 0,
+        successCount: 0,
+        errorCount: 0,
+      }),
+    );
+    vi.mocked(nodeFs.existsSync).mockReturnValue(false);
+  });
+
+  it('フォルダの走査をステージの前半に、新規写真の登録を後半に割り当て、進捗を戻さない', async () => {
+    vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockImplementation(
+      async (_isIncremental, onProgress) => {
+        onProgress?.({ phase: 'scan', foldersScanned: 0, totalFolders: 2 });
+        onProgress?.({ phase: 'scan', foldersScanned: 1, totalFolders: 2 });
+        onProgress?.({ phase: 'scan', foldersScanned: 2, totalFolders: 2 });
+        onProgress?.({ phase: 'register', handled: 0, total: 4 });
+        onProgress?.({
+          phase: 'register',
+          handled: 2,
+          total: 4,
+          currentMonth: '2024-08',
+        });
+        onProgress?.({ phase: 'register', handled: 4, total: 4 });
+        return [];
+      },
+    );
+    const run: InitProgressRun = {
+      runId: 1,
+      kind: 'startup',
+      stage: vi.fn(),
+      setLaunch: vi.fn(),
+      dbUpdated: vi.fn(),
+      flushStats: vi.fn(() => Promise.resolve()),
+      end: vi.fn(),
+    };
+
+    await Effect.runPromise(
+      loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true, progress: run }),
+    );
+
+    const photoIndexCalls = vi
+      .mocked(run.stage)
+      .mock.calls.filter(([stage]) => stage === 'photo_index')
+      .map(([, progress, details]) => ({ progress, details }));
+    expect(photoIndexCalls).toEqual([
+      { progress: 0, details: undefined },
+      { progress: 0, details: { current: 0, total: 2, unit: 'folders' } },
+      { progress: 15, details: { current: 1, total: 2, unit: 'folders' } },
+      { progress: 30, details: { current: 2, total: 2, unit: 'folders' } },
+      { progress: 30, details: { current: 0, total: 4, unit: 'photos' } },
+      {
+        progress: 65,
+        details: {
+          current: 2,
+          total: 4,
+          unit: 'photos',
+          currentItem: '2024-08',
+        },
+      },
+      { progress: 100, details: { current: 4, total: 4, unit: 'photos' } },
+      { progress: 100, details: undefined },
+    ]);
+    // 写真による月別グラフの更新は、登録の進捗のたびにだけ求める
+    expect(
+      vi
+        .mocked(run.dbUpdated)
+        .mock.calls.filter(([change]) => !change.logsChanged),
+    ).toHaveLength(3);
+  });
+
+  it('走査するフォルダが無ければ件数を付けずに走査分まで進める', async () => {
+    vi.mocked(vrchatPhotoService.createVRChatPhotoPathIndex).mockImplementation(
+      async (_isIncremental, onProgress) => {
+        onProgress?.({ phase: 'scan', foldersScanned: 0, totalFolders: 0 });
+        return [];
+      },
+    );
+    const run: InitProgressRun = {
+      runId: 1,
+      kind: 'startup',
+      stage: vi.fn(),
+      setLaunch: vi.fn(),
+      dbUpdated: vi.fn(),
+      flushStats: vi.fn(() => Promise.resolve()),
+      end: vi.fn(),
+    };
+
+    await Effect.runPromise(
+      loadLogInfoIndexFromVRChatLog({ excludeOldLogLoad: true, progress: run }),
+    );
+
+    expect(
+      vi
+        .mocked(run.stage)
+        .mock.calls.filter(([stage]) => stage === 'photo_index'),
+    ).toEqual([
+      ['photo_index', 0],
+      ['photo_index', 30, undefined],
+      ['photo_index', 100],
+    ]);
+  });
+});

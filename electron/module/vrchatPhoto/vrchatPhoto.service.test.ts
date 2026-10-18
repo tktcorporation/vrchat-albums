@@ -14,6 +14,7 @@ import {
 import * as model from './model/vrchatPhotoPath.model';
 import { VRChatPhotoDirPathSchema } from './valueObjects';
 import * as service from './vrchatPhoto.service';
+import type { PhotoIndexProgress } from './vrchatPhoto.service';
 
 // --- Mocks ---
 vi.mock('node:fs/promises');
@@ -846,6 +847,27 @@ describe('createVRChatPhotoPathIndex', () => {
   });
 
   describe('進捗通知', () => {
+    it('フォルダの走査中は、全ディレクトリ合計のフォルダ数で 1 フォルダごとに進捗を通知する', async () => {
+      const progress: PhotoIndexProgress[] = [];
+
+      await service.createVRChatPhotoPathIndex(false, (p) => {
+        progress.push(p);
+      });
+
+      // メイン 2 フォルダ + 追加ディレクトリ 1 フォルダ。2 つ目のディレクトリに入っても総数は変わらない
+      const scan = progress.filter((p) => p.phase === 'scan');
+      expect(scan).toEqual(
+        [0, 1, 2, 3].map((foldersScanned) => ({
+          phase: 'scan',
+          foldersScanned,
+          totalFolders: 3,
+        })),
+      );
+      // 走査の進捗はすべて登録の進捗より前に届く
+      const firstRegister = progress.findIndex((p) => p.phase === 'register');
+      expect(firstRegister).toBe(scan.length);
+    });
+
     it('画像として読めないファイルも処理済みに数え、最後に handled が total に届く', async () => {
       vi.mocked(readImageDimensionsBatch).mockImplementation(async (paths) =>
         paths.map(() => null),
@@ -853,7 +875,9 @@ describe('createVRChatPhotoPathIndex', () => {
       const progress: { handled: number; total: number }[] = [];
 
       await service.createVRChatPhotoPathIndex(false, (p) => {
-        progress.push({ handled: p.handled, total: p.total });
+        if (p.phase === 'register') {
+          progress.push({ handled: p.handled, total: p.total });
+        }
       });
 
       expect(progress[0]).toEqual({ handled: 0, total: 3 });
@@ -862,7 +886,7 @@ describe('createVRChatPhotoPathIndex', () => {
       expect(handled).toEqual(handled.toSorted((a, b) => a - b));
     });
 
-    it('新規ファイルが無ければ進捗を通知しない（0 / 0 の件数を送らない）', async () => {
+    it('新規ファイルが無ければ走査の進捗だけを通知し、登録の進捗（0 / 0 の件数）は送らない', async () => {
       savedScanStates = {
         [yearMonthFolder2024_01]: {
           digest: computeExpectedDigestForFolder([
@@ -880,11 +904,18 @@ describe('createVRChatPhotoPathIndex', () => {
           lastScannedAt: now.toISOString(),
         },
       };
-      const onProgress = vi.fn();
+      const progress: PhotoIndexProgress[] = [];
 
-      await service.createVRChatPhotoPathIndex(true, onProgress);
+      await service.createVRChatPhotoPathIndex(true, (p) => {
+        progress.push(p);
+      });
 
-      expect(onProgress).not.toHaveBeenCalled();
+      expect(progress.every((p) => p.phase === 'scan')).toBe(true);
+      expect(progress.at(-1)).toEqual({
+        phase: 'scan',
+        foldersScanned: 3,
+        totalFolders: 3,
+      });
     });
   });
 

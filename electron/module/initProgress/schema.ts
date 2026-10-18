@@ -35,9 +35,9 @@ export type RunStage = z.infer<typeof RunStageSchema>;
 
 /**
  * `details.current` / `details.total` が数えている対象。
- * レンダラーが「12 / 128 ファイル」「3,412 / 8,900 枚」のように単位を選ぶために使う。
+ * レンダラーが「12 / 128 ファイル」「40 / 310 フォルダ」「3,412 / 8,900 枚」のように単位を選ぶために使う。
  */
-const ProgressUnitSchema = z.enum(['files', 'logs', 'photos']);
+const ProgressUnitSchema = z.enum(['files', 'folders', 'logs', 'photos']);
 
 /** ローカルタイム基準の撮影月 `YYYY-MM` */
 const YearMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);

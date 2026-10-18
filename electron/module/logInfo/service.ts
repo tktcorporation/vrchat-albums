@@ -38,6 +38,13 @@ import { type LogInfoServiceError, LogInfoUnknownError } from './errors';
  */
 const LOG_LOAD_READ_SHARE_PERCENT = 40;
 
+/**
+ * photo_index ステージの進捗のうち、フォルダの走査（ダイジェスト比較と mtime 確認）に割り当てる割合（%）。
+ * 残りを新規写真の登録に割り当てる。差分起動では新規写真が少なく走査がステージの大半を占めるが、
+ * 初回起動では全写真の画像サイズ読み取りと DB 登録の方が重いため、登録に多く割り当てる。
+ */
+const PHOTO_INDEX_SCAN_SHARE_PERCENT = 30;
+
 interface LogProcessingResults {
   createdWorldJoinLogModelList: VRChatWorldJoinLogModel[];
   createdPlayerJoinLogModelList: VRChatPlayerJoinLogModel[];
@@ -489,21 +496,44 @@ export function loadLogInfoIndexFromVRChatLog({
     const photoResults = yield* Effect.promise(() =>
       vrchatPhotoService.createVRChatPhotoPathIndex(
         excludeOldLogLoad,
-        ({ handled, total, currentMonth }) => {
-          progress?.stage(
-            'photo_index',
-            total > 0 ? (handled / total) * 100 : 100,
-            {
-              current: handled,
-              total,
-              unit: 'photos',
-              ...(currentMonth === undefined
-                ? {}
-                : { currentItem: currentMonth }),
-            },
-          );
-          // バッチを登録するたびに月別グラフを伸ばす（送信は stats 側で間引かれる）
-          progress?.dbUpdated({ logsChanged: false });
+        (photoProgress) => {
+          match(photoProgress)
+            .with({ phase: 'scan' }, ({ foldersScanned, totalFolders }) => {
+              progress?.stage(
+                'photo_index',
+                totalFolders > 0
+                  ? (foldersScanned / totalFolders) *
+                      PHOTO_INDEX_SCAN_SHARE_PERCENT
+                  : PHOTO_INDEX_SCAN_SHARE_PERCENT,
+                // フォルダが 1 つも無ければ件数を送らない。「0 / 0 フォルダ」と表示しても伝わる情報が無いため
+                totalFolders > 0
+                  ? {
+                      current: foldersScanned,
+                      total: totalFolders,
+                      unit: 'folders',
+                    }
+                  : undefined,
+              );
+            })
+            .with({ phase: 'register' }, ({ handled, total, currentMonth }) => {
+              progress?.stage(
+                'photo_index',
+                PHOTO_INDEX_SCAN_SHARE_PERCENT +
+                  (total > 0 ? handled / total : 1) *
+                    (100 - PHOTO_INDEX_SCAN_SHARE_PERCENT),
+                {
+                  current: handled,
+                  total,
+                  unit: 'photos',
+                  ...(currentMonth === undefined
+                    ? {}
+                    : { currentItem: currentMonth }),
+                },
+              );
+              // バッチを登録するたびに月別グラフを伸ばす（送信は stats 側で間引かれる）
+              progress?.dbUpdated({ logsChanged: false });
+            })
+            .exhaustive();
         },
       ),
     );
