@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
 import { logger } from '../../../lib/logger';
+import { pathExistsAsync } from '../../../lib/pathExists';
 import {
   BackupPathObjectSchema,
   type ExportPathObject,
@@ -22,6 +23,7 @@ import {
 } from '../exportService/exportService';
 import {
   BackupExportFailed,
+  BackupHistoryReadFailed,
   BackupMetadataUpdateFailed,
   BackupMetadataWriteFailed,
   BackupNotFound,
@@ -190,17 +192,15 @@ export class BackupService {
       const backupBasePath = this.getBackupBasePath();
 
       // バックアップディレクトリが存在しない場合は空配列を返す
-      const accessExists = yield* Effect.tryPromise({
-        try: () =>
-          fs
-            .access(backupBasePath)
-            .then(() => true)
-            .catch(() => false),
-        catch: () => {
-          // This should never happen since the promise catches internally
-          throw new Error('Unexpected error checking backup directory access');
-        },
-      }) as Effect.Effect<boolean, BackupServiceError>;
+      const accessExists = yield* pathExistsAsync(backupBasePath).pipe(
+        Effect.mapError(
+          (checkError) =>
+            new BackupHistoryReadFailed({
+              message: `バックアップフォルダにアクセスできません (${backupBasePath}): ${checkError.code ?? String(checkError.cause)}`,
+              cause: checkError,
+            }),
+        ),
+      );
       if (!accessExists) {
         return [];
       }

@@ -1,8 +1,7 @@
 // Native
-import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
+import { Effect, Either } from 'effect';
 // Packages
 import {
   app,
@@ -25,6 +24,7 @@ import {
   decideNavigation,
 } from './lib/externalUrl';
 import { logger } from './lib/logger';
+import { pathExistsAsync } from './lib/pathExists';
 // Local
 import { getSettingStore, type SettingStore } from './module/settingStore'; // Import the type
 
@@ -460,14 +460,19 @@ const setTray = () => {
     const appPath = app.isPackaged ? process.resourcesPath : app.getAppPath();
     const iconPath = join(appPath, 'assets', 'icon.png');
 
-    // アイコンパスの存在確認
-    const accessExit = await Effect.runPromiseExit(
-      Effect.tryPromise({
-        try: () => fs.access(iconPath),
-        catch: () => ({ type: 'ICON_NOT_FOUND' as const, path: iconPath }),
-      }),
+    // アイコンパスの存在確認。トレイはアプリ本体の動作に必須ではないため、
+    // 確認に失敗しても起動は止めずトレイ作成だけを諦める（原因はログで区別する）
+    const iconExists = await Effect.runPromise(
+      Effect.either(pathExistsAsync(iconPath)),
     );
-    if (accessExit._tag === 'Failure') {
+    if (Either.isLeft(iconExists)) {
+      logger.error({
+        message: `トレイアイコンにアクセスできません: ${iconPath}`,
+        stack: iconExists.left,
+      });
+      return;
+    }
+    if (!iconExists.right) {
       logger.error({ message: `トレイアイコンが見つかりません: ${iconPath}` });
       return;
     }

@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 import { app } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { logger } from '../../lib/logger';
 import { importService } from '../vrchatLog/importService/importService';
 import * as migrationService from './service';
 
@@ -46,6 +47,21 @@ describe('migration service integration', () => {
   let testDir: string;
   let mockCurrentAppPath: string;
   let mockOldAppPath: string;
+
+  /** 指定した名前で終わるパスの存在確認だけを EACCES で失敗させる */
+  const denyAccessTo = (basename: string) => {
+    const originalAccess = nodeFs.promises.access.bind(nodeFs.promises);
+    vi.spyOn(nodeFs.promises, 'access').mockImplementation(
+      async (target, mode) => {
+        if (String(target).endsWith(basename)) {
+          throw Object.assign(new Error('permission denied'), {
+            code: 'EACCES',
+          });
+        }
+        return originalAccess(target, mode);
+      },
+    );
+  };
 
   beforeEach(async () => {
     // Clear migration cache before each test
@@ -89,6 +105,17 @@ describe('migration service integration', () => {
         migrationService.isMigrationNeeded(),
       );
       expect(value).toBe(false);
+    });
+
+    it('should not re-migrate when the marker check fails with a permission error', async () => {
+      denyAccessTo('.migration-completed');
+
+      const value = await Effect.runPromise(
+        migrationService.isMigrationNeeded(),
+      );
+
+      expect(value).toBe(false);
+      expect(logger.error).toHaveBeenCalled();
     });
 
     it('should return true if migration is needed', async () => {
@@ -174,6 +201,22 @@ describe('migration service integration', () => {
       expect(
         nodeFs.existsSync(path.join(mockCurrentAppPath, 'config.json')),
       ).toBe(true);
+    });
+
+    it('should report a logStore permission error instead of skipping it', async () => {
+      await nodeFsPromises.mkdir(path.join(mockOldAppPath, 'logStore'), {
+        recursive: true,
+      });
+      denyAccessTo('logStore');
+
+      const value = await Effect.runPromise(
+        migrationService.performMigration(),
+      );
+
+      expect(value.details.logStore).toBe(false);
+      expect(value.errors).toHaveLength(1);
+      expect(value.errors[0]).toContain('LogStore access failed');
+      expect(importService['importLogStoreFiles']).not.toHaveBeenCalled();
     });
 
     it('should handle partial migration when some files are missing', async () => {
