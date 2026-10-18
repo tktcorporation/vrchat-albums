@@ -60,7 +60,7 @@ export default defineConfig({
   build: {
     outDir: join(__dirname, '../main'),
     emptyOutDir: true,
-    target: 'node20',
+    target: 'node24',
     lib: {
       entry: {
         index: join(__dirname, 'index.ts'),
