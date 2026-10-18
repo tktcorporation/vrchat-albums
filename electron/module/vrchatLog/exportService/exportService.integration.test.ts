@@ -11,7 +11,6 @@ import {
   type DBLogProvider,
   type ExportLogStoreOptions,
   exportLogStoreFromDB,
-  exportLogStoreToSingleFile,
 } from './exportService';
 
 describe('exportService integration', () => {
@@ -121,44 +120,6 @@ describe('exportService integration', () => {
       );
     } finally {
       // 一時ディレクトリを削除
-      try {
-        await fs.rm(tempDir, { recursive: true });
-      } catch {
-        // エラーは無視
-      }
-    }
-  });
-
-  it('単一ファイルエクスポートが正常に動作する', async () => {
-    const tempDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'logstore-export-test-'),
-    );
-
-    try {
-      const options: ExportLogStoreOptions = {
-        startDate: new Date('2023-10-08T00:00:00'),
-        endDate: new Date('2023-10-08T23:59:59'),
-      };
-
-      const outputFilePath = path.join(tempDir, 'single-export.txt');
-      const result = await Effect.runPromise(
-        exportLogStoreToSingleFile(options, getMockDBLogs, outputFilePath),
-      );
-      expect(result.exportedFiles).toHaveLength(1);
-      // 新しい実装では日時付きサブフォルダが作成されるため、パスが変わる
-      const actualFilePath = result.exportedFiles[0];
-      // クロスプラットフォーム対応: パスを分割して検証
-      const pathParts = actualFilePath.split(path.sep);
-      expect(pathParts.at(-1)).toBe('single-export.txt');
-      expect(pathParts.at(-2)).toMatch(
-        /^vrchat-albums-export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/,
-      );
-      expect(result.totalLogLines).toBe(4);
-
-      // ファイル内容を確認
-      const fileContent = await fs.readFile(actualFilePath, 'utf8');
-      expect(fileContent).toContain('Test World');
-    } finally {
       try {
         await fs.rm(tempDir, { recursive: true });
       } catch {

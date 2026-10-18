@@ -6,7 +6,6 @@ import type { Photo } from '../../types/photo';
 import {
   estimateGroupHeight,
   GROUP_HEIGHT_CONSTANTS,
-  precomputeGroupHeights,
 } from '../estimateGroupHeight';
 import { JustifiedLayoutCalculator } from '../justifiedLayoutCalculator';
 
@@ -193,91 +192,6 @@ describe('estimateGroupHeight', () => {
         directCalculation + GROUP_HEIGHT_CONSTANTS.GROUP_SPACING,
       );
     });
-  });
-});
-
-describe('precomputeGroupHeights', () => {
-  it('全グループの高さを計算してキャッシュに保存する', () => {
-    const groups = [
-      { key: 'group-1', photos: createMockPhotos(3) },
-      { key: 'group-2', photos: createMockPhotos(5) },
-      { key: 'group-3', photos: createMockPhotos(2) },
-    ];
-    const containerWidth = 1000;
-
-    const cache = precomputeGroupHeights(groups, containerWidth);
-
-    expect(cache.size).toBe(3);
-    expect(cache.has('group-1')).toBe(true);
-    expect(cache.has('group-2')).toBe(true);
-    expect(cache.has('group-3')).toBe(true);
-
-    // 高さが妥当な値であることを確認
-    for (const [_, height] of cache) {
-      expect(height).toBeGreaterThan(0);
-      expect(height).toBeGreaterThan(
-        LAYOUT_CONSTANTS.HEADER_HEIGHT + LAYOUT_CONSTANTS.SPACING,
-      );
-    }
-  });
-
-  it('既存のキャッシュがあるグループはスキップする', () => {
-    const groups = [
-      { key: 'group-1', photos: createMockPhotos(3) },
-      { key: 'group-2', photos: createMockPhotos(5) },
-    ];
-    const containerWidth = 1000;
-    const existingCache = new Map([['group-1', 999]]);
-
-    const cache = precomputeGroupHeights(groups, containerWidth, existingCache);
-
-    expect(cache.size).toBe(2);
-    expect(cache.get('group-1')).toBe(999); // 既存値が保持される
-    expect(cache.get('group-2')).toBeGreaterThan(0); // 新規計算
-  });
-
-  // Note: containerWidth > 0 は ValidWidth 型によりコンポーネント層で保証される
-  // そのため containerWidth = 0 のテストは削除
-
-  it('空のグループ配列でも正常に動作する', () => {
-    const cache = precomputeGroupHeights([], 1000);
-
-    expect(cache.size).toBe(0);
-  });
-
-  it('既存のキャッシュを変更する（ミュータブル）', () => {
-    const groups = [{ key: 'group-new', photos: createMockPhotos(3) }];
-    const containerWidth = 1000;
-    const existingCache = new Map([['group-old', 500]]);
-
-    const resultCache = precomputeGroupHeights(
-      groups,
-      containerWidth,
-      existingCache,
-    );
-
-    // 同じ参照であることを確認
-    expect(resultCache).toBe(existingCache);
-    expect(resultCache.has('group-old')).toBe(true);
-    expect(resultCache.has('group-new')).toBe(true);
-  });
-
-  it('写真がないグループも正しく計算する', () => {
-    const groups = [
-      { key: 'empty-group', photos: [] },
-      { key: 'with-photos', photos: createMockPhotos(3) },
-    ];
-    const containerWidth = 1000;
-
-    const cache = precomputeGroupHeights(groups, containerWidth);
-
-    expect(cache.size).toBe(2);
-    expect(cache.get('empty-group')).toBe(
-      LAYOUT_CONSTANTS.HEADER_HEIGHT + LAYOUT_CONSTANTS.SPACING,
-    );
-    const emptyGroupHeight = cache.get('empty-group');
-    expect(emptyGroupHeight).toBeDefined();
-    expect(cache.get('with-photos')).toBeGreaterThan(emptyGroupHeight ?? 0);
   });
 });
 
