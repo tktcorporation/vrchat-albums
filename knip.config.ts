@@ -3,9 +3,12 @@ import type { KnipConfig } from 'knip';
 /**
  * Knip configuration for unused code detection
  *
- * pnpm-workspace.yaml がワークスペースを定義しているため、knip はトップレベルの
- * entry / project を読まない。各パッケージの設定は `workspaces` のキー
- * （pnpm-workspace.yaml の packages と同じパス）の下に置く。
+ * 設定はパッケージごとに `workspaces` のキー（pnpm-workspace.yaml の packages と
+ * 同じパス）の下に置き、packages/* の生成コードやフィクスチャはそのパッケージの
+ * 設定で除外する。
+ *
+ * scripts/ も解析対象にし、除外はテンプレート同期ファイルとテスト用フィクスチャに限る。
+ * css を project に含め、`@import` で読み込む依存とどこからも読まれない css を検出する。
  *
  * src/ と electron/ は tRPC で密結合しているため、別パッケージに分けず
  * ルートワークスペース '.' の 1 つのプロジェクトとして解析する。
