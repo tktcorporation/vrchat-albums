@@ -486,7 +486,8 @@ mod tests {
         let mut data = Vec::new();
         data.extend_from_slice(&[0xFF, 0xD8]); // SOI
         data.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xC0]); // padded SOF0
-                                                           // SOF payload
+
+        // SOF payload
         let sof_length: u16 = 11;
         data.extend_from_slice(&sof_length.to_be_bytes());
         data.push(8); // precision
@@ -567,11 +568,13 @@ mod tests {
         // 0xC8 (JPG extension) は SOF ではない — length 付きマーカーとしてスキップされる
         let mut data = Vec::new();
         data.extend_from_slice(&[0xFF, 0xD8]); // SOI
-                                               // 0xC8 marker with dummy payload
+
+        // 0xC8 marker with dummy payload
         data.extend_from_slice(&[0xFF, 0xC8]);
         data.extend_from_slice(&[0x00, 0x04]); // length=4 (2 for length + 2 dummy)
         data.extend_from_slice(&[0x00, 0x00]); // dummy data
-                                               // SOF0
+
+        // SOF0
         data.push(0xFF);
         data.push(0xC0);
         let sof_length: u16 = 11;

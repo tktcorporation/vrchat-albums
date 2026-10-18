@@ -89,7 +89,6 @@ fn read_xmp_from_jpeg_stream(
         // fill bytes (0xFF の連続) をスキップして実際のマーカー種別を取得。
         // JPEG spec では 0xFF の後に任意個の 0xFF fill bytes を挿入できる。
         // BufReader により、1バイトずつの read_exact はバッファから提供される。
-
         loop {
             reader
                 .read_exact(&mut byte)
