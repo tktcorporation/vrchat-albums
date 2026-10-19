@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.31.4
+
+### Patch Changes
+
+- [#888](https://github.com/tktcorporation/vrchat-albums/pull/888) [`6eb7623`](https://github.com/tktcorporation/vrchat-albums/commit/6eb7623b97b1efbb8386309add3687e324604c8d) Thanks [@tktcorporation](https://github.com/tktcorporation)! - アプリ更新後の初回起動で「データベースを準備中」が長く続く問題を改善
+
+- [#890](https://github.com/tktcorporation/vrchat-albums/pull/890) [`cd4d9aa`](https://github.com/tktcorporation/vrchat-albums/commit/cd4d9aab192cb6f3484361248c95f2c80d343d53) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 依存パッケージを範囲内で更新した。React・TanStack Query・lucide-react などの patch / minor 更新と、不要になった pnpm の override 8 件の削除を含む。
+
 ## 0.31.3
 
 ### Patch Changes
