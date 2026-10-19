@@ -64,7 +64,7 @@ export class MetadataParseError extends Data.TaggedError('MetadataParseError')<{
 
 `Effect.catchTag("NoMetadataFound", ...)` を呼ぶと、型レベルで E から `NoMetadataFound` が
 消える。1 クラスに複数の `code` を持たせると、`catchTag` で個別に処理できず、
-`catchAll` + 手動マッチが必要になり Effect の恩恵を失う。
+`Effect.catch` + 手動マッチが必要になり Effect の恩恵を失う。
 
 ## 2. サービス層
 
@@ -112,7 +112,7 @@ export const getMetadataForPhoto = (
 
 ```typescript
 // electron/lib/effectTRPC.ts
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 import { TRPCError } from '@trpc/server';
 import type { UserFacingError } from './errors';
 
@@ -131,9 +131,8 @@ import type { UserFacingError } from './errors';
  * 型制約により、UserFacingError 以外のエラーが E チャネルに残っていると
  * コンパイルエラーになる。
  *
- * 注意: Cause が Sequential/Parallel の場合（Effect.all 等で複数エラーが
- * 並列発生した場合）、最初のエラーのみ処理する。複数エラーの並列実行は
- * 現時点でスコープ外。
+ * 注意: Effect.all 等で複数のエラーが同時に発生し、Cause が複数の失敗を
+ * 持つ場合は、最初のエラーのみ処理する。
  */
 export async function runEffect<T>(
   effect: Effect.Effect<T, UserFacingError>,
@@ -144,7 +143,7 @@ export async function runEffect<T>(
     return exit.value;
   }
 
-  const failOpt = Cause.failureOption(exit.cause);
+  const failOpt = Cause.findErrorOption(exit.cause);
   if (Option.isSome(failOpt)) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -154,7 +153,7 @@ export async function runEffect<T>(
   }
 
   // Defect は re-throw して Sentry で捕捉
-  const dieOpt = Cause.dieOption(exit.cause);
+  const dieOpt = Result.getSuccess(Cause.findDefect(exit.cause));
   if (Option.isSome(dieOpt)) {
     throw dieOpt.value;
   }
@@ -752,7 +751,7 @@ describe('getMetadataForPhoto', () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      const error = Cause.failureOption(exit.cause);
+      const error = Cause.findErrorOption(exit.cause);
       expect(Option.isSome(error)).toBe(true);
       if (Option.isSome(error)) {
         // Data.TaggedError の _tag で判別

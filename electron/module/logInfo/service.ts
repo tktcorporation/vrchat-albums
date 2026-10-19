@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
 import { getDBQueue } from '../../lib/dbQueue';
+import { toError } from '../../lib/errorMapping';
 import { logger } from '../../lib/logger';
 import type { InitProgressRun } from '../initProgress/emitter';
 import type { InitProgressDetails } from '../initProgress/schema';
@@ -167,7 +168,12 @@ function _getLogStoreFilePathsImpl(
           latestPlayerJoinDateResult,
           latestPlayerLeaveDate,
         ] = await Promise.all([
-          Effect.runPromise(worldJoinLogService.findLatestWorldJoinLog()),
+          // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
+          Effect.runPromise(
+            worldJoinLogService
+              .findLatestWorldJoinLog()
+              .pipe(Effect.mapError(toError)),
+          ),
           Effect.runPromise(playerJoinLogService.findLatestPlayerJoinLog()),
           playerLeaveLogService.findLatestPlayerLeaveLog(),
         ]);
@@ -431,7 +437,12 @@ export function loadLogInfoIndexFromVRChatLog({
             latestPlayerJoinDate,
             latestPlayerLeaveDate,
           ] = await Promise.all([
-            Effect.runPromise(worldJoinLogService.findLatestWorldJoinLog()),
+            // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
+            Effect.runPromise(
+              worldJoinLogService
+                .findLatestWorldJoinLog()
+                .pipe(Effect.mapError(toError)),
+            ),
             Effect.runPromise(playerJoinLogService.findLatestPlayerJoinLog()),
             playerLeaveLogService.findLatestPlayerLeaveLog(),
           ]);
@@ -535,11 +546,11 @@ export function loadLogInfoIndexFromVRChatLog({
             (log): log is VRChatPlayerLeaveLog => log.logType === 'playerLeave',
           );
 
+          // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
           const worldJoinResults = await Effect.runPromise(
-            worldJoinLogService.createVRChatWorldJoinLogModel(
-              worldJoinLogBatch,
-              { transaction },
-            ),
+            worldJoinLogService
+              .createVRChatWorldJoinLogModel(worldJoinLogBatch, { transaction })
+              .pipe(Effect.mapError(toError)),
           );
           const playerJoinResults = await Effect.runPromise(
             playerJoinLogService.createVRChatPlayerJoinLogModel(
