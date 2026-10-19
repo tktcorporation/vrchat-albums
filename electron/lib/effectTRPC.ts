@@ -32,8 +32,8 @@ import type { UserFacingError } from './errors';
  * - Defect（予期しないエラー）→ そのまま re-throw（Sentry 送信）
  * - Interrupt → 汎用エラーを throw
  *
- * Cause が Sequential/Parallel の場合（Effect.all 等で複数エラーが
- * 並列発生した場合）、最初のエラーのみ処理する。
+ * Effect.all 等で複数のエラーが同時に発生し、Cause が複数の失敗を持つ場合は、
+ * 最初のエラーのみ処理する。
  */
 export async function runEffect<T>(
   effect: Effect.Effect<T, UserFacingError>,
