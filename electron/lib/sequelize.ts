@@ -1,6 +1,5 @@
-import { Sequelize } from '@sequelize/core';
+import { QueryTypes, Sequelize } from '@sequelize/core';
 import { SqliteDialect } from '@sequelize/sqlite3';
-import { Effect } from 'effect';
 import path from 'pathe';
 import { match } from 'ts-pattern';
 import { uuidv7 } from 'uuidv7';
@@ -14,6 +13,7 @@ import { VRChatWorldJoinLogFromPhotoModel } from '../module/vrchatWorldJoinLogFr
 import * as settingService from './../module/settings/service';
 import { logger } from './logger';
 import { Migrations } from './sequelize/migrations.model';
+import { computeSchemaFingerprint } from './sequelize/schemaFingerprint';
 
 let rdbClient: ReturnType<typeof _newRDBClient> | null = null;
 let migrationProgeress = false;
@@ -171,11 +171,18 @@ const SYNC_MODELS = [
   Migrations,
 ] as const;
 
-// 共通の sync 処理を抽出した関数
+/**
+ * 現在のモデル定義から算出したスキーマ指紋。
+ * `Migrations.schemaFingerprint` に記録された値と比べて、スキーマ同期の要否を決める。
+ */
+export const getCurrentSchemaFingerprint = (): string =>
+  computeSchemaFingerprint(SYNC_MODELS);
+
 /**
  * Sequelize の sync を実行する共通処理。
  * モデルごとに分割して実行し、DB ロック時間を短縮する。
- * マイグレーション情報の記録も行う。
+ * 全モデルの同期が成功した後にだけ、アプリバージョンとスキーマ指紋を `Migrations` に記録する。
+ * 途中で失敗した場合は指紋が残らないため、次回起動時に同期をやり直す。
  */
 const executeSyncRDB = async (options: { force: boolean }) => {
   // 実行中は何もしない
@@ -184,8 +191,10 @@ const executeSyncRDB = async (options: { force: boolean }) => {
     return;
   }
 
-  migrationProgeress = true;
+  // フラグを立てる前に算出する。ここで例外が出てもフラグが立ったまま残らないようにするため
   const appVersion = settingService.getAppVersion();
+  const schemaFingerprint = getCurrentSchemaFingerprint();
+  migrationProgeress = true;
   // effect-lint-allow-try-catch: finally でマイグレーション進行フラグをリセットするため必要
   try {
     // モデルごとに分割して sync を実行
@@ -202,11 +211,11 @@ const executeSyncRDB = async (options: { force: boolean }) => {
       );
     }
 
-    // migration のバージョンを保存
-    const now = new Date();
+    // Migrations は SYNC_MODELS の最後に同期されるため、この時点で schemaFingerprint 列が存在する
     await Migrations.create({
       version: appVersion,
-      migratedAt: now,
+      migratedAt: new Date(),
+      schemaFingerprint,
     });
   } finally {
     migrationProgeress = false;
@@ -216,30 +225,26 @@ const executeSyncRDB = async (options: { force: boolean }) => {
 /**
  * 必要に応じてデータベースを同期するラッパー関数。
  *
- * checkRequired=true（デフォルト）の場合、Migrations テーブルを確認し、
- * 現在のアプリバージョンと一致する migration が既にあればスキーマ同期をスキップする。
- * これにより同一バージョンでの再起動時に不要な ALTER TABLE を回避する。
+ * checkRequired=true（デフォルト）の場合、`Migrations` に記録されたスキーマ指紋と
+ * 現在のモデル定義の指紋を比べ、一致すればスキーマ同期をスキップする。
+ * SQLite の `sync({ alter: true })` は差分が無くても全列でテーブルを作り直し、
+ * 行数に比例して起動を待たせるため、モデル定義が変わったときだけ実行する。
+ * アプリバージョンだけが変わった更新では同期しない。
  */
 export const syncRDBClient = async (options?: { checkRequired: boolean }) => {
   const checkRequired = options?.checkRequired ?? true;
-  const appVersion = settingService.getAppVersion();
 
-  // match() の結果を await して、async コールバックの Promise を正しく解決する。
-  // 旧コードでは await が欠落しており、Promise オブジェクト（truthy）が
-  // そのまま評価されていたため、スキップ判定が機能していなかった。
   const migrationRequired = await match(checkRequired)
-    .with(true, () => checkMigrationRDBClient(appVersion))
+    .with(true, () => checkMigrationRDBClient())
     .with(false, () => true)
     .exhaustive();
 
   if (!migrationRequired) {
-    logger.info(
-      `syncRDBClient: schema already up-to-date for v${appVersion}, skipping sync`,
-    );
+    logger.info('syncRDBClient: schema fingerprint unchanged, skipping sync');
     return;
   }
 
-  logger.info(`syncRDBClient: migration required for v${appVersion}, syncing`);
+  logger.info('syncRDBClient: schema fingerprint changed, syncing');
   await executeSyncRDB({ force: false });
 };
 
@@ -260,47 +265,33 @@ export const __forceSyncRDBClient = async () => {
 
 /**
  * migration の必要があるかどうかを確認する
- * true: migration が必要
+ * true: migration が必要（指紋が未記録、または現在のモデル定義と異なる）
  * false: migration が不要
  */
-export const checkMigrationRDBClient = async (appVersion: string) => {
-  // Migrations テーブルが存在しない場合は migration が必要
-  const migrationsTableExists = await isExistsMigrationTable();
-  if (!migrationsTableExists) {
-    return true;
-  }
-
-  // 実施積みで最新の migration を取得
-  const latestMigration = await Migrations.findOne({
-    order: [['createdAt', 'DESC']],
-  });
-  // 初回は migration が必要
-  if (latestMigration === null) {
-    return true;
-  }
-  // 同じバージョンの migration が存在するか確認
-  if (appVersion === latestMigration.version) {
-    return false;
-  }
-  return true;
+export const checkMigrationRDBClient = async (): Promise<boolean> => {
+  const storedFingerprint = await findStoredSchemaFingerprint();
+  return storedFingerprint !== getCurrentSchemaFingerprint();
 };
 
 /**
- * `Migrations` テーブルが存在するか確認する内部関数。
+ * 最後に成功した同期で記録したスキーマ指紋を返す。
+ *
+ * `Migrations` テーブルが無い DB と、`Migrations` に指紋列が無い DB は
+ * null を返す。列の有無を先に確かめるのは、列が無いまま `Migrations.findOne` を発行すると
+ * SELECT 句の `schemaFingerprint` が SQLite エラーになるため。
  */
-const isExistsMigrationTable = (): Promise<boolean> =>
-  Effect.runPromise(
-    Effect.tryPromise({
-      try: () => Migrations.findAll(),
-      catch: (e): boolean => {
-        return match(e)
-          .with({ name: 'SequelizeDatabaseError' }, () => false)
-          .otherwise(() => {
-            throw e; // 予期しないエラーはre-throw
-          });
-      },
-    }).pipe(
-      Effect.map(() => true),
-      Effect.catch((isFalse) => Effect.succeed(isFalse)),
-    ),
+const findStoredSchemaFingerprint = async (): Promise<string | null> => {
+  const columns = await getRDBClient().__client.query<{ name: string }>(
+    "SELECT name FROM pragma_table_info('Migrations')",
+    { type: QueryTypes.SELECT },
   );
+  if (!columns.some((column) => column.name === 'schemaFingerprint')) {
+    return null;
+  }
+
+  // id は AUTOINCREMENT で単調増加するため、同一ミリ秒に複数行あっても最後の同期を一意に選べる
+  const latestMigration = await Migrations.findOne({
+    order: [['id', 'DESC']],
+  });
+  return latestMigration?.schemaFingerprint ?? null;
+};

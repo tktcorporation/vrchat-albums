@@ -32,6 +32,14 @@ export class Migrations extends Model<
   @NotNull
   declare migratedAt: Date;
 
+  /**
+   * 同期時点のモデル定義から算出したスキーマ指紋（`computeSchemaFingerprint`）。
+   * 起動時にこの値と現在のモデルの指紋を比べ、異なるときだけ `sync({ alter: true })` を実行する。
+   * 値が null の行は、指紋が未記録として同期が必要と判定される。
+   */
+  @Attribute(DataTypes.STRING)
+  declare schemaFingerprint: CreationOptional<string | null>;
+
   @Attribute(DataTypes.DATE)
   @Default(DataTypes.NOW)
   declare createdAt: CreationOptional<Date>;
