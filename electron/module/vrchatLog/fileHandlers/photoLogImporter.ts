@@ -1,7 +1,4 @@
-import { glob } from 'glob';
-
 import { VRChatPhotoPathObjectSchema } from '../../../lib/pathObject';
-import type { VRChatPhotoDirPath } from '../../vrchatPhoto/valueObjects';
 import { createVRChatWorldJoinLogFromPhoto } from '../../vrchatWorldJoinLogFromPhoto/service';
 import type { VRChatWorldJoinLogFromPhoto } from '../../vrchatWorldJoinLogFromPhoto/vrchatWorldJoinLogFromPhoto.model';
 import type { WorldId } from '../type';
@@ -12,25 +9,15 @@ import type { WorldId } from '../type';
  */
 
 /**
- * 写真ディレクトリからワールド参加ログを抽出
- * @param vrChatPhotoDirPath VRChat写真ディレクトリのパス
- * @returns ワールド参加ログの配列
+ * 写真ファイルのパスからワールド参加ログを抽出する
+ * ファイル名のパターン:
+ * VRChat_YYYY-MM-DD_HH-mm-ss.SSS_wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.ext
+ * このパターンに合わないパスは捨てる
  */
-const getLogLinesFromLogPhotoDirPath = async ({
-  vrChatPhotoDirPath,
-}: {
-  vrChatPhotoDirPath: VRChatPhotoDirPath;
-}): Promise<VRChatWorldJoinLogFromPhoto[]> => {
-  // PathObjectを使用してクロスプラットフォーム対応のglobパターンを生成
-  const photoPath = VRChatPhotoPathObjectSchema.parse(vrChatPhotoDirPath.value);
-  const globPattern = photoPath.toPhotoGlobPattern();
-
-  // 正規表現にマッチするファイルを再帰的に取得
-  const logPhotoFilePathList = await glob(globPattern);
-
-  // ファイル名のパターン:
-  // VRChat_YYYY-MM-DD_HH-mm-ss.SSS_wrld_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.ext
-  const worldJoinLogList = logPhotoFilePathList
+const getLogLinesFromPhotoPaths = (
+  photoPaths: readonly string[],
+): VRChatWorldJoinLogFromPhoto[] =>
+  photoPaths
     .map((filePath) => {
       const photoInfo =
         VRChatPhotoPathObjectSchema.parse(filePath).extractPhotoInfo();
@@ -44,26 +31,18 @@ const getLogLinesFromLogPhotoDirPath = async ({
     })
     .filter((log) => log !== null);
 
-  return worldJoinLogList;
-};
-
 /**
  * 写真として保存されているワールドへのJoinログをデータベースに保存
- * @param vrChatPhotoDirPath VRChat写真ディレクトリのパス
+ *
+ * パスの列挙は写真インデックスの作成（createVRChatPhotoPathIndex の worldJoinPhotoPaths）が担う。
+ * 写真フォルダを辿るのはインデックス作成の 1 回だけにするため、ここではパスを受け取るだけにしている。
+ * @param photoPaths ファイル名にワールドIDを含む写真の候補の絶対パス
  */
-export const importLogLinesFromLogPhotoDirPath = async ({
-  vrChatPhotoDirPath,
-}: {
-  vrChatPhotoDirPath: VRChatPhotoDirPath;
-}): Promise<void> => {
-  const logLines = await getLogLinesFromLogPhotoDirPath({
-    vrChatPhotoDirPath,
-  });
-
-  const worldJoinLogs: VRChatWorldJoinLogFromPhoto[] = logLines.map((log) => ({
-    joinDate: log.joinDate,
-    worldId: log.worldId,
-  }));
-
+export const importLogLinesFromPhotoPaths = async ({
+  photoPaths,
+}: Readonly<{
+  photoPaths: readonly string[];
+}>): Promise<void> => {
+  const worldJoinLogs = getLogLinesFromPhotoPaths(photoPaths);
   await createVRChatWorldJoinLogFromPhoto(worldJoinLogs);
 };

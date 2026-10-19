@@ -18,4 +18,4 @@ export {
 } from './logStorageManager';
 
 // 写真からのログインポート
-export { importLogLinesFromLogPhotoDirPath } from './photoLogImporter';
+export { importLogLinesFromPhotoPaths } from './photoLogImporter';

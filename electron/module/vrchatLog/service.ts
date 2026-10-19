@@ -22,7 +22,7 @@ import {
   getLogLinesByLogFilePathListWithPartialSuccess,
   getLogStoreFilePathForDate,
   getLogStoreFilePathsInRange,
-  importLogLinesFromLogPhotoDirPath,
+  importLogLinesFromPhotoPaths,
 } from './fileHandlers';
 import type { VRChatLogStoreFilePath } from './model';
 // パーサー機能のインポート
@@ -177,7 +177,7 @@ export {
   getLogStoreFilePathForDate,
   getLegacyLogStoreFilePath,
   getLogStoreFilePathsInRange,
-  importLogLinesFromLogPhotoDirPath,
+  importLogLinesFromPhotoPaths,
 };
 // 型定義の再エクスポート
 export type {

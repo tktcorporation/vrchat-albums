@@ -247,7 +247,7 @@ describeWhenProfiling('写真インデックス作成のメモリプロファイ
 
       const duration = (Date.now() - startTime) / 1000;
       console.log(`\nIndexing completed in ${duration.toFixed(1)}s`);
-      console.log(`Indexed photos: ${result.length}`);
+      console.log(`Indexed photos: ${result.createdModels.length}`);
     } finally {
       clearInterval(monitoringInterval);
     }

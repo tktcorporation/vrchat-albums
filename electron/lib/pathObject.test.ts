@@ -162,26 +162,6 @@ describe('BackupPathObject', () => {
 });
 
 describe('VRChatPhotoPathObject', () => {
-  it('VRChat写真用のglobパターンを生成できる', () => {
-    const photoPath = VRChatPhotoPathObjectSchema.parse('/path/to/photos');
-    const pattern = photoPath.toPhotoGlobPattern();
-    expect(pattern).toBe('/path/to/photos/**/VRChat_*_wrld_*');
-  });
-
-  it('Windows形式のパスでもglobパターンを正しく生成できる', () => {
-    const photoPath = VRChatPhotoPathObjectSchema.parse(
-      String.raw`C:\Users\Test\Pictures`,
-    );
-    const pattern = photoPath.toPhotoGlobPattern();
-    expect(pattern).toBe('C:/Users/Test/Pictures/**/VRChat_*_wrld_*');
-  });
-
-  it('カスタムパターンでglobパターンを生成できる', () => {
-    const photoPath = VRChatPhotoPathObjectSchema.parse('/photos');
-    const pattern = photoPath.toPhotoGlobPattern('VRChat_*.png');
-    expect(pattern).toBe('/photos/**/VRChat_*.png');
-  });
-
   describe('extractPhotoInfo', () => {
     it('正しい形式の写真ファイル名から情報を抽出できる', () => {
       const filePath =
