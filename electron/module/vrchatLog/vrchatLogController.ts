@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 import { match } from 'ts-pattern';
 import z from 'zod';
 
@@ -75,7 +75,7 @@ export const appendLoglinesToFileFromLogFilePathList = async (
     vrchatLogFileDirService.getValidVRChatLogFileDir(),
   );
   if (Exit.isFailure(vrchatlogFilesDirExit)) {
-    const failOpt = Cause.failureOption(vrchatlogFilesDirExit.cause);
+    const failOpt = Cause.findErrorOption(vrchatlogFilesDirExit.cause);
     if (Option.isSome(failOpt)) {
       throw new VRChatLogFileError(
         match(failOpt.value.error)
@@ -84,7 +84,9 @@ export const appendLoglinesToFileFromLogFilePathList = async (
           .exhaustive(),
       );
     }
-    const dieOpt = Cause.dieOption(vrchatlogFilesDirExit.cause);
+    const dieOpt = Result.getSuccess(
+      Cause.findDefect(vrchatlogFilesDirExit.cause),
+    );
     if (Option.isSome(dieOpt)) {
       throw dieOpt.value;
     }
@@ -116,11 +118,13 @@ export const appendLoglinesToFileFromLogFilePathList = async (
     vrchatLogFileDirService.getVRChatLogFilePathList(vrchatlogFilesDir.path),
   );
   if (Exit.isFailure(logFilePathListExit)) {
-    const failOpt = Cause.failureOption(logFilePathListExit.cause);
+    const failOpt = Cause.findErrorOption(logFilePathListExit.cause);
     if (Option.isSome(failOpt)) {
       throw new VRChatLogFileError('LOG_FILE_DIR_NOT_FOUND' as const);
     }
-    const dieOpt = Cause.dieOption(logFilePathListExit.cause);
+    const dieOpt = Result.getSuccess(
+      Cause.findDefect(logFilePathListExit.cause),
+    );
     if (Option.isSome(dieOpt)) {
       throw dieOpt.value;
     }

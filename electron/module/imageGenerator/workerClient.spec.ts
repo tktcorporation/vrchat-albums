@@ -47,7 +47,7 @@ const job = {
 };
 
 /**
- * runInWorker が内部で Effect.timeoutFail を pipe しているため、
+ * runInWorker が内部で Effect.timeoutOrElse を pipe しているため、
  * `new Worker()` の呼び出しは Effect のファイバースケジューリングにより
  * 1 マイクロタスク以上遅延する（Effect.runPromise 呼び出しの直後では
  * まだ実行されていない）。emit する前にこれを待つ。

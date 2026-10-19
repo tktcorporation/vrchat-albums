@@ -118,7 +118,7 @@ export const getLogStoreFilePathsInRange = async (
         }
       } else {
         // ディレクトリ読み取り失敗は警告のみで継続
-        const failOpt = Cause.failureOption(readdirExit.cause);
+        const failOpt = Cause.findErrorOption(readdirExit.cause);
         if (Option.isSome(failOpt)) {
           const error = failOpt.value;
           logger.warn(
@@ -227,7 +227,7 @@ export const appendLoglinesToFile = (props: {
           // Unexpected errors should propagate as defects
           yield* fs
             .writeFileSyncSafe(newFilePath, newLog)
-            .pipe(Effect.catchAll((e) => Effect.die(e)));
+            .pipe(Effect.catch((e) => Effect.die(e)));
           continue;
         }
       }
@@ -247,9 +247,9 @@ export const appendLoglinesToFile = (props: {
           // readFileSyncSafe returns Effect<Buffer, ReadFileError>
           const readExit = yield* fs
             .readFileSyncSafe(logStoreFilePath.value)
-            .pipe(Effect.either);
-          if (readExit._tag === 'Right') {
-            const content = readExit.right.toString();
+            .pipe(Effect.result);
+          if (readExit._tag === 'Success') {
+            const content = readExit.success.toString();
             for (const line of content.split('\n')) {
               if (line) {
                 existingLines.add(line);
@@ -278,14 +278,14 @@ export const appendLoglinesToFile = (props: {
 
       // ファイルが存在しない場合は新規作成、存在する場合は追記
       // unicorn/prefer-ternary の要求に応えつつ型安全に処理するため、
-      // 各 Effect を個別に catchAll してから ternary で統合
+      // 各 Effect を個別に Effect.catch してから ternary で統合
       const writeEffect = isExists
         ? fs
             .appendFileAsync(logStoreFilePath.value, newLog)
-            .pipe(Effect.catchAll((e) => Effect.die(e)))
+            .pipe(Effect.catch((e) => Effect.die(e)))
         : fs
             .writeFileSyncSafe(logStoreFilePath.value, newLog)
-            .pipe(Effect.catchAll((e) => Effect.die(e)));
+            .pipe(Effect.catch((e) => Effect.die(e)));
       yield* writeEffect;
 
       // キャッシュを更新（書き込み成功後に新しい行を追加）

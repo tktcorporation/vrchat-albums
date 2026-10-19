@@ -428,7 +428,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       const exit = await Effect.runPromiseExit(readXmpTags(nonExistentPath));
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value).toBeInstanceOf(ExifOperationError);
@@ -450,7 +450,7 @@ describe('exif-native 互換性テスト (Contract Test)', () => {
       );
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value).toBeInstanceOf(ExifOperationError);

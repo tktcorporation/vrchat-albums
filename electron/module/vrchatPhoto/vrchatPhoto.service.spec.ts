@@ -148,7 +148,7 @@ describe('vrchatPhoto.service', () => {
         // 結果がErrであることを確認
         expect(Exit.isFailure(exit)).toBe(true);
         if (Exit.isFailure(exit)) {
-          const failOpt = Cause.failureOption(exit.cause);
+          const failOpt = Cause.findErrorOption(exit.cause);
           expect(Option.isSome(failOpt)).toBe(true);
           if (Option.isSome(failOpt)) {
             expect(failOpt.value).toBe('InputFileIsMissing');
@@ -176,7 +176,7 @@ describe('vrchatPhoto.service', () => {
 
         expect(Exit.isFailure(exit)).toBe(true);
         if (Exit.isFailure(exit)) {
-          const failOpt = Cause.failureOption(exit.cause);
+          const failOpt = Cause.findErrorOption(exit.cause);
           expect(Option.isSome(failOpt)).toBe(true);
           if (Option.isSome(failOpt)) {
             expect(failOpt.value).toBe('InputFileIsMissing');

@@ -1,7 +1,7 @@
 import * as fsPromises from 'node:fs/promises';
 
 import * as datefns from 'date-fns';
-import { Effect, Either } from 'effect';
+import { Effect, Result } from 'effect';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
 
@@ -68,7 +68,7 @@ export const generateMissingWorldJoinImages = (params: {
  * ループ1回分の画像生成処理
  *
  * 背景: 個別の World Join に対して API 取得 → 画像ダウンロード → 画像生成 → ファイル保存を行う。
- * 各ステップの失敗は Effect.either で検出し、呼び出し側でスキップ判断する。
+ * 各ステップの失敗は Effect.result で検出し、呼び出し側でスキップ判断する。
  * ファイル I/O エラー（ENOENT, EACCES 等）は ts-pattern で分類し、
  * 予期しないエラー（TypeError 等）は defect として再スローする。
  */
@@ -203,7 +203,7 @@ const generateSingleWorldJoinImage = (
 /**
  * 内部実装: ミューテックスで保護された画像生成処理
  *
- * 各 World Join の画像生成を Effect.either で個別にハンドリングし、
+ * 各 World Join の画像生成を Effect.result で個別にハンドリングし、
  * 予期されたエラーはスキップして次の Join に進む（部分的成功パターン）。
  * 予期しないエラーは generateSingleWorldJoinImage 内で defect として再スローされる。
  */
@@ -231,17 +231,19 @@ const generateMissingWorldJoinImagesInternal = (params: {
           join.joinDateTime,
           join.worldId,
         );
-        return Effect.either(pathExistsAsync(imagePath)).pipe(
+        return Effect.result(pathExistsAsync(imagePath)).pipe(
           Effect.map((exists) => ({ join, exists })),
         );
       },
       { concurrency: 'unbounded' },
     );
     const missingJoins = existenceChecks
-      .filter((check) => Either.isRight(check.exists) && !check.exists.right)
+      .filter(
+        (check) => Result.isSuccess(check.exists) && !check.exists.success,
+      )
       .map((check) => check.join);
     const checkFailures = existenceChecks.flatMap((check) =>
-      Either.isLeft(check.exists) ? [check.exists.left] : [],
+      Result.isFailure(check.exists) ? [check.exists.failure] : [],
     );
     for (const failure of checkFailures) {
       logger.warn(failure.message, failure.cause);
@@ -272,13 +274,13 @@ const generateMissingWorldJoinImagesInternal = (params: {
         );
       }
 
-      // 部分的成功パターン: Effect.either で個別エラーをハンドリング
-      const result = yield* Effect.either(
+      // 部分的成功パターン: Effect.result で個別エラーをハンドリング
+      const result = yield* Effect.result(
         generateSingleWorldJoinImage(join, photoDirPath),
       );
 
-      if (result._tag === 'Left') {
-        logger.warn(result.left.message);
+      if (result._tag === 'Failure') {
+        logger.warn(result.failure.message);
         errors++;
         continue;
       }

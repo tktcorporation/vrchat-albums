@@ -108,7 +108,7 @@ export const getVrcWorldInfoByWorldId = (
 ): Effect.Effect<VRChatWorldInfoFromApi, VRChatApiServiceError> => {
   return Effect.gen(function* () {
     const reqUrl = `https://api.vrchat.cloud/api/1/worlds/${worldId}`;
-    const responseResult = yield* Effect.either(
+    const responseResult = yield* Effect.result(
       getData<unknown>(reqUrl).pipe(
         Effect.mapError((fetchError): VRChatApiServiceError => {
           if (fetchError.status === 404) {
@@ -118,10 +118,12 @@ export const getVrcWorldInfoByWorldId = (
         }),
       ),
     );
-    if (responseResult._tag === 'Left') {
-      return yield* Effect.fail(responseResult.left);
+    if (responseResult._tag === 'Failure') {
+      return yield* Effect.fail(responseResult.failure);
     }
-    const result = VRChatWorldInfoFromApiSchema.safeParse(responseResult.right);
+    const result = VRChatWorldInfoFromApiSchema.safeParse(
+      responseResult.success,
+    );
     if (!result.success) {
       return yield* Effect.fail(
         new VRChatApiParseError({

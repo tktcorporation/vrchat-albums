@@ -301,6 +301,6 @@ const isExistsMigrationTable = (): Promise<boolean> =>
       },
     }).pipe(
       Effect.map(() => true),
-      Effect.catchAll((isFalse) => Effect.succeed(isFalse)),
+      Effect.catch((isFalse) => Effect.succeed(isFalse)),
     ),
   );

@@ -4,7 +4,7 @@ import * as path from 'node:path';
 
 type NodeDirent = Dirent;
 
-import { Effect, Either } from 'effect';
+import { Effect, Result } from 'effect';
 import { match, P } from 'ts-pattern';
 
 import { logger } from '../../../lib/logger';
@@ -86,7 +86,7 @@ export class ImportService {
     paths: string[],
     getDBLogs: DBLogProvider,
   ): Effect.Effect<ImportResult, ImportServiceError> {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       logger.info(`Starting import process for ${paths.length} paths`);
 
       // 1. パスからlogStoreファイルを収集（ディレクトリも対応）
@@ -223,16 +223,16 @@ export class ImportService {
    */
   private async checkPathExists(targetPath: string): Promise<boolean> {
     const result = await Effect.runPromise(
-      Effect.either(pathExistsAsync(targetPath)),
+      Effect.result(pathExistsAsync(targetPath)),
     );
-    if (Either.isLeft(result)) {
+    if (Result.isFailure(result)) {
       throw new ImportFileAccessFailed({
         path: targetPath,
-        message: result.left.code ?? String(result.left.cause),
-        cause: result.left,
+        message: result.failure.code ?? String(result.failure.cause),
+        cause: result.failure,
       });
     }
-    return result.right;
+    return result.success;
   }
 
   /**
@@ -346,7 +346,7 @@ export class ImportService {
     },
     ImportServiceError
   > {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       const allLogLines: VRChatLogLine[] = [];
       const processedFiles: string[] = [];
 

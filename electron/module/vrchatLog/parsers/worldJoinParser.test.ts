@@ -38,7 +38,7 @@ describe('worldJoinParser', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('WORLD_NAME_NOT_FOUND');
@@ -62,7 +62,7 @@ describe('worldJoinParser', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('INVALID_WORLD_ID');
@@ -81,7 +81,7 @@ describe('worldJoinParser', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('LOG_FORMAT_MISMATCH');
@@ -105,7 +105,7 @@ describe('worldJoinParser', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('INVALID_INSTANCE_ID');
@@ -129,7 +129,7 @@ describe('worldJoinParser', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('INVALID_INSTANCE_ID');
@@ -158,7 +158,7 @@ describe('worldJoinParser', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('INVALID_INSTANCE_ID');
@@ -210,7 +210,7 @@ describe('worldJoinParser', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('WORLD_NAME_NOT_FOUND');
@@ -252,7 +252,7 @@ describe('worldJoinParser', () => {
       // Defect(Die) ではなく型付き Fail であること
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('INVALID_WORLD_NAME');
@@ -276,7 +276,7 @@ describe('worldJoinParser', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value.type).toBe('INVALID_DATETIME');

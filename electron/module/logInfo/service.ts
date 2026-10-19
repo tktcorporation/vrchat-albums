@@ -612,22 +612,22 @@ export function loadLogInfoIndexFromVRChatLog({
         );
       };
       reportMetadataProgress(0, photoPaths.length);
-      const metadataResult = yield* Effect.either(
+      const metadataResult = yield* Effect.result(
         metadataService.extractAndSaveMetadataBatch(photoPaths, {
           onProgress: reportMetadataProgress,
         }),
       );
       // DB エラーで途中終了した場合も、このステージの処理は終わっているので完了にする
       reportMetadataProgress(photoPaths.length, photoPaths.length);
-      if (metadataResult._tag === 'Right') {
+      if (metadataResult._tag === 'Success') {
         logger.info(
-          `Photo metadata extracted: ${metadataResult.right} new records`,
+          `Photo metadata extracted: ${metadataResult.success} new records`,
         );
       } else {
         // MetadataDbError は予期しないエラーなので error レベル（Sentry送信）
         logger.error({
-          message: `Photo metadata DB error: ${metadataResult.left.message}`,
-          stack: metadataResult.left,
+          message: `Photo metadata DB error: ${metadataResult.failure.message}`,
+          stack: metadataResult.failure,
         });
       }
       const metadataEndTime = performance.now();

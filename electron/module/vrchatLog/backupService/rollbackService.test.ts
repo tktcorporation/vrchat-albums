@@ -181,7 +181,7 @@ describe('rollbackService', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         if (Option.isSome(failOpt)) {
           expect(getRollbackErrorMessage(failOpt.value)).toContain(
             'バックアップディレクトリが見つかりません',
@@ -213,7 +213,7 @@ describe('rollbackService', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         if (Option.isSome(failOpt)) {
           expect(getRollbackErrorMessage(failOpt.value)).toContain(
             '有効な月別データが見つかりません',
@@ -281,7 +281,7 @@ describe('rollbackService', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         if (Option.isSome(failOpt)) {
           expect(getRollbackErrorMessage(failOpt.value)).toContain(
             'DB再構築に失敗しました',
@@ -307,7 +307,7 @@ describe('rollbackService', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         if (Option.isSome(failOpt)) {
           expect(getRollbackErrorMessage(failOpt.value)).toContain(
             'トランザクションに失敗しました',
@@ -362,7 +362,7 @@ describe('rollbackService', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         if (Option.isSome(failOpt)) {
           expect(getRollbackErrorMessage(failOpt.value)).toContain(
             'メタデータファイルが見つかりません',

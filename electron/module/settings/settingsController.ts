@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 import type { UpdateCheckResult } from 'electron-updater';
 import { match, P } from 'ts-pattern';
 
@@ -215,7 +215,7 @@ const runInitializationHoldingLock = async (
     );
 
     if (Exit.isFailure(logSyncExit)) {
-      const failOpt = Cause.failureOption(logSyncExit.cause);
+      const failOpt = Cause.findErrorOption(logSyncExit.cause);
       if (Option.isSome(failOpt)) {
         const logSyncError = failOpt.value;
         // ログ同期エラーの場合、詳細なエラータイプを特定
@@ -266,7 +266,7 @@ const runInitializationHoldingLock = async (
         });
       } else {
         // Defect: re-throw して Sentry で捕捉
-        const dieOpt = Cause.dieOption(logSyncExit.cause);
+        const dieOpt = Result.getSuccess(Cause.findDefect(logSyncExit.cause));
         if (Option.isSome(dieOpt)) {
           throw dieOpt.value;
         }

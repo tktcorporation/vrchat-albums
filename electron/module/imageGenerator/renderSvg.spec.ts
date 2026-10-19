@@ -46,7 +46,7 @@ describe('renderSvgToPng error handling', () => {
     );
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      const failOpt = Cause.failureOption(exit.cause);
+      const failOpt = Cause.findErrorOption(exit.cause);
       expect(Option.isSome(failOpt)).toBe(true);
       if (Option.isSome(failOpt)) {
         expect(failOpt.value._tag).toBe('SvgRenderFailed');
@@ -58,7 +58,7 @@ describe('renderSvgToPng error handling', () => {
     const exit = await Effect.runPromiseExit(renderSvgToPng('', fontFilePaths));
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      const failOpt = Cause.failureOption(exit.cause);
+      const failOpt = Cause.findErrorOption(exit.cause);
       expect(Option.isSome(failOpt)).toBe(true);
       if (Option.isSome(failOpt)) {
         expect(failOpt.value._tag).toBe('SvgRenderFailed');

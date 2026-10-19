@@ -55,10 +55,12 @@ export const setVRChatLogFilesDirByDialog = (): Effect.Effect<
 > => {
   return openElectronDialog(['openDirectory']).pipe(
     Effect.map((paths) => paths[0]),
-    Effect.tap((dirPath) => {
-      const settingStore = getSettingStore();
-      settingStore.setLogFilesDir(dirPath);
-    }),
+    Effect.tap((dirPath) =>
+      Effect.sync(() => {
+        const settingStore = getSettingStore();
+        settingStore.setLogFilesDir(dirPath);
+      }),
+    ),
     Effect.as(void 0),
   );
 };

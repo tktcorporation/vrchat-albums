@@ -94,7 +94,7 @@ describe('extractAndSaveMetadataBatch の進捗', () => {
     );
 
     const result = await Effect.runPromise(
-      Effect.either(
+      Effect.result(
         extractAndSaveMetadataBatch(photoPaths, {
           onProgress: (processed) => {
             reported.push(processed);
@@ -103,7 +103,7 @@ describe('extractAndSaveMetadataBatch の進捗', () => {
       ),
     );
 
-    expect(result._tag).toBe('Left');
+    expect(result._tag).toBe('Failure');
     expect(reported).not.toContain(photoPaths.length);
   });
 

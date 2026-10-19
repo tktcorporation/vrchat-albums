@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks';
 
 import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 import type Electron from 'electron';
 import { xxhash128 } from 'hash-wasm';
 import * as path from 'pathe';
@@ -299,26 +299,26 @@ const readCacheFile = (
 const getCachedThumbnail = async (
   cacheKey: string,
 ): Promise<CacheReadResult> => {
-  const cacheDirEither = await Effect.runPromise(
-    Effect.either(ensureCacheDir()),
+  const cacheDirResult = await Effect.runPromise(
+    Effect.result(ensureCacheDir()),
   );
-  if (cacheDirEither._tag === 'Left') {
+  if (cacheDirResult._tag === 'Failure') {
     // キャッシュディレクトリが利用不可の場合
     logger.debug({
       message: 'Cache directory unavailable, skipping cache lookup',
-      stack: new Error(cacheDirEither.left.message),
+      stack: new Error(cacheDirResult.failure.message),
     });
     return { status: 'miss', reason: 'cache_dir_unavailable' };
   }
 
-  const cachePath = path.join(cacheDirEither.right, `${cacheKey}.webp`);
+  const cachePath = path.join(cacheDirResult.success, `${cacheKey}.webp`);
 
   // キャッシュファイルのstatを取得
-  const statEither = await Effect.runPromise(
-    Effect.either(statCacheFile(cachePath)),
+  const statResult = await Effect.runPromise(
+    Effect.result(statCacheFile(cachePath)),
   );
-  if (statEither._tag === 'Left') {
-    return match(statEither.left)
+  if (statResult._tag === 'Failure') {
+    return match(statResult.failure)
       .with({ type: 'NOT_FOUND' }, () => ({
         status: 'miss' as const,
         reason: 'not_found' as const,
@@ -331,7 +331,7 @@ const getCachedThumbnail = async (
   }
 
   // キャッシュが有効期限を超えている場合は無効
-  const { stats } = statEither.right;
+  const { stats } = statResult.success;
   const cacheDate = new Date(Number(stats.mtimeMs));
   const expiryDate = dateFns.subDays(new Date(), CACHE_EXPIRY_DAYS);
   if (cacheDate < expiryDate) {
@@ -339,11 +339,11 @@ const getCachedThumbnail = async (
   }
 
   // キャッシュファイルを読み込み
-  const readEither = await Effect.runPromise(
-    Effect.either(readCacheFile(cachePath)),
+  const readResult = await Effect.runPromise(
+    Effect.result(readCacheFile(cachePath)),
   );
-  if (readEither._tag === 'Left') {
-    return match(readEither.left)
+  if (readResult._tag === 'Failure') {
+    return match(readResult.failure)
       .with({ type: 'NOT_FOUND' }, () => ({
         status: 'miss' as const,
         reason: 'not_found' as const,
@@ -355,7 +355,7 @@ const getCachedThumbnail = async (
       .exhaustive();
   }
 
-  return { status: 'hit' as const, data: readEither.right };
+  return { status: 'hit' as const, data: readResult.success };
 };
 
 /**
@@ -381,17 +381,17 @@ const saveThumbnailToCache = async (
   pendingCacheWrites.add(cacheKey);
 
   const program = Effect.gen(function* () {
-    const cacheDirEither = yield* Effect.either(ensureCacheDir());
-    if (cacheDirEither._tag === 'Left') {
+    const cacheDirResult = yield* Effect.result(ensureCacheDir());
+    if (cacheDirResult._tag === 'Failure') {
       // キャッシュディレクトリが利用不可の場合は書き込みをスキップ
       logger.debug({
         message: 'Cache directory unavailable, skipping cache write',
-        stack: new Error(cacheDirEither.left.message),
+        stack: new Error(cacheDirResult.failure.message),
       });
       return;
     }
 
-    const cachePath = path.join(cacheDirEither.right, `${cacheKey}.webp`);
+    const cachePath = path.join(cacheDirResult.success, `${cacheKey}.webp`);
     const tempPath = `${cachePath}${TEMP_FILE_SUFFIX}`;
 
     // アトミック書き込み: tmp -> rename
@@ -407,7 +407,7 @@ const saveThumbnailToCache = async (
         consecutiveCacheFailures = 0;
         return Effect.void;
       }),
-      Effect.catchAll((error) => {
+      Effect.catch((error) => {
         // 失敗カウントをインクリメント
         consecutiveCacheFailures++;
 
@@ -591,32 +591,32 @@ export const selectThumbnailCacheFilesToDelete = (
  * 失敗はログに残して終える（キャッシュは再生成できるため、アプリを止める理由にならない）。
  */
 export const cleanupThumbnailCache = async (): Promise<void> => {
-  const cacheDirEither = await Effect.runPromise(
-    Effect.either(ensureCacheDir()),
+  const cacheDirResult = await Effect.runPromise(
+    Effect.result(ensureCacheDir()),
   );
-  if (cacheDirEither._tag === 'Left') {
+  if (cacheDirResult._tag === 'Failure') {
     // キャッシュディレクトリが利用不可の場合はクリーンアップをスキップ
     logger.debug({
       message: 'Cache directory unavailable, skipping cleanup',
-      stack: new Error(cacheDirEither.left.message),
+      stack: new Error(cacheDirResult.failure.message),
     });
     return;
   }
-  const cacheDir = cacheDirEither.right;
+  const cacheDir = cacheDirResult.success;
 
-  const filesEither = await Effect.runPromise(
-    Effect.either(readCacheDir(cacheDir)),
+  const filesResult = await Effect.runPromise(
+    Effect.result(readCacheDir(cacheDir)),
   );
-  if (filesEither._tag === 'Left') {
+  if (filesResult._tag === 'Failure') {
     logger.error({
       message: 'Failed to cleanup thumbnail cache',
-      stack: new Error(filesEither.left.message),
+      stack: new Error(filesResult.failure.message),
     });
     return;
   }
 
   const fileStats = await Promise.all(
-    filesEither.right.map((file) =>
+    filesResult.success.map((file) =>
       Effect.runPromise(statCacheFileForCleanup(path.join(cacheDir, file))),
     ),
   );
@@ -940,13 +940,13 @@ const getChangedFolder = async (
   skipStats: SkipStatistics,
 ): Promise<ChangedFolder | null> => {
   // hash-wasm でダイジェスト計算（エラー時はスキップ）
-  const digestEither = await Effect.runPromise(
-    Effect.either(computeFolderDigest(folderPath)),
+  const digestResult = await Effect.runPromise(
+    Effect.result(computeFolderDigest(folderPath)),
   );
 
-  if (digestEither._tag === 'Left') {
+  if (digestResult._tag === 'Failure') {
     // FOLDER_NOT_FOUND/PERMISSION_DENIED はログ済み、統計を記録してスキップ
-    match(digestEither.left.type)
+    match(digestResult.failure.type)
       .with('FOLDER_NOT_FOUND', () => {
         skipStats.digestErrors.folderNotFound++;
       })
@@ -957,7 +957,7 @@ const getChangedFolder = async (
     return null;
   }
 
-  const currentDigest = digestEither.right;
+  const currentDigest = digestResult.success;
 
   // ブランド型から生のstring値を取得して比較（オブジェクトキーアクセス用）
   const savedState = savedStates[folderPath as string];
@@ -977,8 +977,8 @@ const getChangedFolder = async (
   );
 
   // 変更があったフォルダのファイル一覧を取得（エラー時はスキップ）
-  const fileNamesEither = await Effect.runPromise(
-    Effect.either(
+  const fileNamesResult = await Effect.runPromise(
+    Effect.result(
       Effect.tryPromise({
         try: () => fsPromises.readdir(folderPath as string),
         catch: (error): { type: 'READDIR_ERROR'; code: string | undefined } => {
@@ -1011,9 +1011,9 @@ const getChangedFolder = async (
     ),
   );
 
-  if (fileNamesEither._tag === 'Left') {
+  if (fileNamesResult._tag === 'Failure') {
     // 統計を記録してスキップ
-    match(fileNamesEither.left.code)
+    match(fileNamesResult.failure.code)
       .with('ENOENT', () => {
         skipStats.readdirErrors.folderNotFound++;
       })
@@ -1031,7 +1031,7 @@ const getChangedFolder = async (
     return null;
   }
 
-  const fileNames = fileNamesEither.right;
+  const fileNames = fileNamesResult.success;
 
   logger.debug(
     `Folder changed: ${folderPath} (saved: ${savedState?.digest ?? 'none'}, current: ${currentDigest})`,
@@ -1079,8 +1079,8 @@ const filterNewFilesByMtime = async (
     }
 
     // ファイルのmtimeを取得
-    const statsEither = await Effect.runPromise(
-      Effect.either(
+    const statsResult = await Effect.runPromise(
+      Effect.result(
         Effect.tryPromise({
           try: () => fsPromises.stat(filePath),
           catch: (
@@ -1122,9 +1122,9 @@ const filterNewFilesByMtime = async (
       ),
     );
 
-    if (statsEither._tag === 'Left') {
+    if (statsResult._tag === 'Failure') {
       // エラー種別に応じて統計を更新
-      match(statsEither.left.type)
+      match(statsResult.failure.type)
         .with('FILE_NOT_FOUND', () => {
           statErrors.fileNotFound++;
         })
@@ -1136,7 +1136,7 @@ const filterNewFilesByMtime = async (
     }
 
     // mtime > lastScannedAt なら新規/更新ファイル
-    if (statsEither.right.mtime > lastScannedAt) {
+    if (statsResult.success.mtime > lastScannedAt) {
       newFiles.push(filePath);
     }
   }
@@ -1818,7 +1818,7 @@ export const getBatchThumbnails = async (
         success.set(photoPath, exit.value);
       } else {
         // 予期されたエラー（InputFileIsMissing）かdefect（予期しないエラー）かを判別
-        const failureOpt = Cause.failureOption(exit.cause);
+        const failureOpt = Cause.findErrorOption(exit.cause);
         if (Option.isSome(failureOpt)) {
           // 予期されたエラー: ファイルが見つからない
           failed.push({
@@ -1828,7 +1828,7 @@ export const getBatchThumbnails = async (
           });
         } else {
           // 予期しないエラー（画像処理内部エラー等）
-          const dieOpt = Cause.dieOption(exit.cause);
+          const dieOpt = Result.getSuccess(Cause.findDefect(exit.cause));
           const unexpectedError = (() => {
             if (!Option.isSome(dieOpt)) {
               return new Error('Unknown error');
