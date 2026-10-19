@@ -4,6 +4,7 @@ import path from 'node:path';
 import * as datefns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
 
+import { toError } from '../../../lib/errorMapping';
 import { logger } from '../../../lib/logger';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import * as fs from '../../../lib/wrappedFs';
@@ -223,11 +224,11 @@ export const appendLoglinesToFile = (props: {
           );
 
           const newLog = `${logs.join('\n')}\n`;
-          // writeFileSyncSafe returns Effect<void, WriteFileError>
-          // Unexpected errors should propagate as defects
+          // 書き込み失敗は予期しないエラーとして defect にする。WriteFileError は
+          // Error ではない値なので、メッセージとスタックが残るよう Error に変換する
           yield* fs
             .writeFileSyncSafe(newFilePath, newLog)
-            .pipe(Effect.catch((e) => Effect.die(e)));
+            .pipe(Effect.catch((e) => Effect.die(toError(e))));
           continue;
         }
       }
@@ -282,10 +283,10 @@ export const appendLoglinesToFile = (props: {
       const writeEffect = isExists
         ? fs
             .appendFileAsync(logStoreFilePath.value, newLog)
-            .pipe(Effect.catch((e) => Effect.die(e)))
+            .pipe(Effect.catch((e) => Effect.die(e.error)))
         : fs
             .writeFileSyncSafe(logStoreFilePath.value, newLog)
-            .pipe(Effect.catch((e) => Effect.die(e)));
+            .pipe(Effect.catch((e) => Effect.die(toError(e))));
       yield* writeEffect;
 
       // キャッシュを更新（書き込み成功後に新しい行を追加）

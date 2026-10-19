@@ -577,7 +577,8 @@ export function loadLogInfoIndexFromVRChatLog({
           logger.debug(`log batch inserted: ${batchNumber}/${totalBatches}`);
         }
       }, 'logInfo.batchInsert')
-      .pipe(Effect.orDie);
+      // DBQueueError は Error ではない値なので、defect にする前に Error に変換する
+      .pipe(Effect.catch((e) => Effect.die(toError(e))));
     const batchProcessEndTime = performance.now();
     logger.info(
       `done DB batch insert: ${(batchProcessEndTime - batchProcessStartTime).toFixed(0)} ms`,
