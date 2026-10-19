@@ -109,7 +109,7 @@ describe('syncRDBClient schema sync decision', () => {
     const { Migrations } = await import('./sequelize/migrations.model');
     const sequelize = client.getRDBClient().__client;
     await clearMigrations();
-    // 指紋を記録する前の版で作られた DB を再現する
+    // 指紋列を持たない Migrations テーブルを作る
     await sequelize.query(
       'ALTER TABLE `Migrations` DROP COLUMN `schemaFingerprint`',
     );

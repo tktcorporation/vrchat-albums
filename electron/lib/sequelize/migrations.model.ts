@@ -35,7 +35,7 @@ export class Migrations extends Model<
   /**
    * 同期時点のモデル定義から算出したスキーマ指紋（`computeSchemaFingerprint`）。
    * 起動時にこの値と現在のモデルの指紋を比べ、異なるときだけ `sync({ alter: true })` を実行する。
-   * 指紋を記録する前の DB の行は null を持ち、同期が必要と判定される。
+   * 値が null の行は、指紋が未記録として同期が必要と判定される。
    */
   @Attribute(DataTypes.STRING)
   declare schemaFingerprint: CreationOptional<string | null>;

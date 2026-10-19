@@ -191,9 +191,10 @@ const executeSyncRDB = async (options: { force: boolean }) => {
     return;
   }
 
-  migrationProgeress = true;
+  // フラグを立てる前に算出する。ここで例外が出てもフラグが立ったまま残らないようにするため
   const appVersion = settingService.getAppVersion();
   const schemaFingerprint = getCurrentSchemaFingerprint();
+  migrationProgeress = true;
   // effect-lint-allow-try-catch: finally でマイグレーション進行フラグをリセットするため必要
   try {
     // モデルごとに分割して sync を実行
@@ -275,7 +276,7 @@ export const checkMigrationRDBClient = async (): Promise<boolean> => {
 /**
  * 最後に成功した同期で記録したスキーマ指紋を返す。
  *
- * `Migrations` テーブルが無い DB と、指紋列を持たない DB（指紋を記録する前の版で作られた DB）は
+ * `Migrations` テーブルが無い DB と、`Migrations` に指紋列が無い DB は
  * null を返す。列の有無を先に確かめるのは、列が無いまま `Migrations.findOne` を発行すると
  * SELECT 句の `schemaFingerprint` が SQLite エラーになるため。
  */

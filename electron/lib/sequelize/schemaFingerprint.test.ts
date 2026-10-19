@@ -156,4 +156,21 @@ describe('computeSchemaFingerprint', () => {
       'CREATE UNIQUE INDEX `SampleNameIndex` ON `Samples` (`name`)',
     );
   });
+  it('名前の無いインデックスを含むモデルでも繰り返し同じ文字列を返し、モデルの定義を書き換えない', () => {
+    const sequelize = new Sequelize({
+      dialect: SqliteDialect,
+      storage: ':memory:',
+    });
+    const model = sequelize.define('Sample', baseAttributes, {
+      tableName: 'Samples',
+      indexes: [{ fields: ['name'] }],
+    });
+    const indexesBefore = structuredClone(model.getIndexes());
+
+    const first = describeModelSchemas([model]);
+    const second = describeModelSchemas([model]);
+
+    expect(second).toBe(first);
+    expect(model.getIndexes()).toStrictEqual(indexesBefore);
+  });
 });
