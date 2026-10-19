@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 import { match } from 'ts-pattern';
 
 import { logger } from '../../../lib/logger';
@@ -45,12 +45,12 @@ const extractFailure = <E>(exit: Exit.Exit<unknown, E>): E | null => {
   if (Exit.isSuccess(exit)) {
     return null;
   }
-  const failOpt = Cause.failureOption(exit.cause);
+  const failOpt = Cause.findErrorOption(exit.cause);
   if (Option.isSome(failOpt)) {
     return failOpt.value;
   }
   // Defect の場合はそのまま throw
-  const dieOpt = Cause.dieOption(exit.cause);
+  const dieOpt = Result.getSuccess(Cause.findDefect(exit.cause));
   if (Option.isSome(dieOpt)) {
     throw dieOpt.value;
   }

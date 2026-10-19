@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit } from 'effect';
+import { Cause, Effect, Exit, Semaphore } from 'effect';
 import { match } from 'ts-pattern';
 
 import { logger } from '../../lib/logger';
@@ -71,7 +71,7 @@ export const toInitSyncMode = (mode: LogSyncMode): InitLaunch['syncMode'] =>
  * withPermits は Effect の完了時（成功・失敗・中断のいずれでも）permit を必ず解放するため、
  * フラグの戻し忘れやエラー経路での取りこぼしによるデッドロックが構造的に起きない。
  */
-const syncMutex = Effect.runSync(Effect.makeSemaphore(1));
+const syncMutex = Effect.runSync(Semaphore.make(1));
 
 /**
  * syncMutex の permit を持っていることを示す値。runWithLogSyncLock だけが作れるので、

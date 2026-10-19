@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 import z from 'zod';
 
 import { logger } from './../../lib/logger';
@@ -91,7 +91,7 @@ export const vrchatPhotoRouter = () =>
         }),
       );
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         if (Option.isSome(failOpt)) {
           return {
             data: null,
@@ -99,7 +99,7 @@ export const vrchatPhotoRouter = () =>
           };
         }
         // Defect: re-throw
-        const dieOpt = Cause.dieOption(exit.cause);
+        const dieOpt = Result.getSuccess(Cause.findDefect(exit.cause));
         if (Option.isSome(dieOpt)) {
           throw dieOpt.value;
         }

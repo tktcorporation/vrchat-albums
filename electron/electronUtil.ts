@@ -1,7 +1,7 @@
 // Native
 import { join } from 'node:path';
 
-import { Effect, Either } from 'effect';
+import { Effect, Result } from 'effect';
 // Packages
 import {
   app,
@@ -369,11 +369,11 @@ function createWindow(): BrowserWindow {
   };
 
   const displayMetricsChangedWrapper = () => {
-    const either = Effect.runSync(
-      Effect.either(displayMetricsChangedHandler()),
+    const handlerResult = Effect.runSync(
+      Effect.result(displayMetricsChangedHandler()),
     );
-    if (either._tag === 'Left') {
-      const error = either.left;
+    if (handlerResult._tag === 'Failure') {
+      const error = handlerResult.failure;
       match(error.code)
         .with('WINDOW_DESTROYED', () => {
           // ウィンドウが破棄されている場合はログ出力しない（正常な状態）
@@ -463,16 +463,16 @@ const setTray = () => {
     // アイコンパスの存在確認。トレイはアプリ本体の動作に必須ではないため、
     // 確認に失敗しても起動は止めずトレイ作成だけを諦める（原因はログで区別する）
     const iconExists = await Effect.runPromise(
-      Effect.either(pathExistsAsync(iconPath)),
+      Effect.result(pathExistsAsync(iconPath)),
     );
-    if (Either.isLeft(iconExists)) {
+    if (Result.isFailure(iconExists)) {
       logger.error({
         message: `トレイアイコンにアクセスできません: ${iconPath}`,
-        stack: iconExists.left,
+        stack: iconExists.failure,
       });
       return;
     }
-    if (!iconExists.right) {
+    if (!iconExists.success) {
       logger.error({ message: `トレイアイコンが見つかりません: ${iconPath}` });
       return;
     }

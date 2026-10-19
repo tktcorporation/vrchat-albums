@@ -50,7 +50,7 @@ describe('playerActionParser', () => {
       const exit = Effect.runSyncExit(extractPlayerJoinInfoFromLog(logLine));
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value).toBe('LOG_FORMAT_MISMATCH');
@@ -67,7 +67,7 @@ describe('playerActionParser', () => {
       const exit = Effect.runSyncExit(extractPlayerJoinInfoFromLog(logLine));
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value).toBe('DATE_PARSE_ERROR');
@@ -115,7 +115,7 @@ describe('playerActionParser', () => {
       const exit = Effect.runSyncExit(extractPlayerLeaveInfoFromLog(logLine));
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value).toBe('LOG_FORMAT_MISMATCH');
@@ -131,7 +131,7 @@ describe('playerActionParser', () => {
       const exit = Effect.runSyncExit(extractPlayerLeaveInfoFromLog(logLine));
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value).toBe('DATE_PARSE_ERROR');

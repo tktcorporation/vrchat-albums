@@ -47,7 +47,7 @@ export const handleMessage = async (
     return;
   }
 
-  const failure = Cause.failureOption(exit.cause);
+  const failure = Cause.findErrorOption(exit.cause);
   if (Option.isSome(failure)) {
     postMessage({
       ok: false,

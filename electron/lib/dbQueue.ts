@@ -210,7 +210,7 @@ class DBQueue {
       taskLabel,
     };
 
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       if (this.totalTasks >= this.options.maxSize) {
         if (this.options.onFull === 'throw') {
           return yield* Effect.fail({

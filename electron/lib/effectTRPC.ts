@@ -4,16 +4,17 @@
  * Effect<T, UserFacingError> を tRPC procedure 内で実行し、
  * E チャネルのエラーを TRPCError に変換する唯一の実行境界。
  *
- * 背景: Effect の E チャネルで型安全にエラーを伝播し、
- * tRPC 境界でのみ TRPCError に変換することで、
- * FiberFailure 問題（Effect.runPromise が E チャネルのエラーを
- * FiberFailure に包み、findUserFacingError が発見できない）を解決する。
+ * 背景: Effect の E チャネルで型安全にエラーを伝播し、TRPCError への変換は
+ * tRPC 境界のこの関数だけが担う。変換箇所を 1 つに絞ることで、
+ * E チャネルのエラー（BAD_REQUEST + UserFacingError を cause に格納）・
+ * Defect（そのまま re-throw）・Interrupt の扱いが procedure ごとにばらつかず、
+ * 引数の型制約によって UserFacingError への変換漏れをコンパイル時に検出できる。
  *
  * @see docs/superpowers/specs/2026-03-22-effect-native-error-handling-design.md
  */
 
 import { TRPCError } from '@trpc/server';
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 
 import type { UserFacingError } from './errors';
 
@@ -31,8 +32,8 @@ import type { UserFacingError } from './errors';
  * - Defect（予期しないエラー）→ そのまま re-throw（Sentry 送信）
  * - Interrupt → 汎用エラーを throw
  *
- * Cause が Sequential/Parallel の場合（Effect.all 等で複数エラーが
- * 並列発生した場合）、最初のエラーのみ処理する。
+ * Effect.all 等で複数のエラーが同時に発生し、Cause が複数の失敗を持つ場合は、
+ * 最初のエラーのみ処理する。
  */
 export async function runEffect<T>(
   effect: Effect.Effect<T, UserFacingError>,
@@ -44,7 +45,7 @@ export async function runEffect<T>(
   }
 
   // E チャネルの UserFacingError → TRPCError.cause に格納
-  const failOpt = Cause.failureOption(exit.cause);
+  const failOpt = Cause.findErrorOption(exit.cause);
   if (Option.isSome(failOpt)) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -54,7 +55,7 @@ export async function runEffect<T>(
   }
 
   // Defect（予期しないエラー）→ そのまま re-throw して Sentry で捕捉
-  const dieOpt = Cause.dieOption(exit.cause);
+  const dieOpt = Result.getSuccess(Cause.findDefect(exit.cause));
   if (Option.isSome(dieOpt)) {
     throw dieOpt.value;
   }
@@ -68,8 +69,8 @@ export async function runEffect<T>(
  * 背景: runEffect は E チャネルのエラーを TRPCError に変換するが、
  * コントローラー層ではエラー型を検査してから分岐したい場合がある
  * （例: エラー種別により null を返すか UserFacingError を投げるか決める）。
- * その場合に Exit/Cause/failureOption/dieOption のボイラープレートを
- * 毎回手書きするのはエラーハンドリング漏れ（dieOption や interrupt の忘れ）のリスクがある。
+ * その場合に Exit/Cause/findErrorOption/findDefect のボイラープレートを
+ * 毎回手書きするのはエラーハンドリング漏れ（findDefect や interrupt の忘れ）のリスクがある。
  *
  * この関数は Defect と Interrupt を自動的に処理し、
  * 呼び出し側は成功値と型付きエラーのみを扱えばよい。
@@ -87,13 +88,13 @@ export async function runEffectExit<T, E>(
     return { success: true, value: exit.value };
   }
 
-  const failOpt = Cause.failureOption(exit.cause);
+  const failOpt = Cause.findErrorOption(exit.cause);
   if (Option.isSome(failOpt)) {
     return { success: false, error: failOpt.value };
   }
 
   // Defect（予期しないエラー）→ そのまま re-throw して Sentry で捕捉
-  const dieOpt = Cause.dieOption(exit.cause);
+  const dieOpt = Result.getSuccess(Cause.findDefect(exit.cause));
   if (Option.isSome(dieOpt)) {
     throw dieOpt.value;
   }

@@ -7,6 +7,7 @@ import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
 import { getDBQueue } from '../../lib/dbQueue';
+import { toError } from '../../lib/errorMapping';
 import { logger } from '../../lib/logger';
 import type { InitProgressRun } from '../initProgress/emitter';
 import type { InitProgressDetails } from '../initProgress/schema';
@@ -167,7 +168,12 @@ function _getLogStoreFilePathsImpl(
           latestPlayerJoinDateResult,
           latestPlayerLeaveDate,
         ] = await Promise.all([
-          Effect.runPromise(worldJoinLogService.findLatestWorldJoinLog()),
+          // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
+          Effect.runPromise(
+            worldJoinLogService
+              .findLatestWorldJoinLog()
+              .pipe(Effect.mapError(toError)),
+          ),
           Effect.runPromise(playerJoinLogService.findLatestPlayerJoinLog()),
           playerLeaveLogService.findLatestPlayerLeaveLog(),
         ]);
@@ -431,7 +437,12 @@ export function loadLogInfoIndexFromVRChatLog({
             latestPlayerJoinDate,
             latestPlayerLeaveDate,
           ] = await Promise.all([
-            Effect.runPromise(worldJoinLogService.findLatestWorldJoinLog()),
+            // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
+            Effect.runPromise(
+              worldJoinLogService
+                .findLatestWorldJoinLog()
+                .pipe(Effect.mapError(toError)),
+            ),
             Effect.runPromise(playerJoinLogService.findLatestPlayerJoinLog()),
             playerLeaveLogService.findLatestPlayerLeaveLog(),
           ]);
@@ -535,11 +546,11 @@ export function loadLogInfoIndexFromVRChatLog({
             (log): log is VRChatPlayerLeaveLog => log.logType === 'playerLeave',
           );
 
+          // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
           const worldJoinResults = await Effect.runPromise(
-            worldJoinLogService.createVRChatWorldJoinLogModel(
-              worldJoinLogBatch,
-              { transaction },
-            ),
+            worldJoinLogService
+              .createVRChatWorldJoinLogModel(worldJoinLogBatch, { transaction })
+              .pipe(Effect.mapError(toError)),
           );
           const playerJoinResults = await Effect.runPromise(
             playerJoinLogService.createVRChatPlayerJoinLogModel(
@@ -566,7 +577,8 @@ export function loadLogInfoIndexFromVRChatLog({
           logger.debug(`log batch inserted: ${batchNumber}/${totalBatches}`);
         }
       }, 'logInfo.batchInsert')
-      .pipe(Effect.orDie);
+      // DBQueueError は Error ではない値なので、defect にする前に Error に変換する
+      .pipe(Effect.catch((e) => Effect.die(toError(e))));
     const batchProcessEndTime = performance.now();
     logger.info(
       `done DB batch insert: ${(batchProcessEndTime - batchProcessStartTime).toFixed(0)} ms`,
@@ -612,22 +624,22 @@ export function loadLogInfoIndexFromVRChatLog({
         );
       };
       reportMetadataProgress(0, photoPaths.length);
-      const metadataResult = yield* Effect.either(
+      const metadataResult = yield* Effect.result(
         metadataService.extractAndSaveMetadataBatch(photoPaths, {
           onProgress: reportMetadataProgress,
         }),
       );
       // DB エラーで途中終了した場合も、このステージの処理は終わっているので完了にする
       reportMetadataProgress(photoPaths.length, photoPaths.length);
-      if (metadataResult._tag === 'Right') {
+      if (metadataResult._tag === 'Success') {
         logger.info(
-          `Photo metadata extracted: ${metadataResult.right} new records`,
+          `Photo metadata extracted: ${metadataResult.success} new records`,
         );
       } else {
         // MetadataDbError は予期しないエラーなので error レベル（Sentry送信）
         logger.error({
-          message: `Photo metadata DB error: ${metadataResult.left.message}`,
-          stack: metadataResult.left,
+          message: `Photo metadata DB error: ${metadataResult.failure.message}`,
+          stack: metadataResult.failure,
         });
       }
       const metadataEndTime = performance.now();

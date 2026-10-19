@@ -2,7 +2,7 @@ import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
-import { Cause, Effect, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { LogRecord } from '../converters/dbToLogStore';
@@ -126,7 +126,7 @@ describe('backupService', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const dieOpt = Cause.dieOption(exit.cause);
+        const dieOpt = Result.getSuccess(Cause.findDefect(exit.cause));
         expect(Option.isSome(dieOpt)).toBe(true);
         if (Option.isSome(dieOpt)) {
           expect(dieOpt.value).toBeInstanceOf(Error);
@@ -185,7 +185,7 @@ describe('backupService', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value._tag).toBe('BackupHistoryReadFailed');
@@ -340,7 +340,7 @@ describe('backupService', () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const failOpt = Cause.failureOption(exit.cause);
+        const failOpt = Cause.findErrorOption(exit.cause);
         expect(Option.isSome(failOpt)).toBe(true);
         if (Option.isSome(failOpt)) {
           expect(failOpt.value._tag).toBe('BackupNotFound');

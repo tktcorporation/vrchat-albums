@@ -252,17 +252,17 @@ describe('generateMissingWorldJoinImages', () => {
       Effect.succeed(Buffer.from('fake-jpeg')),
     );
     // mkdir で TypeError が発生 → 予期しないエラーなので re-throw されるべき
-    vi.mocked(fsPromises.mkdir).mockRejectedValue(
-      new TypeError('Cannot read properties of undefined'),
+    const unexpectedError = new TypeError(
+      'Cannot read properties of undefined',
     );
+    vi.mocked(fsPromises.mkdir).mockRejectedValue(unexpectedError);
 
-    // Effect.runPromise は予期しないエラー（die）を FiberFailure でラップするため、
-    // エラーメッセージでマッチする
+    // Effect.runPromise は予期しないエラー（die）をラップせず、元のエラーのまま reject する
     await expect(
       Effect.runPromise(
         generateMissingWorldJoinImages({ photoDirPath: '/photos' }),
       ),
-    ).rejects.toThrow('Cannot read properties of undefined');
+    ).rejects.toBe(unexpectedError);
   });
 
   it('should skip when already generating (mutex)', async () => {

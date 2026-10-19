@@ -1,5 +1,5 @@
 import { captureException, captureMessage } from '@sentry/electron/main';
-import { Effect, Either } from 'effect';
+import { Effect, Result } from 'effect';
 import * as log from 'electron-log';
 import path from 'pathe';
 import { stackWithCauses } from 'pony-cause';
@@ -81,12 +81,12 @@ const debug: typeof log.debug = log.debug.bind(log);
 const warn: typeof log.warn = log.warn.bind(log);
 
 /**
- * 同期的に try-catch を Either で返すヘルパー。
- * logger 内で Result.fromThrowable の代替として使用。
+ * 同期処理が投げた例外を Result の失敗として返すヘルパー。
+ * logger は Sentry 送信の失敗でログ出力自体を止めないよう、例外を値として扱う。
  */
-const trySyncEither = <A>(fn: () => A): Either.Either<A, unknown> => {
+const trySyncResult = <A>(fn: () => A): Result.Result<A, unknown> => {
   return Effect.runSync(
-    Effect.either(Effect.try({ try: fn, catch: (e) => e })),
+    Effect.result(Effect.try({ try: fn, catch: (e) => e })),
   );
 };
 
@@ -112,13 +112,13 @@ const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
   );
 
   // 規約同意済みかどうかを確認
-  const termsResult = trySyncEither(() => {
+  const termsResult = trySyncResult(() => {
     const settingStore = getSettingStore();
     return settingStore.getTermsAccepted();
   });
-  const termsAccepted = Either.match(termsResult, {
-    onRight: (accepted) => accepted,
-    onLeft: (termsError) => {
+  const termsAccepted = Result.match(termsResult, {
+    onSuccess: (accepted) => accepted,
+    onFailure: (termsError) => {
       log.warn('Failed to get terms accepted:', termsError);
       return false;
     },
@@ -127,7 +127,7 @@ const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
   match(termsAccepted)
     .with(true, () => {
       log.debug('Attempting to send warning to Sentry...');
-      const sendResult = trySyncEither(() => {
+      const sendResult = trySyncResult(() => {
         captureMessage(messageString, {
           level: 'warning',
           extra: {
@@ -139,9 +139,9 @@ const warnWithSentry = ({ message, stack, details }: ErrorLogParams): void => {
           },
         });
       });
-      Either.match(sendResult, {
-        onRight: () => log.debug('Warning sent to Sentry successfully'),
-        onLeft: (sentryError) =>
+      Result.match(sendResult, {
+        onSuccess: () => log.debug('Warning sent to Sentry successfully'),
+        onFailure: (sentryError) =>
           log.debug('Failed to send warning to Sentry:', sentryError),
       });
     })
@@ -166,13 +166,13 @@ const error = ({ message, stack, details, tags }: ErrorLogParams): void => {
   );
 
   // 規約同意済みかどうかを確認
-  const termsResult = trySyncEither(() => {
+  const termsResult = trySyncResult(() => {
     const settingStore = getSettingStore();
     return settingStore.getTermsAccepted();
   });
-  const termsAccepted = Either.match(termsResult, {
-    onRight: (accepted) => accepted,
-    onLeft: (termsError) => {
+  const termsAccepted = Result.match(termsResult, {
+    onSuccess: (accepted) => accepted,
+    onFailure: (termsError) => {
       log.warn('Failed to get terms accepted:', termsError);
       return false;
     },
@@ -199,7 +199,7 @@ const error = ({ message, stack, details, tags }: ErrorLogParams): void => {
       log.debug('Attempting to send error to Sentry...');
       // UserFacingErrorの場合はcauseを送信、それ以外は元のエラーを送信
       const errorToSend = causeError ?? errorInfo;
-      const sendResult = trySyncEither(() => {
+      const sendResult = trySyncResult(() => {
         captureException(errorToSend, {
           extra: {
             ...(stack ? { stack: stackWithCauses(stack) } : {}),
@@ -220,12 +220,12 @@ const error = ({ message, stack, details, tags }: ErrorLogParams): void => {
           },
         });
       });
-      Either.match(sendResult, {
-        onRight: () =>
+      Result.match(sendResult, {
+        onSuccess: () =>
           log.debug(
             `Error sent to Sentry successfully${causeError ? ' (cause from UserFacingError)' : ''}`,
           ),
-        onLeft: (sentryError) =>
+        onFailure: (sentryError) =>
           log.debug('Failed to send error to Sentry:', sentryError),
       });
     })

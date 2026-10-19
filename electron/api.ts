@@ -173,7 +173,7 @@ export const router = trpcRouter({
   setVRChatLogFilesDirByDialog: procedure.mutation(async () => {
     await runEffect(
       service.setVRChatLogFilesDirByDialog().pipe(
-        Effect.catchAll((e) => {
+        Effect.catch((e) => {
           if (e === 'canceled') {
             // キャンセルは silent（ユーザーの意図的な操作）
             return Effect.void;

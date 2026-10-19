@@ -165,7 +165,7 @@ export const getLogLinesByLogFilePathList = (props: {
             );
             if (exit._tag === 'Failure') {
               // Cause, Option already imported at top level
-              const failOpt = Cause.failureOption(exit.cause);
+              const failOpt = Cause.findErrorOption(exit.cause);
               if (Option.isSome(failOpt)) {
                 errors.push(failOpt.value);
               }
@@ -251,7 +251,7 @@ export const getLogLinesByLogFilePathListWithPartialSuccess = async (props: {
         );
         if (exit._tag === 'Failure') {
           // Cause, Option already imported at top level
-          const failOpt = Cause.failureOption(exit.cause);
+          const failOpt = Cause.findErrorOption(exit.cause);
           if (Option.isSome(failOpt)) {
             errors.push({ path: logFilePath.value, error: failOpt.value });
           }
@@ -355,7 +355,7 @@ export async function* getLogLinesByLogFilePathListStreaming(props: {
         );
         if (exit._tag === 'Failure') {
           // Cause, Option already imported at top level
-          const failOpt = Cause.failureOption(exit.cause);
+          const failOpt = Cause.findErrorOption(exit.cause);
           if (Option.isSome(failOpt)) {
             throw failOpt.value;
           }

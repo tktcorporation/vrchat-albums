@@ -111,9 +111,9 @@ export const runInWorker = (
   workerScriptPath: string = resolveWorkerScriptPath(),
   timeoutMillis: number = WORKER_RESPONSE_TIMEOUT_MILLIS,
 ): Effect.Effect<Buffer, WorkerFailure> =>
-  Effect.async<Buffer, WorkerFailure>((resume) => {
+  Effect.callback<Buffer, WorkerFailure>((resume) => {
     // new Worker() が同期的に throw した場合（不正なパス・リソース枯渇等）は
-    // Effect.async がそれを自動的に defect (予期しないエラー) として捕捉するため、
+    // Effect.callback がそれを自動的に defect (予期しないエラー) として捕捉するため、
     // ここではラップしない (ADR-002: 予期しないエラーは再スロー/Sentry送信)
     const worker = new Worker(workerScriptPath, {
       workerData: { kind: RENDER_WORKER_KIND },
@@ -183,11 +183,13 @@ export const runInWorker = (
 
     return Effect.sync(cleanup);
   }).pipe(
-    Effect.timeoutFail({
+    Effect.timeoutOrElse({
       duration: `${timeoutMillis} millis`,
-      onTimeout: () =>
-        reportWorkerAnomaly(
-          `renderWorker が ${timeoutMillis}ms 以内に応答しませんでした`,
+      orElse: () =>
+        Effect.fail(
+          reportWorkerAnomaly(
+            `renderWorker が ${timeoutMillis}ms 以内に応答しませんでした`,
+          ),
         ),
     }),
   );

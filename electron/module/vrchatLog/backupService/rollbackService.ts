@@ -4,7 +4,7 @@ import * as path from 'node:path';
 
 type NodeDirent = Dirent;
 
-import { Cause, Effect, Option } from 'effect';
+import { Cause, Effect, Option, Result } from 'effect';
 import { match } from 'ts-pattern';
 
 import { getDBQueue } from '../../../lib/dbQueue';
@@ -94,7 +94,7 @@ export class RollbackService {
   rollbackToBackup(
     backup: ImportBackupMetadata,
   ): Effect.Effect<void, RollbackServiceError> {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       logger.info(`Starting rollback to backup: ${backup.id}`);
 
       const dbQueue = getDBQueue();
@@ -118,12 +118,14 @@ export class RollbackService {
             this.validateBackupData(backupPath),
           );
           if (validationExit._tag === 'Failure') {
-            const failOpt = Cause.failureOption(validationExit.cause);
+            const failOpt = Cause.findErrorOption(validationExit.cause);
             if (Option.isSome(failOpt)) {
               return { _tag: 'err' as const, error: failOpt.value };
             }
             // Defect - rethrow
-            const dieOpt = Cause.dieOption(validationExit.cause);
+            const dieOpt = Result.getSuccess(
+              Cause.findDefect(validationExit.cause),
+            );
             if (Option.isSome(dieOpt)) {
               throw dieOpt.value;
             }
@@ -139,11 +141,13 @@ export class RollbackService {
             this.restoreLogStoreFromBackup(backupPath),
           );
           if (restoreExit._tag === 'Failure') {
-            const failOpt = Cause.failureOption(restoreExit.cause);
+            const failOpt = Cause.findErrorOption(restoreExit.cause);
             if (Option.isSome(failOpt)) {
               return { _tag: 'err' as const, error: failOpt.value };
             }
-            const dieOpt = Cause.dieOption(restoreExit.cause);
+            const dieOpt = Result.getSuccess(
+              Cause.findDefect(restoreExit.cause),
+            );
             if (Option.isSome(dieOpt)) {
               throw dieOpt.value;
             }
@@ -155,11 +159,13 @@ export class RollbackService {
             this.rebuildDatabaseFromLogStore(),
           );
           if (rebuildExit._tag === 'Failure') {
-            const failOpt = Cause.failureOption(rebuildExit.cause);
+            const failOpt = Cause.findErrorOption(rebuildExit.cause);
             if (Option.isSome(failOpt)) {
               return { _tag: 'err' as const, error: failOpt.value };
             }
-            const dieOpt = Cause.dieOption(rebuildExit.cause);
+            const dieOpt = Result.getSuccess(
+              Cause.findDefect(rebuildExit.cause),
+            );
             if (Option.isSome(dieOpt)) {
               throw dieOpt.value;
             }
@@ -172,7 +178,7 @@ export class RollbackService {
             backupService.updateBackupMetadata(backup),
           );
           if (updateExit._tag === 'Failure') {
-            const failOpt = Cause.failureOption(updateExit.cause);
+            const failOpt = Cause.findErrorOption(updateExit.cause);
             if (Option.isSome(failOpt)) {
               logger.warnWithSentry({
                 message: `Failed to update backup metadata after rollback: ${getBackupErrorMessage(failOpt.value)}`,
@@ -216,7 +222,7 @@ export class RollbackService {
   private validateBackupData(
     backupPath: string,
   ): Effect.Effect<void, RollbackServiceError> {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       // バックアップディレクトリの存在確認
       const backupExists = yield* Effect.tryPromise({
         try: () => existsAsync(backupPath),
@@ -316,7 +322,7 @@ export class RollbackService {
   private restoreLogStoreFromBackup(
     backupPath: string,
   ): Effect.Effect<void, RollbackServiceError> {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       const currentLogStoreDir = getLogStoreDir();
 
       // バックアップ内の月別フォルダを現在のlogStoreに復帰

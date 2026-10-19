@@ -1,7 +1,7 @@
 import * as nodeFsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { Cause, Effect, Either, Exit, Option } from 'effect';
+import { Cause, Effect, Exit, Option, Result } from 'effect';
 
 import { logger } from '../../lib/logger';
 import { pathExistsAsync } from '../../lib/pathExists';
@@ -164,17 +164,17 @@ const getOldAppUserDataPath = (): Effect.Effect<string> => {
           for (const appName of possibleOldAppNames) {
             const possiblePath = path.join(parentDir, appName);
             const existsResult = await Effect.runPromise(
-              Effect.either(pathExistsAsync(possiblePath)),
+              Effect.result(pathExistsAsync(possiblePath)),
             );
-            if (Either.isLeft(existsResult)) {
+            if (Result.isFailure(existsResult)) {
               // 候補が使えないだけで移行全体は止めない。存在しない場合と区別してログに残す
               logger.error({
                 message: `Failed to check old app directory: ${possiblePath}`,
-                stack: existsResult.left,
+                stack: existsResult.failure,
               });
               continue;
             }
-            if (existsResult.right) {
+            if (existsResult.success) {
               return possiblePath;
             }
           }
@@ -215,7 +215,7 @@ export const performMigrationIfNeeded = (): Effect.Effect<void> => {
         Effect.asVoid,
       );
     }),
-    Effect.catchAllDefect((defect) => {
+    Effect.catchDefect((defect) => {
       logger.error({
         message: 'Error during migration check',
         stack: defect instanceof Error ? defect : new Error(String(defect)),
@@ -269,17 +269,17 @@ export const performMigration = (): Effect.Effect<MigrationResult> => {
 
       // Check if logStore directory exists, then migrate
       const logStoreExists = await Effect.runPromise(
-        Effect.either(pathExistsAsync(oldLogStorePath)),
+        Effect.result(pathExistsAsync(oldLogStorePath)),
       );
-      if (Either.isLeft(logStoreExists)) {
+      if (Result.isFailure(logStoreExists)) {
         logger.error({
           message: `Failed to check logStore directory: ${oldLogStorePath}`,
-          stack: logStoreExists.left,
+          stack: logStoreExists.failure,
         });
         result.errors.push(
-          `LogStore access failed: ${logStoreExists.left.message}`,
+          `LogStore access failed: ${logStoreExists.failure.message}`,
         );
-      } else if (!logStoreExists.right) {
+      } else if (!logStoreExists.success) {
         logger.warn(`LogStore migration skipped: not found ${oldLogStorePath}`);
       } else {
         const { importService } =
@@ -294,13 +294,15 @@ export const performMigration = (): Effect.Effect<MigrationResult> => {
           result.details.logStore = true;
           logger.info('LogStore migrated successfully');
         } else {
-          const failOpt = Cause.failureOption(importExit.cause);
+          const failOpt = Cause.findErrorOption(importExit.cause);
           if (Option.isSome(failOpt)) {
             const importError = failOpt.value;
             result.errors.push(`LogStore import failed: ${importError._tag}`);
           } else {
             // Unexpected error (defect)
-            const dieOpt = Cause.dieOption(importExit.cause);
+            const dieOpt = Result.getSuccess(
+              Cause.findDefect(importExit.cause),
+            );
             const errorMsg = (() => {
               if (!Option.isSome(dieOpt)) {
                 return 'Unknown error';
@@ -318,7 +320,7 @@ export const performMigration = (): Effect.Effect<MigrationResult> => {
       // logStore の存在確認自体が失敗した場合はマーカーを書かず、次回に再試行させる。
       // 再実行しても config.json の再コピーは旧アプリの同じファイルで上書きするだけで、
       // アプリの設定は v0-settings.json 側にあるため現在の設定を失わない
-      const logStoreAccessFailed = Either.isLeft(logStoreExists);
+      const logStoreAccessFailed = Result.isFailure(logStoreExists);
       if (
         !logStoreAccessFailed &&
         (result.details.settings ||

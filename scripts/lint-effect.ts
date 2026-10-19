@@ -101,8 +101,10 @@ function checkServiceReturnsEffect(filePath: string, content: string) {
 /**
  * Effect.fail(UserFacingError.withStructuredInfo(...)) パターンの検出
  *
- * 背景: Effect.fail で UserFacingError を E チャネルに入れると、
- * Effect.runPromise が FiberFailure に包んで tRPC の findUserFacingError が発見できない。
+ * 背景: E チャネルのエラーを TRPCError に変換する実行境界は runEffect だけに置く。
+ * UserFacingError はその境界でのみ作り、サービス層の E チャネルはドメインエラーの型で
+ * 伝播させる。runEffect の外で Effect.fail(UserFacingError) すると、ドメインエラーの
+ * 型情報が失われ、境界での網羅的な変換（型制約による変換漏れ検出）を素通りする。
  * コントローラー層では Effect.mapError で UserFacingError に変換し、runEffect に渡すべき。
  *
  * 検出方法: Effect.fail( の後、閉じ括弧までの範囲内に UserFacingError が含まれるかをチェック。
@@ -170,7 +172,7 @@ function checkNoEffectFailUserFacingError(filePath: string, content: string) {
           filePath,
           i + 1,
           'no-effect-fail-userfacingerror',
-          'Effect.fail(UserFacingError) は FiberFailure 問題を引き起こします。Effect.mapError で変換し runEffect に渡してください。',
+          'UserFacingError は runEffect に渡す境界でのみ作ってください。ドメインエラーのまま伝播させ、Effect.mapError で UserFacingError に変換して runEffect に渡してください。',
         );
         inEffectFail = false;
         continue;
@@ -198,7 +200,7 @@ function checkNoEffectFailUserFacingError(filePath: string, content: string) {
           filePath,
           effectFailStartLine + 1,
           'no-effect-fail-userfacingerror',
-          'Effect.fail(UserFacingError) は FiberFailure 問題を引き起こします。Effect.mapError で変換し runEffect に渡してください。',
+          'UserFacingError は runEffect に渡す境界でのみ作ってください。ドメインエラーのまま伝播させ、Effect.mapError で UserFacingError に変換して runEffect に渡してください。',
         );
         inEffectFail = false;
         continue;

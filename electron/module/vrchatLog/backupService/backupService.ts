@@ -92,7 +92,7 @@ export class BackupService {
   createPreImportBackup(
     getDBLogs: DBLogProvider,
   ): Effect.Effect<ImportBackupMetadata, BackupServiceError> {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       const backupTimestamp = new Date();
 
       logger.info('Creating pre-import backup using export functionality');
@@ -188,7 +188,7 @@ export class BackupService {
     ImportBackupMetadata[],
     BackupServiceError
   > {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       const backupBasePath = this.getBackupBasePath();
 
       // バックアップディレクトリが存在しない場合は空配列を返す
@@ -234,11 +234,11 @@ export class BackupService {
         const readExit = yield* Effect.tryPromise({
           try: () => fs.readFile(metadataPath, 'utf8'),
           catch: (e) => e,
-        }).pipe(Effect.either);
+        }).pipe(Effect.result);
 
-        if (readExit._tag === 'Left') {
+        if (readExit._tag === 'Failure') {
           logger.warn(
-            `Failed to read backup metadata for ${folderName}: ${String(readExit.left)}`,
+            `Failed to read backup metadata for ${folderName}: ${String(readExit.failure)}`,
           );
           continue;
         }
@@ -246,28 +246,30 @@ export class BackupService {
         // JSON パースと Date 変換の失敗は個別にスキップ（corrupt ファイルで全体を壊さない）
         const parseExit = yield* Effect.try({
           try: () => {
-            const metadata = JSON.parse(readExit.right) as ImportBackupMetadata;
+            const metadata = JSON.parse(
+              readExit.success,
+            ) as ImportBackupMetadata;
             metadata.backupTimestamp = new Date(metadata.backupTimestamp);
             metadata.importTimestamp = new Date(metadata.importTimestamp);
             return metadata;
           },
           catch: (e) => e,
-        }).pipe(Effect.either);
+        }).pipe(Effect.result);
 
-        if (parseExit._tag === 'Left') {
+        if (parseExit._tag === 'Failure') {
           // corrupt メタデータは Sentry に送信して検知可能にする
           logger.error({
             message: `Failed to parse backup metadata for ${folderName}`,
             stack:
-              parseExit.left instanceof Error
-                ? parseExit.left
-                : new Error(String(parseExit.left)),
+              parseExit.failure instanceof Error
+                ? parseExit.failure
+                : new Error(String(parseExit.failure)),
             details: { folderName, metadataPath },
           });
           continue;
         }
 
-        backups.push(parseExit.right);
+        backups.push(parseExit.success);
       }
 
       // 作成日時で降順ソート（新しいものが先頭）
@@ -285,7 +287,7 @@ export class BackupService {
   getBackup(
     backupId: string,
   ): Effect.Effect<ImportBackupMetadata, BackupServiceError> {
-    return Effect.gen(this, function* () {
+    return Effect.gen({ self: this }, function* () {
       const history = yield* this.getBackupHistory();
 
       const backup = history.find((b) => b.id === backupId);

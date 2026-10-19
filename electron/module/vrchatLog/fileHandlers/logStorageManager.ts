@@ -4,6 +4,7 @@ import path from 'node:path';
 import * as datefns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
 
+import { toError } from '../../../lib/errorMapping';
 import { logger } from '../../../lib/logger';
 import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import * as fs from '../../../lib/wrappedFs';
@@ -118,7 +119,7 @@ export const getLogStoreFilePathsInRange = async (
         }
       } else {
         // ディレクトリ読み取り失敗は警告のみで継続
-        const failOpt = Cause.failureOption(readdirExit.cause);
+        const failOpt = Cause.findErrorOption(readdirExit.cause);
         if (Option.isSome(failOpt)) {
           const error = failOpt.value;
           logger.warn(
@@ -223,11 +224,11 @@ export const appendLoglinesToFile = (props: {
           );
 
           const newLog = `${logs.join('\n')}\n`;
-          // writeFileSyncSafe returns Effect<void, WriteFileError>
-          // Unexpected errors should propagate as defects
+          // 書き込み失敗は予期しないエラーとして defect にする。WriteFileError は
+          // Error ではない値なので、メッセージとスタックが残るよう Error に変換する
           yield* fs
             .writeFileSyncSafe(newFilePath, newLog)
-            .pipe(Effect.catchAll((e) => Effect.die(e)));
+            .pipe(Effect.catch((e) => Effect.die(toError(e))));
           continue;
         }
       }
@@ -247,9 +248,9 @@ export const appendLoglinesToFile = (props: {
           // readFileSyncSafe returns Effect<Buffer, ReadFileError>
           const readExit = yield* fs
             .readFileSyncSafe(logStoreFilePath.value)
-            .pipe(Effect.either);
-          if (readExit._tag === 'Right') {
-            const content = readExit.right.toString();
+            .pipe(Effect.result);
+          if (readExit._tag === 'Success') {
+            const content = readExit.success.toString();
             for (const line of content.split('\n')) {
               if (line) {
                 existingLines.add(line);
@@ -278,14 +279,14 @@ export const appendLoglinesToFile = (props: {
 
       // ファイルが存在しない場合は新規作成、存在する場合は追記
       // unicorn/prefer-ternary の要求に応えつつ型安全に処理するため、
-      // 各 Effect を個別に catchAll してから ternary で統合
+      // 各 Effect を個別に Effect.catch してから ternary で統合
       const writeEffect = isExists
         ? fs
             .appendFileAsync(logStoreFilePath.value, newLog)
-            .pipe(Effect.catchAll((e) => Effect.die(e)))
+            .pipe(Effect.catch((e) => Effect.die(e.error)))
         : fs
             .writeFileSyncSafe(logStoreFilePath.value, newLog)
-            .pipe(Effect.catchAll((e) => Effect.die(e)));
+            .pipe(Effect.catch((e) => Effect.die(toError(e))));
       yield* writeEffect;
 
       // キャッシュを更新（書き込み成功後に新しい行を追加）

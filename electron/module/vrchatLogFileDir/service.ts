@@ -55,19 +55,19 @@ export const getValidVRChatLogFileDir = (): Effect.Effect<
       .with(null, () => getDefaultVRChatVRChatLogFilesDir())
       .with(P.not(null), (storedPath) => storedPath)
       .exhaustive();
-    const logFileNamesResult = yield* Effect.either(
+    const logFileNamesResult = yield* Effect.result(
       getVRChatLogFilePathList(vrChatlogFilesDir),
     );
-    if (logFileNamesResult._tag === 'Left') {
+    if (logFileNamesResult._tag === 'Failure') {
       return yield* Effect.fail({
-        error: match(logFileNamesResult.left)
+        error: match(logFileNamesResult.failure)
           .with('ENOENT', () => 'logFileDirNotFound' as const)
           .exhaustive(),
         storedPath: storedVRChatLogFilesDirPath,
         path: vrChatlogFilesDir,
       });
     }
-    if (logFileNamesResult.right.length === 0) {
+    if (logFileNamesResult.success.length === 0) {
       return yield* Effect.fail({
         error: 'logFilesNotFound' as const,
         path: vrChatlogFilesDir,

@@ -50,10 +50,12 @@ const runBackgroundSync = async (store: SettingStore, now: Date) => {
     return;
   }
 
-  const either = await Effect.runPromise(Effect.either(syncLogsInBackground()));
+  const syncResult = await Effect.runPromise(
+    Effect.result(syncLogsInBackground()),
+  );
 
-  if (either._tag === 'Left') {
-    const error = either.left;
+  if (syncResult._tag === 'Failure') {
+    const error = syncResult.failure;
     const errorMessage = match(error)
       .with(
         { code: 'LOG_FILE_NOT_FOUND' },
@@ -85,7 +87,7 @@ const runBackgroundSync = async (store: SettingStore, now: Date) => {
     createdVRChatPhotoPathModelList,
     createdWorldJoinLogModelList,
     createdPlayerJoinLogModelList,
-  } = either.right;
+  } = syncResult.success;
   if (
     createdVRChatPhotoPathModelList.length === 0 &&
     createdWorldJoinLogModelList.length === 0 &&
