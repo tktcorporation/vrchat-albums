@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.31.3
+
+### Patch Changes
+
+- [#882](https://github.com/tktcorporation/vrchat-albums/pull/882) [`931bbf9`](https://github.com/tktcorporation/vrchat-albums/commit/931bbf9b8026d08afd54892e9a8ff02f543dfada) Thanks [@tktcorporation](https://github.com/tktcorporation)! - ログ同期で、保存されずに捨てていたワールド退出の解析をやめる。全件読み込み時の進捗件数に、保存しない項目が数えられなくなる。
+
+- [#887](https://github.com/tktcorporation/vrchat-albums/pull/887) [`e926ab1`](https://github.com/tktcorporation/vrchat-albums/commit/e926ab1a0709db59fee9a36d87e07af9d84be818) Thanks [@tktcorporation](https://github.com/tktcorporation)! - エラー処理の土台にしている Effect TS を 4 系（4.0.5）へ更新した。アプリの動作は変わらない。
+
+- [#886](https://github.com/tktcorporation/vrchat-albums/pull/886) [`76d517c`](https://github.com/tktcorporation/vrchat-albums/commit/76d517ca2ad04ee8d33d44e7eab4d568012d7846) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 起動時とログ同期で写真フォルダを辿るのが 1 回で済むようになり、写真が多いほど同期の待ち時間が短くなる。
+
+- [#883](https://github.com/tktcorporation/vrchat-albums/pull/883) [`f6a7225`](https://github.com/tktcorporation/vrchat-albums/commit/f6a7225886643a36bce138bfcd4688765872acea) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 起動画面の進捗表示を、まとめて届いた進捗は数え上げて滑らかに進め、進捗が届かない間も処理中と分かる動きを出すようにする。OS で動きを減らす設定にしている場合は静止した表示にする。
+
+- [#884](https://github.com/tktcorporation/vrchat-albums/pull/884) [`82ce1a9`](https://github.com/tktcorporation/vrchat-albums/commit/82ce1a9f63aab64e78aea90846b6728ac44b7404) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真フォルダの確認中は確認したフォルダ数を表示しながら進み、統計の集計を待たずに次の処理へ進むようにしました。写真情報は保存が終わってから完了と表示します。写真フォルダの一覧を探している間も進捗バーが進みます。
+
 ## 0.31.2
 
 ### Patch Changes
