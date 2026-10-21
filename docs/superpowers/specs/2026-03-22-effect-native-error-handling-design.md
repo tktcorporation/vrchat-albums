@@ -110,9 +110,10 @@ export const getMetadataForPhoto = (
 
 ## 3. tRPC 実行境界: `runEffect`
 
+`electron/lib/effectTRPC.ts`:
+
 ```typescript
 import { TRPCError } from '@trpc/server';
-// electron/lib/effectTRPC.ts
 import { Cause, Effect, Exit, Option, Result } from 'effect';
 
 import type { UserFacingError } from './errors';

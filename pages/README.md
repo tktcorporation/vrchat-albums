@@ -41,9 +41,10 @@ export default tseslint.config([
 
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
+`eslint.config.js`:
+
 ```js
 import reactDom from 'eslint-plugin-react-dom';
-// eslint.config.js
 import reactX from 'eslint-plugin-react-x';
 
 export default tseslint.config([
