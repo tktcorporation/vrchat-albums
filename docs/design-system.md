@@ -44,12 +44,13 @@ import { TEXT_COLOR } from '@/v2/constants/ui';
 ```
 
 **移行マッピング:**
-| Before | After |
-|--------|-------|
-| `text-gray-900 dark:text-white` | `TEXT_COLOR.primary` |
-| `text-gray-700 dark:text-gray-300` | `TEXT_COLOR.secondary` |
-| `text-gray-500 dark:text-gray-400` | `TEXT_COLOR.muted` |
-| `text-indigo-600 dark:text-indigo-400` | `TEXT_COLOR.accent` |
+
+| Before                                 | After                  |
+| -------------------------------------- | ---------------------- |
+| `text-gray-900 dark:text-white`        | `TEXT_COLOR.primary`   |
+| `text-gray-700 dark:text-gray-300`     | `TEXT_COLOR.secondary` |
+| `text-gray-500 dark:text-gray-400`     | `TEXT_COLOR.muted`     |
+| `text-indigo-600 dark:text-indigo-400` | `TEXT_COLOR.accent`    |
 
 ### サーフェスカラー (`SURFACE_COLOR`)
 

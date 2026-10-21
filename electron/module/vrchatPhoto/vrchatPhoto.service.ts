@@ -460,14 +460,12 @@ const statCacheFileForCleanup = (
   Effect.promise(() =>
     fsPromises
       .stat(filePath)
-      .then(
-        (stats): CacheFileStatResult => ({
-          filePath,
-          stats,
-          size: Number(stats.size),
-          mtime: Number(stats.mtimeMs),
-        }),
-      )
+      .then((stats): CacheFileStatResult => ({
+        filePath,
+        stats,
+        size: Number(stats.size),
+        mtime: Number(stats.mtimeMs),
+      }))
       .catch((error): null => {
         const nodeError = error as NodeJS.ErrnoException;
         // ENOENT はレースコンディション（ファイル削除）で予期される → null
@@ -622,13 +620,11 @@ export const cleanupThumbnailCache = async (): Promise<void> => {
   );
   const entries = fileStats
     .filter((f): f is NonNullable<CacheFileStatResult> => f !== null)
-    .map(
-      (f): ThumbnailCacheEntry => ({
-        filePath: f.filePath,
-        size: f.size,
-        mtimeMs: f.mtime,
-      }),
-    );
+    .map((f): ThumbnailCacheEntry => ({
+      filePath: f.filePath,
+      size: f.size,
+      mtimeMs: f.mtime,
+    }));
 
   const toDelete = selectThumbnailCacheFilesToDelete(entries, Date.now());
   if (toDelete.length === 0) {
