@@ -195,18 +195,17 @@ export class RollbackService {
           return { _tag: 'ok' as const };
         }, 'rollbackService.rebuildFromBackup')
         .pipe(
-          Effect.mapError(
-            (dbQueueError): RollbackServiceError =>
-              match(dbQueueError)
-                .with(
-                  { type: 'QUEUE_FULL' },
-                  (e) => new RollbackTransactionFailed({ message: e.message }),
-                )
-                .with(
-                  { type: 'TASK_TIMEOUT' },
-                  (e) => new RollbackTransactionFailed({ message: e.message }),
-                )
-                .exhaustive(),
+          Effect.mapError((dbQueueError): RollbackServiceError =>
+            match(dbQueueError)
+              .with(
+                { type: 'QUEUE_FULL' },
+                (e) => new RollbackTransactionFailed({ message: e.message }),
+              )
+              .with(
+                { type: 'TASK_TIMEOUT' },
+                (e) => new RollbackTransactionFailed({ message: e.message }),
+              )
+              .exhaustive(),
           ),
         );
 

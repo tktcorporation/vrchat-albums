@@ -101,6 +101,7 @@ vi.mock('./otherModule');
 
 ```typescript
 import { test, expect } from '@playwright/test';
+
 import { launchApp, closeApp } from './helpers';
 
 test.describe('Feature', () => {
