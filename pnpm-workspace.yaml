@@ -16,8 +16,7 @@ packages:
 # 緊急のセキュリティパッチ等で公開直後の版を即時導入する必要がある場合は、
 # 該当パッケージを minimumReleaseAgeExclude に追加する。
 minimumReleaseAge: 4320
-minimumReleaseAgeExclude:
-  - electron@44.9.3
+minimumReleaseAgeExclude: []
 
 # 依存バージョンの解決方針。highest = 範囲内で最も新しいバージョンを選ぶ。
 # 既知の脆弱性を含む古いバージョンが解決されるのを防ぐ（画像解像度とは無関係）。
