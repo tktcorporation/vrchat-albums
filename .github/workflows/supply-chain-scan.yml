@@ -91,4 +91,8 @@ jobs:
         shell: bash
         env:
           SKIP_REBUILD_NATIVE: '1'
+          # GHSA-jr5w-w6x2-84p9 の修正版を公開直後に導入するため、
+          # 公開後 48 時間の待機から Electron のみ除外する。マルウェア検査は維持する。
+          # 待機期間の経過後に、この例外を削除する。
+          SAFE_CHAIN_MINIMUM_PACKAGE_AGE_EXCLUSIONS: 'electron'
         run: pnpm install --frozen-lockfile
