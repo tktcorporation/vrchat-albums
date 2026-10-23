@@ -158,7 +158,7 @@ importers:
         version: 4.3.3
       trpc-electron:
         specifier: ^0.1.2
-        version: 0.1.2(patch_hash=921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4)(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.7.2)
+        version: 0.1.2(patch_hash=921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4)(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.9.3)
       ts-pattern:
         specifier: 5.9.0
         version: 5.9.0
@@ -239,8 +239,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(react@19.3.1)
       electron:
-        specifier: ~44.7.2
-        version: 44.7.2
+        specifier: ~44.9.1
+        version: 44.9.3
       electron-builder:
         specifier: ^26.15.3
         version: 26.15.3(electron-builder-squirrel-windows@26.15.3)
@@ -4551,8 +4551,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@44.7.2:
-    resolution: {integrity: sha512-u3Pbz0Hi1sSSwBMz2v8LiagsfUG4QURPUe/qphM+g4THKP8o4BYdnuboyhlLO8HIC/KfV5rvltyacbP4jEq9yw==}
+  electron@44.9.3:
+    resolution: {integrity: sha512-Cv9/yMnZxNWsMlIe8T4v//NKHdUvbeyoTJoXE3BIcRxus2meeFaO9h/P3zB5d4cBXum51IgAYrT2QjpIDWKpJA==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -10645,7 +10645,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@44.7.2:
+  electron@44.9.3:
     dependencies:
       '@electron-internal/extract-zip': 1.0.5
       '@electron/get': 5.1.0
@@ -13122,11 +13122,11 @@ snapshots:
 
   trough@2.2.0: {}
 
-  trpc-electron@0.1.2(patch_hash=921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4)(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.7.2):
+  trpc-electron@0.1.2(patch_hash=921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4)(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.9.3):
     dependencies:
       '@trpc/client': 11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3)
       '@trpc/server': 11.19.0(typescript@6.0.3)
-      electron: 44.7.2
+      electron: 44.9.3
 
   truncate-utf8-bytes@1.0.2:
     dependencies:
