@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.31.5
+
+### Patch Changes
+
+- [#891](https://github.com/tktcorporation/vrchat-albums/pull/891) [`fedf6c6`](https://github.com/tktcorporation/vrchat-albums/commit/fedf6c658211ba562ac82e3b247bff6a01733720) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真の EXIF を読むネイティブモジュールが使う並列処理ライブラリ（crossbeam-epoch）を、脆弱性を修正した版へ更新した。アプリの動作は変わらない。
+
+- [#893](https://github.com/tktcorporation/vrchat-albums/pull/893) [`880e02d`](https://github.com/tktcorporation/vrchat-albums/commit/880e02dd4865907858efeedb769702b649d4119a) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Electron を修正版の 44.9.1 に更新し、eMudhra の侵害された中間証明書を Chromium と Node.js の TLS 通信でブロックする。
+
 ## 0.31.4
 
 ### Patch Changes
