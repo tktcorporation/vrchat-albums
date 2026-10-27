@@ -1,27 +1,39 @@
 #!/usr/bin/env bun
+import { existsSync } from 'node:fs';
 import { basename, isAbsolute, join, resolve } from 'node:path';
-import { projectDirectory, workingTree } from '../.claude/hooks/hook-utils.ts';
+import { workingTree } from '../.claude/hooks/hook-utils.ts';
 
 const hookPath = process.argv[2];
 if (!hookPath) throw new Error('shared hook path is required');
+// このアダプターが置かれたプロジェクト。相対パスの hook はここを基準に解く。プロセスの現在地
+// （サブモジュールの中などセッションの作業場所）を基準にすると、そこに無いファイルを指す。
+const projectRoot = join(import.meta.dir, '..');
 // MCP 経由の PR 作成ゲートは、落ちたときも作成を通さない（対象は PR 作成の呼び出しだけ）。
 // 全コマンドで動く pre-bash-guard.ts は対象にしない。落ちたときに拒否へ倒すと、解析用の依存を
 // 入れられない環境（オフライン、依存の lockfile を読めない古い Bun）で全コマンドが止まり続ける。
 const isPrGate = basename(hookPath) === 'require-pr-self-review-mcp.ts';
+// シェルのコマンドを検査するガード（Bash の PR 作成ゲートを含む）。落ちたときは上の理由で通すが、
+// 入力そのものが壊れているときは止める。検査できない入力のまま通すと、コマンドがガードを経ずに
+// 実行される一方、正しい形の入力でやり直せば済むので、止めても作業は続けられる。
+const isShellGuard = basename(hookPath) === 'pre-bash-guard.ts';
 function refuse(detail: string): never {
   process.stderr.write(`shared hook blocked: ${hookPath}: ${detail}\n`);
   process.exit(2);
 }
-/** 想定外の入力。PR 作成ゲートは作成を通さず、それ以外の hook は実行せずに元の処理を続ける。 */
+/**
+ * 想定外の入力。PR 作成ゲートとシェルのガードは実行を止め、それ以外の hook は実行せずに元の処理を
+ * 続ける。
+ */
 function invalidInput(detail: string): never {
-  if (isPrGate) refuse(detail);
+  if (isPrGate || isShellGuard) refuse(detail);
   process.stderr.write(`shared hook skipped: ${hookPath}: ${detail}\n`);
   process.exit(0);
 }
 // Claude Code が hook に渡すものと同じ形にする: CLAUDE_PROJECT_DIR は状態ファイル用の
-// 主チェックアウト、入力の cwd は lint / 検証の対象になる作業ツリー（worktree）。
-process.env.CLAUDE_PROJECT_DIR = await projectDirectory();
+// プロジェクト、入力の cwd は lint / 検証の対象になる作業ツリー（worktree）。
+process.env.CLAUDE_PROJECT_DIR = projectRoot;
 const tree = await workingTree();
+const executable = isAbsolute(hookPath) ? hookPath : join(projectRoot, hookPath);
 const inputText = await Bun.stdin.text();
 interface HookPayload {
   cwd?: string;
@@ -56,8 +68,21 @@ if (input.tool_name === 'exec_command') {
   // Resolve relative paths against the host process, like exec_command does.
   input.cwd = shell.workdir === undefined ? (input.cwd ?? tree) : resolve(shell.workdir);
   input.tool_input = { ...shell, command: shell.cmd };
+} else if (input.tool_name === 'Bash') {
+  const shell = input.tool_input;
+  if (!shell || typeof shell !== 'object' || typeof shell.command !== 'string') {
+    invalidInput('Bash requires tool_input.command');
+  }
 }
 input.cwd ??= tree;
+
+// hook が見つからないまま通すと、PreToolUse のガードが黙って外れる。
+if (!existsSync(executable)) {
+  console.error(`hook が見つかりません: ${executable}`);
+  if (input.hook_event_name === 'PreToolUse') process.exit(2);
+  console.log(unexpectedFailure(1, `hook が見つかりません: ${executable}`));
+  process.exit(0);
+}
 
 /** Codex に返す、意図しない hook 失敗の診断。exit 2 以外は実行を止める指示ではない。 */
 function unexpectedFailure(status: number, stderr: string): string {
@@ -77,11 +102,6 @@ function unexpectedFailure(status: number, stderr: string): string {
 }
 
 const runHook = async (payload: unknown): Promise<string> => {
-  // スクリプト本体は tree（Codex が開いているワークスペース）から解決する。Codex は
-  // ワークスペース自体を worktree 直下に開くことがあり、その worktree だけに存在する
-  // hook 定義（他 worktree /main checkout にまだ無いコミット）を、CLAUDE_PROJECT_DIR
-  // （常に主チェックアウトを指す）から解決すると見つけられない。
-  const executable = isAbsolute(hookPath) ? hookPath : join(tree, hookPath);
   const command = hookPath.endsWith('.ts') ? ['bun', executable] : [executable];
   let output: string;
   let stderr: string;

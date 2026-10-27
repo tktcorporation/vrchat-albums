@@ -6,15 +6,43 @@ Claude が作成した PR は、作成直後にセルフレビューを回すと
 
 ## 仕組み
 
-`gh pr create` は PreToolUse フック（`.claude/hooks/require-pr-self-review.ts`）でブロックされる。フックはラウンドごとの記録を読み、「2 ラウンド以上あり、最後のラウンドが codex review・現在の HEAD に対するもの・かつ指摘 0 件かユーザーが受け入れた（`accepted`）」のときだけ通す。最後を codex review 以外にしても通らない（それより前の codex ラウンドは古いコミットしか見ていない可能性があるため）。指摘の残るラウンドを、受け入れの記録なしに何回重ねても通らず、収束後に新しいコミットを重ねると、その HEAD に対する codex review をもう一度要求される。
+PR の作成は、PR の head になるコミットにレビュー収束の証跡（attestation）があるときだけ通る。
 
-このゲートは対象を作業ツリーの現在のブランチで判定する。`gh pr create --head <branch>` で別ブランチを PR にする場合は、そのブランチのディレクトリ（worktree）でレビュー・記録してから作成する。**hook はコマンド文字列から `--head` の指定先を読み取らない**（`--title`/`--body` の自由記述に `--head` という文字列が現れるとゲートを誤って通してしまうため、あえて実装していない）。したがって、レビュー済みブランチのディレクトリにいながら `--head` で別の未レビューブランチを指定すれば、この防御は効かない。この経路は仕組みで防いでおらず、`agent-work-discipline.md` が禁じる行為（名指しされた対象をすり替える）に該当する運用上の禁止事項として扱う。
+証跡は記録用の CLI（`.claude/hooks/record-pr-review.ts`）が書く。ラウンドを記録した時点で、そのチェックアウトの記録が「2 ラウンド以上あり、最後のラウンドが codex review・現在の HEAD に対するもの・かつ指摘 0 件かユーザーが受け入れた（`accepted`）」を満たせば、その HEAD の SHA・origin の owner/repo・ブランチ・記録したチェックアウトを台帳に追記する。最後を codex review 以外にしても収束しない（それより前の codex ラウンドは古いコミットしか見ていない可能性があるため）。台帳は、プロジェクトディレクトリからスーパープロジェクトを辿りきったいちばん外側のリポジトリの git 共通ディレクトリ（`claude/pr-review/attestations.jsonl`）に 1 つだけあり、ルート・入れ子のサブモジュール・linked worktree のどこで記録しても同じファイルに書かれる。
 
-GitHub MCP サーバー経由の PR 作成（`mcp__github__create_pull_request` 等、matcher は `^mcp__.+__(?:github_)?create_pull_request$`。MCP ツールを `MCP:<ツール名>` で渡す Cursor では `^MCP:(?:github_)?create_pull_request$`）は、別の PreToolUse フック（`.claude/hooks/require-pr-self-review-mcp.ts`）が同じ収束条件でブロックする。tool_input の `owner`/`repo`/`head`（`owner:branch` 形式は owner がベースリポジトリの owner と一致する場合だけ受け付ける）が、作業ツリーの origin リモート・現在のブランチと一致し、かつリモートの head ブランチの HEAD がそのブランチでレビュー済みのローカル HEAD と同じコミットを指している場合に限って収束判定へ進む。いずれか一方でも確認できなければ理由を問わず常にブロックする（ローカルの記録を対象にできない呼び出しを通す判断はしない）。対象ブランチをチェックアウトした正しいディレクトリでレビュー・記録し、push してリモートと揃えてから、そのディレクトリを cwd にして呼び出す。
+PR 作成のゲート（`.claude/hooks/pr-review-gate.ts`）は、リモートの head ブランチが指す SHA を `git ls-remote` で引き、同じ owner/repo でその SHA の証跡があれば通す。収束の判定は記録の時点で済んでいるので、ゲートは対象のチェックアウトを推測しない。収束後に積んだコミットは別の SHA なので、その HEAD でレビューを回して記録し直すまで通らない。指摘が残って収束しなかったラウンドを記録すると、記録用の CLI は、指摘の対象になりうる HEAD とその祖先の証跡を取り消し、取り消したコミットはそのコミットで収束を記録し直すまでゲートを通らない（取り消す範囲は `.claude/hooks/record-pr-review.ts` のコメントを参照）。手順は、収束を記録してから push し、`gh pr create -R <host/owner/repo> --head <branch>` を実行する。
 
-このゲートが塞がないもの: 一度 close した PR を `state: "open"` で reopen する経路（`mcp__github__update_pull_request` 等）は対象外で、reopen 前に head へ push されたレビュー前のコミットを防げない。`gh` の `pr` サブコマンドを経由しない生の API 呼び出し（`gh api -X POST .../pulls` 等）も Bash 側の `isPrCreateCommand` の対象外。MCP 経路の owner/repo 照合は origin リモートの URL から切り出した文字列との一致だけを見ており、その URL のホストが実際に対象の GitHub インスタンスかは確認しない。base/head の owner が異なる本来のフォーク間 PR は、head 側のリポジトリを作業ツリーの origin にできないため、この経路では常にブロックする（`gh pr create` で作成する）。どれも `--head` の運用上の注意（上の段落）と同じ扱いで、意図的な誤用までは仕組みで防いでいない。
+`gh pr create` は内部で GraphQL を使うので、GraphQL を拒否して REST だけを通す実行環境では PR を作れない。どの環境でも同じ手順で作れる入口として、PR の head にするブランチのチェックアウトで `bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/create-pr.ts --title <題> --body-file <ファイル> [--draft]` を使う。この CLI は対象を実行時に確定させる（repo とホストは origin、head は現在のブランチ、base は `origin/HEAD` の default branch で、`--base` に別のブランチを渡すと止める）。Bash の経路と同じ判定（`pr-review-gate.ts`。下の base と `insteadOf` の規則を含む）でリモートの head の SHA に証跡があることを確かめてから REST で作成し、応答の head と base を確かめた値と照合する。同じ head の open な PR が既にあれば作らずにその URL を返す。作成の要求が曖昧に失敗したときは再試行せず、同じ head の PR を探し直して実在を確かめてから結果を返す。終了コードと出力の形は `.claude/hooks/create-pr.ts` の冒頭にある。どの経路が使える環境かは `bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/github-doctor.ts` で確かめる。
 
-Claude Code 以外（Cursor・Codex）での自動発火はホストごとの確認が要る。共有MCPゲートは `owner/repo/head` と `repository_full_name/head`（および対応する別名）を受け付け、矛盾する指定は拒否する。`functions.exec` を使うクラウドでは `.claude/guides/tools/cloud-review.md` の作成ラッパーを使う。ラッパー内で同じ収束判定と証跡の照合を行い、成功時だけコネクタへ進む。別経路のAPIまで禁止するものではない。
+Bash の `gh pr create`（別名の `gh pr new` も同じ）は、対象が実行前に確定する次の形だけを受け付け、それ以外で `gh pr create` か `gh pr new` を含むコマンドは止める（`.claude/hooks/pr-create-command.ts`）。`create`・`new` は `pr` の直後のサブコマンドの位置（`gh` と `pr` の間、`pr` とサブコマンドの間に挟めるのはオプションだけ）にあるときだけ数えるので、`gh pr checkout 5 && git switch -c new-x` や `gh pr list --search new` は対象にならない。ただし `gh` と `pr` の間・`pr` とサブコマンドの間に `-R <値>`・`--repo <値>`・`--repo=<値>` 以外のオプションがあると、gh がそれを値を取るフラグとして読むかでサブコマンドの位置が変わるので、同じコマンドの（改行や `;`・`&&`・`|` で区切られる前の）後ろの語に `pr` → `create`/`new` の並びがあれば PR 作成として扱う。また、引用符の中や heredoc の本文に書かれた並びも数えるので、`bash -c "gh pr create"` やコミットメッセージ中の `gh pr create` は止める。サブコマンドの位置が `gh pr $SUB` のように実行時まで決まらない書き方や、実行するコマンドが `"$GH" pr create`・`env "$GH" pr create` のように実行時まで決まる書き方も、PR 作成になりうるので止める（引数の文字列の中では、`bash -c`・`eval` のように実行される場合だけ数える）。`-R <host/owner/repo>`（`--repo`）と `--head <branch>`（`-H`）は必須で、`-R` は `gh` と `pr` の間に置いてもよい。`-R` はホストまで書いた `host/owner/repo` の形（例: `github.com/owner/repo`）で書き、ホストと owner/repo が origin の URL と一致しなければ止める。ホストを省くと gh は `GH_HOST` やログイン済みのホストから補い、ゲートの確かめるホストとずれうるため。origin のホストに SSH 設定（`~/.ssh/config`）の Host 別名を使うチェックアウトは、git の設定から実際のホストを決められず Bash の経路を通らないので、MCP の経路で作成するか、origin を実際のホスト名で設定する。origin の URL は `insteadOf` で書き換える前の値を見て、URL が複数あるときは止める。
+
+```
+[cd <リテラルのパス> && ]... gh pr create|new -R <host/owner/repo> --head <branch> [オプション]
+```
+
+両方の明示を求めるのは、省いたときに gh が選ぶ PR の対象リポジトリと head の ref が、リモートの構成・`gh repo set-default`・追跡設定・手元のリモート追跡ブランチで変わり、ゲートの側で再現しきれないため。ゲートは書かれた対象だけを確かめる。
+
+ゲートは gh の引数解釈を真似ず、意味を確定できない書き方は止める。オプションは `gh pr create --help` の一覧にあるものだけを、`-H <値>`・`--head <値>`・`--head=<値>` のように 1 語ずつ書く。短いオプションの連結（`-dH`）や値の直結（`-Hfeat`・`-H=feat`）、一覧に無いオプション、位置引数、`-R`・`--head` の重複は止める。`gh` と `pr` の間、`pr` と `create` の間に置けるのは `-R`/`--repo` だけで、`gh` より前には何も置けない。
+
+ラッパー（`timeout` など）、`bash -c`、サブシェル、コマンド置換、変数を含むパス、`;`・`||`・パイプでつないだ他のコマンド、同じ呼び出しでのブランチ切り替え、複数の `gh pr create` は受け付けない。コミットメッセージや本文に `gh pr create` と書くだけなら、その文章をファイルに書いて `-F <ファイル>` で渡す。`-R` の repo が実行ディレクトリ（`cd` の行き先）の origin と異なれば止めるので、その repo を origin に持つチェックアウトから実行する。`--head` の branch は、origin のその名前のブランチが指す SHA で判定する。`owner:branch` 形式は owner が origin の owner と一致する場合だけ受け付ける。
+
+GitHub MCP サーバー経由の PR 作成（`mcp__github__create_pull_request` 等、matcher は `^mcp__.+__(?:github_)?create_pull_request$`。MCP ツールを `MCP:<ツール名>` で渡す Cursor では `^MCP:(?:github_)?create_pull_request$`）は、`.claude/hooks/require-pr-self-review-mcp.ts` が同じ証跡で判定する。ツール入力の owner/repo と head ブランチで台帳を引き、収束を記録したチェックアウトのうち、いまも残っていて記録どおりの origin（repo とホスト）を持つ最新のものからリモートの head を確かめる。origin にホストの無い（ローカルのパスや `file://` の）チェックアウトの記録は候補にしない。そのようなチェックアウトが 1 つも無ければ止める。`head` の `owner:branch` 形式は owner がベースリポジトリの owner と一致する場合だけ受け付け、owner の異なるフォーク間 PR は常に止める（`gh pr create` で作成する）。ツール入力の別名（`owner`/`repo` と `repository_full_name` など）が食い違う場合も止める。証跡は origin のホストごとに区別する。ツール入力にホストが無いので、同じ owner/repo とブランチの候補が複数のホストにあれば止める。候補が 1 つのホストだけなら、MCP サーバーが PR を作るホストもそのホストだとみなす（hook からは MCP サーバーの接続先が見えない）。
+
+PR 作成ゲートは、判定の途中で落ちたときも PR を作らせない。PreToolUse の hook は、明示的な拒否以外の異常終了を非ブロッキングの失敗として扱い、ツールをそのまま実行させるため。MCP 経路の登録には、Claude Code では `onFailure: "block"`、Cursor では `failClosed: true` を付ける。Cursor と Codex のアダプター（`.cursor/run-shared-hook.ts`・`.codex/run-shared-hook.ts`）は、このゲートに限って、異常終了と読めない入力・出力を拒否に変える。Codex のアダプターは、Bash 経路のゲートを含む `pre-bash-guard.ts` についても、読めない入力や食い違うシェル入力（`tool_input.cmd` と `command` の不一致など）を拒否に変える（異常終了は下の理由で拒否に変えない）。Cursor は出力の無い成功も失敗として扱うので、アダプターはゲートが何も出さずに終わったときに許可を明示して返す。Bash 経路は `pre-bash-guard.ts` の中で判定し、判定中の例外を拒否として扱う。ただし `pre-bash-guard.ts` 自体を読み込めない（Bash の構文解析に使う依存を入れられない等）ときは、hook は拒否以外の終了コードで終わり、コマンドはゲートを通らずに実行される。Bash 経路が拒否に倒せるのは、hook が読み込まれて判定を始めた後の失敗に限る。登録の正本は `.claude/hooks/manifest.json` で、各ホストの設定は `pnpm agent-adapters:generate` が書き出す。
+
+Claude Code 以外（Cursor・Codex）での自動発火はホストごとの確認が要る。共有 MCP ゲートは `owner/repo/head` と `repository_full_name/head`（および対応する別名）を受け付け、矛盾する指定は拒否する。`functions.exec` を使うクラウドでは `.claude/guides/tools/cloud-review.md` の作成ラッパーを使う。ラッパーは、リモートの head の SHA に台帳の証跡があり、レビューの証拠（`record-pr-review.ts` の `--evidence`）が同じ head・base・記録と一致するときだけコネクタへ進む。別経路の API まで禁止するものではない。
+
+どちらの経路も、PR の base を指定するなら origin の default branch（`origin/HEAD`）と同じでなければ止める。レビューループは default branch との差分を見るので、別のブランチへ向けた PR にはレビューしていないコミットが入りうるため。Bash で `--base` を省いた場合は、gh が base に使うブランチ設定 `gh-merge-base` を、`--head` のブランチとチェックアウト中のブランチの両方について確かめる。base を省き、その設定も無ければ GitHub がリポジトリの default branch を使う。手元に `origin/HEAD` が無いと比べられないので止める（そのチェックアウトで `git remote set-head origin --auto` を実行する）。
+
+どちらの経路も、origin の取得先の URL が `url.<base>.insteadOf` で別のリポジトリへ書き換えられていれば止める。PR を作るリポジトリは書き換える前の URL で決まる一方、リモートの SHA は書き換えた先から読むので、書き換え先が古いミラーだと未レビューの head を通しうるため。書き換えの前後の URL をホスト・ポート・owner/repo に分けて（大文字小文字を区別せずに）比べ、どれかが違うか、どちらかがホストを持たない（ローカルのパスや `file://`）ときに止める。`git@github.com:` を `https://github.com/` へ向けるような、scheme やユーザー名だけを変える書き換えは同じリポジトリへ問い合わせるので止めない。ポートは既定のもの（https の 443・ssh の 22）を省いたものと同じに扱い、それ以外のポートへの書き換えは別のサーバーでありうるので止める。`pushInsteadOf` だけの設定は取得先を変えないので止めない。
+
+このゲートが防ぐのは、レビューの収束を記録し忘れたまま PR を作ることまでで、意図的な回避は防がない。証跡そのものが自己申告なので、回避しようとする側は偽の記録を書けば済み、ゲートの側でそれ以上を塞いでも守れる範囲は広がらないため。ゲートには次の限界がある。
+
+- 証跡は記録するエージェント自身の申告で、hook はレビューが実際に行われたかを検証できない（`codex` タグと同じ。下の手順 1 を参照）
+- ゲートは手元の git の設定を通してリモートの SHA を読む。`core.sshCommand`・`remote.origin.uploadpack`・プロキシなどの通信設定、origin を独自スキーム（`foo://` など。git は `git-remote-foo` に通信を任せる）にする設定、gh の設定を意図的に変えれば、ゲートが確かめる相手と gh が PR を作る相手を分けられる
+- ゲートはリモートへ届く必要があり、`git ls-remote` が失敗・タイムアウトすれば止める
+- rebase や squash でコミットの SHA が変わると、内容が同じでも証跡は無くなり、レビューのやり直しが要る
+- close した PR の reopen や、`gh pr` と `create-pr.ts` を経由しない生の API 呼び出しは対象外で、運用上の禁止事項として扱う
 
 ## 手順
 
@@ -34,25 +62,25 @@ PR を作成したいとき、以下を自動的に実行する:
 
 ### 2. ラウンドごとに記録する
 
-ラウンドの指摘に対応し終えるたびに、そのラウンドの指摘件数を添えて記録する。指摘が 0 件だったラウンドは 0 を渡す（それが収束の証拠になる）。そのラウンドが `codex review` によるものなら `codex` を渡す。途中収束をユーザーが受け入れたラウンドは `accepted` も渡す（このときも件数は実際のまま。0 だと偽らない）。
+ラウンドの指摘に対応し終えるたびに、そのラウンドの指摘件数を添えて記録する。記録は実行したディレクトリのチェックアウトと現在のブランチに付くので、サブモジュールや worktree で作業しているときはそのディレクトリで実行する。`$CLAUDE_PROJECT_DIR` はルートプロジェクトのディレクトリで、設定されていない環境ではルートプロジェクトの絶対パスに置き換える。指摘が 0 件だったラウンドは 0 を渡す（それが収束の証拠になる）。そのラウンドが `codex review` によるものなら `codex` を渡す。途中収束をユーザーが受け入れたラウンドは `accepted` も渡す（このときも件数は実際のまま。0 だと偽らない）。
 
 ```bash
-bun .claude/hooks/record-pr-review.ts <指摘件数> [codex] [accepted]
+bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/record-pr-review.ts <指摘件数> [codex] [accepted]
 ```
 
 対応していない指摘があるラウンドは記録しない。件数は「レビュアーが挙げた件数」で、直さないと決めた指摘も含める。
 
-一定のラウンドごとに振り返りが必要になり、済ませるまで、収束しないラウンドを記録できない。振り返りでは、指摘件数が下がっていても、指摘の中身を分類し、レビューが続く原因と別の解決策を確認して診断メモに記録する。指摘件数が最良値を更新していない停滞、またはレビューの長期化では、全ラウンドの共通原因と設計・要件・進め方の案を比較し、ユーザーと採る方針を決めて `asked` を記録する。停滞していない定期的な振り返りでは `continue` または `replan` を選べる。間隔と閾値は `.claude/hooks/review-policy.ts` が定め、手順は `pr-review-loop` の「振り返り」にある。
+一定のラウンドごとに振り返りが必要になり、済ませるまで、収束しないラウンドを記録できない。振り返りでは、指摘件数が下がっていても、指摘の中身を分類し、レビューが続く原因と別の解決策を確認して診断メモに記録する。指摘件数が最良値を更新していない停滞、またはレビューの長期化では、全ラウンドの共通原因と設計・要件・進め方の案を比較し、ユーザーと採る方針を決めて `asked` を記録する。停滞していない定期的な振り返りでは `continue` または `replan` を選べる。振り返りの間隔とレビューの長期化は、直近の収束（証跡を書いたラウンド）より後のラウンドだけで数えるので、PR 作成後の外部指摘への対応は数え直しから始まる。間隔と閾値は `.claude/hooks/review-policy.ts` が定め、手順は `pr-review-loop` の「振り返り」にある。
 
 ```bash
-bun .claude/hooks/record-pr-review.ts checkpoint <continue|replan|asked> "<診断メモ>"
+bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/record-pr-review.ts checkpoint <continue|replan|asked> "<診断メモ>"
 ```
 
 `asked` も `codex` と同じく自己申告で、hook はユーザーへ確認したかを検証できない。
 
 ### 3. PR 作成
 
-2 ラウンド以上・最後が codex review で現在の HEAD に対して 0 件になっていれば `gh pr create` が通る。途中収束（直しても指摘の根本原因が変わらない）は自分では閉じない。残る指摘と直さない理由をユーザーに示し、ユーザーが残りを受け入れたときだけ、その判断を PR 本文に書いて、現在の HEAD に対する codex review のラウンドを実際の指摘件数のまま `accepted` を付けて記録する（0 件だったと偽らない）。
+2 ラウンド以上・最後が codex review で現在の HEAD に対して 0 件になれば、記録用の CLI がその HEAD の証跡を書く。その HEAD を push すれば `gh pr create`（GraphQL が使えない環境では `create-pr.ts`）が通る。途中収束（直しても指摘の根本原因が変わらない）は自分では閉じない。残る指摘と直さない理由をユーザーに示し、ユーザーが残りを受け入れたときだけ、その判断を PR 本文に書いて、現在の HEAD に対する codex review のラウンドを実際の指摘件数のまま `accepted` を付けて記録する（0 件だったと偽らない）。
 
 ## レビュー指摘への対応方針
 
@@ -91,8 +119,9 @@ bun .claude/hooks/record-pr-review.ts checkpoint <continue|replan|asked> "<診�
 
 ## 注意
 
-- ラウンドの記録はブランチごとに、主チェックアウトの `.git/claude/pr-review/<ブランチ名>.rounds` に置く（`.claude/hooks/review-count.ts`）。worktree から記録しても hook と同じファイルになり、別ブランチの記録とは混ざらない
-- 記録のリセットは `.claude/hooks/reset-pr-review-count.ts`（PostToolUse）が行う。`post-bash-pr.ts` はコマンドの終了コードではなく、`gh pr view` でそのブランチに実際に PR が存在するかを確認してから発火する（終了コードは `|| true` 等で上書きできるため信用しない）。MCP 経路（`post-mcp-pr.ts`）は `gh` を使わないため同じ確認ができず、明らかな失敗（`tool_response` の `is_error`/`isError`）以外は呼び出しの成否を問わずリセットする。実際には PR が作られていなかった場合、次の PR 作成でもう一度レビューを求めるだけで安全側に倒れる
+- ラウンドの記録はブランチごとに、対象チェックアウトの git 共通ディレクトリの `claude/pr-review/<ブランチ名>.rounds` に置く（`.claude/hooks/review-count.ts`）。linked worktree から記録しても主チェックアウトと同じ場所になり、別ブランチの記録とはファイル名で分かれる。サブモジュールの記録は、そのサブモジュール自身の git 共通ディレクトリ（親リポジトリの `.git/modules/<名前>`）に置かれ、親リポジトリの記録とは混ざらない
+- 収束と振り返りの判定は、記録のうちレビュー範囲 `<default-branch>...HEAD` に入るコミット（HEAD から辿れて、origin の default branch の先端からは辿れないもの）をレビューしたものだけを数える。default branch に取り込まれた前の作業（merge commit・fast-forward のどちらでも）、同じ名前で作り直したブランチ、rebase で履歴から外れたコミットへの記録は、ファイルに残っても数えない。新しいコミットの無いブランチでは何も数えない。`origin/HEAD` が設定されていないリポジトリでは、HEAD から辿れるかだけで絞る（`git remote set-head origin --auto` で設定できる）。外部指摘後の push ゲートも、指摘を観測した後のラウンドに同じ絞り込みをかける
+- PR を作成しても記録は消えない。マージ後に同じ名前でブランチを作り直した場合も、上の範囲の絞り込みで前の作業の記録は数えない
 
 ## 既存 PR への追加コミットでは「指摘は外部レビューが見つけてくれる」に頼らない
 

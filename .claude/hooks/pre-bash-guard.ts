@@ -8,8 +8,10 @@
  * 補助に留める。フラグの束ね方や pathspec の全パターンまでは追わず、迂回しようと思えば
  * 迂回できる作りを許容する。狙いは、通ろうとしたときにガードレールの存在に気づかせること。
  *
- * 判定は command-parse.ts が認識する通常の直接コマンドに対して行う。文書 heredoc、引用された
- * 説明、外部スクリプトやラッパーの中身は対象にしない。
+ * git の巻き戻しなどの判定は、command-parse.ts が認識する通常の直接コマンドに対して行う。
+ * 文書 heredoc、引用された説明、外部スクリプトやラッパーの中身は対象にしない。
+ * PR 作成の検出（pr-create-command.ts）だけは逆で、対象を実行前に確定できない書き方を
+ * 曖昧なものとしてまとめて止める。heredoc の本文や引用符の中に書かれた `gh pr create` も止める。
  *
  * git の巻き戻し（restore / checkout / stash）は、対象がこのセッションのエージェント自身が
  * Write / Edit で書いた変更なら通し、それ以外の未コミット変更に及ぶなら止める。
@@ -28,12 +30,9 @@ import {
   type SimpleCommand,
 } from './command-parse.ts';
 import { dirtyFiles } from './foreign-changes.ts';
-import {
-  isPrCreateCommand,
-  ownershipFingerprint,
-  projectDirectory,
-  readEditedFiles,
-} from './hook-utils.ts';
+import { isRecord, ownershipFingerprint, projectDirectory, readEditedFiles } from './hook-utils.ts';
+import { prCreateInvocation } from './pr-create-command.ts';
+import { bashPrCreateDenyReason } from './pr-review-gate.ts';
 
 const text = await Bun.stdin.text();
 let input: { session_id?: string; cwd?: string; tool_input?: { command?: string } };
@@ -374,24 +373,62 @@ for (const entry of commands) {
 // ---------------------------------------------------------------------------
 
 const root = await projectDirectory();
-async function run(path: string, cwd?: string): Promise<void> {
+// 子が返す additionalContext。push ごとに子を起動するので、1 つのコマンドに push が複数あると
+// 子の JSON が連結されて読めなくなる。集めて最後に 1 個の JSON として出す。
+const notes: string[] = [];
+async function run(path: string, cwd?: string, capture = false): Promise<void> {
   // project hook は bash と bun (TypeScript) の両方で書かれているため、
   // 拡張子で実行系を選ぶ。bun 固定だと .sh は構文エラーで落ち、glob を
   // *.ts に絞ると .sh は黙ってスキャン対象から外れる（後者で実際に
   // block-redash-direct-exec.sh / block-athena-exec.sh が発火しなくなる
   // 回帰が起きた）。
   const interpreter = path.endsWith('.sh') ? 'bash' : 'bun';
+  // cwd を渡すのは、ここで対象ディレクトリ（cd や git -C を解いた結果）を確定させた検査だけ。
+  // 受け手がコマンド文字列から対象を解き直さないよう、command を外して渡す。
+  const stdin = cwd
+    ? JSON.stringify({ ...input, cwd, tool_input: { ...input.tool_input, command: undefined } })
+    : text;
   const child = Bun.spawn([interpreter, join(root, path)], {
     cwd: root,
     env: process.env,
-    stdin: new Blob([cwd ? JSON.stringify({ ...input, cwd }) : text]),
-    stdout: 'inherit',
+    stdin: new Blob([stdin]),
+    stdout: capture ? 'pipe' : 'inherit',
     stderr: 'inherit',
   });
+  const out = capture ? (await new Response(child.stdout).text()).trim() : '';
   const status = await child.exited;
   if (status !== 0) process.exit(status);
+  if (!out) return;
+  // 子の出力が読めなくても止めずに知らせ、後続の検査（project hook）は続ける。
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(out);
+  } catch {
+    notes.push(`WARNING: ${path} の出力を読めません: ${out.slice(0, 200)}`);
+    return;
+  }
+  const context = isRecord(parsed) && isRecord(parsed.hookSpecificOutput)
+    ? parsed.hookSpecificOutput.additionalContext
+    : undefined;
+  if (typeof context === 'string' && context) notes.push(context);
 }
-if (isPrCreateCommand(command)) await run('.claude/hooks/require-pr-self-review.ts');
+// gh pr create は、対象（実行ディレクトリ・-R のリポジトリ・--head のブランチ）が実行前に確定する形だけを受け付け、
+// リモートの head の SHA に収束の証跡があるかで判定する（pr-review-gate.ts）。
+// 判定の途中で落ちたときも PR 作成は通さない。exit 2 以外の異常終了は、hook 実行系が
+// 非ブロッキングの失敗として扱い、コマンドをそのまま実行させるため。
+let prCreateReason: string | null;
+try {
+  const prCreate = prCreateInvocation(command, origin);
+  prCreateReason =
+    prCreate.kind === 'rejected'
+      ? prCreate.reason
+      : prCreate.kind === 'canonical'
+        ? await bashPrCreateDenyReason(prCreate)
+        : null;
+} catch (error) {
+  prCreateReason = `PR 作成ゲートの判定に失敗しました（${error instanceof Error ? error.message : String(error)}）。`;
+}
+if (prCreateReason) block(`PR作成をブロックしました。${prCreateReason}`);
 // PreToolUse はシェル全体の実行前に一度だけ動く。先行コマンドが HEAD を変えると、
 // この時点で検査した SHA と実際に push される SHA が異なる。
 const HEAD_MUTATIONS = new Set([
@@ -426,7 +463,7 @@ for (const entry of commands) {
       '同じ Bash コマンド内で git add/commit 等の後に push すると、push 前に確定した HEAD をレビューできません。変更・commit を先に実行し、git push を別の Bash コマンドで実行してください。',
     );
   if (target.directory.kind === 'known')
-    await run('.claude/hooks/require-pr-feedback-review.ts', target.directory.path);
+    await run('.claude/hooks/require-pr-feedback-review.ts', target.directory.path, true);
   else
     console.error(
       'NOTICE: git push の作業ツリーを特定できません。LLM が送信先 PR のレビュー指摘を確認してください。',
@@ -434,3 +471,13 @@ for (const entry of commands) {
 }
 for await (const path of new Glob('.claude/hooks/project/*.{ts,sh}').scan({ cwd: root }))
   await run(path);
+// 同じ作業ツリーへの push が並ぶと同じ警告が繰り返されるため、重複を除いて 1 個にまとめる。
+if (notes.length > 0)
+  console.log(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        additionalContext: [...new Set(notes)].join('\n'),
+      },
+    }),
+  );

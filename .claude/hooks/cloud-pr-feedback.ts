@@ -11,10 +11,10 @@ import {
   needsUserDecision,
 } from './pr-feedback-policy.ts';
 import { writeCloudPushGrant } from './cloud-push-grant.ts';
-import { isRecord } from './hook-utils.ts';
+import { isRecord, remoteIdentity } from './hook-utils.ts';
 import { nowMs, parseIsoUtcMs } from './iso-time.ts';
-import { remoteHeadSha } from './require-pr-self-review-mcp.ts';
-import { reviewTargetSha } from './review-count.ts';
+import { remoteHeadSha } from './pr-review-gate.ts';
+import { reviewRangeOf, reviewTargetSha } from './review-count.ts';
 import { MIN_NOTE_LENGTH, normalizeNote } from './review-policy.ts';
 
 type CloudEvidence = {
@@ -40,16 +40,15 @@ export function sameRepositoryText(actual: unknown, expected: string): boolean {
   return typeof actual === 'string' && actual.toLowerCase() === expected.toLowerCase();
 }
 
-/** Compare the effective Git remote, not a particular HTTPS/SSH serialization. */
+/**
+ * origin の URL が、観測した GitHub（github.com）の repository を指すか。書き方（scheme・ユーザー名・
+ * 既定ポート・`.git`・ssh.github.com）の違いは hook-utils.ts の remoteIdentity と同じ規則でそろえる。
+ * .codex/cloud-pr-feedback.cjs は TS を読み込めないので同じ規則を写して持ち、テストで一致を確かめる。
+ * 空白や改行を含む値は、複数の URL が連結された出力でありうるので一致とみなさない。
+ */
 export function matchesGitHubRemote(remote: string, repository: string): boolean {
-  const match =
-    /^(?:https:\/\/github\.com(?::443)?\/|ssh:\/\/git@github\.com(?::22)?\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/?$/i.exec(
-      remote,
-    );
-  if (!match || match[0] !== remote) return false;
-  const path = match[1]!.toLowerCase();
-  const target = repository.toLowerCase();
-  return path === target || path === `${target}.git`;
+  if (/\s/u.test(remote)) return false;
+  return remoteIdentity(remote) === `github.com/${repository}`.toLowerCase();
 }
 
 function instantMilliseconds(value: string): number | null {
@@ -282,11 +281,16 @@ export async function processCloudFeedback(
         .quiet()
         .nothrow()
     ).exitCode === 0;
+  const reviewable = await reviewRangeOf(
+    observed.rounds.map((round) => round.sha),
+    input,
+  );
   const verdict = judgeExternalPush(
     observed.history,
     observed.rounds,
     currentHead,
     reviewedHeadPublished,
+    reviewable,
   );
   if (verdict !== 'allow') throw new Error(`外部レビューの push ゲート: ${verdict}`);
   if (observed.history.reviewedCommentCount < comments.length)

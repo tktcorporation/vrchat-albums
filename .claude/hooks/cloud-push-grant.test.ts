@@ -32,7 +32,7 @@ describe('checkCloudPushGrant', () => {
 });
 
 describe('gh が使えない環境の外部指摘 push ガード', () => {
-  test('コネクタ側ゲートの許可がある HEAD だけを 1 回通す', async () => {
+  test('確かめられない push は警告して通し、コネクタ側ゲートの許可がある HEAD は 1 回だけ警告なしで通す', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'cloud-push-grant-'));
     try {
       for (const args of [
@@ -58,23 +58,22 @@ describe('gh が使えない環境の外部指摘 push ガード', () => {
           stdout: 'pipe',
           stderr: 'pipe',
         });
-        const [code, error] = await Promise.all([child.exited, new Response(child.stderr).text()]);
-        return { code, error };
+        const [code, output] = await Promise.all([child.exited, new Response(child.stdout).text()]);
+        return { code, warned: output.includes('WARNING') };
       };
       const branch = await currentBranch(cwd);
       const sha = await reviewTargetSha({ cwd });
 
-      expect((await run()).code).toBe(2);
+      const warned = { code: 0, warned: true };
+      expect(await run()).toEqual(warned);
 
       await writeCloudPushGrant({ cwd }, { branch, head: 'b'.repeat(40) });
-      const mismatch = await run();
-      expect(mismatch.code).toBe(2);
-      expect(mismatch.error).toContain('一致しません');
+      expect(await run()).toEqual(warned);
 
       await writeCloudPushGrant({ cwd }, { branch, head: sha });
-      expect((await run()).code).toBe(0);
-      // 使った許可は消えるので、同じ許可で 2 回目の push は通らない。
-      expect((await run()).code).toBe(2);
+      expect(await run()).toEqual({ code: 0, warned: false });
+      // 使った許可は消えるので、2 回目の push は再び警告する。
+      expect(await run()).toEqual(warned);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

@@ -17,7 +17,7 @@ pr-review-loop(本スキル)  →  上記2つを「指摘全体」に対して�
 
 本スキルは `pr-deep-review` の手順そのものは変更しない。`upstream-fix` の Phase 1-4 の視点も変更しない。変えるのは適用範囲で、upstream-fix を**1件の指摘ではなくラウンドの指摘全体**に対して適用し、それを複数ラウンド繰り返す。
 
-`.claude/rules/pr-self-review.md` が定める `gh pr create` 前のゲートは、本スキルのループを収束まで回すこと。収束条件の正確な中身（何ラウンド必要か、最後のラウンドに何を求めるか）はそちらの「仕組み」節を読む。ここでは手順だけを示す: ラウンドごとに `bun .claude/hooks/record-pr-review.ts <指摘件数> [codex]` で記録し、hook が収束を認めなければ Step 1 に戻る。
+`.claude/rules/pr-self-review.md` が定める `gh pr create` 前のゲートは、本スキルのループを収束まで回すこと。収束条件の正確な中身（何ラウンド必要か、最後のラウンドに何を求めるか）はそちらの「仕組み」節を読む。ここでは手順だけを示す: ラウンドごとに `bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/record-pr-review.ts <指摘件数> [codex]` で記録し、hook が収束を認めなければ Step 1 に戻る。収束を認めたラウンドで、hook はその HEAD の SHA を PR 作成ゲートの証跡として書く。証跡の台帳は、いちばん外側のスーパープロジェクトの git 共通ディレクトリに 1 つだけあるので、入れ子のサブモジュールで記録してもルートのゲートから見える。PR はその SHA を origin へ push してから作成する。`gh pr create`（別名の `gh pr new`）は、ゲートが意味を確定できる書き方だけが通る: `gh pr create -R <host/owner/repo> --head <branch> ...` の形で `-R` と `--head` を必ず書き、<host/owner/repo> を origin に持つチェックアウトから実行する。オプションは `gh pr create --help` にあるものを 1 語ずつ書く（`-dH`・`-Hfeat`・`-H=feat` は止まる）。
 
 ## いつ使うか
 
@@ -65,7 +65,7 @@ Agent: "以下の差分を pr-deep-review スキル(.claude/skills/pr-deep-revie
 
 ### Step 2: 収束判定
 
-- 今ラウンドの指摘が0件 → このラウンドが codex review なら `bun .claude/hooks/record-pr-review.ts 0 codex`、そうでなければ `bun .claude/hooks/record-pr-review.ts 0` で記録する。コマンドの「収束」は PR 作成前の条件を示す。既存 PR の外部指摘後は、指摘を観測した後だけで 2 ラウンド以上（最後は codex review）が揃ってから Step 7 へ進む。まだ 1 ラウンドなら Step 1 をもう一度行う。外部指摘がない場合は、コマンドの出力が「収束」なら Step 7 へ、「未収束」ならその出力が示す理由（ラウンド数不足・最後が codex でない、など）を解消する Step 1 をもう一度行う（正確な収束条件は `.claude/rules/pr-self-review.md` の「仕組み」節を参照）
+- 今ラウンドの指摘が0件 → このラウンドが codex review なら `bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/record-pr-review.ts 0 codex`、そうでなければ `bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/record-pr-review.ts 0` で記録する。コマンドの「収束」は PR 作成前の条件を示す。既存 PR の外部指摘後は、指摘を観測した後だけで 2 ラウンド以上（最後は codex review）が揃ってから Step 7 へ進む。まだ 1 ラウンドなら Step 1 をもう一度行う。外部指摘がない場合は、コマンドの出力が「収束」なら Step 7 へ、「未収束」ならその出力が示す理由（ラウンド数不足・最後が codex でない、など）を解消する Step 1 をもう一度行う（正確な収束条件は `.claude/rules/pr-self-review.md` の「仕組み」節を参照）
 - 今ラウンドの指摘が指し示す根本原因を、**前ラウンドの Step 3 で診断したクラスタ**と比較する(素の指摘リストの文字列同士を比較しない)。指し示す根本原因が前ラウンドから変わっていなければ**意味的に同じ**とみなす(文言の揺れは同一とみなす) → **途中収束**(直しても変わらない状態)。下記「非収束そのものを診断する」で全ラウンドを振り返り、レビューが続く原因と設計・要件・進め方を変える案を示してユーザーと方針を決める。残る指摘を受け入れる方針が選ばれた場合だけ、現在の HEAD に対して codex review をもう一度行い(この回も指摘は残るはずだが、それが受け入れ対象であることを確認する)、その実際の件数のまま `accepted` を付けて記録する(0 件だと偽らない)。別の方針が選ばれたら Step 3 へ。記録したら Step 7へ
 - どちらでもなければ Step 3 へ
 
@@ -98,7 +98,7 @@ Agent: "以下の差分を pr-deep-review スキル(.claude/skills/pr-deep-revie
 
 ### Step 6: ラウンド継続判定
 
-このラウンドの指摘件数を `bun .claude/hooks/record-pr-review.ts <件数> [codex]` で記録する(指摘 0 件なら 0。codex review のラウンドは第 2 引数に `codex` を渡す)。
+このラウンドの指摘件数を `bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/record-pr-review.ts <件数> [codex]` で記録する(指摘 0 件なら 0。codex review のラウンドは第 2 引数に `codex` を渡す)。
 
 記録コマンドの出力が「振り返りが必要」と言ったら、Step 1 に戻る前に下記「振り返り」を行う。hook が一定ラウンドごとに強制し、済ませるまで、収束しないラウンドを記録できない。
 
@@ -109,7 +109,7 @@ Agent: "以下の差分を pr-deep-review スキル(.claude/skills/pr-deep-revie
 
 #### 振り返り(一定ラウンドごと。hook が強制する)
 
-レビューが長引いていること自体が、構造を疑う十分な合図になる。指摘件数は確率的に減ることがあるので、件数が下がっていても、指摘の中身を見て「このまま進めてよいか」「もっと良い解決策はないか」を確認する。収束に向かっている実感の有無に関係なく、間隔ごとに必ず行う(間隔は `.claude/hooks/review-policy.ts` の `CHECKPOINT_INTERVAL`)。
+レビューが長引いていること自体が、構造を疑う十分な合図になる。指摘件数は確率的に減ることがあるので、件数が下がっていても、指摘の中身を見て「このまま進めてよいか」「もっと良い解決策はないか」を確認する。収束に向かっている実感の有無に関係なく、間隔ごとに必ず行う(間隔は `.claude/hooks/review-policy.ts` の `CHECKPOINT_INTERVAL`)。ラウンドの数え方は、収束したラウンド(証跡を書いたラウンド)の後から数え直す。PR 作成後の外部指摘への対応は、新しいレビューとして間隔と長期化の判定を始める。
 
 1. 直近の指摘を、根本原因で分類する(何種類か、どの箇所・どの規則に集中しているか)
 2. 同じ構造が原因で、同種の指摘が形を変えて出続けていないかを、下記「非収束そのものを診断する」の手順で確認する
@@ -118,14 +118,14 @@ Agent: "以下の差分を pr-deep-review スキル(.claude/skills/pr-deep-revie
 5. 結論を、次のとおり決めて記録する。診断メモには 1〜4 の検討結果を書く(文字数の下限は hook が検査する)
 
    ```bash
-   bun .claude/hooks/record-pr-review.ts checkpoint <continue|replan|asked> "<診断メモ>"
+   bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/record-pr-review.ts checkpoint <continue|replan|asked> "<診断メモ>"
    ```
 
    - `continue`: 分類の結果、共通の構造的原因は見つからず、今の方針で収束できると判断した
    - `replan`: 構造的原因や、より良い解決策を見つけたので、方針を変える
    - `asked`: 指摘が続く原因と設計・要件・進め方の案を示し、ユーザーと進む方向を決めた
 
-指摘件数が最良値を更新していない停滞では、hook は `asked` 以外を受理しない。ブランチのラウンドが `LONG_REVIEW_ROUNDS` に達した後も、件数の傾向に関係なく `asked` が必要になる。どちらも「続けるか」だけを聞かず、非収束の原因を診断して設計・要件・進め方の案を比較し、採る方針をユーザーと決める。停滞していない定期的な振り返りでは、診断の結果に応じて `continue` または `replan` を記録できる。
+指摘件数が最良値を更新していない停滞では、hook は `asked` 以外を受理しない。直近の収束より後のラウンドが `LONG_REVIEW_ROUNDS` に達した後も、件数の傾向に関係なく `asked` が必要になる。どちらも「続けるか」だけを聞かず、非収束の原因を診断して設計・要件・進め方の案を比較し、採る方針をユーザーと決める。停滞していない定期的な振り返りでは、診断の結果に応じて `continue` または `replan` を記録できる。
 
 **確認が必要なときは、レビューを続けるかだけを聞かない。** 質問を作る前に、下の 5 つの問いに全ラウンドの指摘から答える。答えはそれぞれ根拠（件数・ファイル・指摘の要約）付きで書き、推測で埋めない。
 
@@ -165,7 +165,7 @@ Step 2 の途中収束判定は「直前ラウンドと同じ根本原因が繰�
 
 収束した場合は、指摘の根本原因と確定した対応をまとめる。非収束で相談する場合は、ラウンドの時系列より先に**なぜレビューが続いているか**を原因別に示し、設計・要件・進め方の案と推奨理由を比較して方針を尋ねる。`.claude/rules/conclusion-only-output.md` に従い、試行錯誤の過程(捨てた案等)は書かず、判断に必要な事実と選択肢を書く。accepted で収束した場合・途中収束のまま止めた場合は、残る指摘をユーザー判断事項として明記する（PR 本文にも同じ内容を書く）。
 
-判定が「準備完了」「準備完了(要受理事項の記載)」のときだけ、各ラウンドの記録（`bun .claude/hooks/record-pr-review.ts <指摘件数> [codex] [accepted]`）が済んでいれば `gh pr create` が通ることを伝える。「途中収束(要判断)」「中断(打ち切り)」のときは、まだ `gh pr create` が通らないこと、続行するには何が要るかを伝える。
+判定が「準備完了」「準備完了(要受理事項の記載)」のときだけ、各ラウンドの記録（`bun "$CLAUDE_PROJECT_DIR"/.claude/hooks/record-pr-review.ts <指摘件数> [codex] [accepted]`）が済んで収束の証跡が書かれていれば、その HEAD を push した後に `gh pr create -R <host/owner/repo> --head <branch>` が通ることを伝える。「途中収束(要判断)」「中断(打ち切り)」のときは、まだ `gh pr create` が通らないこと、続行するには何が要るかを伝える。
 
 ## 出力フォーマット
 

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 const manifest: unknown = await Bun.file(join(import.meta.dir, 'manifest.json')).json();
 
-/** PR 作成ゲートと作成後のリセットについて、ホストごとの matcher を取り出す。 */
+/** PR 作成ゲートについて、ホストごとの matcher を取り出す。 */
 function matchersFor(id: string): Record<string, string> {
   const hooks = Reflect.get(Object(manifest), 'hooks');
   const hook = Array.isArray(hooks)
@@ -40,22 +40,20 @@ const otherNames = [
 ];
 
 describe('PR 作成の MCP 呼び出しに掛ける matcher', () => {
-  for (const id of ['require-pr-self-review-mcp', 'post-mcp-pr']) {
-    test(`${id} は各ホストの PR 作成ツール名にだけ一致する`, () => {
-      const matchers = matchersFor(id);
-      for (const [host, names] of Object.entries(prCreateNames)) {
-        const matcher = matchers[host];
-        expect(matcher).toBeString();
-        const pattern = new RegExp(matcher ?? '');
-        for (const name of names) expect(pattern.test(name)).toBe(true);
-        for (const name of otherNames) expect(pattern.test(name)).toBe(false);
-        // Cursor（MCP:）と Claude Code・Codex（mcp__）の命名を取り違えて受け付けない
-        const foreign =
-          host === 'cursor'
-            ? [...prCreateNames.claude, ...prCreateNames.codex]
-            : prCreateNames.cursor;
-        for (const name of foreign) expect(pattern.test(name)).toBe(false);
-      }
-    });
-  }
+  test('require-pr-self-review-mcp は各ホストの PR 作成ツール名にだけ一致する', () => {
+    const matchers = matchersFor('require-pr-self-review-mcp');
+    for (const [host, names] of Object.entries(prCreateNames)) {
+      const matcher = matchers[host];
+      expect(matcher).toBeString();
+      const pattern = new RegExp(matcher ?? '');
+      for (const name of names) expect(pattern.test(name)).toBe(true);
+      for (const name of otherNames) expect(pattern.test(name)).toBe(false);
+      // Cursor（MCP:）と Claude Code・Codex（mcp__）の命名を取り違えて受け付けない
+      const foreign =
+        host === 'cursor'
+          ? [...prCreateNames.claude, ...prCreateNames.codex]
+          : prCreateNames.cursor;
+      for (const name of foreign) expect(pattern.test(name)).toBe(false);
+    }
+  });
 });

@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /** PR の指摘を読み始めた時点のローカルレビュー回数を記録する。 */
-import { readInput } from './hook-utils.ts';
 import { refreshFeedback } from './pr-feedback-observation.ts';
 
-const feedback = await refreshFeedback(await readInput());
+// 実行したディレクトリのチェックアウトを対象にする（サブモジュールや worktree ならその中で実行する）。
+const feedback = await refreshFeedback();
 if (feedback.kind !== 'found') {
   console.error(
     feedback.kind === 'no_pr'

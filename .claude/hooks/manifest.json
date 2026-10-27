@@ -81,22 +81,6 @@
       }
     },
     {
-      "id": "post-bash-pr",
-      "script": ".claude/hooks/post-bash-pr.ts",
-      "claude": {
-        "event": "PostToolUse",
-        "matcher": "Bash"
-      },
-      "cursor": {
-        "event": "postToolUse",
-        "matcher": "Shell"
-      },
-      "codex": {
-        "event": "PostToolUse",
-        "matcher": "^(Bash|exec_command)$"
-      }
-    },
-    {
       "id": "post-bash-timing",
       "script": ".claude/hooks/post-bash-timing.ts",
       "claude": {
@@ -225,22 +209,6 @@
       },
       "codex": {
         "event": "PreToolUse",
-        "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
-      }
-    },
-    {
-      "id": "post-mcp-pr",
-      "script": ".claude/hooks/post-mcp-pr.ts",
-      "claude": {
-        "event": "PostToolUse",
-        "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
-      },
-      "cursor": {
-        "event": "postToolUse",
-        "matcher": "^MCP:(?:github_)?create_pull_request$"
-      },
-      "codex": {
-        "event": "PostToolUse",
         "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
       }
     }

@@ -85,3 +85,24 @@ test('push は最新の指摘後に現在の HEAD で収束した場合だけ通
   const third = observe(observe(history, 'b', 'two', 3), 'c', 'three', 3);
   expect(judgeExternalPush(third, rounds, 'a')).toBe('consult_user');
 });
+
+test('push の判定は、指摘後のラウンドのうちレビュー範囲に入るものだけを数える', () => {
+  const history = observe(newExternalReviewHistory(42), 'head', 'one', 1);
+  const stale = { count: 3, sha: 'merged-work', reviewer: 'other' as const, accepted: false };
+  const before = { count: 2, sha: 'head', reviewer: 'other' as const, accepted: false };
+  const other = { count: 1, sha: 'head', reviewer: 'other' as const, accepted: false };
+  const codex = { count: 0, sha: 'head', reviewer: 'codex' as const, accepted: false };
+  const reviewable = new Set(['head']);
+  // 範囲外のラウンドを数えると 2 ラウンドに見えて通ってしまう。
+  expect(judgeExternalPush(history, [before, stale, codex], 'head')).toBe('allow');
+  expect(judgeExternalPush(history, [before, stale, codex], 'head', false, reviewable)).toBe(
+    'review_locally',
+  );
+  // 基準線（位置 1）は絞り込む前の並びで切る。先頭の範囲内ラウンドは指摘前なので数えない。
+  expect(judgeExternalPush(history, [before, other, codex], 'head', false, reviewable)).toBe(
+    'allow',
+  );
+  expect(judgeExternalPush(history, [before, codex], 'head', false, reviewable)).toBe(
+    'review_locally',
+  );
+});

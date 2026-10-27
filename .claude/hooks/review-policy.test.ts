@@ -29,6 +29,10 @@ const round = (count: number, accepted = false): Entry => ({
   round: roundOf(count, { accepted }),
 });
 const rounds = (...counts: number[]): Entry[] => counts.map((count) => round(count));
+const other = (count: number, accepted = false): Entry => ({
+  kind: 'round',
+  round: roundOf(count, { reviewer: 'other', accepted }),
+});
 const checkpoint: Entry = { kind: 'checkpoint', decision: ASKED, sha, note: '診断メモ' };
 
 describe('checkpointState', () => {
@@ -65,8 +69,26 @@ describe('checkpointState', () => {
   });
 
   test('最後のラウンドが 0 件か accepted なら停滞ではない', () => {
-    expect(checkpointState(rounds(3, 1, 0))).toMatchObject({ reason: null });
-    expect(checkpointState([round(2), round(2), round(2, true)])).toMatchObject({ reason: null });
+    // codex 以外のラウンドなので収束はせず、窓は区切られない。
+    expect(checkpointState([round(3), round(1), other(0)])).toMatchObject({ reason: null });
+    expect(checkpointState([round(2), round(2), other(2, true)])).toMatchObject({ reason: null });
+  });
+
+  test('収束したラウンドより後のラウンドだけで、窓と総数を数え直す', () => {
+    const converged = [round(3), round(1), round(0)];
+    expect(checkpointState(converged)).toEqual({ status: 'clear', counts: [], totalRounds: 0 });
+    const after = { kind: 'round', round: roundOf(2, { sha: head, reviewer: 'other' }) } as const;
+    expect(checkpointState([...converged, after])).toEqual({
+      status: 'clear',
+      counts: [2],
+      totalRounds: 1,
+    });
+  });
+
+  test('収束より前の長いレビューは、収束後の長期化の判定に数えない', () => {
+    const before = [...rounds(9, 7, 5), checkpoint, ...rounds(4, 3), round(0)];
+    const state = checkpointState([...before, ...rounds(4, 3, 2)]);
+    expect(state).toEqual({ status: 'due', counts: [4, 3, 2], totalRounds: 3, reason: null });
   });
 
   test('振り返りの記録以降のラウンドだけを窓として数える', () => {
@@ -138,6 +160,21 @@ describe('judgeRound', () => {
     expect(judgeRound(rounds(8, 6), roundOf(4))).toMatchObject({
       kind: 'record',
       next: { status: 'due', counts: [8, 6, 4], totalRounds: 3, reason: null },
+    });
+  });
+
+  test('収束した後の新しい SHA へのラウンドは、収束前のラウンドで振り返りに掛からない', () => {
+    const entries = [round(3), round(1), round(0)];
+    expect(
+      isConverged(
+        entries.flatMap((e) => (e.kind === 'round' ? [e.round] : [])),
+        sha,
+      ),
+    ).toBe(true);
+    const verdict = judgeRound(entries, roundOf(2, { sha: head, reviewer: 'other' }));
+    expect(verdict).toMatchObject({
+      kind: 'record',
+      next: { status: 'clear', counts: [2], totalRounds: 1 },
     });
   });
 

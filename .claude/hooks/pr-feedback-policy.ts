@@ -89,11 +89,19 @@ export const acknowledgeFeedback = (
 
 export type PushVerdict = 'allow' | 'consult_user' | 'review_locally';
 
+/**
+ * 外部指摘を受けた PR への push を通すかを決める。
+ *
+ * `rounds` はファイルにある並びをそのまま渡す（履歴が保存した基準線はこの並びの位置なので）。
+ * `reviewable` はそのうちレビュー範囲に入るコミットの集合で、基準線より後のラウンドをこれで
+ * 絞ってから収束を判定する。先に絞ると位置がずれるので、切り出してから絞る。null なら絞らない。
+ */
 export function judgeExternalPush(
   history: ExternalReviewHistory,
   rounds: Round[],
   currentSha: string,
   reviewedHeadPublished = false,
+  reviewable: ReadonlySet<string> | null = null,
 ): PushVerdict {
   if (needsUserDecision(history)) return 'consult_user';
   // 成功した push の後は通常の追加コミットを再レビュー対象にしない。
@@ -107,7 +115,12 @@ export function judgeExternalPush(
     history.roundsAtLastFeedback,
     history.consultation.kind === 'answered' ? history.consultation.roundsAtConsultation : 0,
   );
-  if (judgeConvergence(rounds.slice(baseline), currentSha).kind !== 'converged') {
+  const sinceFeedback = rounds.slice(baseline);
+  const counted =
+    reviewable === null
+      ? sinceFeedback
+      : sinceFeedback.filter((round) => reviewable.has(round.sha));
+  if (judgeConvergence(counted, currentSha).kind !== 'converged') {
     return 'review_locally';
   }
   return 'allow';

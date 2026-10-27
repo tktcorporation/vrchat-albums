@@ -52,6 +52,14 @@ export type Entry =
   | { kind: 'round'; round: Round }
   | { kind: 'checkpoint'; decision: CheckpointDecision; sha: string; note: string };
 
+/** 記録がレビュー・振り返りの対象にした HEAD の SHA。 */
+export const entrySha = (entry: Entry): string =>
+  entry.kind === 'round' ? entry.round.sha : entry.sha;
+
+/** reachable に含まれる SHA の記録だけを、順序を保って残す。 */
+export const entriesWithin = (entries: Entry[], reachable: ReadonlySet<string>): Entry[] =>
+  entries.filter((entry) => reachable.has(entrySha(entry)));
+
 export const roundsOf = (entries: Entry[]): Round[] =>
   entries.flatMap((entry) => (entry.kind === 'round' ? [entry.round] : []));
 
@@ -173,7 +181,7 @@ export function convergenceReason(
  */
 export const CHECKPOINT_INTERVAL = 3;
 /**
- * ブランチのラウンドがこの数に達したら、指摘件数の傾向に関係なく、振り返りでユーザーへの
+ * 直近の収束より後のラウンドがこの数に達したら、指摘件数の傾向に関係なく、振り返りでユーザーへの
  * 確認を必須にする。件数は確率的に減ることがあり、レビューが長引いた事実そのものが、
  * 構造の見直しを促す十分な合図になる。振り返り間隔の整数倍にするので、この閾値に達した
  * 以降の振り返りは、すべて確認が必須になる。
@@ -188,7 +196,7 @@ export type CheckpointReason = { kind: 'stalled' } | { kind: 'long'; totalRounds
 interface Progress {
   /** 直近の振り返り以降のラウンドの指摘件数。 */
   counts: number[];
-  /** このブランチで記録済みのラウンドの総数。 */
+  /** このブランチで直近の収束より後に記録したラウンドの総数。 */
   totalRounds: number;
 }
 export type ClearState = Progress & { status: 'clear' };
@@ -211,7 +219,29 @@ function lastCheckpointIndex(entries: Entry[]): number {
   return -1;
 }
 
-export function checkpointState(entries: Entry[]): CheckpointState {
+/**
+ * 収束したラウンド（PR 作成ゲートの証跡を書いた時点）の直後の位置。無ければ 0。
+ * ラウンドは記録した時点の HEAD をレビューするので、そこまでのラウンドで収束を判定する。
+ */
+function afterLastConvergence(entries: Entry[]): number {
+  let boundary = 0;
+  const rounds: Round[] = [];
+  entries.forEach((entry, index) => {
+    if (entry.kind !== 'round') return;
+    rounds.push(entry.round);
+    if (isConverged(rounds, entry.round.sha)) boundary = index + 1;
+  });
+  return boundary;
+}
+
+/**
+ * 振り返りの窓とラウンドの総数は、直近の収束より後の記録だけで数える。収束で PR 作成前の
+ * レビューは区切りがつき、PR 作成後の外部指摘への対応は新しいレビューとして始まる。収束前の
+ * ラウンドまで数えると、PR 作成後の最初の修正ラウンドから振り返りや長期化の判定に掛かる。
+ * 記録ファイルは書き換えないので、外部指摘の履歴が保存した位置（pr-feedback-policy.ts）はずれない。
+ */
+export function checkpointState(allEntries: Entry[]): CheckpointState {
+  const entries = allEntries.slice(afterLastConvergence(allEntries));
   const lastCheckpoint = lastCheckpointIndex(entries);
   const window = roundsOf(entries.slice(lastCheckpoint + 1));
   const counts = window.map((round) => round.count);
@@ -256,7 +286,8 @@ export type CheckpointRejection =
   | { kind: 'must_ask'; reason: CheckpointReason; counts: number[] }
   | { kind: 'note_too_short' };
 export type CheckpointVerdict =
-  | { kind: 'accept'; entries: Entry[] }
+  /** entries は追記後の全記録、entry は追記した振り返り。 */
+  | { kind: 'accept'; entries: Entry[]; entry: Entry }
   | { kind: 'reject'; rejection: CheckpointRejection };
 
 export function judgeCheckpoint(
@@ -279,8 +310,6 @@ export function judgeCheckpoint(
   if (text.length < MIN_NOTE_LENGTH) {
     return { kind: 'reject', rejection: { kind: 'note_too_short' } };
   }
-  return {
-    kind: 'accept',
-    entries: [...entries, { kind: 'checkpoint', decision, sha, note: text }],
-  };
+  const entry: Entry = { kind: 'checkpoint', decision, sha, note: text };
+  return { kind: 'accept', entries: [...entries, entry], entry };
 }

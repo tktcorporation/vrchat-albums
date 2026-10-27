@@ -17,6 +17,12 @@ import { formatIsoUtc, nowMs, parseIsoUtcMs } from './iso-time.ts';
 import { parseGitHubFeedback } from './pr-feedback-github.ts';
 import { reviewCountFile } from './review-count.ts';
 
+// .cjs の型は既定エクスポートの関数として推論され、付け足したプロパティが型に現れないため取り出して使う。
+const cjsMatchesGitHubRemote: (remote: string, repository: string) => boolean = Reflect.get(
+  cloudPrFeedback,
+  'matchesGitHubRemote',
+);
+
 const head = 'a'.repeat(40);
 const reviewed = 'b'.repeat(40);
 const currentUtc = () => formatIsoUtc(nowMs());
@@ -517,6 +523,10 @@ describe('connector feedback boundary', () => {
     expect(commands.find((cmd) => cmd.startsWith('git push'))).toContain('git push origin');
     expect(commands).toContain('git remote get-url --push --all origin');
     expect(commands.find((cmd) => cmd.startsWith('git push'))).not.toContain('HEAD:');
+    // 全ブランチの一覧は出力の上限で切れうるので、対象の ref だけを問い合わせる。
+    expect(commands.find((cmd) => cmd.includes('git ls-remote'))).toContain(
+      `--heads origin 'refs/heads/${'fix/branch'}'`,
+    );
 
     commands.length = 0;
     const sshResult = await cloudPrFeedback(makeTools(false, 'git@github.com:owner/repo.git'), {
@@ -635,5 +645,168 @@ describe('connector feedback boundary', () => {
     );
     expect(result.kind).toBe('consulted');
     expect(commands.some((cmd) => cmd.startsWith('git push'))).toBe(false);
+  });
+});
+
+// 片付けの失敗を確かめるための、ゲートの結果と apply_patch の振る舞いを差し替えられる道具一式。
+function cleanupTools(gate: () => unknown, deletePatch: () => unknown) {
+  const commands: string[] = [];
+  return {
+    commands,
+    tools: {
+      getUserLogin: async () => ({ structuredContent: { login: 'me' } }),
+      now: async () => ({ current_time: currentToolTime() }),
+      fetch: async ({ url }: { url: string }) => ({
+        structuredContent: {
+          content: JSON.stringify(
+            url.includes('/comments?') ? comments : url.includes('/reviews?') ? reviews : pr,
+          ),
+        },
+      }),
+      exec: async ({ cmd }: { cmd: string }) => {
+        commands.push(cmd);
+        if (cmd.startsWith('mktemp -d'))
+          return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
+        if (cmd.startsWith('rmdir ')) return { exit_code: 1, output: 'Directory not empty' };
+        return gate();
+      },
+      patch: async (patch: string) => (patch.includes('*** Delete File:') ? deletePatch() : {}),
+    },
+  };
+}
+
+describe('証跡の片付けの失敗', () => {
+  test('ゲートが落ち、証跡の削除も失敗したら、両方を残った場所とともに報告する', async () => {
+    const { tools, commands } = cleanupTools(
+      () => {
+        throw new Error('gate crashed');
+      },
+      () => ({ isError: true }),
+    );
+    const error: unknown = await Promise.resolve(cloudPrFeedback(tools, options)).catch(
+      (reason: unknown) => reason,
+    );
+    if (!(error instanceof AggregateError)) throw new Error(`unexpected: ${String(error)}`);
+    const aggregate = error;
+    expect(aggregate.message).toContain('gate crashed');
+    expect(aggregate.message).toContain('/tmp/codex-pr-feedback.abc123/evidence.json');
+    expect(aggregate.cause).toBe(aggregate.errors[0]);
+    expect(String(aggregate.errors[0])).toContain('gate crashed');
+    expect(commands.at(-1)).toContain('rmdir');
+  });
+
+  test('ゲートが通っても、証跡を消せなければ失敗として報告する', async () => {
+    const { tools } = cleanupTools(
+      () => ({ exit_code: 0, output: '{}' }),
+      () => {
+        throw new Error('delete rejected');
+      },
+    );
+    const error = await Promise.resolve(cloudPrFeedback(tools, options)).then(
+      () => '',
+      (reason: unknown) => String(reason),
+    );
+    expect(error).toContain('Could not remove private connector evidence');
+    expect(error).toContain('/tmp/codex-pr-feedback.abc123/evidence.json');
+  });
+});
+
+describe('ラッパーに渡すパス', () => {
+  test('空白・Unicode・+ を含むパスはそのまま単一引用符で渡し、改行や NUL を含むパスは拒否する', async () => {
+    const commands: string[] = [];
+    const sourceTree = "/work/my tools+ü/it's";
+    await Promise.resolve(
+      cloudPrFeedback(
+        {
+          ...cleanupTools(
+            () => ({ exit_code: 1, output: 'denied' }),
+            () => ({}),
+          ).tools,
+          exec: async ({ cmd }: { cmd: string }) => {
+            commands.push(cmd);
+            if (cmd.startsWith('mktemp -d'))
+              return { exit_code: 0, output: '/tmp/codex-pr-feedback.abc123\n' };
+            return { exit_code: cmd.startsWith('rmdir ') ? 0 : 1, output: 'denied' };
+          },
+        },
+        { ...options, sourceTree, bun: '/opt/my bun/bin/bun' },
+      ),
+    ).catch(() => undefined);
+    expect(commands).toContain(
+      `'/opt/my bun/bin/bun' '/work/my tools+ü/it'\\''s/.claude/hooks/cloud-pr-feedback.ts' observe < '/tmp/codex-pr-feedback.abc123/evidence.json'`,
+    );
+    for (const bad of ['/work/a\nb', '/work/a\0b', 'relative/path']) {
+      const error = await Promise.resolve(
+        cloudPrFeedback(
+          cleanupTools(
+            () => ({}),
+            () => ({}),
+          ).tools,
+          {
+            ...options,
+            sourceTree: bad,
+          },
+        ),
+      ).then(
+        () => '',
+        (reason: unknown) => String(reason),
+      );
+      expect(error).toContain('Invalid connector observation arguments');
+    }
+  });
+});
+
+describe('origin の同一性の規則', () => {
+  const urls = [
+    'https://github.com/owner/repo.git',
+    'https://github.com:443/owner/repo',
+    'https://token@github.com/Owner/Repo.git/',
+    'git@github.com:owner/repo.git',
+    'ssh://git@github.com/owner/repo.git',
+    'ssh://git@github.com:22/owner/repo.git',
+    'ssh://git@ssh.github.com:443/owner/repo.git',
+    'git@ssh.github.com:owner/repo.git',
+    'git+ssh://git@github.com/owner/repo',
+    'ssh://git@github.com:443/owner/repo.git',
+    'https://github.com:8443/owner/repo.git',
+    'https://ghe.example.com/owner/repo.git',
+    'https://github.com/other/repo.git',
+    'https://github.com.evil/owner/repo.git',
+    'git@github.com.evil:owner/repo.git',
+    'https://github.com/owner/repo.git?redirect=1',
+    'https://github.com/owner/repo.git\nhttps://github.com/other/repo.git',
+    'file:///srv/owner/repo.git',
+    '/srv/owner/repo.git',
+    'https://github.com#@evil.example/owner/repo',
+    'https://github.com?@evil.example/owner/repo',
+    'https://user#x@github.com/owner/repo.git',
+    'https://a@b@github.com/owner/repo.git',
+    'ssh://git@github.com:22?@evil.example/owner/repo.git',
+    'git@github.com#@evil.example:owner/repo.git',
+    'https://us%40er:p%23w@github.com/owner/repo.git',
+    'https://github.com/other/repo.git?x=/owner/repo.git',
+  ];
+
+  test.each([
+    'https://github.com#@evil.example/owner/repo',
+    'https://github.com?@evil.example/owner/repo',
+    'https://a@b@github.com/owner/repo.git',
+    'git@github.com#@evil.example:owner/repo.git',
+    'https://github.com/other/repo.git?x=/owner/repo.git',
+    'https://github.com/other/repo.git#/owner/repo.git',
+  ])('接続先やパスの切り出しが git とずれうる %p は一致とみなさない', (url) => {
+    expect(matchesGitHubRemote(url, 'owner/repo')).toBe(false);
+    expect(cjsMatchesGitHubRemote(url, 'owner/repo')).toBe(false);
+  });
+
+  test('ssh.github.com の 443 番ポート経由の SSH も github.com のリポジトリとして受け付ける', () => {
+    expect(matchesGitHubRemote('ssh://git@ssh.github.com:443/owner/repo.git', 'owner/repo')).toBe(
+      true,
+    );
+    expect(matchesGitHubRemote('https://github.com:8443/owner/repo.git', 'owner/repo')).toBe(false);
+  });
+
+  test.each(urls)('TS のゲートと .cjs のラッパーは %p の判定で一致する', (url) => {
+    expect(cjsMatchesGitHubRemote(url, 'owner/repo')).toBe(matchesGitHubRemote(url, 'owner/repo'));
   });
 });

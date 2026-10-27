@@ -80,10 +80,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/post-bash-pr.ts"
-          },
-          {
-            "type": "command",
             "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/post-bash-timing.ts"
           },
           {
@@ -108,15 +104,6 @@
             "type": "command",
             "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/post-lint.ts",
             "statusMessage": "Running lint on edited file..."
-          }
-        ]
-      },
-      {
-        "matcher": "^mcp__.+__(?:github_)?create_pull_request$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-or-skip-for-cursor.ts .claude/hooks/post-mcp-pr.ts"
           }
         ]
       }

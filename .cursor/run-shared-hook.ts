@@ -10,7 +10,7 @@
  */
 import { existsSync } from 'node:fs';
 import { basename, isAbsolute, join } from 'node:path';
-import { projectDirectory, workingTree } from '../.claude/hooks/hook-utils.ts';
+import { workingTree } from '../.claude/hooks/hook-utils.ts';
 
 const args = process.argv.slice(2);
 let eventOverride: string | undefined;
@@ -30,7 +30,10 @@ function deny(reason: string): never {
   process.exit(2);
 }
 
-process.env.CLAUDE_PROJECT_DIR = await projectDirectory();
+// このアダプターが置かれたプロジェクト。相対パスの hook はここを基準に解く。プロセスの現在地
+// （サブモジュールの中などセッションの作業場所）を基準にすると、そこに無いファイルを指す。
+const projectRoot = join(import.meta.dir, '..');
+process.env.CLAUDE_PROJECT_DIR = projectRoot;
 process.env.CURSOR_HOOK_VIA_ADAPTER = '1';
 const tree = await workingTree();
 const inputText = await Bun.stdin.text();
@@ -218,16 +221,13 @@ function toCursorOutput(output: string): string {
 const runHook = async (
   payload: ClaudePayload,
 ): Promise<{ output: string; status: number; stderr: string }> => {
-  // スクリプト本体は tree（Cursor が開いているワークスペース）から解決する。Cursor は
-  // ワークスペース自体を worktree 直下に開くことがあり、その worktree だけに存在する
-  // hook 定義（他 worktree /main checkout にまだ無いコミット）を、CLAUDE_PROJECT_DIR
-  // （常に主チェックアウトを指す）から解決すると見つけられない。
-  const executable = isAbsolute(hookPath) ? hookPath : join(tree, hookPath);
-  if (!existsSync(executable) && !isAbsolute(hookPath)) {
+  const executable = isAbsolute(hookPath) ? hookPath : join(projectRoot, hookPath);
+  // hook が見つからないまま通すと、PreToolUse のガードが黙って外れる。
+  if (!existsSync(executable)) {
     return {
       output: '',
-      status: 1,
-      stderr: `ENOENT: shared hook not found: ${executable}`,
+      status: payload.hook_event_name === 'PreToolUse' ? 2 : 1,
+      stderr: `hook が見つかりません: ${executable}`,
     };
   }
   const command = hookPath.endsWith('.ts') ? ['bun', executable] : [executable];
