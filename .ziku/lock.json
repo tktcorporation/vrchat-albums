@@ -266,10 +266,7 @@
       "tools/agent-fleet/test/fixtures/codex-history-dir/sessions/2026/09/03/rollout-2026-09-03T10-00-00-thread-parent.jsonl": "74713bdecdb7ca8a3d3cbbee6d914d728c13c97a833d3fb632a5b6f383108a43",
       "tools/agent-fleet/test/fixtures/codex-dir-rollout/sessions/2026/09/05/rollout-2026-09-05T00-00-00-thread-dir.jsonl/.gitkeep": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       ".ziku/ziku.jsonc": "00d3fe830f9d0eb3537f6b727d8c2b1e1c487ffd78ea8ca15d9e1228e6d2814e",
-      ".claude/hooks/post-bash-pr.ts": "aeed44ca7feae1ed9123b5946d9b6cc771810413b53540725393cd64841ca65b",
-      ".claude/hooks/post-mcp-pr.ts": "8db931235aa605c98e6cb3d7c3c80646ad08c5aab788e2b67204f991ad8aca02",
       ".claude/hooks/require-pr-self-review.ts": "4b8ba60b8ef0edff798b589704eb2b43d6b96e9e894d1bd8a3148d83a8495079",
-      ".claude/hooks/reset-pr-review-count.ts": "4279d5d29d510069740fc88f546b646a6ba59049f68cfc125f28ba1fba8d179d",
       ".claude/skills/functional-ddd/SKILL.md": "29c4631d6b8fe3408e239c0edfb6eca3bc6e467606e3ddfee6a38834d21b489d"
     },
     "ref": "a7d4e8df25f84288109b780d7546a1d96ce78dac"
