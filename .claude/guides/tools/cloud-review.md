@@ -1,6 +1,11 @@
 # Cloudでのレビュー付きDraft PR作成
 
-`functions.exec` でツールを呼び出すクラウド環境では、リポジトリの `PreToolUse` フックが自動適用されるとは限らない。PR作成には `.codex/create-reviewed-pr.cjs` を使う。このラッパーは共有レビュー判定を実行してからGitHubコネクタを呼ぶ。チェックを単独実行した後、コネクタを直接呼ぶ手順にはしない。
+クラウドで PR を作る経路は、gh の REST がリポジトリに届くかで分かれる。どちらの環境かは `bun .claude/hooks/github-doctor.ts` で確かめる（gh の有無と認証、REST と GraphQL のどちらが通るか、勧める作成経路を示す）。
+
+- **gh の REST が届く**（GraphQL を拒否して `gh pr create` が失敗する環境を含む）：`bun .claude/hooks/create-pr.ts --title <題> --body-file <ファイル> [--draft]` で作る。Bash の `gh pr create` と同じ証跡（`.claude/rules/pr-self-review.md` の「仕組み」節）で判定し、作成の応答の head・base を照合する。終了コードと出力の形はスクリプト冒頭にある
+- **gh を使えず、GitHub コネクタを `functions.exec` から呼ぶ**：以下の `.codex/create-reviewed-pr.cjs` を使う
+
+`functions.exec` でツールを呼び出すクラウド環境では、リポジトリの `PreToolUse` フックが自動適用されるとは限らない。このラッパーは共有レビュー判定を実行してからGitHubコネクタを呼ぶ。チェックを単独実行した後、コネクタを直接呼ぶ手順にはしない。
 
 ## レビューを終えて記録する
 
@@ -19,13 +24,13 @@ git rev-parse HEAD "origin/$default_branch"
 bun .claude/hooks/record-pr-review.ts 0 codex --base "origin/$default_branch" --evidence /tmp/final-review.txt
 ```
 
-件数・`accepted`・`codex` は実際の結果と既存ルールに従う。例の0を結果を確認せず記録しない。保存される証跡はbase/head、レポート本文とハッシュ、ラウンド記録のハッシュであり、独立実行を認証する署名ではない。
+件数・`accepted`・`codex` は実際の結果と既存ルールに従う。例の0を結果を確認せず記録しない。このラウンドで収束すると、記録用の CLI がそのHEADのSHAを収束の証跡として台帳（`claude/pr-review/attestations.jsonl`、`.claude/rules/pr-self-review.md` の「仕組み」節）に書く。`--evidence` で保存される証拠はbase/head、レポート本文とハッシュ、ラウンド記録のハッシュであり、独立実行を認証する署名ではない。
 
-必要なテストを実行し、最新baseとの実マージ結果を確認する。変更ブランチだけをpushしてから作成する。HEADやbaseが変わった場合は、新しい差分をレビューし直して証跡を記録する。
+必要なテストを実行し、最新baseとの実マージ結果を確認する。収束を記録したHEADそのものを変更ブランチへpushしてから作成する。HEADやbaseが変わった場合は、新しい差分をレビューし直して証跡を記録する。
 
 ## functions.execから作成する
 
-以下の `cwd`・SHA・base ブランチ名・本文・コネクタ名は実際の作業対象に合わせる。BunがPATHに無い場合は、`bun` に確認済みの実行ファイルの絶対パスを渡す。ソースはレビューした作業ツリーから読み込む。
+以下の `cwd`・SHA・base ブランチ名・本文・コネクタ名は実際の作業対象に合わせる。`cwd` は head ブランチをチェックアウトし、対象リポジトリを origin に持つ作業ツリーにする。base は origin の既定ブランチ（`origin/HEAD`）にする。BunがPATHに無い場合は、`bun` に確認済みの実行ファイルの絶対パスを渡す。ソースはレビューした作業ツリーから読み込む。
 
 ```javascript
 const cwd = '/workspace/repository/worktree';
@@ -66,17 +71,17 @@ text(result);
 
 ## 強制する範囲
 
-このラッパーは、未収束、証跡なし、汚れた作業ツリー、対象不一致、古いhead/base、通信失敗、未完了のチェック、不正な応答では作成コネクタを呼ばない。既存のフック対応ホストではCodexアダプターが `Bash` と `exec_command` を共有フックへ渡すが、ホストが `.codex/hooks.json` を読むことが前提になる。`functions.exec` 内の全呼び出しを自動捕捉する設定ではない。
+このラッパーは、リモートのheadのSHAに収束の証跡が無いとき（未収束、収束後に積んだコミット、未push）、レビューの証拠が無いか古いとき、汚れた作業ツリー、対象不一致、既定ブランチ以外のbase、古いhead/base、通信失敗、未完了のチェック、不正な応答では作成コネクタを呼ばない。既存のフック対応ホストではCodexアダプターが `Bash` と `exec_command` を共有フックへ渡すが、ホストが `.codex/hooks.json` を読むことが前提になる。`functions.exec` 内の全呼び出しを自動捕捉する設定ではない。事前チェックは許可した要求そのものを返さず、そのSHA-256だけを返す。ラッパーは送る要求から同じ値を計算し、一致したときだけ作成する（長い本文で出力が上限を超えても、照合が切れた出力に依存しない）。`cwd` はコマンドの文字列に埋め込まず、`exec_command` の `workdir` として渡す。シェルの単一引用符で埋め込むのは `bun` と実行するスクリプトのパス（観測ラッパーでは `sourceTree` から作る）で、空白やUnicodeを含んでよい。改行とNULを含む `bun`・`sourceTree`（PR作成ラッパーでは `cwd` も）は拒否する。コネクタは github.com にPRを作るので、事前チェックは origin が github.com の同じリポジトリ（`ssh.github.com` を含む）でなければ拒否する。別ホストの同名リポジトリの証跡やhead・baseで、github.com のPRを作らせないため。
 
-別CLI、GitHub画面、直接API、reopen、作成後のpush、改変されたラッパーはこの入口の外にある。レビュー記録は自己申告で、判定と作成の間のリモート更新もGitHubとの原子的操作にはできない。返却されたhead/baseが違えば未検証として報告する。既存共有ゲートのorigin照合はURL末尾のowner/repoを使い、ホストの真正性までは検証しない。
+別CLI、GitHub画面、直接API、reopen、作成後のpush、改変されたラッパーはこの入口の外にある。レビュー記録は自己申告で、判定と作成の間のリモート更新もGitHubとの原子的操作にはできない。返却されたhead/baseが違えば未検証として報告する。共有ゲートのorigin照合はURLのホストと末尾のowner/repoを証跡と突き合わせるが、そのホストが実際に対象のGitHubインスタンスかまでは検証しない。
 
 CIのフックテストは判定実装の検証であり、各PRの独立レビュー実施の認証ではない。全経路の統制やマージ時の強制には、ホスト側のツール制御やGitHubの権限・必須チェック設定が別途必要になる。これらの外部設定をこのラッパーは変更しない。
 
 ## gh が認証できないクラウドで既存 PR の外部指摘を観測する
 
-GitHub コネクタが利用可能な場合、レビュー前の観測と push 直前の再取得には `.codex/cloud-pr-feedback.cjs` を使う。`functions.exec` 内でレビュー済みのソースを読み、`exec`・`github_fetch`・`github_get_user_login` を注入する。コネクタが PR 本体、全ページのインラインコメントとレビューを取得し、Bun 側がリポジトリ・PR・ブランチ・remote head・観測時刻・指摘 ID・レビュー対象 commit を検証して既存の `.rounds.external` と同じ判定を使う。欠損、取得失敗、対象不一致では履歴を進めない。`mode: 'push'` は直前にもう一度取得してゲートを判定し、origin の push 先が観測した GitHub リポジトリと一致するときだけ検証済みのローカル SHA を指定して通常の fast-forward push を行う。観測後に 2 ラウンドの実レビューが必要な規則は変わらない。
+GitHub コネクタが利用可能な場合、レビュー前の観測と push 直前の再取得には `.codex/cloud-pr-feedback.cjs` を使う。`functions.exec` 内でレビュー済みのソースを読み、`exec`・`github_fetch`・`github_get_user_login` を注入する。コネクタが PR 本体、全ページのインラインコメントとレビューを取得し、Bun 側がリポジトリ・PR・ブランチ・remote head・観測時刻・指摘 ID・レビュー対象 commit を検証して既存の `.rounds.external` と同じ判定を使う。欠損、取得失敗、対象不一致では履歴を進めない。origin の照合は共有ゲートと同じ規則で、scheme・ユーザー名・既定ポート・`.git` の違いと、github.com へ 443 番ポートで SSH 接続する `ssh.github.com` を同じリポジトリとして扱う。証跡の一時ファイルを消せなかったときは、ゲートの結果にかかわらず残った場所を添えて失敗を返す。ゲートも失敗していれば、その失敗を主にして片付けの失敗を添える。`mode: 'push'` は直前にもう一度取得してゲートを判定し、origin の push 先が観測した GitHub リポジトリと一致するときだけ検証済みのローカル SHA を指定して通常の fast-forward push を行い、push 後は対象ブランチの ref だけを `git ls-remote` で引いてリモートの head を確かめる。観測後に 2 ラウンドの実レビューが必要な規則は変わらない。
 
-ホストがリポジトリの PreToolUse フックを発火させる場合、この `git push` にも `require-pr-feedback-review.ts` が走り、`gh` で指摘を取り直そうとする。`gh` が使えないと取得できず止まるため、`mode: 'push'` のゲートは許可した時点でブランチと HEAD に紐づく 120 秒限りの許可（`.rounds.external.cloud-push.json`、`cloud-push-grant.ts`）を残す。フックは `gh` で取得できないときに限ってこの許可を確認し、ブランチと HEAD が一致して期限内なら 1 回だけ通して許可を消す。`gh` が使える環境では許可を見ず、従来どおり `gh` の結果で判定する。許可はレビュー記録と同じく自己申告の記録である。
+ホストがリポジトリの PreToolUse フックを発火させる場合、この `git push` にも `require-pr-feedback-review.ts` が走り、`gh` で指摘を取り直そうとする。`gh` が使えないとフックは指摘を取得できず、push を止めずに警告して通す（`.claude/rules/ci-workflow.md` の「push 後: レビューコメントに対応する」）。同じ判定はラッパーが済ませているので、`mode: 'push'` のゲートは許可した時点でブランチと HEAD に紐づく 120 秒限りの許可（`.rounds.external.cloud-push.json`、`cloud-push-grant.ts`）を残す。フックは `gh` で取得できないときに限ってこの許可を確認し、ブランチと HEAD が一致して期限内なら警告を出さずに 1 回だけ通して許可を消す。`gh` が使える環境では許可を見ず、`gh` の結果で判定する。許可はレビュー記録と同じく自己申告の記録である。
 
 ```javascript
 const sourceTree = '/workspace/repository/.claude/worktrees/reviewed-tooling';

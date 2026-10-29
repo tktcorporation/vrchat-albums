@@ -11,7 +11,7 @@ PRD/設計doc/Wiki記事/レポート/PR本文/Issueなど、対外的な日本�
 
 - `faithful-doc-writing` … 内容の忠実性(言ってないことを勝手に足さない)
 - `prd-review` … PRD特有の8観点(ロジックの一貫性/仮説の明確さ等)
-- `pr-first-reader-check` … PR限定/初見の読み手に文脈と可読性が伝わるか
+- `pr-first-reader-check` … 文章の種類を問わず、初見の読み手に意図どおり伝わるか(語/文/構造の点検と、知識ゼロの読み手役に答えさせて意図と照らす理解度テスト)
 - **本スキル** … 上記のどれでもカバーしない、文〜文書全体の文章作法(段落構成/論証の厳密さ/読み手の負荷管理/LLM口調/冗長排除/見出し/読者への誠実さ)。対象はPRDに限らずWiki記事/レポート/PR本文/Issue全般
 
 内輪語禁止/技術説明の正確性は `@.claude/rules/agent-work-discipline.md`、結論だけを書く原則は `@.claude/rules/conclusion-only-output.md` が別途カバーする。本スキルではそれらと重複する項目は本文を書かず参照だけにする。

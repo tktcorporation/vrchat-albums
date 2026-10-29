@@ -7,39 +7,35 @@
  * ターンの終わりごとに未解決スレッドを見て、まだ知らせていないものがあれば 1 度だけ止める。
  * 同じスレッドで何度も止めない（知らせたスレッドの id をセッション状態に記録する）。
  *
- * gh が使えない・PR が無い・API に失敗した場合は何もしない。
+ * GitHub への問い合わせは Port（github-port.ts）を通し、PR の検索・ログイン名・指摘の取得は
+ * REST だけで行う。未解決スレッドは GraphQL でしか取れないので、取れない環境ではレビュー済みの
+ * 基準線より後に届いたインラインコメントを代わりに知らせる。
+ *
+ * gh が使えない・PR が無い・PR を確認できない場合は何もしない。Stop は毎ターン動くので、
+ * 確認できない状態を毎回止めて知らせると作業が進まない。push のゲートは同じ状態を理由付きで警告する。
  *
  * ボットコメントの到着は分単位で遅れるため、直近のチェックから間もない Stop では gh を
  * 呼ばずスキップする（THROTTLE_MS 未満）。これが無いと、PR に紐づく間は連続する Stop の
- * 度に `gh pr view`/`repo view`/`api user`/`api graphql` の4呼び出しが毎回走り、無関係な
+ * 度に PR の検索・ログイン名・スレッド・コメント・レビューの取得が毎回走り、無関係な
  * セッションを含めてレート制限とレイテンシを消費する。
  */
-import { $ } from 'bun';
 import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { readInput, sessionStateDir, workingTree } from './hook-utils.ts';
+import { createGitHubPort } from './github-port.ts';
+import type { ReviewThread } from './github-port.ts';
+import { hookCommand, isRecord, readInput, resolveTarget, sessionStateDir } from './hook-utils.ts';
 import { refreshFeedback } from './pr-feedback-observation.ts';
 
 const THROTTLE_MS = 45_000;
 
-/**
- * `$.ShellOutput.json()` は Promise を返す `Response.json()` 等と違って同期関数で、不正な JSON
- * だと同期的に throw する。`await output.json().catch(...)` と書くと、throw した時点で
- * `.catch` を呼ぶ前にエラーが伝播し（成功時も戻り値はただのオブジェクトで `.catch` を持たない
- * ため常に例外になる）意図した既定値へ倒れない。try/catch で明示的に包む。
- */
-function safeShellJson<T>(output: $.ShellOutput, fallback: T): T {
-  try {
-    const parsed: T = output.json();
-    return parsed;
-  } catch {
-    return fallback;
-  }
-}
-
 const input = await readInput();
 if (input?.stop_hook_active) process.exit(0);
-const tree = await workingTree(input);
+// Stop の入力にはコマンドが無いので、対象はセッションの現在地（入力の cwd）のチェックアウトになる。
+// `cd <submodule> && ...` のようにコマンドごとに移動して作業していると、現在地はルートのままで、
+// サブモジュール側の PR は見ない（ゲートは push・PR 作成の時点で対象を解くので、見逃しは
+// Stop での通知に限られる）。
+const target = await resolveTarget(input);
+const tree = target.cwd;
 
 const directory = await sessionStateDir();
 const throttlePath = directory
@@ -58,87 +54,20 @@ if (throttlePath) {
   await Bun.write(throttlePath, String(now)).catch(() => undefined);
 }
 
-const pr = await $`gh pr view --json number,url`.cwd(tree).quiet().nothrow();
-if (pr.exitCode !== 0) process.exit(0);
-const view = safeShellJson<{ number?: number; url?: string }>(pr, {});
-const { number, url } = view;
-if (!number) process.exit(0);
+const port = createGitHubPort(tree);
+const lookup = await port.findOpenPullRequest();
+if (lookup.kind !== 'found') process.exit(0);
+const { number, url, repository } = lookup.pullRequest;
 
-const repo = await $`gh repo view --json nameWithOwner --jq .nameWithOwner`
-  .cwd(tree)
-  .quiet()
-  .nothrow();
-const me = await $`gh api user --jq .login`.quiet().nothrow();
-if (repo.exitCode !== 0 || me.exitCode !== 0) process.exit(0);
-const [owner, name] = repo.text().trim().split('/');
-const login = me.text().trim();
-
-interface Thread {
-  id: string;
-  isResolved: boolean;
-  path: string;
-  line: number | null;
-  comments: {
-    nodes: {
-      databaseId: number;
-      author: { login: string } | null;
-      body: string;
-    }[];
-  };
-  firstComment: { nodes: { author: { login: string } | null; body: string }[] };
-}
-interface Payload {
-  data?: {
-    repository?: {
-      pullRequest?: {
-        reviewThreads?: {
-          nodes?: Thread[];
-          pageInfo?: { hasNextPage: boolean; endCursor: string | null };
-        };
-      };
-    };
-  };
-}
-const query = `query($owner:String!,$name:String!,$number:Int!,$after:String){
-  repository(owner:$owner,name:$name){ pullRequest(number:$number){
-    reviewThreads(first:100, after:$after){
-      pageInfo{ hasNextPage endCursor }
-      nodes{ id isResolved path line
-        comments(last:1){ nodes{ databaseId author{ login } body } }
-        firstComment: comments(first:1){ nodes{ author{ login } body } }
-      }
-    }
-  } }
-}`;
-// 100件を超える PR ではスレッドが複数ページに分かれる。1ページだけ見て「対応待ちが無い」と
-// 判定すると、後続ページに未解決スレッドが残っていても見逃す
-const threads: Thread[] = [];
-let after: string | null = null;
-for (;;) {
-  const args = [
-    'api',
-    'graphql',
-    '-f',
-    `query=${query}`,
-    '-f',
-    `owner=${owner}`,
-    '-f',
-    `name=${name}`,
-    '-F',
-    `number=${number}`,
-  ];
-  if (after) args.push('-f', `after=${after}`);
-  const result = await $`gh ${args}`.cwd(tree).quiet().nothrow();
-  if (result.exitCode !== 0) process.exit(0);
-  const payload = safeShellJson<Payload | null>(result, null);
-  const page = payload?.data?.repository?.pullRequest?.reviewThreads;
-  threads.push(...(page?.nodes ?? []));
-  if (!page?.pageInfo?.hasNextPage) break;
-  after = page.pageInfo.endCursor ?? null;
-  if (!after) break;
-}
+// 未解決スレッドは GraphQL でしか取れない。取れない環境では null にし、REST で取れる
+// インラインコメントの観測へ切り替える。
+const threadResult = await port.reviewThreads(number);
+const loginResult = await port.viewerLogin();
+const threads: ReviewThread[] | null =
+  threadResult.kind === 'ok' && loginResult.kind === 'ok' ? threadResult.value : null;
+const login = loginResult.kind === 'ok' ? loginResult.value : '';
 // 未解決で、最後の発言が自分ではないスレッドだけが対応待ち
-const waiting = threads.filter(
+const waiting = (threads ?? []).filter(
   (thread) => !thread.isResolved && thread.comments.nodes[0]?.author?.login !== login,
 );
 
@@ -158,30 +87,35 @@ const nagged = new Set(
 );
 // 知らせた状態は「スレッド id + 最後のコメント id」で覚える。同じスレッドでも新しい返信が
 // 付けば再び知らせる
-const stateOf = (thread: Thread) => `${thread.id}:${thread.comments.nodes[0]?.databaseId ?? ''}`;
+const stateOf = (thread: ReviewThread) =>
+  `${thread.id}:${thread.comments.nodes[0]?.databaseId ?? ''}`;
 const fresh = waiting.filter((thread) => !nagged.has(stateOf(thread)));
 // レビュー本文だけの CHANGES_REQUESTED にも未解決スレッドは存在しない。
 // スレッドの有無に関係なく GitHub のレビューを観測してから通知を判定する。
-const observed = await refreshFeedback(input);
+const observed = await refreshFeedback(target, port);
 if (observed.kind !== 'found') {
   if (fresh.length === 0) process.exit(0);
   console.log(
     JSON.stringify({
       decision: 'block',
-      reason: `PR #${number} の指摘を履歴に記録できませんでした。bun .claude/hooks/observe-pr-feedback.ts を再実行し、成功を確認してからレビューを始めてください。`,
+      reason: `PR #${number} の指摘を履歴に記録できませんでした。${hookCommand('observe-pr-feedback.ts')} を ${tree} で再実行し、成功を確認してからレビューを始めてください。`,
     }),
   );
   process.exit(0);
 }
-const freshReviews = observed.history.seenComments
+const unreviewed = observed.history.seenComments
   .slice(observed.history.reviewedCommentCount)
-  .filter((id) => id.startsWith('review:') && !nagged.has(id));
-if (fresh.length === 0 && freshReviews.length === 0) process.exit(0);
+  .filter((id) => !nagged.has(id));
+const freshReviews = unreviewed.filter((id) => id.startsWith('review:'));
+// スレッドを取れたときは、解決済みを除けるスレッドで知らせる。取れないときは、レビュー済みの
+// 基準線より後に届いたインラインコメントを知らせる（解決済みかどうかは REST では分からない）。
+const freshComments = threads === null ? unreviewed.filter((id) => id.startsWith('comment:')) : [];
+if (fresh.length === 0 && freshReviews.length === 0 && freshComments.length === 0) process.exit(0);
 if (naggedPath) {
   await mkdir(dirname(naggedPath), { recursive: true }).catch(() => undefined);
   await Bun.write(
     naggedPath,
-    `${[...nagged, ...fresh.map(stateOf), ...freshReviews].join('\n')}\n`,
+    `${[...nagged, ...fresh.map(stateOf), ...freshReviews, ...freshComments].join('\n')}\n`,
   ).catch(() => undefined);
 }
 
@@ -192,15 +126,33 @@ const summary = fresh
     return `- ${thread.path}:${thread.line ?? '-'} (${first?.author?.login ?? '?'}): ${head}`;
   })
   .join('\n');
+const commentRows = freshComments.length > 0 ? await port.reviewComments(number) : null;
+const commentSummary = freshComments
+  .map((id) => {
+    const row =
+      commentRows?.kind === 'ok'
+        ? commentRows.value.find((item) => isRecord(item) && `comment:${item.id}` === id)
+        : undefined;
+    if (!isRecord(row)) return `- ${id}`;
+    const path = typeof row.path === 'string' ? row.path : '?';
+    const line = typeof row.line === 'number' ? row.line : '-';
+    const author = isRecord(row.user) && typeof row.user.login === 'string' ? row.user.login : '?';
+    const body = (typeof row.body === 'string' ? row.body : '').replace(/\s+/g, ' ').slice(0, 120);
+    return `- ${path}:${line} (${author}): ${body}`;
+  })
+  .join('\n');
 const reviewSummary =
   freshReviews.length > 0
-    ? `\n- 変更要求レビュー本文 ${freshReviews.length} 件。gh pr view ${number} --json reviews で本文を確認してください。`
+    ? `\n- 変更要求レビュー本文 ${freshReviews.length} 件。gh api repos/${repository}/pulls/${number}/reviews で本文を確認してください。`
     : '';
-const guidance =
-  '指摘を読み始めるときは bun .claude/hooks/observe-pr-feedback.ts で観測を記録してください。個別の指摘だけを直して push せず、.claude/skills/pr-review-loop/SKILL.md の手順で差分全体を再レビューし、収束させてから push してください。外部指摘が異なる HEAD に 3 回続いた場合は .claude/rules/ci-workflow.md の診断と方針相談を行ってください。';
+const counts =
+  threads === null
+    ? `未確認のインラインコメントが ${freshComments.length} 件（未解決スレッドを取得できないため、解決済みのものを含みうる）`
+    : `未対応のレビュースレッドが ${fresh.length} 件`;
+const guidance = `指摘を読み始めるときは ${tree} で ${hookCommand('observe-pr-feedback.ts')} を実行して観測を記録してください。個別の指摘だけを直して push せず、.claude/skills/pr-review-loop/SKILL.md の手順で差分全体を再レビューし、収束させてから push してください。外部指摘が異なる HEAD に 3 回続いた場合は .claude/rules/ci-workflow.md の診断と方針相談を行ってください。`;
 console.log(
   JSON.stringify({
     decision: 'block',
-    reason: `🛑 Stop hook: PR #${number}（${url}）に未対応のレビュースレッドが ${fresh.length} 件、未確認の変更要求レビュー本文が ${freshReviews.length} 件あります。${guidance} コメントごとに「修正 / 直さない理由 / 回答」を判断し、対応したスレッドを resolve してください。\n${summary}${reviewSummary}`,
+    reason: `🛑 Stop hook: PR #${number}（${url}）に${counts}、未確認の変更要求レビュー本文が ${freshReviews.length} 件あります。${guidance} コメントごとに「修正 / 直さない理由 / 回答」を判断し、対応したスレッドを resolve してください。\n${[summary, commentSummary].filter(Boolean).join('\n')}${reviewSummary}`,
   }),
 );

@@ -31,10 +31,6 @@
     ],
     "postToolUse": [
       {
-        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-bash-pr.ts",
-        "matcher": "Shell"
-      },
-      {
         "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-bash-timing.ts",
         "matcher": "Shell"
       },
@@ -53,10 +49,6 @@
       {
         "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-lint.ts",
         "matcher": "Write|StrReplace|Edit|Delete|EditNotebook"
-      },
-      {
-        "command": "bun .cursor/run-shared-hook.ts .claude/hooks/post-mcp-pr.ts",
-        "matcher": "^MCP:(?:github_)?create_pull_request$"
       }
     ],
     "stop": [

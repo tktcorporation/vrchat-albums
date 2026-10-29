@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/prompt-router.ts"
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/prompt-router.ts"
           }
         ]
       }
@@ -16,11 +16,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/pre-bash-guard.ts"
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/pre-bash-guard.ts"
           },
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/pre-bash-timing.ts"
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/pre-bash-timing.ts"
           }
         ],
         "matcher": "^(Bash|exec_command)$"
@@ -29,12 +29,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/protect-config.ts",
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/protect-config.ts",
             "statusMessage": "Checking if file is a protected config..."
           },
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/track-edits.ts"
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/track-edits.ts"
           }
         ],
         "matcher": "Edit|Write|apply_patch"
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/require-pr-self-review-mcp.ts"
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/require-pr-self-review-mcp.ts"
           }
         ],
         "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
@@ -54,15 +54,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-bash-pr.ts"
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/post-bash-timing.ts"
           },
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-bash-timing.ts"
-          },
-          {
-            "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-bash-guard.ts"
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/post-bash-guard.ts"
           }
         ],
         "matcher": "^(Bash|exec_command)$"
@@ -71,29 +67,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/track-edits.ts"
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/track-edits.ts"
           },
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/docs-lifecycle-guard.ts",
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/docs-lifecycle-guard.ts",
             "statusMessage": "Checking doc placement..."
           },
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-lint.ts",
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/post-lint.ts",
             "statusMessage": "Running lint on edited file..."
           }
         ],
         "matcher": "Edit|Write|apply_patch"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/post-mcp-pr.ts"
-          }
-        ],
-        "matcher": "^mcp__.+__(?:github_)?create_pull_request$"
       }
     ],
     "Stop": [
@@ -101,12 +88,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/stop-verify.ts",
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/stop-verify.ts",
             "statusMessage": "Running lint + test verification before completion..."
           },
           {
             "type": "command",
-            "command": "bun \"$(git rev-parse --show-toplevel)/.codex/run-shared-hook.ts\" .claude/hooks/stop-pr-comments.ts",
+            "command": "bun \"$(d=$(git rev-parse --show-toplevel); while s=$(git -C \"$d\" rev-parse --show-superproject-working-tree); do if [ -z \"$s\" ]; then c=$(git -C \"$d\" rev-parse --path-format=absolute --git-common-dir) && m=$(git -C \"$d\" --git-dir=\"$c\" rev-parse --show-toplevel) && [ \"$m\" != \"$d\" ] && s=$(git -C \"$m\" rev-parse --show-superproject-working-tree) || break; fi; [ -n \"$s\" ] || break; d=$s; done; printf %s \"$d\")/.codex/run-shared-hook.ts\" .claude/hooks/stop-pr-comments.ts",
             "statusMessage": "Checking unresolved PR review threads..."
           }
         ]

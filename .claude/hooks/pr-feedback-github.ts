@@ -1,10 +1,11 @@
-import { $ } from 'bun';
+import { createGitHubPort } from './github-port.ts';
+import type { GitHubPort, GitHubUnavailableCause } from './github-port.ts';
 import type { FeedbackObservation } from './pr-feedback-policy.ts';
 
 /** GitHub の返答をドメインの外部指摘へ変換する境界。 */
 export type GitHubFeedback =
   | { kind: 'no_pr' }
-  | { kind: 'unavailable'; reason: string }
+  | { kind: 'unavailable'; cause: GitHubUnavailableCause; reason: string }
   | {
       kind: 'found';
       pr: number;
@@ -72,17 +73,6 @@ function isReviewSubmission(value: unknown): value is ReviewSubmission {
   );
 }
 
-async function fetchPages(tree: string, endpoint: string): Promise<unknown[] | null> {
-  const response = await $`gh api ${endpoint} --paginate --slurp`.cwd(tree).quiet().nothrow();
-  if (response.exitCode !== 0) return null;
-  try {
-    const pages: unknown = response.json();
-    return Array.isArray(pages) && pages.every(Array.isArray) ? pages.flat() : null;
-  } catch {
-    return null;
-  }
-}
-
 /** CLI と cloud connector の raw REST payload に同じ検証・抽出を適用する。 */
 export function parseGitHubFeedback(
   view: unknown,
@@ -91,21 +81,29 @@ export function parseGitHubFeedback(
   reviews: unknown,
 ): GitHubFeedback {
   if (typeof view !== 'object' || view === null) {
-    return { kind: 'unavailable', reason: 'PR の JSON を解析できませんでした' };
+    return { kind: 'unavailable', cause: 'unknown', reason: 'PR の JSON を解析できませんでした' };
   }
   const number = 'number' in view ? view.number : undefined;
   const remoteHead = 'headRefOid' in view ? view.headRefOid : undefined;
   if (typeof number !== 'number' || !Number.isInteger(number) || !number) {
-    return { kind: 'unavailable', reason: 'PR 番号を読み取れませんでした' };
+    return { kind: 'unavailable', cause: 'unknown', reason: 'PR 番号を読み取れませんでした' };
   }
   if (typeof viewerLogin !== 'string' || !viewerLogin.trim()) {
-    return { kind: 'unavailable', reason: 'GitHub のログイン名を取得できませんでした' };
+    return {
+      kind: 'unavailable',
+      cause: 'unknown',
+      reason: 'GitHub のログイン名を取得できませんでした',
+    };
   }
   if (!Array.isArray(comments) || !comments.every(isReviewComment)) {
-    return { kind: 'unavailable', reason: 'レビューコメントの項目が不足しています' };
+    return {
+      kind: 'unavailable',
+      cause: 'unknown',
+      reason: 'レビューコメントの項目が不足しています',
+    };
   }
   if (!Array.isArray(reviews) || !reviews.every(isReviewSubmission)) {
-    return { kind: 'unavailable', reason: 'レビューの項目が不足しています' };
+    return { kind: 'unavailable', cause: 'unknown', reason: 'レビューの項目が不足しています' };
   }
   const login = viewerLogin.trim().toLowerCase();
   const reviewedHeads = new Map(reviews.map((review) => [review.id, review.commit_id]));
@@ -145,50 +143,29 @@ export function parseGitHubFeedback(
   };
 }
 
-export async function fetchGitHubFeedback(tree: string): Promise<GitHubFeedback> {
-  const pr = await $`gh pr view --json number,headRefOid`.cwd(tree).quiet().nothrow();
-  if (pr.exitCode !== 0) {
-    return pr.stderr.toString().includes('no pull requests found for branch')
-      ? { kind: 'no_pr' }
-      : { kind: 'unavailable', reason: '現在の PR を確認できませんでした' };
-  }
-  let view: unknown;
-  try {
-    view = pr.json();
-  } catch {
-    return { kind: 'unavailable', reason: 'PR の JSON を解析できませんでした' };
-  }
-  if (typeof view !== 'object' || view === null || !('number' in view))
-    return { kind: 'unavailable', reason: 'PR 番号を読み取れませんでした' };
-  const number = view.number;
-  if (typeof number !== 'number' || !Number.isInteger(number) || !number)
-    return { kind: 'unavailable', reason: 'PR 番号を読み取れませんでした' };
-  let login = '';
-  const me = await $`gh api user --jq .login`.cwd(tree).quiet().nothrow();
-  if (me.exitCode === 0 && me.text().trim()) {
-    login = me.text().trim();
-  } else {
-    const authStatus = await $`gh auth status`.cwd(tree).quiet().nothrow();
-    const match = /account\s+([A-Za-z0-9_.-]+)/i.exec(
-      authStatus.stdout.toString() + authStatus.stderr.toString(),
-    );
-    if (match?.[1]) {
-      login = match[1];
-    }
-  }
-  if (!login) {
-    return { kind: 'unavailable', reason: 'GitHub のログイン名を取得できませんでした' };
-  }
-  const comments = await fetchPages(
-    tree,
-    `repos/{owner}/{repo}/pulls/${number}/comments?per_page=100`,
+/**
+ * 現在のブランチの PR に付いた外部指摘を GitHub から取る。GitHub への問い合わせは Port
+ * （github-port.ts）を通すので、GraphQL を拒否する実行環境でも REST だけで判定できる。
+ * `port` を渡すと、同じ hook 実行の中で取得済みの PR・ログイン名を使い回す。
+ */
+export async function fetchGitHubFeedback(
+  tree: string,
+  port: GitHubPort = createGitHubPort(tree),
+): Promise<GitHubFeedback> {
+  const lookup = await port.findOpenPullRequest();
+  if (lookup.kind === 'no_pr') return lookup;
+  if (lookup.kind === 'unavailable') return lookup;
+  const { number, headSha } = lookup.pullRequest;
+  const login = await port.viewerLogin();
+  if (login.kind === 'unavailable') return login;
+  const comments = await port.reviewComments(number);
+  if (comments.kind === 'unavailable') return comments;
+  const reviews = await port.reviews(number);
+  if (reviews.kind === 'unavailable') return reviews;
+  return parseGitHubFeedback(
+    { number, headRefOid: headSha },
+    login.value,
+    comments.value,
+    reviews.value,
   );
-  const reviews = await fetchPages(
-    tree,
-    `repos/{owner}/{repo}/pulls/${number}/reviews?per_page=100`,
-  );
-  if (!comments || !reviews) {
-    return { kind: 'unavailable', reason: 'PR のレビュー指摘を取得できませんでした' };
-  }
-  return parseGitHubFeedback(view, login, comments, reviews);
 }

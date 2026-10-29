@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { isRecord } from './hook-utils.ts';
+
+// hook-utils.ts は `bun` を読み込むので、Node のテストランナーからも読み込めるよう同じ判定をここに持つ。
+// review-count.ts も同じ理由で、ファイルを読み書きする関数の中で遅れて読み込む。
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** Local, self-declared review evidence; this is not reviewer authentication. */
 export interface ReviewEvidence {

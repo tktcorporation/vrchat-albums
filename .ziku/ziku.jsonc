@@ -78,6 +78,7 @@
     ".claude/guides/tools/cursor.md",
     ".claude/guides/tools/cloud-review.md",
     ".codex/cloud-pr-feedback.cjs",
-    ".codex/create-reviewed-pr.cjs"
+    ".codex/create-reviewed-pr.cjs",
+    ".claude/skills/design-improvement"
   ],
 }

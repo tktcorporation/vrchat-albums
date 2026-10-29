@@ -2,6 +2,59 @@
  * Cloud connector entrypoint for observing external PR comments and guarding a push.
  * Load this file from the reviewed tooling tree inside functions.exec, then inject tools.
  */
+// The functions below mirror parseRemoteUrl / remoteIdentity in .claude/hooks/hook-utils.ts, which
+// this file cannot import. cloud-pr-feedback.test.ts asserts both agree on a table of URLs.
+const DEFAULT_PORTS = { https: 443, http: 80, ssh: 22, 'git+ssh': 22, 'ssh+git': 22, git: 9418 };
+const canonicalHost = (host) => {
+  const lower = host.toLowerCase();
+  return lower === 'ssh.github.com' ? 'github.com' : lower;
+};
+function urlHost(url) {
+  const scheme = url.match(/^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]*@)?([^/:]*)/iu);
+  if (scheme)
+    return url.toLowerCase().startsWith('file:') || !scheme[1] ? null : canonicalHost(scheme[1]);
+  const scp = url.match(/^(?:[^@/]+@)?([^/:]+):/u);
+  return scp?.[1] ? canonicalHost(scp[1]) : null;
+}
+function urlPort(url) {
+  const match = url.match(/^([a-z][a-z0-9+.-]*):\/\/(?:[^@/]*@)?[^/:]*(?::(\d*))?(?:\/|$)/iu);
+  if (!match?.[2]) return null;
+  const port = Number(match[2]);
+  return port === DEFAULT_PORTS[(match[1] ?? '').toLowerCase()] ? null : port;
+}
+const USERINFO = /^[A-Za-z0-9\-._~%!$&'()*+,;=:]*$/u;
+function wellFormedAuthority(url) {
+  // `?`・`#` を含む URL は、owner/repo の切り出しと git が実際に問い合わせるパスがずれうる
+  // （`…/other/repo.git?x=/acme/repo.git` は末尾を acme/repo と読めるが、git は other/repo へ行く）。
+  if (/[#?]/u.test(url)) return false;
+  const scheme = url.match(/^[a-z][a-z0-9+.-]*:\/\/([^/]*)/iu);
+  const authority = scheme ? scheme[1] : url.match(/^([^/:]*):/u)?.[1];
+  if (authority === undefined) return true;
+  const at = authority.lastIndexOf('@');
+  return at === -1 || USERINFO.test(authority.slice(0, at));
+}
+function remoteIdentity(raw) {
+  const url = raw.trim().replace(/\/+$/u, '');
+  if (!wellFormedAuthority(url)) return null;
+  const match = url.match(/[:/]([^/:]+)\/([^/]+?)(\.git)?$/u);
+  const host = urlHost(url);
+  if (!match?.[1] || !match[2] || host === null) return null;
+  let port = urlPort(url);
+  if (port === 443 && /^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]*@)?ssh\.github\.com:/iu.test(url))
+    port = null;
+  const endpoint = port === null ? host : `${host}:${port}`;
+  return `${endpoint}/${match[1]}/${match[2]}`.toLowerCase();
+}
+/** Whether a remote URL names `repository` on github.com; mirrors matchesGitHubRemote in the TS gate. */
+function matchesGitHubRemote(remote, repository) {
+  if (typeof remote !== 'string' || /\s/u.test(remote)) return false;
+  return remoteIdentity(remote) === `github.com/${repository}`.toLowerCase();
+}
+
+// quote() embeds a value in sh single quotes; only NUL (cannot appear in an argument) and line
+// breaks (which split the tool's command line) cannot be carried that way.
+const quotable = (value) => typeof value === 'string' && value !== '' && !/[\0\n\r]/.test(value);
+
 module.exports = async function cloudPrFeedback(tools, options) {
   const {
     cwd,
@@ -18,10 +71,10 @@ module.exports = async function cloudPrFeedback(tools, options) {
     !Number.isSafeInteger(prNumber) ||
     prNumber <= 0 ||
     !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) ||
-    typeof branch !== 'string' ||
-    branch.length === 0 ||
-    !/^\/[A-Za-z0-9/_.-]+$/.test(sourceTree) ||
-    !/^[A-Za-z0-9/_.-]+$/.test(bun)
+    !quotable(branch) ||
+    !quotable(sourceTree) ||
+    !sourceTree.startsWith('/') ||
+    !quotable(bun)
   )
     throw new Error('Invalid connector observation arguments');
   if (mode === 'consult' && (typeof consultationNote !== 'string' || !consultationNote.trim()))
@@ -84,19 +137,9 @@ module.exports = async function cloudPrFeedback(tools, options) {
     ...(mode === 'consult' ? { consultationNote } : {}),
   };
   const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
-  const matchesGitHubRemote = (remote) => {
-    const match =
-      /^(?:https:\/\/github\.com(?::443)?\/|ssh:\/\/git@github\.com(?::22)?\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/?$/i.exec(
-        remote,
-      );
-    if (!match || match[0] !== remote) return false;
-    const path = match[1].toLowerCase();
-    const target = repository.toLowerCase();
-    return path === target || path === `${target}.git`;
-  };
   // polls は 1 秒ごとの完了確認の回数。待ち切れないと失敗を返すが、コマンド自体は走り続けるため、
   // 待たれる側の上限時間より長く取る。ゲートのリモート確認は 15 秒で打ち切られる
-  // （.claude/hooks/require-pr-self-review-mcp.ts の REMOTE_FETCH_TIMEOUT_MS）。
+  // （.claude/hooks/pr-review-gate.ts の REMOTE_FETCH_TIMEOUT_MS）。
   const run = async (cmd, maxOutputTokens, polls = 30) => {
     let result = await tools.exec({
       cmd,
@@ -131,8 +174,8 @@ module.exports = async function cloudPrFeedback(tools, options) {
     throw new Error('Could not create a private evidence directory');
   const snapshotPath = `${directory}/evidence.json`;
   let check;
+  let gateError;
   let saved = false;
-  let cleanupFailed = false;
   try {
     const added = await tools.patch(
       `*** Begin Patch\n*** Add File: ${snapshotPath}\n+${JSON.stringify(evidence)}\n*** End Patch`,
@@ -141,25 +184,50 @@ module.exports = async function cloudPrFeedback(tools, options) {
     saved = true;
     const command = `${quote(bun)} ${quote(script)} ${mode === 'push' ? 'prepush' : mode} < ${quote(snapshotPath)}`;
     check = await run(command, 1000, 60);
-  } finally {
-    // functions.exec のホストは rm -f / rm -rf の形のコマンドを実行前に拒否する。保存に使った
-    // apply_patch で証跡を消し、空になった一時ディレクトリだけを rmdir で消す。
-    // 削除が例外を投げても rmdir まで進め、try 側の元の例外を上書きしない。
-    let deleteFailed = false;
-    if (saved) {
-      try {
-        const deleted = await tools.patch(
-          `*** Begin Patch\n*** Delete File: ${snapshotPath}\n*** End Patch`,
-        );
-        deleteFailed = Boolean(deleted?.isError);
-      } catch {
-        deleteFailed = true;
-      }
-    }
-    const removed = await run(`rmdir -- ${quote(directory)}`, 100);
-    cleanupFailed = deleteFailed || removed.exit_code !== 0;
+  } catch (error) {
+    gateError = error;
   }
-  if (cleanupFailed) throw new Error('Could not remove private connector evidence');
+  // functions.exec のホストは rm -f / rm -rf の形のコマンドを実行前に拒否する。保存に使った
+  // apply_patch で証跡を消し、空になった一時ディレクトリだけを rmdir で消す。どの段が失敗しても
+  // 残りの段まで進め、失敗は残った場所と合わせて必ず報告する。ゲートの失敗があればそれを主にし、
+  // 片付けの失敗は AggregateError に添える（片付けの失敗でゲートの失敗を覆い隠さない）。
+  const cleanupErrors = [];
+  if (saved) {
+    try {
+      const deleted = await tools.patch(
+        `*** Begin Patch\n*** Delete File: ${snapshotPath}\n*** End Patch`,
+      );
+      if (deleted?.isError) throw new Error('apply_patch reported an error');
+    } catch (error) {
+      cleanupErrors.push(
+        new Error(`Could not delete evidence snapshot ${snapshotPath}`, { cause: error }),
+      );
+    }
+  }
+  try {
+    const removed = await run(`rmdir -- ${quote(directory)}`, 100);
+    if (removed.exit_code !== 0) throw new Error(removed.output);
+  } catch (error) {
+    cleanupErrors.push(
+      new Error(`Could not remove evidence directory ${directory}`, { cause: error }),
+    );
+  }
+  if (cleanupErrors.length > 0) {
+    const detail = cleanupErrors.map((error) => error.message).join('; ');
+    if (gateError !== undefined) {
+      const primary = gateError instanceof Error ? gateError.message : String(gateError);
+      throw new AggregateError(
+        [gateError, ...cleanupErrors],
+        `${primary}; private connector evidence cleanup also failed: ${detail}`,
+        { cause: gateError },
+      );
+    }
+    throw new AggregateError(
+      cleanupErrors,
+      `Could not remove private connector evidence: ${detail}`,
+    );
+  }
+  if (gateError !== undefined) throw gateError;
   if (check.exit_code !== 0) throw new Error(`Feedback ${mode} gate failed: ${check.output}`);
   const record = JSON.parse(check.output.trim());
   if (
@@ -184,7 +252,7 @@ module.exports = async function cloudPrFeedback(tools, options) {
   if (before.exit_code !== 0 || before.output.trim() !== record.localHead)
     throw new Error('Local HEAD changed after feedback gate; no push was started');
   const destination = await run('git remote get-url --push --all origin', 100);
-  if (destination.exit_code !== 0 || !matchesGitHubRemote(destination.output.trim()))
+  if (destination.exit_code !== 0 || !matchesGitHubRemote(destination.output.trim(), repository))
     throw new Error('Origin push destination differs from the observed repository');
   const pushed = await run(
     `git push origin ${quote(`${record.localHead}:refs/heads/${branch}`)}`,
@@ -194,8 +262,12 @@ module.exports = async function cloudPrFeedback(tools, options) {
   );
   if (pushed.exit_code !== 0) throw new Error(`Push failed: ${pushed.output}`);
   // ゲート側の remoteHeadSha と同じく、15 秒で打ち切り、認証プロンプトを出さず、ref 名の
-  // 完全一致で読む（先頭行を読むと `a/refs/heads/<branch>` のような別ブランチを拾う）。
-  const remote = await run('GIT_TERMINAL_PROMPT=0 timeout 15 git ls-remote --heads origin', 12000);
+  // 完全一致で読む（パターンは末尾一致なので `a/refs/heads/<branch>` のような別ブランチも返る）。
+  // 全ブランチを列挙すると出力が上限で切れ、対象の ref が落ちうるので、対象の ref だけを問い合わせる。
+  const remote = await run(
+    `GIT_TERMINAL_PROMPT=0 timeout 15 git ls-remote --heads origin ${quote(`refs/heads/${branch}`)}`,
+    12000,
+  );
   const finalHead = remote.output
     .split('\n')
     .map((line) => line.trim().split(/\s+/))
@@ -204,3 +276,4 @@ module.exports = async function cloudPrFeedback(tools, options) {
     throw new Error('Push completed but final remote head could not be verified');
   return { kind: 'pushed-verified', ...record, finalHead: record.localHead };
 };
+module.exports.matchesGitHubRemote = matchesGitHubRemote;

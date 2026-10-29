@@ -2,10 +2,11 @@
  * クラウドの push ラッパー（.codex/cloud-pr-feedback.cjs の push モード）が、GitHub コネクタで
  * 取り直した指摘に対してゲートを通した結果を、続く `git push` の PreToolUse hook へ渡す許可。
  *
- * `gh` が認証できない環境では、require-pr-feedback-review.ts が指摘を取得できず push を止める。
- * 同じ判定はコネクタ経由で直前に済んでいるため、その結果をブランチと HEAD に紐づけた短命の
- * 記録として残し、`gh` が使えないときに限って 1 回だけ使わせる。記録は自己申告で、
- * レビュー記録（.rounds）と同じくエージェント自身が書き換えられる。
+ * `gh` が認証できない環境では、push のゲート（pr-push-gate.ts）は指摘を取得できず、警告して push を
+ * 通す。同じ判定はコネクタ経由で直前に済んでいるため、その結果をブランチと HEAD に紐づけた短命の
+ * 記録として残し、`gh` が使えないときに限って 1 回だけ警告を省かせる（読み取り専用の診断は
+ * peekCloudPushGrant で確かめるだけで消費しない）。記録は自己申告で、レビュー記録（.rounds）と
+ * 同じくエージェント自身が書き換えられる。
  */
 import { mkdir, rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -64,4 +65,14 @@ export async function consumeCloudPushGrant(
   const text = await file.text();
   await rm(path, { force: true });
   return checkCloudPushGrant(text, { ...target, now: nowMs() });
+}
+
+/** 許可を消さずに、今回の push に使えるかだけを判定する（読み取り専用の診断用）。 */
+export async function peekCloudPushGrant(
+  input: { cwd?: string } | null,
+  target: PushTarget,
+): Promise<string | null> {
+  const file = Bun.file(await grantFile(input));
+  if (!(await file.exists())) return 'クラウドの push 許可がありません';
+  return checkCloudPushGrant(await file.text(), { ...target, now: nowMs() });
 }
