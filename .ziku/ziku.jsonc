@@ -40,7 +40,6 @@
     ".config/docs-lifecycle.json",
     "scripts/docs-lifecycle",
     ".claude/hooks/record-pr-review.sh",
-    ".claude/hooks/require-pr-self-review.sh",
     ".claude/rules/ci-workflow.md",
     ".claude/rules/code-intent-documentation.md",
     ".claude/rules/codex-pairing.md",
