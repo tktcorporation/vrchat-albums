@@ -237,8 +237,11 @@ function normalizeEnv(argv: ShellWord[], inherited: Map<string, ShellWord>): Nor
       index++;
       break;
     }
-    if (value === '-i' || value === '--ignore-environment' || value === '-0' || value === '--null')
+    if (value === '-i' || value === '--ignore-environment') {
+      env.clear();
       continue;
+    }
+    if (value === '-0' || value === '--null') continue;
     if (value === '-u' || value === '--unset') {
       const target = literal(argv[++index]);
       if (target === undefined) return { argv: [], env, opaqueReason: 'invalid env --unset' };

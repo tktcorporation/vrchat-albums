@@ -213,4 +213,10 @@ describe('resolveLinkTarget', () => {
     });
     expect(resolveLinkTarget('docs/plans/a.md', '../../..')).toEqual({ kind: 'outside-repo' });
   });
+
+  it('バックスラッシュ区切りのトラバーサルも outside-repo として扱う', () => {
+    expect(resolveLinkTarget('docs/a.md', '..\\..\\..\\Windows')).toEqual({
+      kind: 'outside-repo',
+    });
+  });
 });

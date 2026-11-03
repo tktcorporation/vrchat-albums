@@ -1,20 +1,16 @@
 #!/usr/bin/env bun
 /**
  * Explicit gate for hosts that do not dispatch repository PreToolUse hooks. It allows the exact
- * request only when the remote head SHA has a review convergence attestation in the ledger
- * (pr-review-gate.ts) and the self-declared review evidence still matches the head, base and rounds.
+ * request only when the shared gate (pr-review-gate.ts checkPrTarget) accepts the remote head and the
+ * PR base, and the self-declared review evidence still matches the head, the default branch tip the
+ * review covered, and the rounds.
  */
 import { $ } from 'bun';
 import { createHash } from 'node:crypto';
 import { matchesGitHubRemote } from './cloud-pr-feedback.ts';
-import { currentBranch, isRecord, originRepository } from './hook-utils.ts';
+import { currentBranch, isRecord } from './hook-utils.ts';
 import { prCreateTarget } from './pr-create-target.ts';
-import {
-  baseDenyReason,
-  checkAttestation,
-  readAttestations,
-  remoteHeadSha,
-} from './pr-review-gate.ts';
+import { checkPrTarget, readRemoteHeads } from './pr-review-gate.ts';
 import { readRecordedEntries } from './review-count.ts';
 import { checkReviewEvidence, readReviewEvidence } from './review-evidence.ts';
 import { formatEntries } from './review-policy.ts';
@@ -116,29 +112,33 @@ try {
     .filter((line) => line.trim() !== '');
   if (originUrls.length !== 1 || !matchesGitHubRemote(originUrls[0] ?? '', repo))
     throw new Error('origin is not the GitHub.com repository the connector creates the PR in');
-  const baseError = await baseDenyReason(cwd, request.base);
-  if (baseError) throw new Error(baseError);
-  // Convergence is decided by the attestation ledger for the remote head SHA (pr-review-gate.ts).
-  const attestationError = await checkAttestation(repo, headBranch, cwd);
-  if (attestationError) throw new Error(attestationError);
-  const origin = await originRepository(cwd);
-  const attested = (await readAttestations()).some(
-    (entry) =>
-      entry.sha === expectedHead && entry.repo === repo && entry.host === (origin?.host ?? null),
-  );
-  if (!attested) throw new Error('Expected head has no review convergence attestation');
-  const baseSha = await remoteHeadSha(cwd, request.base);
+  // Convergence (attestation of the remote head SHA) and the base rule are decided by the shared gate
+  // (pr-review-gate.ts) from one read of origin's branches; the SHAs below come from that same read.
+  const verdict = await checkPrTarget(repo, headBranch, cwd, [request.base]);
+  if (verdict.kind === 'denied') throw new Error(verdict.reason);
+  if (verdict.headSha !== expectedHead) throw new Error('Remote head differs from expected head');
+  const baseSha = verdict.baseShas.get(request.base);
   if (!baseSha || baseSha !== expectedBase)
     throw new Error('Remote base changed or could not be read');
+  // The attestation covers <default-branch>...HEAD, so the final review evidence is bound to the default
+  // branch tip even when the PR targets a stacked base.
+  const reviewedBaseSha = verdict.defaultSha;
+  if (!reviewedBaseSha) throw new Error('Remote default branch could not be read');
   const evidenceError = checkReviewEvidence(await readReviewEvidence({ cwd }), {
     headSha: expectedHead,
-    baseSha,
+    baseSha: reviewedBaseSha,
     roundsText: formatEntries(await readRecordedEntries({ cwd })),
   });
   if (evidenceError) throw new Error(evidenceError);
   // Recheck after reading evidence; a concurrent push still cannot be atomically locked with PR creation.
-  if ((await remoteHeadSha(cwd, headBranch)) !== expectedHead) {
-    throw new Error('Remote head differs from expected head');
+  const recheck = await readRemoteHeads(cwd);
+  if (
+    recheck.kind !== 'ok' ||
+    recheck.heads.get(headBranch) !== expectedHead ||
+    recheck.heads.get(request.base) !== baseSha ||
+    (verdict.defaultBranch !== null && recheck.heads.get(verdict.defaultBranch) !== reviewedBaseSha)
+  ) {
+    throw new Error('Remote head or base changed during the check');
   }
   console.log(
     JSON.stringify({

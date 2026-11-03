@@ -11,7 +11,7 @@
 
 `.claude/skills/pr-review-loop/SKILL.md` に従い、独立レビュー、修正、コミット、再レビューを収束まで回す。Codex CLIが使えない場合の代替条件は `.claude/rules/pr-self-review.md` に従う。フックやラッパー自体がレビューを行うわけではない。
 
-最終レビューでは、取得した最新baseとHEADをレビュアーへ明示する。結果をテキストファイルへ保存し、最終ラウンドの記録に添える。
+最終レビューでは、取得した最新の既定ブランチとHEADをレビュアーへ明示する。結果をテキストファイルへ保存し、最終ラウンドの記録に添える。
 
 ```bash
 # 既定ブランチ名はリポジトリごとに異なるため origin/HEAD から導く。
@@ -30,7 +30,7 @@ bun .claude/hooks/record-pr-review.ts 0 codex --base "origin/$default_branch" --
 
 ## functions.execから作成する
 
-以下の `cwd`・SHA・base ブランチ名・本文・コネクタ名は実際の作業対象に合わせる。`cwd` は head ブランチをチェックアウトし、対象リポジトリを origin に持つ作業ツリーにする。base は origin の既定ブランチ（`origin/HEAD`）にする。BunがPATHに無い場合は、`bun` に確認済みの実行ファイルの絶対パスを渡す。ソースはレビューした作業ツリーから読み込む。
+以下の `cwd`・SHA・base ブランチ名・本文・コネクタ名は実際の作業対象に合わせる。`cwd` は head ブランチをチェックアウトし、対象リポジトリを origin に持つ作業ツリーにする。base は origin の既定ブランチ（origin の HEAD が指すブランチ）か、積み重ねた PR の下のブランチ（head の祖先で、既定ブランチに無いコミットを持つブランチ）にする（条件は `.claude/rules/pr-self-review.md` の「仕組み」節）。最終ラウンドの記録の `--base` は、PR の base にかかわらず既定ブランチ（`origin/<既定ブランチ>`）にする。証跡が覆うのは既定ブランチとの差分で、事前チェックはレビューの証拠の base を、リモートから読んだ origin の既定ブランチの先端と照合し、PR の base は別に base の条件で判定する。`expectedBase` には PR の base のブランチの SHA を渡す。積み重ねた PR の base は手元の履歴で判定するので、shallow な clone では先に `git fetch --unshallow origin` を実行する。BunがPATHに無い場合は、`bun` に確認済みの実行ファイルの絶対パスを渡す。ソースはレビューした作業ツリーから読み込む。
 
 ```javascript
 const cwd = '/workspace/repository/worktree';
@@ -53,7 +53,7 @@ const result = await module.exports(
     cwd,
     bun: 'bun',
     expectedHead: 'REVIEWED_HEAD_SHA',
-    expectedBase: 'REVIEWED_BASE_SHA',
+    expectedBase: 'PR_BASE_SHA',
     request: {
       repository_full_name: 'owner/repository',
       head: 'feature-branch',
@@ -71,7 +71,7 @@ text(result);
 
 ## 強制する範囲
 
-このラッパーは、リモートのheadのSHAに収束の証跡が無いとき（未収束、収束後に積んだコミット、未push）、レビューの証拠が無いか古いとき、汚れた作業ツリー、対象不一致、既定ブランチ以外のbase、古いhead/base、通信失敗、未完了のチェック、不正な応答では作成コネクタを呼ばない。既存のフック対応ホストではCodexアダプターが `Bash` と `exec_command` を共有フックへ渡すが、ホストが `.codex/hooks.json` を読むことが前提になる。`functions.exec` 内の全呼び出しを自動捕捉する設定ではない。事前チェックは許可した要求そのものを返さず、そのSHA-256だけを返す。ラッパーは送る要求から同じ値を計算し、一致したときだけ作成する（長い本文で出力が上限を超えても、照合が切れた出力に依存しない）。`cwd` はコマンドの文字列に埋め込まず、`exec_command` の `workdir` として渡す。シェルの単一引用符で埋め込むのは `bun` と実行するスクリプトのパス（観測ラッパーでは `sourceTree` から作る）で、空白やUnicodeを含んでよい。改行とNULを含む `bun`・`sourceTree`（PR作成ラッパーでは `cwd` も）は拒否する。コネクタは github.com にPRを作るので、事前チェックは origin が github.com の同じリポジトリ（`ssh.github.com` を含む）でなければ拒否する。別ホストの同名リポジトリの証跡やhead・baseで、github.com のPRを作らせないため。
+このラッパーは、リモートのheadのSHAに収束の証跡が無いとき（未収束、収束後に積んだコミット、未push）、レビューの証拠が無いか古いとき、汚れた作業ツリー、対象不一致、既定ブランチでも積み重ねた PR の下のブランチでもないbase、古いhead/base、通信失敗、未完了のチェック、不正な応答では作成コネクタを呼ばない。既存のフック対応ホストではCodexアダプターが `Bash` と `exec_command` を共有フックへ渡すが、ホストが `.codex/hooks.json` を読むことが前提になる。`functions.exec` 内の全呼び出しを自動捕捉する設定ではない。事前チェックは許可した要求そのものを返さず、そのSHA-256だけを返す。ラッパーは送る要求から同じ値を計算し、一致したときだけ作成する（長い本文で出力が上限を超えても、照合が切れた出力に依存しない）。`cwd` はコマンドの文字列に埋め込まず、`exec_command` の `workdir` として渡す。シェルの単一引用符で埋め込むのは `bun` と実行するスクリプトのパス（観測ラッパーでは `sourceTree` から作る）で、空白やUnicodeを含んでよい。改行とNULを含む `bun`・`sourceTree`（PR作成ラッパーでは `cwd` も）は拒否する。コネクタは github.com にPRを作るので、事前チェックは origin が github.com の同じリポジトリ（`ssh.github.com` を含む）でなければ拒否する。別ホストの同名リポジトリの証跡やhead・baseで、github.com のPRを作らせないため。
 
 別CLI、GitHub画面、直接API、reopen、作成後のpush、改変されたラッパーはこの入口の外にある。レビュー記録は自己申告で、判定と作成の間のリモート更新もGitHubとの原子的操作にはできない。返却されたhead/baseが違えば未検証として報告する。共有ゲートのorigin照合はURLのホストと末尾のowner/repoを証跡と突き合わせるが、そのホストが実際に対象のGitHubインスタンスかまでは検証しない。
 

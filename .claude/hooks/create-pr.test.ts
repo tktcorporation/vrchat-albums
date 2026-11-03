@@ -132,6 +132,22 @@ async function run(
   return { code, stdout, stderr, calls, sentRequest };
 }
 
+/**
+ * 積み重ねた PR の構成。origin の stack は feature の親（main に無いコミット）を指し、feature はその上に
+ * 1 コミット積んで push し、その先端に証跡を書く。
+ */
+async function stackedCheckout(): Promise<FakeGitHubCheckout> {
+  const repo = await fakeGitHubCheckout(root);
+  git(repo.cwd, 'push', '-q', repo.bare, 'feature:refs/heads/stack');
+  await writeFile(join(repo.cwd, 'stacked'), 'stacked');
+  git(repo.cwd, 'add', 'stacked');
+  git(repo.cwd, 'commit', '-qm', 'stacked');
+  git(repo.cwd, 'push', '-q', repo.bare, 'feature');
+  const stacked = { ...repo, sha: git(repo.cwd, 'rev-parse', 'HEAD') };
+  await attest(stacked);
+  return stacked;
+}
+
 /** 作成要求への応答。head は既定で確かめた SHA と同じにする。 */
 const createdResponse = (headSha: string, baseRef = 'main'): string =>
   JSON.stringify(pullRow(7, headSha, baseRef));
@@ -268,20 +284,200 @@ describe('作成の要求が失敗したときの確かめ直し', () => {
 
 describe('作成の前提', () => {
   test(
-    'origin/HEAD が無ければ止め、set-head を案内する',
+    'default branch は手元の origin/HEAD ではなく origin の HEAD から読む',
     async () => {
       const repo = await fakeGitHubCheckout(root, { setHead: false });
       await attest(repo);
       const result = await run(repo, 'full', { FAKE_GH_CREATED: createdResponse(repo.sha) });
+      expect(result.code).toBe(EXIT_CODE.created);
+      expect(result.sentRequest).toEqual(expect.objectContaining({ base: 'main' }));
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    'origin の HEAD がブランチを指していなければ止める',
+    async () => {
+      const repo = await fakeGitHubCheckout(root);
+      await attest(repo);
+      git(repo.bare, 'symbolic-ref', 'HEAD', 'refs/heads/missing');
+      const result = await run(repo, 'full', { FAKE_GH_CREATED: createdResponse(repo.sha) });
       expect(result.code).toBe(EXIT_CODE.refused);
-      expect(result.stderr).toContain('git remote set-head origin --auto');
+      expect(result.stderr).toContain('origin の HEAD がブランチを指していない');
       expect(result.calls).toEqual([]);
     },
     CASE_TIMEOUT_MS,
   );
 
   test(
-    '--base に default branch 以外を渡すと止める',
+    'shallow なチェックアウトでは、base が default branch に無いコミットを持つかを確かめられないので止める',
+    async () => {
+      // main は seed の上に 1 コミット進み、feature は seed から分かれる。release は seed を指すので
+      // default branch の先端の祖先だが、main を深さ 1 で取ると seed への経路が履歴の境界で切れる。
+      const repo = await fakeGitHubCheckout(root);
+      git(repo.cwd, 'push', '-q', repo.bare, 'main:refs/heads/release');
+      git(repo.cwd, 'checkout', '-q', 'main');
+      await writeFile(join(repo.cwd, 'ahead'), 'ahead');
+      git(repo.cwd, 'add', 'ahead');
+      git(repo.cwd, 'commit', '-qm', 'ahead');
+      git(repo.cwd, 'push', '-q', repo.bare, 'main');
+      git(repo.cwd, 'checkout', '-q', 'feature');
+      const shallowDir = join(repo.cwd, '..', 'shallow');
+      git(
+        repo.cwd,
+        'clone',
+        '-q',
+        '--depth',
+        '2',
+        '--branch',
+        'feature',
+        `file://${repo.bare}`,
+        shallowDir,
+      );
+      git(shallowDir, 'fetch', '-q', '--depth', '1', 'origin', 'main');
+      git(shallowDir, 'remote', 'set-url', 'origin', 'ssh://github.com/owner/repo.git');
+      const shallow = {
+        ...repo,
+        cwd: shallowDir,
+        env: { ...repo.env, CLAUDE_PROJECT_DIR: shallowDir },
+      };
+      await attest(shallow);
+      const result = await run(shallow, 'full', { FAKE_GH_CREATED: createdResponse(repo.sha) }, [
+        '--base',
+        'release',
+      ]);
+      expect(result.code).toBe(EXIT_CODE.refused);
+      expect(result.stderr).toContain('git fetch --unshallow origin');
+      expect(result.calls.filter((call) => call.includes('-X POST'))).toEqual([]);
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    'shallow なチェックアウトでは、base が head の祖先でないと判定しても、履歴の境界のせいでありうるので fetch --unshallow を案内する',
+    async () => {
+      // stack は feature の 1 つ前のコミットを指す。feature を深さ 1 で取ると、head から stack への経路が
+      // 履歴の境界で切れ、祖先でも「祖先でない」と判定される。
+      const repo = await stackedCheckout();
+      await writeFile(join(repo.cwd, 'more'), 'more');
+      git(repo.cwd, 'add', 'more');
+      git(repo.cwd, 'commit', '-qm', 'more');
+      git(repo.cwd, 'push', '-q', repo.bare, 'feature');
+      const shallowDir = join(repo.cwd, '..', 'shallow-head');
+      git(
+        repo.cwd,
+        'clone',
+        '-q',
+        '--depth',
+        '1',
+        '--branch',
+        'feature',
+        `file://${repo.bare}`,
+        shallowDir,
+      );
+      git(shallowDir, 'fetch', '-q', '--depth', '1', 'origin', 'stack', 'main');
+      git(shallowDir, 'remote', 'set-url', 'origin', 'ssh://github.com/owner/repo.git');
+      const shallow = {
+        ...repo,
+        cwd: shallowDir,
+        sha: git(shallowDir, 'rev-parse', 'HEAD'),
+        env: { ...repo.env, CLAUDE_PROJECT_DIR: shallowDir },
+      };
+      await attest(shallow);
+      const result = await run(shallow, 'full', { FAKE_GH_CREATED: createdResponse(shallow.sha) }, [
+        '--base',
+        'stack',
+      ]);
+      expect(result.code).toBe(EXIT_CODE.refused);
+      expect(result.stderr).toContain('git fetch --unshallow origin');
+      expect(result.stderr).not.toContain('マージかリベース');
+      expect(result.calls.filter((call) => call.includes('-X POST'))).toEqual([]);
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    '--base に head の下に積んだブランチを渡すと、そのブランチを base にして作る',
+    async () => {
+      const repo = await stackedCheckout();
+      const result = await run(
+        repo,
+        'full',
+        { FAKE_GH_CREATED: createdResponse(repo.sha, 'stack') },
+        ['--base', 'stack'],
+      );
+      expect({ code: result.code, stdout: result.stdout.trim() }).toEqual({
+        code: EXIT_CODE.created,
+        stdout: NEW_PR,
+      });
+      expect(result.sentRequest).toEqual(
+        expect.objectContaining({ head: 'feature', base: 'stack' }),
+      );
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    '--base のブランチが default branch の先端の祖先なら、自分の作業を持たないので止める',
+    async () => {
+      const repo = await fakeGitHubCheckout(root);
+      await attest(repo);
+      // default branch（main）より遅れていない、自分のコミットを持たないブランチ。
+      git(repo.cwd, 'push', '-q', repo.bare, 'main:refs/heads/release');
+      const result = await run(repo, 'full', { FAKE_GH_CREATED: createdResponse(repo.sha) }, [
+        '--base',
+        'release',
+      ]);
+      expect(result.code).toBe(EXIT_CODE.refused);
+      expect(result.stderr).toContain('default branch（main）に無いコミットを持たない');
+      expect(result.calls.filter((call) => call.includes('-X POST'))).toEqual([]);
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    '同じ head の open な PR の base が指定と違えば、そのことを理由に書く',
+    async () => {
+      const repo = await stackedCheckout();
+      const result = await run(
+        repo,
+        'full',
+        { FAKE_GH_PULLS: JSON.stringify([pullRow(42, repo.sha, 'main')]) },
+        ['--base', 'stack'],
+      );
+      expect({ code: result.code, stdout: result.stdout.trim() }).toEqual({
+        code: EXIT_CODE.exists,
+        stdout: OLD_PR,
+      });
+      expect(result.stderr).toContain('その PR の base は main で、指定した base（stack）と異なります');
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    '--base のブランチが head の祖先でなければ止める',
+    async () => {
+      const repo = await fakeGitHubCheckout(root);
+      await attest(repo);
+      git(repo.cwd, 'checkout', '-q', '-b', 'side', 'main');
+      await writeFile(join(repo.cwd, 'side'), 'side');
+      git(repo.cwd, 'add', 'side');
+      git(repo.cwd, 'commit', '-qm', 'side');
+      git(repo.cwd, 'push', '-q', repo.bare, 'side');
+      git(repo.cwd, 'checkout', '-q', 'feature');
+      const result = await run(repo, 'full', { FAKE_GH_CREATED: createdResponse(repo.sha) }, [
+        '--base',
+        'side',
+      ]);
+      expect(result.code).toBe(EXIT_CODE.refused);
+      expect(result.stderr).toContain('の祖先ではありません');
+      expect(result.calls.filter((call) => call.includes('-X POST'))).toEqual([]);
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    '--base のブランチが origin に無ければ止める',
     async () => {
       const repo = await fakeGitHubCheckout(root);
       await attest(repo);
@@ -290,7 +486,44 @@ describe('作成の前提', () => {
         'release',
       ]);
       expect(result.code).toBe(EXIT_CODE.refused);
-      expect(result.stderr).toContain('default branch（main）と異なります');
+      expect(result.stderr).toContain('base（release）が origin にありません');
+      expect(result.calls.filter((call) => call.includes('-X POST'))).toEqual([]);
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    '--base のブランチの先端が手元に無ければ、fetch を案内して止める',
+    async () => {
+      const repo = await fakeGitHubCheckout(root);
+      await attest(repo);
+      const other = join(repo.cwd, '..', 'other');
+      git(repo.cwd, 'clone', '-q', repo.bare, other);
+      await writeFile(join(other, 'remote-only'), 'remote-only');
+      git(other, 'add', 'remote-only');
+      git(other, 'commit', '-qm', 'remote-only');
+      git(other, 'push', '-q', 'origin', 'HEAD:refs/heads/remote-only');
+      const result = await run(repo, 'full', { FAKE_GH_CREATED: createdResponse(repo.sha) }, [
+        '--base',
+        'remote-only',
+      ]);
+      expect(result.code).toBe(EXIT_CODE.refused);
+      expect(result.stderr).toContain('git fetch origin remote-only');
+    },
+    CASE_TIMEOUT_MS,
+  );
+
+  test(
+    '--base に head と同じブランチを渡すと止める',
+    async () => {
+      const repo = await fakeGitHubCheckout(root);
+      await attest(repo);
+      const result = await run(repo, 'full', { FAKE_GH_CREATED: createdResponse(repo.sha) }, [
+        '--base',
+        'feature',
+      ]);
+      expect(result.code).toBe(EXIT_CODE.refused);
+      expect(result.stderr).toContain('head のブランチと同じ');
       expect(result.calls).toEqual([]);
     },
     CASE_TIMEOUT_MS,

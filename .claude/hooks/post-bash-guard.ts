@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 import { Glob } from 'bun';
 import { join } from 'node:path';
+import { projectDirectory } from './hook-utils.ts';
 
 // PostToolUse は実行後の通知専用（block できない）なので、pre-bash-guard.ts
 // のように最初の非ゼロ終了で打ち切らず、全 project hook を走らせて
 // additionalContext をまとめて 1 個の JSON にする。子が複数とも
 // additionalContext を返すと JSON が連結されて壊れるため、ここで集約する。
 const text = await Bun.stdin.text();
-const root = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+const root = await projectDirectory();
 
 async function runCapture(path: string): Promise<string> {
   const interpreter = path.endsWith('.sh') ? 'bash' : 'bun';

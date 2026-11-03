@@ -10,7 +10,12 @@ process.chdir(root);
 if (!existsSync('.config/docs-lifecycle.json')) process.exit(0);
 const supplied = input.tool_input?.file_path ?? input.tool_input?.path;
 if (!supplied || !existsSync(supplied)) process.exit(0);
-const file = supplied.startsWith(root) ? relative(root, supplied) : supplied;
+// scan の prefix は posix 形式のグロブ由来（例: `docs/`）。Windows では relative() が
+// `\` 区切りを返すため、比較前に `/` へ寄せる。
+const file = (supplied.startsWith(root) ? relative(root, supplied) : supplied).replaceAll(
+  '\\',
+  '/',
+);
 if (!/\.mdx?$/.test(file)) process.exit(0);
 const config: { scan?: string[] } = await Bun.file('.config/docs-lifecycle.json').json();
 const roots = (config.scan ?? []).map((glob) => glob.split('*')[0]);

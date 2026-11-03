@@ -83,9 +83,14 @@ export function resolveLinkTarget(docPath: string, target: string): ResolvedLink
     // 不正なパーセントエンコードはそのまま扱う（存在チェックで落ちる）
   }
 
-  const normalized = decoded.startsWith('/')
-    ? posix.normalize(decoded.slice(1))
-    : posix.normalize(posix.join(posix.dirname(docPath), decoded));
+  // 存在チェック側 (cli.ts) は node:path の join を使い、Windows では `\` もセパレータに
+  // なる。ここを posix セマンティクスのままにすると `..\..\..\Windows` のような
+  // バックスラッシュ区切りのトラバーサルが `../` 判定をすり抜け、Windows 上でだけ
+  // リポジトリ外を指す repo-path を作れてしまう。先に `\` を `/` へ寄せて両者を揃える。
+  const posixTarget = decoded.replaceAll('\\', '/');
+  const normalized = posixTarget.startsWith('/')
+    ? posix.normalize(posixTarget.slice(1))
+    : posix.normalize(posix.join(posix.dirname(docPath), posixTarget));
 
   if (normalized === '..' || normalized.startsWith('../')) return { kind: 'outside-repo' };
   return { kind: 'repo-path', path: normalized };
