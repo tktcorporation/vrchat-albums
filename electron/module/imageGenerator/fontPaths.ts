@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import { Effect } from 'effect';
 import * as path from 'pathe';
 
-import { withElectronApp } from '../../lib/electronModules';
+import { getHost } from '../../lib/host';
 import { FontLoadFailed } from './errors';
 
 let fontsLoaded = false;
@@ -15,31 +15,20 @@ let cachedFontFilePaths: string[] = [];
  * 背景: resvg-js は fontFiles オプションでフォントファイルパスを受け取る。
  * Noto Sans JP をバンドルし、日本語テキストを含む SVG をレンダリング可能にする。
  *
- * Electron API (`app.isPackaged` 等) に依存するため Main プロセス側でのみ呼び出す。
+ * 殻の情報（`getHost()`）に依存するため Main プロセス側でのみ呼び出す。
  * renderSvg.ts の worker-safe な関数群とはあえて別ファイルに分離し、
  * 「worker からは決して import されない」というモジュール境界を構造的に保証する
  * (ADR-005: docs/adr/005-main-process-cpu-bound-worker-offload.md)。
  *
- * フォント解決の優先順位:
- * 1. Electron パッケージ済み: process.resourcesPath/fonts/
- * 2. 開発環境: electron/resources/fonts/ (__dirname からの相対パス)
- * 3. テスト環境: 同じ相対パスで解決（withElectronApp の fallback 経由）
+ * フォントは殻の同梱リソースのディレクトリ（`HostInfo.resourcesPath`）の fonts/ から読む。
+ * パッケージ時と開発時の場所の違いは殻が吸収する。
  */
 export const loadFonts = (): Effect.Effect<string[], FontLoadFailed> => {
   if (fontsLoaded) {
     return Effect.succeed(cachedFontFilePaths);
   }
 
-  const fontsDir = withElectronApp(
-    path.join(__dirname, '../../resources/fonts'),
-    (app) =>
-      path.join(
-        app.isPackaged
-          ? process.resourcesPath
-          : path.join(__dirname, '../../resources'),
-        'fonts',
-      ),
-  );
+  const fontsDir = path.join(getHost().info.resourcesPath, 'fonts');
 
   /**
    * ロード対象のフォントファイル名。

@@ -5,8 +5,8 @@ import * as datefns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
 
 import { toError } from '../../../lib/errorMapping';
+import { getHost } from '../../../lib/host';
 import { logger } from '../../../lib/logger';
-import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import * as fs from '../../../lib/wrappedFs';
 import type { VRChatLogLine, VRChatLogStoreFilePath } from '../model';
 import {
@@ -25,7 +25,7 @@ import {
  * logStoreディレクトリは、VRChatログから抽出した必要な情報のみを保存するディレクトリ
  */
 export const getLogStoreDir = (): string => {
-  return path.join(getAppUserDataPath(), 'logStore');
+  return path.join(getHost().info.paths.userData, 'logStore');
 };
 
 /**

@@ -1,6 +1,6 @@
 import z from 'zod';
 
-import { getApp } from '../../../lib/electronModules';
+import { getHost } from '../../../lib/host';
 import { logger } from '../../../lib/logger';
 import { UserFacingError } from './../../../lib/errors';
 import { procedure, router as trpcRouter } from './../../../trpc';
@@ -32,10 +32,8 @@ const setIsBackgroundFileCreationEnabled =
  * アプリの自動起動設定が有効かを取得するユーティリティ。
  * SystemSettings コンポーネントから利用される。
  */
-const getIsAppAutoStartEnabled = async (): Promise<boolean> => {
-  const loginItemSettings = getApp().getLoginItemSettings();
-  return loginItemSettings.openAtLogin;
-};
+const getIsAppAutoStartEnabled = (): Promise<boolean> =>
+  getHost().shell.getOpenAtLogin();
 
 /**
  * アプリの自動起動設定を変更するユーティリティ。
@@ -53,9 +51,7 @@ const setIsAppAutoStartEnabled = async (
   isEnabled: boolean,
   settingStore: ReturnType<typeof getSettingStore>,
 ) => {
-  getApp().setLoginItemSettings({
-    openAtLogin: isEnabled,
-  });
+  await getHost().shell.setOpenAtLogin(isEnabled);
 
   // ユーザーの意図を永続化（アップデート後の復元用）
   settingStore.setAutoStartEnabled(isEnabled);
@@ -67,9 +63,9 @@ const setIsAppAutoStartEnabled = async (
   });
 
   // 設定が反映されたか確認
-  const newSettings = getApp().getLoginItemSettings();
+  const openAtLogin = await getHost().shell.getOpenAtLogin();
 
-  if (newSettings.openAtLogin !== isEnabled) {
+  if (openAtLogin !== isEnabled) {
     throw new UserFacingError('自動起動設定の更新に失敗しました。');
   }
 

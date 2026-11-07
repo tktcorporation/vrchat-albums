@@ -5,7 +5,13 @@ import { afterAll, afterEach, vi } from 'vitest';
 // getAppVersion() が App version is undefined エラーを投げるのを防ぐ
 process.env.npm_package_version ??= '0.0.0-test';
 
+import { registerHost } from './electron/lib/host';
+import { createTestHost } from './electron/lib/host/testHost';
 import * as client from './electron/lib/sequelize';
+
+// electron/module のサービスは getHost() から OS の機能を受け取るため、
+// 全テストで既定の殻を登録しておく。値や操作を確かめたいテストは各自で登録し直す
+registerHost(createTestHost());
 
 // Sentryのモック設定
 vi.mock('@sentry/electron/main', () => ({
@@ -65,18 +71,4 @@ vi.mock('electron', () => {
   };
 
   return mock;
-});
-
-// vi.mock section after existing mocks
-vi.mock('electron-trpc/renderer', () => {
-  /** No-op TRPC link mock to prevent tests from requiring Electron context */
-  // oxlint-disable-next-line eslint-plugin-unicorn(consistent-function-scoping) -- vi.mockはホイスティングされるため、外部スコープの変数を参照できない
-  const mockIpcLink = () => {
-    return (_runtime: unknown) =>
-      ({ next, op }: { next: (operation: unknown) => unknown; op: unknown }) =>
-        next(op);
-  };
-  return {
-    ipcLink: mockIpcLink,
-  };
 });

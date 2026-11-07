@@ -5,13 +5,13 @@ import z from 'zod';
 
 import { reloadMainWindow } from '../../../electronUtil';
 import { runEffect } from '../../../lib/effectTRPC';
-import { getClipboard } from '../../../lib/electronModules';
 import {
   mapToFileOperationError,
   mapToOpenPathError,
   toUserFacing,
 } from '../../../lib/errorMapping';
 import { ERROR_CATEGORIES, ERROR_CODES } from '../../../lib/errors';
+import { getHost } from '../../../lib/host';
 import * as exiftool from '../../../lib/wrappedExifTool';
 import { eventEmitter, procedure, router as trpcRouter } from './../../../trpc';
 import { DirectoryPathSchema } from './../../../valueObjects/index';
@@ -43,7 +43,7 @@ export const electronUtilRouter = () =>
       reloadMainWindow();
     }),
     copyTextToClipboard: procedure.input(z.string()).mutation(async (ctx) => {
-      await getClipboard().writeText(ctx.input);
+      await getHost().shell.writeClipboardText(ctx.input);
       eventEmitter.emit('toast', 'copied');
     }),
     /**
@@ -80,7 +80,7 @@ export const electronUtilRouter = () =>
               const dialogResult =
                 await utilsService.showSavePngDialog(filename);
 
-              if (dialogResult.canceled || !dialogResult.filePath) {
+              if (dialogResult.canceled) {
                 return;
               }
 

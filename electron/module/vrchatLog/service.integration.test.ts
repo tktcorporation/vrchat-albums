@@ -4,14 +4,10 @@ import * as path from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getAppUserDataPath } from '../../lib/wrappedApp';
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
 import { VRChatLogLineSchema } from './model';
 import { appendLoglinesToFile, getLogStoreFilePathsInRange } from './service';
-
-// getAppUserDataPathのモックのみ設定する
-vi.mock('../../lib/wrappedApp', () => ({
-  getAppUserDataPath: vi.fn(),
-}));
 
 /**
  * 実際のファイルシステムを使用した統合テスト
@@ -26,8 +22,8 @@ describe('タイムスタンプ付きログファイルの実際のファイル�
 
   // テスト前の準備
   beforeEach(() => {
-    // モックを設定
-    vi.mocked(getAppUserDataPath).mockReturnValue(testDir);
+    // サービスがユーザーデータとして読むディレクトリを差し替える
+    registerHost(createTestHost({ paths: { userData: testDir } }));
 
     // テスト用の一時ディレクトリを作成
     if (!nodeFs.existsSync(testDir)) {

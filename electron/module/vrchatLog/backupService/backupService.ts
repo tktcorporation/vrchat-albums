@@ -8,6 +8,7 @@ import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
+import { getHost } from '../../../lib/host';
 import { logger } from '../../../lib/logger';
 import { pathExistsAsync } from '../../../lib/pathExists';
 import {
@@ -15,7 +16,6 @@ import {
   type ExportPathObject,
   ExportPathObjectSchema,
 } from '../../../lib/pathObject';
-import { getAppUserDataPath } from '../../../lib/wrappedApp';
 import type { LogRecord } from '../converters/dbToLogStore';
 import {
   exportLogStoreFromDB,
@@ -303,7 +303,7 @@ export class BackupService {
    * バックアップの基本パスを取得
    */
   getBackupBasePath(): string {
-    return path.join(getAppUserDataPath(), 'backups');
+    return path.join(getHost().info.paths.userData, 'backups');
   }
 
   /**

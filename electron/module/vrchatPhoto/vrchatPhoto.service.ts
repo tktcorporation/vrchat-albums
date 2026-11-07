@@ -1,13 +1,11 @@
 import * as crypto from 'node:crypto';
 import type { Dirent } from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
-import * as os from 'node:os';
 import { performance } from 'node:perf_hooks';
 
 import { Transformer } from '@napi-rs/image';
 import * as dateFns from 'date-fns';
 import { Cause, Effect, Exit, Option, Result } from 'effect';
-import type Electron from 'electron';
 import { xxhash128 } from 'hash-wasm';
 import * as path from 'pathe';
 import { match, P } from 'ts-pattern';
@@ -19,7 +17,7 @@ import {
   type VRChatPhotoContainingFolderPath,
   VRChatPhotoContainingFolderPathSchema,
 } from './../../lib/brandedTypes';
-import { isTestEnvironment } from './../../lib/env';
+import { getHost } from './../../lib/host';
 import { logger } from './../../lib/logger';
 import {
   getGlobalMemoryMonitor,
@@ -100,66 +98,11 @@ const CACHE_FAILURE_THRESHOLD = 10;
 let consecutiveCacheFailures = 0;
 
 /**
- * Electronのappモジュールを遅延取得する
- * Playwrightテスト時のクラッシュを防ぐため、トップレベルインポートを避ける
- *
- * ## 環境による動作の違い
- * - テスト環境: Electronを試行せずnullを返す（想定された動作）
- * - 開発/プロダクション環境: Electronのロードを試行し、失敗時はエラーログ出力
- *
- * @returns Electron appモジュール、または利用不可時はnull
- */
-const getElectronApp = (): typeof Electron.app | null => {
-  // テスト環境ではElectronを試行しない（想定された動作）
-  if (isTestEnvironment()) {
-    logger.debug('Test environment detected, skipping Electron module');
-    return null;
-  }
-
-  // effect-lint-allow-try-catch: Electron環境検出パターン（遅延require）
-  try {
-    const { app } = require('electron') as typeof Electron;
-    return app;
-  } catch (error) {
-    // 開発/プロダクション環境でのElectronロード失敗は予期しない
-    // Sentryに送信して問題を検知できるようにする
-    if (process.env.NODE_ENV === 'production') {
-      logger.error({
-        message: 'Failed to load Electron app module in production environment',
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
-    } else {
-      // 開発環境では警告レベル（Electronなしでの動作確認時など）
-      logger.warn({
-        message: 'Electron app module not available, using fallback paths',
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
-    }
-    return null;
-  }
-};
-
-/**
  * サムネイルキャッシュディレクトリのパスを取得
+ * OS の一時ディレクトリ配下に置き、OS のクリーンアップ対象に含める。
  */
-const getThumbnailCacheDir = (): string => {
-  const app = getElectronApp();
-  if (app) {
-    // effect-lint-allow-try-catch: Electron環境検出パターン（app.getPath フォールバック）
-    try {
-      return path.join(app.getPath('temp'), THUMBNAIL_CACHE_DIR_NAME);
-    } catch (error) {
-      // アプリ未初期化時はフォールバック
-      // 本番環境での調査が必要なためwarnレベルでログ出力
-      logger.warn({
-        message: 'app.getPath("temp") failed, using os.tmpdir() fallback',
-        stack: error instanceof Error ? error : new Error(String(error)),
-      });
-    }
-  }
-  // テスト環境などでappが使えない場合
-  return path.join(os.tmpdir(), THUMBNAIL_CACHE_DIR_NAME);
-};
+const getThumbnailCacheDir = (): string =>
+  path.join(getHost().info.paths.temp, THUMBNAIL_CACHE_DIR_NAME);
 
 /**
  * キャッシュキーを生成（ファイルパスとサイズからハッシュを生成）
@@ -666,13 +609,9 @@ const getDefaultVRChatPhotoDir = (): VRChatPhotoDirPath => {
   let logFilesDir: string;
 
   if (process.platform === 'win32' && process.env.USERPROFILE) {
-    const app = getElectronApp();
-    const picturesPath = app?.getPath('pictures');
-    // app.getPath('pictures') はフルパスを返す (例: C:\Users\xxx\Pictures)
-    // フォールバック時は USERPROFILE/Pictures を使用
-    logFilesDir = picturesPath
-      ? path.join(picturesPath, 'VRChat')
-      : path.join(process.env.USERPROFILE, 'Pictures', 'VRChat');
+    // pictures は OS が決めるフルパス (例: C:\Users\xxx\Pictures)。
+    // ピクチャフォルダを別ドライブへ移したユーザーにも追従する
+    logFilesDir = path.join(getHost().info.paths.pictures, 'VRChat');
   } else {
     logFilesDir = path.join(process.env.HOME ?? '', 'Pictures', 'VRChat');
   }

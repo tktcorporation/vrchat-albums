@@ -11,22 +11,34 @@ import { app, type BrowserWindow } from 'electron';
 // Electron ネイティブの app.isPackaged を使用
 const isDev = !app.isPackaged;
 
-// Packages
-import { createIPCHandler } from 'trpc-electron/main';
-
 import { scrubEventData } from '../src/lib/utils/masking';
 import { router } from './api';
 import { SENTRY_DATA_COLLECTION } from './constants/sentryDataCollection';
 import * as electronUtil from './electronUtil';
 import { initializeSettingStoreForUtil } from './electronUtil';
+import { getHost, registerHost } from './lib/host';
+import { createElectronHost } from './lib/host/electronHost';
 import { logger } from './lib/logger';
 import * as sequelizeClient from './lib/sequelize';
-import { getAppUserDataPath } from './lib/wrappedApp';
+import { startTrpcServer } from './lib/trpcTransport';
 import { getBackgroundUsecase } from './module/backGroundUsecase';
 import { startBackgroundSyncTimer } from './module/logSync/backgroundTimer';
 import { initSettingStore } from './module/settingStore';
 import { hasAcceptedCurrentTerms } from './module/terms/consent';
 import { startThumbnailCacheCleanupScheduler } from './module/vrchatPhoto/thumbnailCacheCleanupScheduler';
+import { eventEmitter } from './trpc';
+
+// electron/module のサービスは getHost() から OS の機能を受け取る。
+// どのサービスより先に殻を登録するため、モジュール本体の最初の処理として登録する
+registerHost(createElectronHost());
+
+// tRPC の接続はウィンドウごとに張り、ウィンドウが作られた瞬間に接続する（startTrpcServer）。
+// 最初のウィンドウより先に待ち受けを始めるため、モジュールの読み込み時に呼ぶ。
+// アプリは window.open を拒否しており、BrowserWindow を作るのは createWindow だけなので、
+// webContents 1 つにつき接続は 1 つになる。アプリの終了まで止めないので、戻り値の停止関数は使わない。
+// ctx は electron/trpc.ts の initTRPC.context が宣言する形で渡す。procedure は ctx を読まず、
+// イベントは electron/trpc.ts の eventEmitter を直接使う
+startTrpcServer({ router, createContext: () => ({ eventEmitter }) });
 
 const settingStore = initSettingStore();
 initializeSettingStoreForUtil();
@@ -112,7 +124,7 @@ const createOrGetMainWindow = async (): Promise<BrowserWindow> => {
  */
 const initializeRDBClient = async () => {
   const filePath = path
-    .join(getAppUserDataPath(), 'db.sqlite')
+    .join(getHost().info.paths.userData, 'db.sqlite')
     .split(path.sep)
     .join(path.posix.sep);
   await sequelizeClient.initRDBClient({
@@ -137,12 +149,8 @@ const initializeApp = async () => {
   // データベースクライアント初期化
   await initializeRDBClient();
 
-  const mainWindow = await createOrGetMainWindow();
+  await createOrGetMainWindow();
 
-  createIPCHandler({
-    router,
-    windows: [mainWindow],
-  });
   void electronUtil.setTray();
   startThumbnailCacheCleanupScheduler();
 

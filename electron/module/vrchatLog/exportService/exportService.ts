@@ -5,7 +5,7 @@ import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
-import { withElectronApp } from '../../../lib/electronModules';
+import { getHost } from '../../../lib/host';
 import {
   exportLogsToLogStore,
   formatLogStoreContent,
@@ -60,27 +60,10 @@ export type DBLogProvider = (
 ) => Promise<LogRecord[]>;
 
 /**
- * Electronのダウンロードパスを安全に取得。
- *
- * `withElectronApp` が以下のいずれの失敗も fallback (null) に倒すため、
- * 内部の try/catch は不要:
- * - テスト/非 Electron 環境: `require('electron')` 失敗
- * - Electron 環境: `app.getPath('downloads')` 失敗（プラットフォーム依存）
- */
-const getElectronDownloadsPath = (): string | null =>
-  withElectronApp<string | null>(null, (app) => app.getPath('downloads'));
-
-/**
  * デフォルトのlogStoreディレクトリパスを取得
  */
-const getDefaultLogStorePath = (): string => {
-  const downloadsPath = getElectronDownloadsPath();
-  if (downloadsPath) {
-    return path.join(downloadsPath, 'logStore');
-  }
-  // テスト環境などでappが利用できない場合のフォールバック
-  return path.join(process.cwd(), 'logStore');
-};
+const getDefaultLogStorePath = (): string =>
+  path.join(getHost().info.paths.downloads, 'logStore');
 
 /**
  * エクスポート実行日時からフォルダ名を生成

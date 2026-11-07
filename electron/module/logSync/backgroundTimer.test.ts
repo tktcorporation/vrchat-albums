@@ -9,10 +9,6 @@ import {
 } from './backgroundTimer';
 import { syncLogsInBackground } from './service';
 
-vi.mock('../../lib/electronModules', () => ({
-  getNotification: () => vi.fn(() => ({ show: vi.fn() })),
-}));
-
 vi.mock('../../lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));

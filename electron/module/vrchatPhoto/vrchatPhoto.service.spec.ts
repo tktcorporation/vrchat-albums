@@ -20,13 +20,6 @@ vi.mock('node:fs/promises', () => ({
   rename: vi.fn().mockResolvedValue(undefined),
 }));
 
-// electronをモック
-vi.mock('electron', () => ({
-  app: {
-    getPath: vi.fn().mockReturnValue('/tmp'),
-  },
-}));
-
 // @napi-rs/imageモジュールをモック
 const mockWebp = vi.fn().mockResolvedValue(Buffer.from('dummy_thumbnail_data'));
 const mockResize = vi.fn().mockReturnValue({ webp: mockWebp });

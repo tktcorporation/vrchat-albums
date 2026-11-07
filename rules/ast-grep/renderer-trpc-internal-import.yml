@@ -1,0 +1,75 @@
+id: renderer-trpc-internal-import
+language: TypeScript
+severity: error
+message: |
+  src/trpc/ の中身を直接 import しないでください。
+  画面から tRPC を呼ぶときは src/trpc.ts の trpcClient / trpcReact を使ってください。
+note: |
+  殻を換えるときに書き換える範囲を src/trpc.ts の後ろに閉じ込めるため。
+  テストは中身を直接確かめるので対象外。
+  構成: electron/lib/trpcTransport/index.ts の JSDoc
+rule:
+  any:
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - has:
+            field: source
+            regex: (^['"]|/)trpc/
+    - all:
+        - any:
+            - pattern: import($PATH)
+            - pattern: require($PATH)
+        - has:
+            stopBy: end
+            kind: string
+            regex: (^['"]|/)trpc/
+files:
+  - '**/*.ts'
+  - '**/*.tsx'
+ignores:
+  - src/trpc.ts
+  - src/trpc/**
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/__tests__/**'
+---
+id: renderer-trpc-internal-import-tsx
+language: Tsx
+severity: error
+message: |
+  src/trpc/ の中身を直接 import しないでください。
+  画面から tRPC を呼ぶときは src/trpc.ts の trpcClient / trpcReact を使ってください。
+note: |
+  殻を換えるときに書き換える範囲を src/trpc.ts の後ろに閉じ込めるため。
+  テストは中身を直接確かめるので対象外。
+  構成: electron/lib/trpcTransport/index.ts の JSDoc
+rule:
+  any:
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - has:
+            field: source
+            regex: (^['"]|/)trpc/
+    - all:
+        - any:
+            - pattern: import($PATH)
+            - pattern: require($PATH)
+        - has:
+            stopBy: end
+            kind: string
+            regex: (^['"]|/)trpc/
+files:
+  - '**/*.ts'
+  - '**/*.tsx'
+ignores:
+  - src/trpc.ts
+  - src/trpc/**
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/__tests__/**'

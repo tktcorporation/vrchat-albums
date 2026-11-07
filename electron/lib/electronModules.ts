@@ -3,13 +3,14 @@
  *
  * トップレベルで `import { app } from 'electron'` すると、
  * Playwright テスト実行時に Electron の初期化がブロックされてタイムアウトする。
- * このモジュールで遅延 require に集約し、各 service/controller から利用する。
+ * このモジュールで遅延 require に集約する。
  *
- * 参照: .claude/rules/electron-import.md
+ * 使うのは殻の側（`electron/lib/host/electronHost.ts`、tRPC の受け口
+ * `electron/lib/trpcTransport/index.ts`、殻より先に読み込まれる `electron/lib/logger.ts`）だけ。electron/module のサービスは OS の機能を
+ * `getHost()`（electron/lib/host）から受け取り、このモジュールを直接使わない。
+ * サービスを utilityProcess へ移すと Electron の API が使えなくなるため。
  *
- * 注意: テスト環境ではフォールバックが必要な場合は wrappedApp.ts の
- * try-catch パターンを使うこと。このモジュールはフォールバックなしの
- * 「Electron 環境前提」のヘルパー。
+ * 参照: .claude/rules/project/electron-import.md
  */
 
 import type Electron from 'electron';
@@ -22,16 +23,14 @@ export const getClipboard = () => getElectron().clipboard;
 export const getClipboardItem = () => getElectron().ClipboardItem;
 export const getNativeImage = () => getElectron().nativeImage;
 export const getNotification = () => getElectron().Notification;
+export const getIpcMain = () => getElectron().ipcMain;
 
 /**
  * Electron 環境であれば `fn(app)` を、そうでなければ `fallback` を返す。
  *
- * 背景: 「Electron 前提だがテスト環境でも動く必要がある」モジュール（logger,
- * wrappedApp, exportService, vrchatPhoto.service, renderSvg）で
- * 同じ try-catch + `require('electron')` の遅延ロードパターンが重複していた。
- * このヘルパーで集約することで:
- *   - `effect-lint-allow-try-catch` 注釈付き try-catch を削減
- *   - フォールバック値の組み立て方を呼び出し側に委ねる（高階関数）
+ * 殻の登録より先に読み込まれ、テスト環境でも動く必要があるモジュール（logger）が、
+ * Electron の有無で値を切り替えるために使う。try-catch による環境検出をここに集約し、
+ * フォールバック値の組み立て方は呼び出し側に委ねる。
  *
  * @param fallback テスト/非 Electron 環境で返す値
  * @param fn Electron 環境で `app` を受けて結果を計算する関数

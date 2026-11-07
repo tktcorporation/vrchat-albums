@@ -19,36 +19,35 @@ import { app } from 'electron';
 const logPath = app.getPath('logs');
 ```
 
+### electron/module のサービスから Electron を使ってはならない
+
+サービスは OS の機能（パス・ダイアログ・クリップボード・通知・ログイン時の起動）を `electron/lib/host` の `getHost()` から受け取る。サービスを utilityProcess へ移すと `app`・`dialog`・`clipboard`・`shell`・`Notification` が使えなくなるため、サービスは殻が実装する `Host` インターフェース（`electron/lib/host/types.ts`）だけに依存させる。
+
+```typescript
+// ✅ OK: サービスは殻から受け取る
+import { getHost } from '../../lib/host';
+const backupDir = path.join(getHost().info.paths.userData, 'backups');
+await getHost().shell.notify({ title, body });
+```
+
+型だけの import（`import type { X } from 'electron'`）は実行時に残らないので許容する。検出は ast-grep の `electron-toplevel-import`。
+
+テストでは `vitest.setup.ts` が `createTestHost()` を登録する。値や操作を確かめたいテストは `registerHost(createTestHost({ paths: { userData: dir } }))` のように登録し直す。
+
 ---
 
-## 推奨パターン
+## 殻の側での推奨パターン
+
+Electron の API を直接呼ぶのは殻の側（`electron/index.ts`、`electron/electronUtil.ts`、`electron/lib/host/electronHost.ts`、殻より先に読み込まれる `electron/lib/logger.ts`）だけ。共通モジュールでは `electron/lib/electronModules.ts` の遅延取得ヘルパーを使う。
+
+画面との tRPC の通信（IPC）は `electron/lib/trpcTransport/` の入口（処理本体は `startTrpcServer`、preload は `exposeTrpcBridge`）だけを使う。構成と殻を換えるときの差し替え範囲は `electron/lib/trpcTransport/index.ts` の JSDoc にある。
 
 ### 遅延評価（require）
 
 ```typescript
 // ✅ OK: 遅延評価
-const getLogPath = () => {
-  try {
-    const { app } = require('electron');
-    return app.getPath('logs');
-  } catch {
-    return '/tmp/test-logs';
-  }
-};
-```
-
-### 動的インポート
-
-```typescript
-// ✅ OK: 動的インポート
-const getLogPath = async () => {
-  try {
-    const { app } = await import('electron');
-    return app.getPath('logs');
-  } catch {
-    return '/tmp/test-logs';
-  }
-};
+import { withElectronApp } from './electronModules';
+const isPackaged = withElectronApp(false, (app) => app.isPackaged);
 ```
 
 ---

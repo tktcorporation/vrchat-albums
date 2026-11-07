@@ -5,16 +5,17 @@ import * as path from 'node:path';
 import { uuidv7 } from 'uuidv7';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
+
 // テスト用のユーザーデータディレクトリを設定
 const testUserDataDir = path.join(
   os.tmpdir(),
   `vrchat-albums-test-${uuidv7()}`,
 );
 
-// モック設定を最初に定義
-vi.mock('../../lib/wrappedApp', () => ({
-  getAppUserDataPath: vi.fn(() => testUserDataDir),
-}));
+// サービスがユーザーデータとして読むディレクトリをテスト用に差し替える
+registerHost(createTestHost({ paths: { userData: testUserDataDir } }));
 
 vi.mock('./exportService/exportService', () => {
   const { Effect } = require('effect');

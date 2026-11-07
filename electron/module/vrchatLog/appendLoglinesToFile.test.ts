@@ -3,14 +3,14 @@ import type * as NodeFs from 'node:fs';
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
 import * as fs from '../../lib/wrappedFs';
 import { appendLoglinesToFile } from './fileHandlers/logStorageManager';
 import { VRChatLogLineSchema } from './model';
 
-// モック設定
-vi.mock('../../lib/wrappedApp', () => ({
-  getAppUserDataPath: vi.fn(() => '/mock/user/data'),
-}));
+// サービスがユーザーデータとして読むディレクトリをテスト用に差し替える
+registerHost(createTestHost({ paths: { userData: '/mock/user/data' } }));
 
 // 実際の関数をモックする
 vi.mock('../../lib/wrappedFs', () => {

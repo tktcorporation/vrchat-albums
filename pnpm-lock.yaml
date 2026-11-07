@@ -8,9 +8,6 @@ overrides:
   tar: '>=7.5.19'
   '@tootallnate/once': '>=2.0.1 <3'
 
-patchedDependencies:
-  trpc-electron@0.1.2: 921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4
-
 importers:
 
   .:
@@ -156,9 +153,6 @@ importers:
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
-      trpc-electron:
-        specifier: ^0.1.2
-        version: 0.1.2(patch_hash=921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4)(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.9.1)
       ts-pattern:
         specifier: 5.9.0
         version: 5.9.0
@@ -6618,13 +6612,6 @@ packages:
 
   trough@2.2.0:
     resolution: {integrity: sha512-tmMpK00BjZiUyVyvrBK7knerNgmgvcV/KLVyuma/SC+TQN167GrMRciANTz09+k3zW8L8t60jWO1GpfkZdjTaw==}
-
-  trpc-electron@0.1.2:
-    resolution: {integrity: sha512-sQpWBwQWzsgrERugjzUpPqY/+/n8NxkUq6YssQ5+5rALkvGCWq45T5Dreiwm2kh91dZMFlALTyMd8PhB0vgbIg==}
-    peerDependencies:
-      '@trpc/client': '>=11.0.0'
-      '@trpc/server': '>=11.0.0'
-      electron: '>19.0.0'
 
   truncate-utf8-bytes@1.0.2:
     resolution: {integrity: sha512-95Pu1QXQvruGEhv62XCMO3Mm90GscOCClvrIUwCM0PYOXK3kaF3l3sIHxx71ThJfcbM2O5Au6SO3AWCSEfW4mQ==}
@@ -13121,12 +13108,6 @@ snapshots:
   trim-lines@3.0.1: {}
 
   trough@2.2.0: {}
-
-  trpc-electron@0.1.2(patch_hash=921bf81674067eb23b3a519ef8edbb9501005855dfbc704c2be64efb60de3ed4)(@trpc/client@11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3))(@trpc/server@11.19.0(typescript@6.0.3))(electron@44.9.1):
-    dependencies:
-      '@trpc/client': 11.19.0(@trpc/server@11.19.0(typescript@6.0.3))(typescript@6.0.3)
-      '@trpc/server': 11.19.0(typescript@6.0.3)
-      electron: 44.9.1
 
   truncate-utf8-bytes@1.0.2:
     dependencies:

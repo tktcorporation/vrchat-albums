@@ -5,6 +5,8 @@ import { Effect } from 'effect';
 import * as path from 'pathe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type HostShell, registerHost } from '../../../../lib/host';
+import { createTestHost } from '../../../../lib/host/testHost';
 import { eventEmitter } from '../../../../trpc';
 import { electronUtilRouter } from '../electronUtilController';
 
@@ -12,28 +14,12 @@ const normalizePath = (p: string) => p.replaceAll('\\', '/');
 
 vi.mock('node:fs/promises');
 
-const mockElectron = vi.hoisted(() => ({
-  app: {
-    isPackaged: false,
-  },
-  dialog: {
-    showSaveDialog: vi.fn(),
-  },
-}));
+const showSaveDialog = vi.fn<HostShell['showSaveDialog']>();
 
 const mockExifTool = vi.hoisted(() => ({
   writeDateTimeWithTimezone: vi.fn(),
 }));
 
-vi.mock('electron', () => mockElectron);
-vi.mock('../../../../lib/electronModules', () => ({
-  getApp: () => mockElectron.app,
-  getShell: () => ({}),
-  getDialog: () => mockElectron.dialog,
-  getClipboard: () => ({}),
-  getClipboardItem: () => class {},
-  getNativeImage: () => ({}),
-}));
 vi.mock('../../../../lib/wrappedExifTool', () => mockExifTool);
 
 const tempDir = path.join(os.tmpdir(), 'test-dir');
@@ -59,6 +45,7 @@ const callDownload = () =>
 describe('electronUtilController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    registerHost(createTestHost({ shell: { showSaveDialog } }));
     vi.mocked(fs.mkdtemp).mockResolvedValue(tempDir);
     vi.mocked(fs.writeFile).mockResolvedValue(undefined);
     vi.mocked(fs.copyFile).mockResolvedValue(undefined);
@@ -70,7 +57,7 @@ describe('electronUtilController', () => {
   describe('downloadImageAsPhotoLogPng', () => {
     it('一時ファイルに EXIF を書き込み、選ばれた保存先へコピーする', async () => {
       const savePath = path.join(os.homedir(), 'Downloads', `${filename}.png`);
-      mockElectron.dialog.showSaveDialog.mockResolvedValue({
+      showSaveDialog.mockResolvedValue({
         canceled: false,
         filePath: savePath,
       });
@@ -108,7 +95,7 @@ describe('electronUtilController', () => {
     });
 
     it('保存ダイアログをキャンセルしたらコピーせず一時ディレクトリを消す', async () => {
-      mockElectron.dialog.showSaveDialog.mockResolvedValue({ canceled: true });
+      showSaveDialog.mockResolvedValue({ canceled: true });
 
       await callDownload();
 
@@ -123,7 +110,7 @@ describe('electronUtilController', () => {
     });
 
     it('保存先へのコピーに失敗しても一時ディレクトリを消して失敗を返す', async () => {
-      mockElectron.dialog.showSaveDialog.mockResolvedValue({
+      showSaveDialog.mockResolvedValue({
         canceled: false,
         filePath: path.join(os.homedir(), 'Downloads', `${filename}.png`),
       });
