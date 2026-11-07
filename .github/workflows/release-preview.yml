@@ -25,7 +25,7 @@ jobs:
       github.event.pull_request.head.ref == 'changeset-release/main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'preview') &&
-      (github.event.action != 'labeled' || github.event.label.name == 'preview')
+      ((github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'preview')
     runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -56,6 +56,8 @@ jobs:
       run:
         shell: bash
     strategy:
+      # 1 つの OS が失敗しても、ほかの OS の成果物は動作確認に使えるので最後まで作る
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -122,6 +124,9 @@ jobs:
 
   comment:
     needs: [vars, build]
+    # 一部の OS が失敗しても、できた成果物のリンクと失敗したことを PR に残す。
+    # 失敗した head のまま前回の成功コメントが残ると、最新の head のビルドだと誤解されるため。
+    if: ${{ !cancelled() && needs.vars.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -136,6 +141,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PREVIEW_VERSION: ${{ needs.vars.outputs.version }}
+          BUILD_RESULT: ${{ needs.build.result }}
         run: |
           # 同じ PR へのコメントを 1 件に保つため、目印のあるコメントを探して更新する
           marker='<!-- release-preview-build -->'
@@ -150,6 +156,11 @@ jobs:
             echo
             echo "このリリース PR の head（${HEAD_SHA:0:8}）をビルドしました。ダウンロードには GitHub へのログインが必要で、14 日後に消えます。"
             echo
+            if [[ "$BUILD_RESULT" != "success" ]]; then
+              echo "> [!WARNING]"
+              echo "> 一部の OS のビルドが失敗しました。下の表にない OS はビルドのログを確認してください。"
+              echo
+            fi
             echo "| 成果物 | リンク |"
             echo "| --- | --- |"
             echo "$rows"

@@ -6,8 +6,11 @@ import { createTestHost } from '../../../lib/host/testHost';
 import { UpdateCheckFailed } from '../errors';
 import { getElectronUpdaterInfo } from '../service';
 
-const checkResult = (version: string): HostUpdateCheckResult => ({
-  isUpdateAvailable: true,
+const checkResult = (
+  version: string,
+  isUpdateAvailable = true,
+): HostUpdateCheckResult => ({
+  isUpdateAvailable,
   updateInfo: {
     version,
     releaseDate: '2026-01-01T00:00:00.000Z',
@@ -21,7 +24,7 @@ describe('getElectronUpdaterInfo', () => {
     registerHost(createTestHost());
   });
 
-  it('配布元の版が動いている版と違えば更新ありとし、確認結果を添える', async () => {
+  it('electron-updater が更新ありと判定すれば更新ありとし、確認結果を添える', async () => {
     const result = checkResult('2.0.0');
     registerHost(
       createTestHost({
@@ -36,11 +39,12 @@ describe('getElectronUpdaterInfo', () => {
     });
   });
 
-  it('配布元の版が動いている版と同じなら更新なしとする', async () => {
+  it('配布元の版が動いている版と違っても、electron-updater が更新なしと判定すれば更新なしとする', async () => {
+    // beta 版を動かしていて、配布元の最新が 1 つ前の安定版のとき
     registerHost(
       createTestHost({
-        info: { appVersion: '2.0.0' },
-        updater: { checkForUpdates: async () => checkResult('2.0.0') },
+        info: { appVersion: '2.0.0-beta.1' },
+        updater: { checkForUpdates: async () => checkResult('1.9.0', false) },
       }),
     );
 
