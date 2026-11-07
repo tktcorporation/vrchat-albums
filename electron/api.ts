@@ -1,11 +1,11 @@
 import { Effect } from 'effect';
 import z from 'zod';
 
-import { initializeMainSentry } from './index';
 import { runEffect, runEffectExit } from './lib/effectTRPC';
 import { mapToFileOperationError, toError } from './lib/errorMapping';
 import { ERROR_CATEGORIES, ERROR_CODES, UserFacingError } from './lib/errors';
 import { createEventQueue } from './lib/eventQueue';
+import { getHost } from './lib/host';
 import { logger } from './lib/logger';
 import { backgroundSettingsRouter } from './module/backgroundSettings/controller/backgroundSettingsController';
 import { debugRouter } from './module/debug/debugController';
@@ -174,11 +174,11 @@ export const router = trpcRouter({
         version: z.string(),
       }),
     )
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       settingStore.setTermsAccepted(input.accepted);
       settingStore.setTermsVersion(input.version);
       if (input.accepted) {
-        initializeMainSentry();
+        await getHost().shell.onTermsAccepted();
       }
     }),
   getVRChatPhotoExtraDirList: procedure.query((): string[] => {

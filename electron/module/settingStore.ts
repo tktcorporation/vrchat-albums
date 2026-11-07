@@ -4,6 +4,7 @@ import { match } from 'ts-pattern';
 import { z } from 'zod';
 
 import { FolderDigestSchema } from '../lib/brandedTypes';
+import { getHost } from '../lib/host';
 
 type TestPlaywrightStoreName = `test-playwright-settings-${string}`;
 type StoreName = 'v0-settings' | 'test-settings' | TestPlaywrightStoreName;
@@ -237,7 +238,10 @@ import {
 
 let settingStore: ReturnType<typeof setSettingStore> | null = null;
 const setSettingStore = (name: StoreName) => {
-  const store = new Store({ name });
+  // 保存先は、electron-store が main プロセスの `app.getPath('userData')` から補う値と同じものを殻から明示して渡す。
+  // `app` の無いプロセスで開くと electron-store は保存先を補えないため。
+  // 版（projectVersion）は migrations を使うときだけ要るので渡さない
+  const store = new Store({ name, cwd: getHost().info.paths.userData });
   const { get, set } = {
     get: getValue(store),
     set: setValue(store),

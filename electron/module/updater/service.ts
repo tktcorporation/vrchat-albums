@@ -1,83 +1,31 @@
 import { Effect } from 'effect';
-import { autoUpdater } from 'electron-updater';
-import { BehaviorSubject } from 'rxjs';
 
+import { getHost } from '../../lib/host';
 import { logger } from '../../lib/logger';
 import { UpdateCheckFailed } from './errors';
 
 /**
- * Electron自動アップデート機能を管理するサービス。
+ * アプリの自動更新を、殻の更新（`getHost().updater`）へつなぐサービス。
+ *
+ * 更新の状態は殻が electron-updater のイベントから組み立てて持つ。ここは確認の失敗を
+ * ログに残して型付きのエラーへ分類し、ルーターへ渡す。
  *
  * @see docs/error-handling.md - エラーハンドリング設計
  * @see electron/module/updater/router.ts - tRPCルーター
+ * @see electron/lib/host/electronUpdater.ts - 殻の実装
  */
 
-/**
- * このプラットフォームでアップデートを自動でダウンロード・インストールできるか。
- *
- * macOS ビルドは署名なしの dmg だけを配布している。electron-updater の MacUpdater は
- * zip を、Squirrel.Mac はコード署名を必要とするため、macOS では自動インストールが
- * 成立しない。macOS ではダウンロードページへの誘導に切り替える。
- */
-export const canAutoInstallUpdates = (
-  platform: NodeJS.Platform = process.platform,
-): boolean => platform !== 'darwin';
+export const checkForUpdates = (): Effect.Effect<void, UpdateCheckFailed> =>
+  Effect.tryPromise({
+    try: () => getHost().updater.checkForUpdates(),
+    catch: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`アップデートの確認中にエラーが発生しました: ${message}`);
+      return new UpdateCheckFailed({ message, cause: error });
+    },
+  }).pipe(Effect.asVoid);
 
-export class UpdaterService {
-  private updateDownloaded = new BehaviorSubject<boolean>(false);
-  private availableVersion = new BehaviorSubject<string | null>(null);
+export const quitAndInstall = (): Promise<void> =>
+  getHost().updater.quitAndInstall();
 
-  constructor(private readonly canAutoInstall = canAutoInstallUpdates()) {
-    this.initializeAutoUpdater();
-  }
-
-  private initializeAutoUpdater() {
-    autoUpdater.autoDownload = this.canAutoInstall;
-    autoUpdater.autoInstallOnAppQuit = this.canAutoInstall;
-
-    autoUpdater.on('update-available', (info) => {
-      this.availableVersion.next(info.version);
-    });
-
-    autoUpdater.on('update-downloaded', () => {
-      this.updateDownloaded.next(true);
-    });
-
-    // ダウンロードやインストールの失敗はイベントでしか届かないため、ここでログに残す。
-    // 確認の失敗もこのイベントに届くので、checkForUpdates の失敗ログと重複して残る
-    autoUpdater.on('error', (error) => {
-      logger.warn(`アップデート処理中にエラーが発生しました: ${error.message}`);
-    });
-  }
-
-  public checkForUpdates(): Effect.Effect<void, UpdateCheckFailed> {
-    return Effect.tryPromise({
-      try: () => autoUpdater.checkForUpdates(),
-      catch: (error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(`アップデートの確認中にエラーが発生しました: ${message}`);
-        return new UpdateCheckFailed({ message, cause: error });
-      },
-    }).pipe(Effect.asVoid);
-  }
-
-  public async quitAndInstall() {
-    autoUpdater.quitAndInstall();
-  }
-
-  public getUpdateDownloaded() {
-    return this.updateDownloaded.value;
-  }
-
-  public getAvailableVersion() {
-    return this.availableVersion.value;
-  }
-
-  public getCanAutoInstall() {
-    return this.canAutoInstall;
-  }
-
-  public subscribeToUpdateDownloaded(callback: (downloaded: boolean) => void) {
-    return this.updateDownloaded.subscribe(callback);
-  }
-}
+export const getUpdateStatus = () => getHost().updater.getStatus();

@@ -1,0 +1,47 @@
+id: backend-shell-import
+language: TypeScript
+severity: error
+message: |
+  処理本体（electron/api.ts・electron/trpc.ts・electron/module）から殻の本体を import しないでください。
+  electron-updater・electron/electronUtil.ts・electron/index.ts の機能は
+  electron/lib/host の getHost()（shell・updater）から受け取ってください。
+note: |
+  処理本体は utilityProcess へ移せるよう、main プロセスにしか無いもの（ウィンドウ・自動更新・
+  エラー監視の初期化）へ直接届かないようにする。殻はそれらを Host として実装する。
+  親ディレクトリの index を指す相対パス（'..'、'../index'、'../../index' など）は electron/index.ts に
+  届きうるので、処理本体からは使わない。
+  参照: .claude/rules/project/electron-import.md
+  インターフェース: electron/lib/host/types.ts
+utils:
+  forbidden-source:
+    any:
+      - regex: ^['"]electron-updater(/.*)?['"]$
+      # electron/electronUtil.ts（electron/module/electronUtil/ には index が無く、ディレクトリとしては import しない）
+      - regex: (^['"]|/)electronUtil['"]$
+      # electron/index.ts。親ディレクトリや自ディレクトリの index だけを指す相対パス
+      - regex: ^['"]\.{1,2}(/\.\.)*(/index)?['"]$
+rule:
+  any:
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - has:
+            field: source
+            matches: forbidden-source
+    - all:
+        - any:
+            - pattern: import($PATH)
+            - pattern: require($PATH)
+        - has:
+            stopBy: end
+            kind: string
+            matches: forbidden-source
+files:
+  - electron/module/**/*.ts
+  - electron/api.ts
+  - electron/trpc.ts
+ignores:
+  - '**/*.test.ts'
+  - '**/*.spec.ts'
+  - '**/__tests__/**'

@@ -127,4 +127,23 @@ describe('electronUtilController', () => {
       });
     });
   });
+
+  describe('reloadWindow', () => {
+    it('殻のウィンドウ再読み込みを呼ぶ', async () => {
+      const reloadWindow = vi.fn<HostShell['reloadWindow']>(async () => {});
+      registerHost(createTestHost({ shell: { reloadWindow } }));
+
+      await electronUtilRouter().reloadWindow({
+        ctx: {} as unknown,
+        input: undefined,
+        path: '',
+        type: 'mutation',
+        getRawInput: async () => undefined,
+        signal: new AbortController().signal,
+        batchIndex: 0,
+      });
+
+      expect(reloadWindow).toHaveBeenCalledOnce();
+    });
+  });
 });

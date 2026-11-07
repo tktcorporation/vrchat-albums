@@ -1,13 +1,12 @@
 import { Effect } from 'effect';
-import { autoUpdater, type UpdateCheckResult } from 'electron-updater';
 
-import { getHost } from '../../lib/host';
+import { getHost, type HostUpdateCheckResult } from '../../lib/host';
 import { logger } from '../../lib/logger';
 import { UpdateCheckFailed } from './errors';
 
 export interface UpdaterInfo {
   isUpdateAvailable: boolean;
-  updateInfo: UpdateCheckResult | null;
+  updateInfo: HostUpdateCheckResult | null;
 }
 
 /**
@@ -39,7 +38,7 @@ export const getElectronUpdaterInfo = (): Effect.Effect<
   UpdateCheckFailed
 > => {
   return Effect.tryPromise({
-    try: () => autoUpdater.checkForUpdates(),
+    try: () => getHost().updater.checkForUpdates(),
     catch: (error): UpdateCheckFailed =>
       new UpdateCheckFailed({
         message:

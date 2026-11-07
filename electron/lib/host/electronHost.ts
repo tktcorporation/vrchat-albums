@@ -14,7 +14,13 @@ import {
   getShell,
 } from '../electronModules';
 import { logger } from '../logger';
-import type { Host, HostInfo, HostPaths, HostShell } from './types';
+import type {
+  Host,
+  HostInfo,
+  HostPaths,
+  HostShell,
+  HostUpdater,
+} from './types';
 
 /** 殻の情報を読み出す `app` の部分。テストが偽物の app を渡せるよう、使う操作だけに絞る */
 type HostInfoSource = Pick<
@@ -94,7 +100,22 @@ export const createElectronHostInfo = (app: HostInfoSource): HostInfo => ({
   resourcesPath: resolveResourcesPath(app),
 });
 
-const electronHostShell: HostShell = {
+/**
+ * 殻の操作のうち、main プロセスのウィンドウとエラー監視を扱うもの。
+ *
+ * どちらも `electron/electronUtil.ts` や `@sentry/electron/main` を読み込む殻の本体にあり、
+ * この関数から直接 import すると、OS の操作だけを確かめたいテストまでそれらを読み込む。
+ * 殻を登録する側（`electron/registerElectronHost.ts`）から関数として受け取る。
+ */
+export interface ElectronHostDeps {
+  /** メインウィンドウを再読み込みする */
+  readonly reloadWindow: () => void;
+  /** 規約への同意を受けて、同意を前提にする殻の機能を有効にする */
+  readonly onTermsAccepted: () => void;
+  readonly updater: HostUpdater;
+}
+
+export const createElectronHostShell = (deps: ElectronHostDeps): HostShell => ({
   openPath: (targetPath) => getShell().openPath(targetPath),
   openExternal: (url) => getShell().openExternal(url),
   showOpenDialog: async (properties) => {
@@ -142,15 +163,22 @@ const electronHostShell: HostShell = {
   setOpenAtLogin: async (openAtLogin) => {
     getApp().setLoginItemSettings({ openAtLogin });
   },
-};
+  reloadWindow: async () => {
+    deps.reloadWindow();
+  },
+  onTermsAccepted: async () => {
+    deps.onTermsAccepted();
+  },
+});
 
 /**
  * Electron の main プロセスで動く殻の実装。
  *
- * `electron/index.ts` が起動直後に `registerHost(createElectronHost())` で登録する。
+ * `electron/registerElectronHost.ts` が、処理本体のどのモジュールより先に登録する。
  * `app.getPath()` などはこの関数を呼んだ時点で読むので、`app` が使えるプロセスで呼ぶ。
  */
-export const createElectronHost = (): Host => ({
+export const createElectronHost = (deps: ElectronHostDeps): Host => ({
   info: createElectronHostInfo(getApp()),
-  shell: electronHostShell,
+  shell: createElectronHostShell(deps),
+  updater: deps.updater,
 });

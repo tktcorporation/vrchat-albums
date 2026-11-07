@@ -3,7 +3,6 @@ import * as datefns from 'date-fns';
 import { Effect, Exit } from 'effect';
 import z from 'zod';
 
-import { reloadMainWindow } from '../../../electronUtil';
 import { runEffect } from '../../../lib/effectTRPC';
 import {
   mapToFileOperationError,
@@ -40,7 +39,7 @@ export const electronUtilRouter = () =>
       }),
     reloadWindow: procedure.mutation(async () => {
       consola.log('reloadWindow');
-      reloadMainWindow();
+      await getHost().shell.reloadWindow();
     }),
     copyTextToClipboard: procedure.input(z.string()).mutation(async (ctx) => {
       await getHost().shell.writeClipboardText(ctx.input);

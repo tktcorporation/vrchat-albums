@@ -1,7 +1,13 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import type { Host, HostInfo, HostPaths, HostShell } from './types';
+import type {
+  Host,
+  HostInfo,
+  HostPaths,
+  HostShell,
+  HostUpdater,
+} from './types';
 
 /**
  * テストで差し替えたい部分だけを渡すための型。
@@ -11,6 +17,7 @@ export interface TestHostOverrides {
   readonly paths?: Partial<HostPaths>;
   readonly info?: Partial<Omit<HostInfo, 'paths'>>;
   readonly shell?: Partial<HostShell>;
+  readonly updater?: Partial<HostUpdater>;
 }
 
 /**
@@ -42,6 +49,19 @@ const createNoopTestShell = (): HostShell => ({
   notify: async () => {},
   getOpenAtLogin: async () => false,
   setOpenAtLogin: async () => {},
+  reloadWindow: async () => {},
+  onTermsAccepted: async () => {},
+});
+
+/** 開発時の electron-updater と同じく、更新の仕組みが動かない状態を返す既定の更新 */
+const createNoopTestUpdater = (): HostUpdater => ({
+  checkForUpdates: async () => null,
+  quitAndInstall: async () => {},
+  getStatus: async () => ({
+    updateDownloaded: false,
+    availableVersion: null,
+    canAutoInstall: false,
+  }),
 });
 
 /**
@@ -60,4 +80,5 @@ export const createTestHost = (overrides: TestHostOverrides = {}): Host => ({
     ...overrides.info,
   },
   shell: { ...createNoopTestShell(), ...overrides.shell },
+  updater: { ...createNoopTestUpdater(), ...overrides.updater },
 });
