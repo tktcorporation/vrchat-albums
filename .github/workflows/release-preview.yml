@@ -6,17 +6,17 @@ name: Release Preview Build
 # GitHub Release には何も上げない（--publish never）ので、配布中の版と自動アップデートの経路に触れない。
 on:
   pull_request:
-    types: [labeled, synchronize, reopened]
+    types: [labeled, unlabeled, synchronize, reopened]
     branches:
       - main
 
 permissions:
   contents: read
 
-# 同じ PR の古いビルドは新しい head のビルドで置き換える。
-# `preview` 以外のラベルを付けた実行は何もせずに終わるので、進行中のビルドを止めないよう別のグループに入れる。
+# 同じ PR の古いビルドは、新しい head のビルドか `preview` ラベルの取り外しで止める。
+# `preview` 以外のラベルの付け外しは何もせずに終わるので、進行中のビルドを止めないよう別のグループに入れる。
 concurrency:
-  group: release-preview-${{ github.event.pull_request.number }}-${{ github.event.action == 'labeled' && github.event.label.name != 'preview' && github.run_id || 'build' }}
+  group: release-preview-${{ github.event.pull_request.number }}-${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'preview' && github.run_id || 'build' }}
   cancel-in-progress: true
 
 jobs:
@@ -39,12 +39,14 @@ jobs:
 
       # リリース PR の package.json は次に出す版（例: 0.30.0）になっている。そのままビルドすると、
       # preview を入れた環境では本番の 0.30.0 が同じ版に見えて自動アップデートされない。
-      # semver の prerelease（0.30.0-preview.N < 0.30.0）にして、本番が出たら更新されるようにする。
+      # semver の prerelease（0.30.0-beta.N < 0.30.0）にして、本番が出たら更新されるようにする。
+      # 識別子は beta にする。electron-updater は prerelease の版を動かしているとき、識別子をチャンネルとして扱い、
+      # alpha と beta 以外のチャンネルでは同じ識別子のタグしか探さないので、本番のタグ vX.Y.Z を拾わなくなる。
       - name: Compute preview version
         id: version
         run: |
           base=$(node -p "require('./package.json').version")
-          echo "version=${base}-preview.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "version=${base}-beta.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build on ${{ matrix.os }}
