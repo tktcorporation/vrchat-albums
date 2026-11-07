@@ -6,14 +6,14 @@ name: Release Preview Build
 # GitHub Release には何も上げない（--publish never）ので、配布中の版と自動アップデートの経路に触れない。
 on:
   pull_request:
-    types: [labeled, unlabeled, synchronize, reopened]
+    types: [labeled, unlabeled, synchronize, reopened, closed]
     branches:
       - main
 
 permissions:
   contents: read
 
-# 同じ PR の古いビルドは、新しい head のビルドか `preview` ラベルの取り外しで止める。
+# 同じ PR の古いビルドは、新しい head のビルド、`preview` ラベルの取り外し、PR の close（merge を含む）で止める。
 # `preview` 以外のラベルの付け外しは何もせずに終わるので、進行中のビルドを止めないよう別のグループに入れる。
 concurrency:
   group: release-preview-${{ github.event.pull_request.number }}-${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'preview' && github.run_id || 'build' }}
@@ -22,6 +22,7 @@ concurrency:
 jobs:
   vars:
     if: >-
+      github.event.action != 'closed' &&
       github.event.pull_request.head.ref == 'changeset-release/main' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'preview') &&
@@ -52,6 +53,8 @@ jobs:
     name: Build on ${{ matrix.os }}
     needs: vars
     runs-on: ${{ matrix.os }}
+    # 既定の 6 時間では、止まったビルドが runner を長く占有する
+    timeout-minutes: 90
     defaults:
       run:
         shell: bash
@@ -150,17 +153,17 @@ jobs:
           run_url="https://github.com/${REPO}/actions/runs/${RUN_ID}"
 
           rows=$(gh api --paginate "repos/${REPO}/actions/runs/${RUN_ID}/artifacts" \
-            --jq ".artifacts[] | \"| \(.name) | [ダウンロード](${run_url}/artifacts/\(.id)) |\"")
+            --jq ".artifacts | sort_by(.name)[] | \"| \(.name) | [ダウンロード](${run_url}/artifacts/\(.id)) |\"")
 
           {
             echo "$marker"
             echo "## Preview build: \`${PREVIEW_VERSION}\`"
             echo
-            echo "このリリース PR の head（${HEAD_SHA:0:8}）をビルドしました。ダウンロードには GitHub へのログインが必要で、14 日後に消えます。"
+            echo "このリリース PR の head（${HEAD_SHA:0:8}）をビルドしました。成果物は zip で、ダウンロードには GitHub へのログインが必要です。14 日後に消えます。"
             echo
             if [[ "$BUILD_RESULT" != "success" ]]; then
               echo "> [!WARNING]"
-              echo "> 一部の OS のビルドが失敗しました。下の表にない OS はビルドのログを確認してください。"
+              echo "> ビルドに失敗した OS があります。成果物が無い OS はビルドのログを確認してください。"
               echo
             fi
             if [[ -n "$rows" ]]; then
@@ -174,8 +177,11 @@ jobs:
             echo "ビルドのログ: ${run_url}"
           } > body.md
 
-          comment_id=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | head -n 1)
+          # パイプで head に渡すと gh の失敗が終了コードに出ず、検索に失敗したまま新しいコメントを重ねて作るので、
+          # 結果をいったん変数に受けてから先頭を取る
+          comment_ids=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id")
+          comment_id=${comment_ids%%$'\n'*}
 
           if [[ -n "$comment_id" ]]; then
             gh api --method PATCH "repos/${REPO}/issues/comments/${comment_id}" -F body=@body.md > /dev/null
