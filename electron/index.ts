@@ -5,7 +5,7 @@ import {
   type EventHint,
   init as initSentry,
 } from '@sentry/electron/main';
-import { app, type BrowserWindow } from 'electron';
+import { app, type BrowserWindow, ipcMain } from 'electron';
 
 // electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
 // Electron ネイティブの app.isPackaged を使用
@@ -32,6 +32,27 @@ import { eventEmitter } from './trpc';
 // electron/module のサービスは getHost() から OS の機能を受け取る。
 // どのサービスより先に殻を登録するため、モジュール本体の最初の処理として登録する
 registerHost(createElectronHost());
+
+// tRPC の接続はウィンドウごとに張る。トレイや二重起動から開き直したウィンドウは
+// 新しい webContents を持つので、最初のウィンドウだけにつなぐと応答が届かない。
+// browser-window-created は BrowserWindow のコンストラクタの中で同期的に発火し、
+// createWindow が loadURL を呼ぶより先に届くので、画面が送り始める前に接続できる。
+// アプリは window.open を拒否しており、BrowserWindow を作るのは createWindow だけなので、
+// webContents 1 つにつき接続は 1 つになる。ウィンドウより先に登録するためモジュールの読み込み時に登録する。
+// ctx は electron/trpc.ts の initTRPC.context が宣言する形で渡す。procedure は ctx を読まず、
+// イベントは electron/trpc.ts の eventEmitter を直接使う
+app.on('browser-window-created', (_event, window) => {
+  serveOverElectronIpc(
+    window.webContents,
+    (channel) =>
+      serveTrpc({
+        router,
+        createContext: () => ({ eventEmitter }),
+        channel,
+      }),
+    ipcMain,
+  );
+});
 
 const settingStore = initSettingStore();
 initializeSettingStoreForUtil();
@@ -142,17 +163,8 @@ const initializeApp = async () => {
   // データベースクライアント初期化
   await initializeRDBClient();
 
-  const mainWindow = await createOrGetMainWindow();
+  await createOrGetMainWindow();
 
-  // ctx は electron/trpc.ts の initTRPC.context が宣言する形で渡す。procedure は ctx を読まず、
-  // イベントは electron/trpc.ts の eventEmitter を直接使う
-  serveOverElectronIpc(mainWindow.webContents, (channel) =>
-    serveTrpc({
-      router,
-      createContext: () => ({ eventEmitter }),
-      channel,
-    }),
-  );
   void electronUtil.setTray();
   startThumbnailCacheCleanupScheduler();
 

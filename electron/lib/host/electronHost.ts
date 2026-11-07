@@ -1,4 +1,8 @@
-import * as path from 'pathe';
+import * as os from 'node:os';
+import * as path from 'node:path';
+
+import { Effect } from 'effect';
+import type Electron from 'electron';
 
 import {
   getApp,
@@ -9,33 +13,86 @@ import {
   getNotification,
   getShell,
 } from '../electronModules';
-import type { Host, HostInfo, HostShell } from './types';
+import { logger } from '../logger';
+import type { Host, HostInfo, HostPaths, HostShell } from './types';
+
+/** 殻の情報を読み出す `app` の部分。テストが偽物の app を渡せるよう、使う操作だけに絞る */
+type HostInfoSource = Pick<
+  Electron.App,
+  'getPath' | 'getVersion' | 'getAppPath' | 'isPackaged'
+>;
 
 /**
  * 同梱リソースのディレクトリを決める。
  *
  * パッケージ時は electron-builder が `extraResources` を `process.resourcesPath` へ置く。
- * 開発時はソースの `electron/resources` を直接読む（ビルド後の main/ でも、
- * ソース上の electron/lib/host/ でも、2 階層上が基準になる）。
+ * 開発時はソースの `electron/resources` を直接読む。開発時の `app.getAppPath()` は
+ * リポジトリの直下（package.json のあるディレクトリ）を返し、ビルド後のバンドルがある
+ * `main/` の位置に左右されない。
  */
-const resolveResourcesPath = (isPackaged: boolean): string =>
-  isPackaged ? process.resourcesPath : path.join(__dirname, '../../resources');
+const resolveResourcesPath = (app: HostInfoSource): string =>
+  app.isPackaged
+    ? process.resourcesPath
+    : path.join(app.getAppPath(), 'electron', 'resources');
 
-const createElectronHostInfo = (): HostInfo => {
-  const app = getApp();
-  return {
-    paths: {
-      userData: app.getPath('userData'),
-      logs: app.getPath('logs'),
-      downloads: app.getPath('downloads'),
-      pictures: app.getPath('pictures'),
-      temp: app.getPath('temp'),
-    },
-    appVersion: app.getVersion(),
-    isPackaged: app.isPackaged,
-    resourcesPath: resolveResourcesPath(app.isPackaged),
-  };
-};
+/**
+ * 無くても起動を続けられるディレクトリと、`app.getPath()` が失敗したときの代わり。
+ *
+ * Windows では、ダウンロードやピクチャの既知フォルダーの登録が壊れていたり、届かない
+ * ネットワーク共有へ移されていたりすると `app.getPath()` が例外を投げる。起動時に
+ * 1 度だけ読むので、ここで止めるとアプリ全体が起動しない。そのフォルダーを使う機能
+ * （エクスポートの既定の出力先・写真フォルダーの既定値・サムネイルのキャッシュ）だけが
+ * 代わりのディレクトリで動くようにする。
+ */
+const OPTIONAL_PATH_FALLBACKS = {
+  // エクスポートの既定の出力先（`<downloads>/logStore`）の代わりに作業ディレクトリを使う
+  downloads: () => process.cwd(),
+  // Windows の既定のピクチャフォルダーの場所
+  pictures: () =>
+    path.join(process.env.USERPROFILE ?? os.homedir(), 'Pictures'),
+  temp: () => os.tmpdir(),
+} as const satisfies Record<Exclude<keyof HostPaths, 'userData'>, () => string>;
+
+const readOptionalPath = (
+  app: HostInfoSource,
+  name: keyof typeof OPTIONAL_PATH_FALLBACKS,
+): string =>
+  Effect.runSync(
+    Effect.try({
+      try: () => app.getPath(name),
+      catch: (error) =>
+        error instanceof Error ? error : new Error(String(error)),
+    }).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          const fallback = OPTIONAL_PATH_FALLBACKS[name]();
+          logger.warn({
+            message: `app.getPath('${name}') failed, using ${fallback} instead`,
+            stack: error,
+          });
+          return fallback;
+        }),
+      ),
+    ),
+  );
+
+/**
+ * 殻の情報を `app` から読み出す。
+ *
+ * userData は設定と DB の保存先で、代わりの場所に書くと前回までのデータが見えなくなる。
+ * 読めなければ例外のまま起動を止める。
+ */
+export const createElectronHostInfo = (app: HostInfoSource): HostInfo => ({
+  paths: {
+    userData: app.getPath('userData'),
+    downloads: readOptionalPath(app, 'downloads'),
+    pictures: readOptionalPath(app, 'pictures'),
+    temp: readOptionalPath(app, 'temp'),
+  },
+  appVersion: app.getVersion(),
+  isPackaged: app.isPackaged,
+  resourcesPath: resolveResourcesPath(app),
+});
 
 const electronHostShell: HostShell = {
   openPath: (targetPath) => getShell().openPath(targetPath),
@@ -94,6 +151,6 @@ const electronHostShell: HostShell = {
  * `app.getPath()` などはこの関数を呼んだ時点で読むので、`app` が使えるプロセスで呼ぶ。
  */
 export const createElectronHost = (): Host => ({
-  info: createElectronHostInfo(),
+  info: createElectronHostInfo(getApp()),
   shell: electronHostShell,
 });

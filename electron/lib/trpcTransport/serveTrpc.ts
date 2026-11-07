@@ -110,10 +110,8 @@ const nextOrAbort = <T>(
  *
  * 非同期ジェネレーターが await の途中にいると、return() は次の yield まで待たされる。
  * 画面への complete はそれを待たずに送り、後片付け（`finally` でのリスナー解除）は
- * ジェネレーターが yield に戻った時点で走らせる。
- *
- * イテレーターに Symbol.asyncDispose を足すことはしない。Node 24 の非同期ジェネレーターは
- * 標準で Symbol.asyncDispose（return() を呼ぶ）を持つので、足そうとすると衝突する。
+ * ジェネレーターが yield に戻った時点で走らせる。procedure は購読の signal の中止で
+ * 待ちを抜けるので（`electron/lib/eventQueue.ts`）、後片付けは次のイベントを待たない。
  */
 const stopIterator = (iterator: AsyncIterator<unknown>) => {
   void Promise.resolve()

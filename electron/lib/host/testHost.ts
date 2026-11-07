@@ -22,7 +22,6 @@ const createDefaultTestPaths = (): HostPaths => {
   const tmp = os.tmpdir();
   return {
     userData: path.join(tmp, 'vrchat-albums-test-user-data'),
-    logs: path.join(tmp, 'vrchat-albums-test-logs'),
     downloads: path.join(tmp, 'vrchat-albums-test-downloads'),
     pictures: path.join(tmp, 'vrchat-albums-test-pictures'),
     temp: tmp,

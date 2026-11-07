@@ -5,6 +5,7 @@ import { initializeMainSentry } from './index';
 import { runEffect, runEffectExit } from './lib/effectTRPC';
 import { mapToFileOperationError, toError } from './lib/errorMapping';
 import { ERROR_CATEGORIES, ERROR_CODES, UserFacingError } from './lib/errors';
+import { createEventQueue } from './lib/eventQueue';
 import { logger } from './lib/logger';
 import { backgroundSettingsRouter } from './module/backgroundSettings/controller/backgroundSettingsController';
 import { debugRouter } from './module/debug/debugController';
@@ -31,35 +32,6 @@ import { eventEmitter as ee, procedure, router as trpcRouter } from './trpc';
 
 const settingStore = initSettingStore();
 
-/**
- * EventEmitter のイベントを非同期ジェネレーターで消費するための
- * シンプルなキュー＋シグナル。
- *
- * push() でデータをキューに追加し、drain() で全アイテムを yield する。
- * キューが空の場合は次の push() まで await で待機する。
- */
-function createEventQueueSignal<T>() {
-  const queue: T[] = [];
-  let resolve: (() => void) | null = null;
-
-  return {
-    push(item: T) {
-      queue.push(item);
-      resolve?.();
-    },
-    async *drain() {
-      if (queue.length === 0) {
-        await new Promise<void>((r) => {
-          resolve = r;
-        });
-      }
-      while (queue.length > 0) {
-        yield queue.shift() as T;
-      }
-    },
-  };
-}
-
 export const router = trpcRouter({
   backgroundSettings: backgroundSettingsRouter(settingStore),
   settings: settingsRouter(),
@@ -73,25 +45,22 @@ export const router = trpcRouter({
   vrchatApi: vrchatApiRouter,
   debug: debugRouter,
   updater: updaterRouter,
-  subscribeToast: procedure.subscription(async function* () {
+  subscribeToast: procedure.subscription(async function* ({ signal }) {
     /**
      * メインプロセスの `toast` イベントを非同期ジェネレーターで
      * サブスクライバーへ送信する。
-     * EventEmitter のイベントを Promise ベースのキューに変換し、
-     * クリーンアップは for-await ループ終了時に実行される。
+     * 購読が止まると signal の中止で drain() が終わり、finally でリスナーを外す。
      */
-    const signal = createEventQueueSignal<unknown>();
+    const queue = createEventQueue<unknown>(signal);
 
     function onToast(data: unknown) {
-      signal.push(data);
+      queue.push(data);
     }
 
     ee.on('toast', onToast);
     // effect-lint-allow-try-catch: finally でイベントリスナーのクリーンアップが必要
     try {
-      while (true) {
-        yield* signal.drain();
-      }
+      yield* queue.drain();
     } finally {
       ee.off('toast', onToast);
     }
@@ -100,17 +69,17 @@ export const router = trpcRouter({
    * 初期化進捗を購読する
    * zodスキーマで検証済みのデータのみを送信
    */
-  subscribeInitProgress: procedure.subscription(async function* () {
+  subscribeInitProgress: procedure.subscription(async function* ({ signal }) {
     // subscription接続完了を即座に通知
     yield { stage: 'ready' as const } satisfies InitProgressPayload;
 
-    const signal = createEventQueueSignal<InitProgressPayload>();
+    const queue = createEventQueue<InitProgressPayload>(signal);
 
     function onInitProgress(data: unknown) {
       // zodで検証してから送信
       const result = InitProgressPayloadSchema.safeParse(data);
       if (result.success) {
-        signal.push(result.data);
+        queue.push(result.data);
       } else {
         logger.error({
           message: 'Invalid init progress payload received',
@@ -132,9 +101,7 @@ export const router = trpcRouter({
     }
     // effect-lint-allow-try-catch: finally でイベントリスナーのクリーンアップが必要
     try {
-      while (true) {
-        yield* signal.drain();
-      }
+      yield* queue.drain();
     } finally {
       ee.off(INIT_PROGRESS_CHANNEL, onInitProgress);
     }

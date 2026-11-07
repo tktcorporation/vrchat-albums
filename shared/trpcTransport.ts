@@ -4,7 +4,7 @@
  * tRPC の link（`src/trpc/messageLink.ts`）とサーバー側の受け口
  * （`electron/lib/trpcTransport/`）は、この型のメッセージを送り合うだけで、
  * 通信路が何でできているかを知らない。Electron の IPC はこの通信路の実装の 1 つで、
- * 殻を換えるときは実装（MessagePort・WebSocket・別の土台の RPC）を差し替える（#899）。
+ * 殻を換えるときは実装（MessagePort・WebSocket・別の土台の RPC）を差し替える。
  *
  * メッセージの中身（input と結果）は tRPC の transformer（superjson）で
  * 直列化した後の値で、通信路は構造化複製できる値として運べばよい。

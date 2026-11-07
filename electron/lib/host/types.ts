@@ -2,7 +2,7 @@
  * 処理本体（electron/module/）が、アプリの殻から受け取る機能の型。
  *
  * 処理本体を utilityProcess で動かすと、`app`・`dialog`・`clipboard`・`shell`・
- * `Notification` は子プロセスから使えない（#897）。処理本体は Electron を直接触らず、
+ * `Notification` は子プロセスから使えない。処理本体は Electron を直接触らず、
  * 殻が実装するこの型を通して OS の機能を使う。
  *
  * 値の受け渡し方は 2 種類に分けている。
@@ -17,7 +17,6 @@
 export interface HostPaths {
   /** 設定・DB・ログの保存先。例: `%APPDATA%\\VRChatAlbums` */
   readonly userData: string;
-  readonly logs: string;
   readonly downloads: string;
   readonly pictures: string;
   readonly temp: string;
