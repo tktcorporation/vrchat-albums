@@ -1,36 +1,22 @@
+// 処理本体（./api など）が読み込まれた時点で殻の値を使うため、殻の登録を最初に評価する
+import './registerElectronHost';
 import path from 'node:path';
 
-import {
-  type Event,
-  type EventHint,
-  init as initSentry,
-} from '@sentry/electron/main';
 import { app, type BrowserWindow } from 'electron';
 
-// electron-is-dev 3.0 は Pure ESM のため CommonJS ビルドと互換性がない
-// Electron ネイティブの app.isPackaged を使用
-const isDev = !app.isPackaged;
-
-import { scrubEventData } from '../src/lib/utils/masking';
 import { router } from './api';
-import { SENTRY_DATA_COLLECTION } from './constants/sentryDataCollection';
 import * as electronUtil from './electronUtil';
 import { initializeSettingStoreForUtil } from './electronUtil';
-import { getHost, registerHost } from './lib/host';
-import { createElectronHost } from './lib/host/electronHost';
+import { getHost } from './lib/host';
 import { logger } from './lib/logger';
+import { initializeMainSentry } from './lib/sentryMain';
 import * as sequelizeClient from './lib/sequelize';
 import { startTrpcServer } from './lib/trpcTransport';
 import { getBackgroundUsecase } from './module/backGroundUsecase';
 import { startBackgroundSyncTimer } from './module/logSync/backgroundTimer';
 import { initSettingStore } from './module/settingStore';
-import { hasAcceptedCurrentTerms } from './module/terms/consent';
 import { startThumbnailCacheCleanupScheduler } from './module/vrchatPhoto/thumbnailCacheCleanupScheduler';
 import { eventEmitter } from './trpc';
-
-// electron/module のサービスは getHost() から OS の機能を受け取る。
-// どのサービスより先に殻を登録するため、モジュール本体の最初の処理として登録する
-registerHost(createElectronHost());
 
 // tRPC の接続はウィンドウごとに張り、ウィンドウが作られた瞬間に接続する（startTrpcServer）。
 // 最初のウィンドウより先に待ち受けを始めるため、モジュールの読み込み時に呼ぶ。
@@ -42,66 +28,6 @@ startTrpcServer({ router, createContext: () => ({ eventEmitter }) });
 
 const settingStore = initSettingStore();
 initializeSettingStoreForUtil();
-
-let isSentryInitializedMain = false;
-export const getIsSentryInitializedMain = () => isSentryInitializedMain; // Sentry初期化フラグ exportする
-
-export interface ErrorEvent extends Event {
-  type: undefined;
-}
-
-// Sentryの初期化関数 exportする
-export const initializeMainSentry = () => {
-  if (isSentryInitializedMain) {
-    logger.info('Sentry already initialized in main process.');
-    return;
-  }
-  // SENTRY_DSN がなければ初期化しない
-  if (!process.env.SENTRY_DSN) {
-    logger.info('Sentry not initialized in main process (SENTRY_DSN not set)');
-    return;
-  }
-
-  logger.info(
-    `Sentry initializing in main process via electron/index.ts: isDev: ${isDev}`,
-  );
-  initSentry({
-    dsn: process.env.SENTRY_DSN,
-    environment: isDev ? 'development' : 'production',
-    debug: isDev,
-    // __SENTRY_RELEASE__ はビルド時に Sentry プラグインによって置換される
-    // リリースバージョンを表す定数
-    release: __SENTRY_RELEASE__,
-    dataCollection: SENTRY_DATA_COLLECTION,
-    beforeSend: (event: ErrorEvent, _hint: EventHint) => {
-      // 開発環境でも、現在の版の規約に同意しているかを確かめる
-      if (!hasAcceptedCurrentTerms(settingStore)) {
-        if (isDev) {
-          logger.info(
-            'Sentry event dropped in development mode due to terms not accepted.',
-          );
-        } else {
-          logger.info('Sentry event dropped due to terms not accepted.');
-        }
-        return null;
-      }
-
-      const processedEvent = scrubEventData(event);
-
-      if (isDev) {
-        logger.info('Sentry event sent in development mode.');
-      }
-
-      return processedEvent;
-    },
-  });
-  logger.info(
-    isDev
-      ? 'Sentry initialized in main process for development (terms check enabled).'
-      : 'Sentry initialized in main process via electron/index.ts. Event sending depends on terms acceptance.',
-  );
-  isSentryInitializedMain = true;
-};
 
 // アプリ起動時に初期化試行
 initializeMainSentry();

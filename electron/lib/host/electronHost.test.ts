@@ -4,7 +4,11 @@ import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { logger } from '../logger';
-import { createElectronHostInfo } from './electronHost';
+import {
+  createElectronHostInfo,
+  createElectronHostShell,
+} from './electronHost';
+import { createTestHost } from './testHost';
 
 type PathName = Parameters<
   Parameters<typeof createElectronHostInfo>[0]['getPath']
@@ -72,5 +76,24 @@ describe('createElectronHostInfo', () => {
       '/packaged/resources',
     );
     Reflect.deleteProperty(process, 'resourcesPath');
+  });
+});
+
+describe('createElectronHostShell', () => {
+  it('ウィンドウの再読み込みと規約への同意を、登録時に受け取った関数へ渡す', async () => {
+    const reloadWindow = vi.fn();
+    const onTermsAccepted = vi.fn();
+    const shell = createElectronHostShell({
+      reloadWindow,
+      onTermsAccepted,
+      updater: createTestHost().updater,
+    });
+
+    await shell.reloadWindow();
+    expect(reloadWindow).toHaveBeenCalledTimes(1);
+    expect(onTermsAccepted).not.toHaveBeenCalled();
+
+    await shell.onTermsAccepted();
+    expect(onTermsAccepted).toHaveBeenCalledTimes(1);
   });
 });

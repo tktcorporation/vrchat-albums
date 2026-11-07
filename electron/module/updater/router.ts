@@ -1,9 +1,7 @@
 import { Effect } from 'effect';
 
 import { procedure, router } from '../../trpc';
-import { UpdaterService } from './service';
-
-const updaterService = new UpdaterService();
+import * as updaterService from './service';
 
 export const updaterRouter = router({
   checkForUpdates: procedure.mutation(async () => {
@@ -20,11 +18,12 @@ export const updaterRouter = router({
     await updaterService.quitAndInstall();
   }),
 
-  getUpdateStatus: procedure.query(() => {
+  getUpdateStatus: procedure.query(async () => {
+    const status = await updaterService.getUpdateStatus();
     return {
-      updateDownloaded: updaterService.getUpdateDownloaded(),
-      availableVersion: updaterService.getAvailableVersion(),
-      canAutoInstall: updaterService.getCanAutoInstall(),
+      updateDownloaded: status.updateDownloaded,
+      availableVersion: status.availableVersion,
+      canAutoInstall: status.canAutoInstall,
     };
   }),
 });

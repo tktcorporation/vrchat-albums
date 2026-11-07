@@ -5,9 +5,11 @@ export type * from './types';
 /**
  * 処理本体が使う殻の機能の登録先。
  *
- * 殻（`electron/index.ts`）が起動直後に `registerHost()` で実装を登録し、
- * 処理本体は `getHost()` で取り出す。テストは `vitest.setup.ts` で
- * `createTestHost()` を登録する。
+ * 殻の実装は `electron/registerElectronHost.ts` が `registerHost()` で登録し、
+ * 処理本体は `getHost()` で取り出す。`electron/api.ts` などはモジュールの読み込み時に
+ * `getHost()` を呼ぶため、`electron/index.ts` はこの登録モジュールを最初に import する
+ * （順序は ast-grep の `register-electron-host-first` が検出する）。
+ * テストは `vitest.setup.ts` で `createTestHost()` を登録する。
  *
  * Effect の Layer ではなくモジュール単位の登録にしているのは、electron/ の
  * サービスがどれも Context を使っておらず、Layer にすると全サービスの

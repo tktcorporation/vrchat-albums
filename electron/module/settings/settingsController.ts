@@ -1,5 +1,4 @@
 import { Cause, Effect, Exit, Option, Result } from 'effect';
-import type { UpdateCheckResult } from 'electron-updater';
 import { match, P } from 'ts-pattern';
 
 import {
@@ -7,7 +6,7 @@ import {
   ERROR_CODES,
   UserFacingError,
 } from '../../lib/errors';
-import { getHost } from '../../lib/host';
+import { getHost, type HostUpdateCheckResult } from '../../lib/host';
 import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
 import { beginInitProgressRun } from '../initProgress/emitter';
@@ -319,7 +318,7 @@ export const settingsRouter = () =>
     checkForUpdatesAndReturnResult: procedure.query(
       async (): Promise<{
         isUpdateAvailable: boolean;
-        updateInfo: UpdateCheckResult | null;
+        updateInfo: HostUpdateCheckResult | null;
       }> => {
         const exit = await Effect.runPromiseExit(
           settingService.getElectronUpdaterInfo(),

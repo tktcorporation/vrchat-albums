@@ -5,7 +5,7 @@
  * Playwright テスト実行時に Electron の初期化がブロックされてタイムアウトする。
  * このモジュールで遅延 require に集約する。
  *
- * 使うのは殻の側（`electron/lib/host/electronHost.ts`、tRPC の受け口
+ * 使うのは殻の側（`electron/lib/host/electronHost.ts`、`electron/lib/sentryMain.ts`、tRPC の受け口
  * `electron/lib/trpcTransport/index.ts`、殻より先に読み込まれる `electron/lib/logger.ts`）だけ。electron/module のサービスは OS の機能を
  * `getHost()`（electron/lib/host）から受け取り、このモジュールを直接使わない。
  * サービスを utilityProcess へ移すと Electron の API が使えなくなるため。
