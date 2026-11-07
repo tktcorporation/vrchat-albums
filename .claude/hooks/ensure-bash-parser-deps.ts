@@ -73,6 +73,9 @@ const BUN_LOCK = `{
 }
 `;
 
+/** 依存を入れた直後に起動し直した子プロセスであることを示す環境変数。 */
+const RESPAWNED = 'CLAUDE_HOOK_DEPS_RESPAWNED';
+
 export async function ensureBashParserDeps(hooksDir: string): Promise<void> {
   if (existsSync(join(hooksDir, 'node_modules', '@ast-grep', 'napi'))) return;
   await Bun.write(join(hooksDir, 'package.json'), PACKAGE_JSON);
@@ -89,11 +92,20 @@ export async function ensureBashParserDeps(hooksDir: string): Promise<void> {
   // 同じプロセスでは、モジュール解決が「node_modules が無い」状態を覚えたままで、入れたばかりの依存を
   // 読めない。hook が失敗すると多くのホストはコマンドを止めずに通すため、初回の 1 回だけ防御が外れる。
   // 同じ引数で起動し直し、その結果を自分の結果として返す。import は stdin を読む前に走るので、
-  // 入力はまだ消費されておらず子プロセスへそのまま渡る。次の起動では依存があるので再起動しない。
+  // 入力はまだ消費されておらず子プロセスへそのまま渡る。
+  // bun test の中では argv がテストファイルを指し、起動し直すとテストランナーの外で実行される。
+  // `bun --eval` などで起動したときは起動し直すスクリプトが無い。どちらも起動し直さない
+  // （テストでは、その前に依存を入れておく）。
+  if (process.env.NODE_ENV === 'test' || !process.argv[1]) return;
+  // 起動し直した子でも依存が見つからないなら、インストールが成功を返しても依存が入らない環境なので、
+  // 起動し直しを繰り返さずに失敗させる。
+  if (process.env[RESPAWNED] === '1')
+    throw new Error('.claude/hooks の @ast-grep をインストールしましたが、読み込める状態になりません');
   const rerun = Bun.spawnSync([process.execPath, ...process.argv.slice(1)], {
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',
+    env: { ...process.env, [RESPAWNED]: '1' },
   });
   process.exit(rerun.exitCode ?? 1);
 }

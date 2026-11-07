@@ -477,6 +477,50 @@ describe('gh pr create の受け付ける形', () => {
   });
 });
 
+describe('gh api での PR の直接作成', () => {
+  const start = '/work/root';
+  const fields = '-f head=feat -f base=main';
+  test.each([
+    `gh api repos/acme/x/pulls ${fields} -f title=t`,
+    `gh api -X POST /repos/acme/x/pulls ${fields}`,
+    `gh api --method=POST repos/acme/x/pulls/ ${fields}`,
+    `gh api -Xpost repos/acme/x/pulls ${fields}`,
+    `gh api https://api.github.com/repos/acme/x/pulls ${fields}`,
+    `gh api "repos/acme/x/pulls?x=1" ${fields}`,
+    'gh api repos/acme/x/pulls --input pr.json',
+    `cd lib && gh api repos/acme/x/pulls ${fields} --jq .html_url`,
+    `gh api repos/acme/x/pulls ${fields} | cat`,
+    `bash -c 'gh api repos/acme/x/pulls ${fields}'`,
+    'gh api repos/acme/x/pulls -fhead=feat -fbase=main',
+    `gh api graphql -f query='mutation { createPullRequest(input: {}) { clientMutationId } }'`,
+  ])('%p は止め、create-pr.ts へ案内する', (command) => {
+    expect(prCreateInvocation(command, start)).toEqual({
+      kind: 'rejected',
+      reason: expect.stringContaining('create-pr.ts'),
+    });
+  });
+
+  test.each([
+    'gh api repos/acme/x/pulls',
+    'gh api repos/acme/x/pulls --jq ".[].number"',
+    'gh api repos/acme/x/pulls | jq length',
+    'gh api -X GET repos/acme/x/pulls -f state=open',
+    'gh api -X POST repos/acme/x/pulls -X GET -f head=feat',
+    'gh api repos/acme/x/pulls/554 --jq .mergeable',
+    'gh api -X POST repos/acme/x/pulls/554/requested_reviewers -f reviewers[]=a',
+    'gh api repos/acme/x/pulls/554/comments -f body=hello',
+    'gh api "repos/acme/x/pulls/$PR/comments/$ID/replies" -f body=done',
+    'gh api -X PATCH "repos/$REPO/pulls/$PR" -f body=x',
+    'gh api repos/acme/x/issues -f title=t',
+    'rg -F "gh api repos/{owner}/{repo}/pulls" docs',
+    'bun .claude/hooks/create-pr.ts --title t --body-file body.md',
+    `gh api graphql -f query='{ viewer { login } }'`,
+  ])('PR の直接作成でない %p は対象にしない', (command) => {
+    expect(prCreateInvocation(command, start)).toEqual({ kind: 'none' });
+  });
+});
+
+
 describe('origin の取得先の書き換えの比較', () => {
   test.each([
     ['git@github.com:acme/x.git', 'https://github.com/acme/x.git'],
@@ -997,17 +1041,17 @@ describe('GitHub MCP の PR 作成ゲート', () => {
     expect(result.stdout).toContain('いまも同じ origin を持つチェックアウトが見つかりません');
   });
 
-  test('base が origin の default branch と違えば止める', async () => {
+  test('base が origin に無いブランチなら止める', async () => {
     expect((await gate(mcp('lib-feature'))).stdout).toBe('');
     const other = await gate(mcp('lib-feature', 'lib', { base: 'release' }));
     expect(denied(other.stdout)).toBe(true);
-    expect(other.stdout).toContain('default branch（main）と異なります');
+    expect(other.stdout).toContain('base（release）が origin にありません');
     const bash1 = await bash(
       at.libWorktree,
       'gh pr create -R github.com/acme/lib --head lib-feature --base release',
     );
     expectSingleBlock(bash1);
-    expect(bash1.stderr).toContain('default branch（main）と異なります');
+    expect(bash1.stderr).toContain('base（release）が origin にありません');
     expect(
       (await bash(at.libWorktree, 'gh pr create -R github.com/acme/lib --head lib-feature -B main'))
         .code,
@@ -1030,7 +1074,7 @@ describe('GitHub MCP の PR 作成ゲート', () => {
       mcp('lib-feature', 'lib', { base: undefined, base_branch: 'release' }),
     );
     expect(denied(alias.stdout)).toBe(true);
-    expect(alias.stdout).toContain('default branch（main）と異なります');
+    expect(alias.stdout).toContain('base（release）が origin にありません');
     const conflicting = await gate(
       mcp('lib-feature', 'lib', { base: 'main', base_branch: 'release' }),
     );
@@ -1038,7 +1082,76 @@ describe('GitHub MCP の PR 作成ゲート', () => {
     expect(conflicting.stdout).toContain('食い違っています');
   });
 
-  test('--base を省いても、ブランチ設定の gh-merge-base が default branch と違えば止める', async () => {
+  test('base が head の下に積んだブランチなら通し、head の祖先でないか default branch に無いコミットを持たなければ止める', async () => {
+    expect((await gate(mcp('lib-feature'))).stdout).toBe('');
+    // 積み重ねた PR の下のブランチ（head の親）と、main から分かれた head の祖先でないブランチ。
+    git(at.libWorktree, 'push', '-q', 'origin', 'lib-feature~1:refs/heads/lib-stack');
+    const side = git(
+      at.libWorktree,
+      'commit-tree',
+      'origin/main^{tree}',
+      '-p',
+      'origin/main',
+      '-m',
+      'side',
+    );
+    git(at.libWorktree, 'push', '-q', 'origin', `${side}:refs/heads/lib-side`);
+    // default branch の先端を指す、自分のコミットを持たないブランチ。
+    git(at.libWorktree, 'push', '-q', 'origin', 'origin/main:refs/heads/lib-release');
+    try {
+      expect((await gate(mcp('lib-feature', 'lib', { base: 'lib-stack' }))).stdout).toBe('');
+      expect(
+        (
+          await bash(
+            at.libWorktree,
+            'gh pr create -R github.com/acme/lib --head lib-feature --base lib-stack',
+          )
+        ).code,
+      ).toBe(0);
+      git(at.libWorktree, 'config', 'branch.lib-feature.gh-merge-base', 'lib-stack');
+      try {
+        expect(
+          (await bash(at.libWorktree, 'gh pr create -R github.com/acme/lib --head lib-feature'))
+            .code,
+        ).toBe(0);
+      } finally {
+        git(at.libWorktree, 'config', '--unset', 'branch.lib-feature.gh-merge-base');
+      }
+
+      const notAncestor = await gate(mcp('lib-feature', 'lib', { base: 'lib-side' }));
+      expect(denied(notAncestor.stdout)).toBe(true);
+      expect(notAncestor.stdout).toContain('の祖先ではありません');
+      const bashSide = await bash(
+        at.libWorktree,
+        'gh pr create -R github.com/acme/lib --head lib-feature --base lib-side',
+      );
+      expectSingleBlock(bashSide);
+      expect(bashSide.stderr).toContain('の祖先ではありません');
+
+      const lagging = await gate(mcp('lib-feature', 'lib', { base: 'lib-release' }));
+      expect(denied(lagging.stdout)).toBe(true);
+      expect(lagging.stdout).toContain('default branch（main）に無いコミットを持たない');
+      const bashLagging = await bash(
+        at.libWorktree,
+        'gh pr create -R github.com/acme/lib --head lib-feature --base lib-release',
+      );
+      expectSingleBlock(bashLagging);
+      expect(bashLagging.stderr).toContain('default branch（main）に無いコミットを持たない');
+    } finally {
+      git(
+        at.libWorktree,
+        'push',
+        '-q',
+        'origin',
+        '--delete',
+        'lib-stack',
+        'lib-side',
+        'lib-release',
+      );
+    }
+  });
+
+  test('--base を省いても、ブランチ設定の gh-merge-base が origin に無いブランチなら止める', async () => {
     const command = 'gh pr create -R github.com/acme/lib --head lib-feature';
     git(at.libWorktree, 'config', 'branch.lib-feature.gh-merge-base', 'release');
     try {
@@ -1066,7 +1179,7 @@ describe('GitHub MCP の PR 作成ゲート', () => {
     expect((await bash(at.libWorktree, command)).code).toBe(0);
   });
 
-  test('origin/HEAD が無いチェックアウトでは base を確かめられないので止め、設定すれば通す', async () => {
+  test('default branch は手元の origin/HEAD ではなく origin の HEAD から読む', async () => {
     const bare = join(base, 'remotes', 'acme', 'headless.git');
     git(base, 'init', '-q', '--bare', '-b', 'main', bare);
     const repo = join(base, 'headless');
@@ -1074,16 +1187,28 @@ describe('GitHub MCP の PR 作成ゲート', () => {
     await commit(repo, 'headless-main');
     git(repo, 'remote', 'add', 'origin', 'ssh://github.com/acme/headless.git');
     git(repo, 'push', '-q', 'origin', 'main');
+    git(repo, 'push', '-q', 'origin', 'main:refs/heads/headless-release');
     git(repo, 'checkout', '-q', '-b', 'headless-feat');
     await commit(repo, 'headless-feat');
     await converge(repo);
     git(repo, 'push', '-q', 'origin', 'headless-feat');
-    const result = await gate(mcp('headless-feat', 'headless'));
-    expect(denied(result.stdout)).toBe(true);
-    expect(result.stdout).toContain('git remote set-head origin --auto');
-    git(repo, 'fetch', '-q', 'origin');
-    git(repo, 'remote', 'set-head', 'origin', 'main');
+    // 手元に origin/HEAD が無くても、origin の HEAD が指す main を default branch として通す。
     expect((await gate(mcp('headless-feat', 'headless'))).stdout).toBe('');
+    // 手元の origin/HEAD を別のブランチへ向けても、そのブランチを default branch とみなさない。
+    git(repo, 'fetch', '-q', 'origin');
+    git(repo, 'remote', 'set-head', 'origin', 'headless-release');
+    const rewritten = await gate(mcp('headless-feat', 'headless', { base: 'headless-release' }));
+    expect(denied(rewritten.stdout)).toBe(true);
+    expect(rewritten.stdout).toContain('default branch（main）に無いコミットを持たない');
+    // origin の HEAD がブランチを指していなければ、default branch を決められないので止める。
+    git(bare, 'symbolic-ref', 'HEAD', 'refs/heads/missing');
+    try {
+      const headless = await gate(mcp('headless-feat', 'headless'));
+      expect(denied(headless.stdout)).toBe(true);
+      expect(headless.stdout).toContain('origin の HEAD がブランチを指していない');
+    } finally {
+      git(bare, 'symbolic-ref', 'HEAD', 'refs/heads/main');
+    }
   });
 
   test('台帳に記録の無いブランチは止める', async () => {

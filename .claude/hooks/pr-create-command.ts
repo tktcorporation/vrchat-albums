@@ -17,6 +17,11 @@
  * サブシェル、コマンド置換、変数を含むパス、`;`・`||`・パイプ、gh より前のブランチ切り替え、
  * 複数の `gh pr create` は、実際に何がどこで動くかを実行前に確定できないので受け付けない。
  * 文字列に `gh pr create`（`gh pr new`）を含むだけのコマンド（コミットメッセージなど）も同じく止める。
+ *
+ * GitHub の GraphQL を使えない実行環境では `gh pr create` が動かず、REST API が作成の手段になる。
+ * REST API での作成は create-pr.ts が担い、`gh api` で `repos/<owner>/<repo>/pulls` へ直接 POST する
+ * 呼び出しはここで止めてそちらへ案内する。任意の `gh api` の引数から作成の対象を確定するには gh と
+ * シェルの解釈を再現する必要があるので、受け付ける形は設けない。
  */
 import { basename, resolve } from 'node:path';
 import { andChainArgv, parseCommands, wordValue, type ShellWord } from './command-parse.ts';
@@ -234,18 +239,109 @@ function parsedPrCreate(command: string, origin: string, depth = 0, executed = t
   });
 }
 
-/** Bash の入力文字列が `gh pr create`（`gh pr new`）を含むなら、受け付ける形かを判定する。 */
-export function prCreateInvocation(command: string, origin: string): PrCreateInvocation {
-  if (!isPrCreateCommand(command) && !parsedPrCreate(command, origin)) return { kind: 'none' };
+/**
+ * `cd <リテラルのパス> &&` の連なりと最後の 1 コマンドに分け、cd を解いた実行ディレクトリを返す。
+ * それ以外のつなぎ方（`;`・`||`・パイプ、cd 以外の前置コマンド）なら null。
+ */
+function cdChain(command: string, origin: string): { cwd: string; last: string[] } | null {
   const chain = andChainArgv(command)?.map(literalValues);
   const last = chain?.at(-1);
-  if (!chain || !last) return { kind: 'rejected', reason: REJECTED };
+  if (!chain || !last) return null;
   let cwd = origin;
   for (const argv of chain.slice(0, -1)) {
     const target = cdTarget(argv);
-    if (target === null) return { kind: 'rejected', reason: REJECTED };
+    if (target === null) return null;
     cwd = resolve(cwd, target);
   }
+  return { cwd, last };
+}
+
+const API_REJECTED =
+  'REST API で PR を作成するときは、`gh api` を直接呼ばず `bun .claude/hooks/create-pr.ts --title <タイトル> --body-file <本文のファイル> [--draft]` を使ってください。' +
+  'このスクリプトは現在のブランチと origin から対象を決め、レビュー収束の証跡を確かめてから作成します。' +
+  'コミットメッセージや本文にこの呼び出しを書くだけなら、その文章をファイルに書いて `-F <ファイル>` で渡してください。';
+
+/** PR の一覧と作成のエンドポイント（gh と同じく先頭の `/`・クエリ・フラグメント・GHES の `api/v3/` を除いたパス）。 */
+const PULLS_PATH = /^repos\/[^/]+\/[^/]+\/pulls$/iu;
+/** gh api がリクエストに本文を付ける（既定のメソッドを POST にする）オプション。 */
+const API_BODY_OPTIONS = new Set(['-f', '--raw-field', '-F', '--field', '--input']);
+
+function endpointPath(endpoint: string): string {
+  const url = /^(?:https?:)?\/\/[^/]+\/(.*)$/iu.exec(endpoint);
+  return (url ? (url[1] ?? '') : endpoint)
+    .replace(/[?#].*$/su, '')
+    .replace(/^\/+/u, '')
+    .replace(/^api\/v3\//iu, '')
+    .replace(/\/+$/u, '');
+}
+
+/**
+ * `gh api` に続く引数（`api` 自身は含まない）が、PR の一覧・作成のエンドポイントへの書き込みか。
+ * gh は `-X`/`--method` を省くと、本文のオプションがあれば POST、無ければ GET にする（最後の指定が勝つ）。
+ * 値の決まらない語は数えない。対象を実行時に組み立てる呼び出しまでは追わない
+ * （このゲートが防ぐのは収束の記録忘れで、意図的な回避ではない）。
+ */
+function writesPullsCollection(args: readonly string[]): boolean {
+  let method: string | undefined;
+  let hasBody = false;
+  let pulls = false;
+  for (const [index, word] of args.entries()) {
+    const previous = args[index - 1];
+    if (previous === '-X' || previous === '--method') method = word;
+    else if (word.startsWith('--method=')) method = word.slice('--method='.length);
+    else if (word.startsWith('-X') && word.length > 2) method = word.slice(2);
+    if (API_BODY_OPTIONS.has(word) || /^(?:--(?:raw-field|field|input)=|-[fF].)/u.test(word))
+      hasBody = true;
+    if (!word.startsWith('-') && PULLS_PATH.test(endpointPath(word))) pulls = true;
+  }
+  const effective = method?.toUpperCase() ?? (hasBody ? 'POST' : 'GET');
+  if (effective === 'GET') return false;
+  // GraphQL の createPullRequest も PR の作成になる
+  if (args.some((word) => endpointPath(word) === 'graphql'))
+    return args.some((word) => /createPullRequest/iu.test(word));
+  return pulls && effective === 'POST';
+}
+
+/**
+ * コマンド文字列に含まれる `gh api` の呼び出しの引数を、構文解析した argv から集める。引用符の中の
+ * 文字列（`bash -c '…'` など）も解き直して探す。
+ */
+function ghApiArgs(command: string, origin: string, depth = 0): string[][] {
+  const parsed = parseCommands(command, origin);
+  if (parsed.kind !== 'parsed') return [];
+  const found: string[][] = [];
+  for (const entry of parsed.commands) {
+    const argv = entry.argv.map((word) => wordValue(word) ?? NON_LITERAL_WORD);
+    argv.forEach((value, index) => {
+      if (basename(value) === 'gh' && argv[index + 1] === 'api') found.push(argv.slice(index + 2));
+    });
+    if (depth < MAX_NESTED_PARSE)
+      for (const value of argv.slice(1))
+        if (value !== NON_LITERAL_WORD) found.push(...ghApiArgs(value, origin, depth + 1));
+  }
+  return found;
+}
+
+/**
+ * `gh api` で PR を直接作成する呼び出し（`repos/<owner>/<repo>/pulls` への POST）を止め、
+ * レビュー収束の証跡を確かめてから作成する create-pr.ts へ案内する。一覧の取得や、
+ * PR の作成でない書き込み（コメント・レビュー依頼など）は対象にしない。
+ */
+function apiPrCreateInvocation(command: string, origin: string): PrCreateInvocation {
+  if (indexOfWord(command, 'api', 0) === -1) return { kind: 'none' };
+  return ghApiArgs(command, origin).some(writesPullsCollection)
+    ? { kind: 'rejected', reason: API_REJECTED }
+    : { kind: 'none' };
+}
+
+/** Bash の入力文字列が PR 作成（`gh pr create`・`gh pr new`・REST API）を含むなら、受け付ける形かを判定する。 */
+export function prCreateInvocation(command: string, origin: string): PrCreateInvocation {
+  const api = apiPrCreateInvocation(command, origin);
+  if (api.kind !== 'none') return api;
+  if (!isPrCreateCommand(command) && !parsedPrCreate(command, origin)) return { kind: 'none' };
+  const chain = cdChain(command, origin);
+  if (chain === null) return { kind: 'rejected', reason: REJECTED };
+  const { cwd, last } = chain;
   const options = ghPrCreateOptions(last);
   if (options.kind === 'rejected') return options;
   const { repo, head, base } = options.target;

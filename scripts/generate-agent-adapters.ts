@@ -217,38 +217,61 @@ function buildCodexHooks(hooks: ManifestHook[]): {
   };
 }
 
-/** `.claude/rules/*.md` の paths frontmatter を読む。無ければ alwaysApply。 */
-function parseRulePaths(markdown: string): string[] | null {
-  if (!markdown.startsWith('---\n')) return null;
+/**
+ * `.claude/rules/*.md` の `paths` frontmatter を読む。キー自体が無ければ
+ * 空配列を返し、呼び出し側で alwaysApply: true として生成する。
+ *
+ * ここで `paths:` キーはあるのに抽出に失敗した場合は、黙って alwaysApply へ
+ * フォールバックしない。フォールバックすると、本来 `*.ts` などに絞っていた
+ * はずのルールが Cursor 側では repo 全体へ適用されるという、書いた本人が
+ * 気づけない形でスコープが緩む方向の事故になる。抽出できないと分かった時点で
+ * 生成自体を失敗させ、frontmatter の書式を直させる。
+ */
+function parseRulePaths(rulePath: string, markdown: string): string[] {
+  if (!markdown.startsWith('---\n')) return [];
   const end = markdown.indexOf('\n---\n', 4);
-  if (end === -1) return null;
+  if (end === -1) return [];
   const frontmatter = markdown.slice(4, end);
-  const inline = frontmatter.match(/^paths:\s*\[([^\]]*)\]/m);
+  if (!/^paths:/m.test(frontmatter)) return [];
+
+  const inline = frontmatter.match(/^paths:\s*\[([^\]]*)\]\s*$/m);
   if (inline) {
     return inline[1]
       .split(',')
       .map((part) => part.trim().replace(/^['"]|['"]$/g, ''))
       .filter(Boolean);
   }
-  if (/^paths:\s*$/m.test(frontmatter) || /^paths:\s*\n/m.test(frontmatter)) {
-    const lines = frontmatter.split('\n');
-    const start = lines.findIndex((line) => /^paths:\s*$/.test(line));
-    if (start === -1) return null;
-    const paths: string[] = [];
-    for (let i = start + 1; i < lines.length; i++) {
-      const match = lines[i].match(/^\s*-\s*['"]?([^'"]+)['"]?\s*$/);
-      if (!match) break;
-      paths.push(match[1]);
-    }
-    return paths.length > 0 ? paths : null;
+
+  const lines = frontmatter.split('\n');
+  const start = lines.findIndex((line) => /^paths:\s*$/.test(line));
+  if (start === -1)
+    throw new Error(
+      `${rulePath}: paths: の形式を解析できません（inline 配列 \`paths: [...]\` でも block リストでもありません）。`,
+    );
+
+  const paths: string[] = [];
+  let i = start + 1;
+  for (; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === '' || /^\s*#/.test(line)) continue;
+    const match = line.match(/^\s*-\s*(?:['"]([^'"]+)['"]|([^\s#]+))\s*(?:#.*)?$/);
+    if (!match) break;
+    paths.push((match[1] ?? match[2]) as string);
   }
-  return null;
+  if (i < lines.length && /^\s*-/.test(lines[i]))
+    throw new Error(`${rulePath}: paths: block list の ${i + 1} 行目を解析できません: ${lines[i]}`);
+  if (paths.length === 0)
+    throw new Error(`${rulePath}: paths: block list から項目を 1 件も抽出できませんでした。`);
+  return paths;
 }
 
 function buildCursorRuleMdc(rulePath: string): { relativePath: string; content: string } {
   const rel = relative(repoRoot, rulePath).replaceAll('\\', '/');
-  const markdown = readFileSync(rulePath, 'utf8');
-  const paths = parseRulePaths(markdown);
+  // core.autocrlf 有効な Windows チェックアウトでは frontmatter が `---\r\n` になり、
+  // 以降の LF 前提の判定（`---\n` 一致・行分割）がすべて素通りする。読み込み直後に
+  // 揃える。
+  const markdown = readFileSync(rulePath, 'utf8').replaceAll('\r\n', '\n');
+  const paths = parseRulePaths(rulePath, markdown);
   const title =
     markdown
       .split('\n')
@@ -256,7 +279,7 @@ function buildCursorRuleMdc(rulePath: string): { relativePath: string; content: 
       ?.replace(/^#\s+/, '')
       .trim() ?? relative(join(repoRoot, '.claude/rules'), rulePath);
   const frontmatter =
-    paths && paths.length > 0
+    paths.length > 0
       ? [
           `---`,
           `description: ${yamlString(`${title} — from ${rel}`)}`,

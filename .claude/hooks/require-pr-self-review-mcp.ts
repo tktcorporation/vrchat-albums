@@ -2,7 +2,7 @@
 /**
  * PreToolUse(mcp__*__[github_]create_pull_request、
  *   Cursor では MCP:[github_]create_pull_request): GitHub MCP 経由の PR 作成にも、Bash の
- * `gh pr create` と同じ証跡のゲート（pr-review-gate.ts の checkAttestation）を掛ける。
+ * `gh pr create` と同じ証跡と base のゲート（pr-review-gate.ts の checkPrTarget）を掛ける。
  *
  * ツール入力にディレクトリの手がかりは無いので、リモートを引く場所には、台帳で同じ
  * owner/repo と head ブランチの収束を記録したチェックアウトのうち、いまも残っていて記録どおりの
@@ -15,14 +15,14 @@
  *
  * 対象外: 一度 close した PR を state: "open" で reopen する経路
  * （mcp__github__update_pull_request）は新規 PR 作成に当たらないため塞いでいない。
- * `gh api -X POST .../pulls` のような、gh の pr サブコマンドを経由しない生の API 呼び出しも対象外。
+ * `gh api` で pulls へ直接 POST する呼び出しは Bash のゲート（pr-create-command.ts）が止める。
+ * `curl` など gh を経由しない API 呼び出しは対象外。
  */
 import { existsSync } from 'node:fs';
 import { originRepository } from './hook-utils.ts';
 import { prCreateTarget } from './pr-create-target.ts';
 import {
-  baseDenyReason,
-  checkAttestation,
+  checkPrTarget,
   denyJson,
   readAttestations,
   type Attestation,
@@ -65,9 +65,13 @@ export async function reviewDenyReason(toolInput: unknown): Promise<string | nul
   if (!recorded) {
     return `${name} の ${headBranch} ブランチで収束を記録し、いまも同じ origin を持つチェックアウトが見つかりません。このブランチをチェックアウトしたディレクトリで .claude/skills/pr-review-loop/SKILL.md の手順を回して収束を記録し、push してから再実行してください。`;
   }
-  const baseReason = await baseDenyReason(recorded.checkout, target.base);
-  if (baseReason) return baseReason;
-  return checkAttestation(name, headBranch, recorded.checkout);
+  const verdict = await checkPrTarget(
+    name,
+    headBranch,
+    recorded.checkout,
+    target.base === undefined ? [] : [target.base],
+  );
+  return verdict.kind === 'allowed' ? null : verdict.reason;
 }
 
 if (import.meta.main) {

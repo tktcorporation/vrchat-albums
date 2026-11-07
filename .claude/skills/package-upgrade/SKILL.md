@@ -75,7 +75,29 @@ pnpm --filter <ws> update <pkg>          # 特定 workspace に絞って更新
 pnpm add <pkg>@<version> --filter <ws>   # 特定版を狙う
 ```
 
-cooldown が効くリポジトリなら、解決された version は最低でも cooldown 期間ぶん枯れている（具体値は `pnpm-workspace.yaml` の `minimumReleaseAge`）。**cooldown を跨いで最新版を掴むために `minimumReleaseAgeExclude` を安易に足さない** — 足すのは「上流が critical CVE の hotfix を出した直後」のような明確な理由があるときだけ。足したら PR 説明に理由を書き、取り込み後に掃除する。
+cooldown が効くリポジトリなら、解決された version は最低でも cooldown 期間ぶん枯れている（具体値は `pnpm-workspace.yaml` の `minimumReleaseAge`）。`minimumReleaseAgeExclude` で cooldown を跨ぐのは、次の「脆弱性の修正版が cooldown 期間内にしか無いとき」の判断で許されたときだけにする。
+
+#### 脆弱性の修正版が cooldown 期間内にしか無いとき
+
+先に、cooldown を満たした修正版が無いかを確かめる。advisory（GHSA / OSV）が挙げる修正版は、最新版より前の版であることが多い。最新版だけを見て例外へ進まない。
+
+| 状況                                                                                                                                                                | 対応                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| cooldown を満たした修正版がある                                                                                                                                     | その版を使う。例外は使わない                                |
+| 修正版が cooldown 期間内にしか無く、本番の実行経路から到達しうる脆弱性で、深刻度が Critical / High か、実際に悪用されている（KEV 掲載・攻撃の報告・公開された PoC） | 公開から 6 時間たった修正版を、下の確認を通してから取り込む |
+| 修正版が cooldown 期間内にしか無く、上の行に当たらない（影響が開発・テスト環境に閉じる、または本番から到達しても Medium / Low で悪用の報告が無い）                  | cooldown が明けるまで待ち、それまでは受容として記録する     |
+
+6 時間は、侵害された版が検知されて registry から取り下げられるまでにかかる時間（多くは数時間）を超える長さとして置いている。待機をゼロにしないのは、攻撃者が「緊急のセキュリティ修正」を装って侵害版を出すと、例外の経路がそのまま侵入口になるため。
+
+cooldown を跨ぐ前に、次をすべて確かめる。
+
+- advisory が、その版を修正版として挙げている。リリースノートの記載だけでは足りない
+- 公開者と provenance（npm の trusted publishing など）が直前の版と同じ
+- 直前の版との差分が修正に見合う大きさで、新しい依存や install script が増えていない
+
+公開時刻は `npm view <pkg> time --json` で確かめる。`minimumReleaseAgeExclude` は公開からの時間を見ないので、6 時間に満たないうちはエントリを足さずに待つ。
+
+`minimumReleaseAgeExclude` には `pkg@x.y.z` の形で版を名指しし、パッケージ全体を外さない。PR 説明に理由（advisory ID、本番から到達する経路、上の確認の結果）を書き、cooldown 期間を過ぎたらエントリを消す。`pnpm audit --fix` は、修正対象の各 advisory の最小修正版を公開からの時間を問わず `minimumReleaseAgeExclude` に足し、既定では overrides も書く。そのまま使わず、足されたエントリを上の判断で絞る。
 
 ### 2-2. 差分を必ず人間の目で確認する
 
@@ -181,13 +203,12 @@ changeset を使うリポジトリでは、依存更新が **runtime artifact（
 
 ## アンチパターン
 
-| やりがち                                                | なぜダメか                                                                      | 代わりに                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `pnpm update` で全部最新に上げる                        | cooldown は効くが breaking change の山を一度に抱える / 脆弱性の優先順位が消える | 脆弱性起点で対象を絞る (Phase 1)                          |
-| lockfile 差分を見ずに通す                               | worm は新規 transitive dep として紛れ込む                                       | `git diff pnpm-lock.yaml` を必ず読む (Phase 2-2)          |
-| `strictDepBuilds` のエラーを allowlist 追加で即黙らせる | 後付け postinstall を見逃す = worm の主要伝播経路を素通り                       | その script が何をするか確認してから (Phase 2-2)          |
-| transitive 脆弱性に脊髄反射で override                  | 上流が直しても残る負債。別依存と非互換を起こす                                  | 直接依存上げ → 上流確認 → 受容、を尽くす (Phase 3-1)      |
-| 既存 override / 受容を見ない                            | 負債が溜まる一方。外せるのに残り続ける                                          | 毎回棚卸しして外せないか確認 (Phase 3-2)                  |
-| cooldown が邪魔で `minimumReleaseAgeExclude` 常用       | hardening が骨抜き。汚染版を掴むリスクが戻る                                    | hotfix の明確な理由があるときだけ、掃除前提で (Phase 2-1) |
-| runtime 依存更新で changeset を省く                     | release が発火せず変更がユーザーに届かない                                      | runtime artifact が変わるなら bump 付き (Phase 4)         |
-
+| やりがち                                                | なぜダメか                                                                      | 代わりに                                                                             |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `pnpm update` で全部最新に上げる                        | cooldown は効くが breaking change の山を一度に抱える / 脆弱性の優先順位が消える | 脆弱性起点で対象を絞る (Phase 1)                                                     |
+| lockfile 差分を見ずに通す                               | worm は新規 transitive dep として紛れ込む                                       | `git diff pnpm-lock.yaml` を必ず読む (Phase 2-2)                                     |
+| `strictDepBuilds` のエラーを allowlist 追加で即黙らせる | 後付け postinstall を見逃す = worm の主要伝播経路を素通り                       | その script が何をするか確認してから (Phase 2-2)                                     |
+| transitive 脆弱性に脊髄反射で override                  | 上流が直しても残る負債。別依存と非互換を起こす                                  | 直接依存上げ → 上流確認 → 受容、を尽くす (Phase 3-1)                                 |
+| 既存 override / 受容を見ない                            | 負債が溜まる一方。外せるのに残り続ける                                          | 毎回棚卸しして外せないか確認 (Phase 3-2)                                             |
+| cooldown が邪魔で `minimumReleaseAgeExclude` 常用       | hardening が骨抜き。汚染版を掴むリスクが戻る                                    | Phase 2-1 の条件を満たす版だけを `pkg@x.y.z` で名指しし、cooldown 期間を過ぎたら消す |
+| runtime 依存更新で changeset を省く                     | release が発火せず変更がユーザーに届かない                                      | runtime artifact が変わるなら bump 付き (Phase 4)                                    |
