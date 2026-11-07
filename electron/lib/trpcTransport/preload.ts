@@ -2,48 +2,40 @@
  * tRPC の通信路の、preload 側の唯一の入口（全体の構成は `./index.ts`）。
  *
  * preload は sandbox 内で単一ファイルにバンドルされるので、ここからは型と
- * チャンネル名の定数（`./ipcChannelName.ts`）だけを読み込み、スキーマの検証や
- * tRPC のサーバー側の部品をバンドルに巻き込まない。
+ * チャンネル名の定数（`./ipcChannelName.ts`）、port の上の通信路（`./portBridge.ts`）だけを読み込み、
+ * スキーマの検証や tRPC のサーバー側の部品をバンドルに巻き込まない。
  */
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
-import type {
-  ClientMessage,
-  MessageChannel,
-  ServerMessage,
-} from '../../../shared/trpcTransport';
-import { TRPC_IPC_CHANNEL } from './ipcChannelName';
+import { type BridgePort, createPortBridge } from './portBridge';
 
 /**
  * 画面へ公開する通信路（`shared/trpcTransport.ts` の `MessageChannel`）。
- * 画面側は `src/trpc/electronRendererChannel.ts` がこれを使い、受け手は `./electronIpcChannel.ts`。
- * 送受信とも固定の 1 チャンネルだけを使い、画面に任意の IPC を許さない。
- * 送った中身は処理本体側がスキーマで確かめる。
+ * 画面側は `src/trpc/electronRendererChannel.ts` がこれを使う。メッセージは main が渡した
+ * MessagePort で処理本体へ直接届き、処理本体がスキーマで確かめる。
  */
-const electronTRPC: MessageChannel<ClientMessage, ServerMessage> = {
-  send: (message) => {
-    ipcRenderer.send(TRPC_IPC_CHANNEL, message);
-  },
-  onMessage: (listener) => {
-    const onIpcMessage = (_event: IpcRendererEvent, message: ServerMessage) => {
-      listener(message);
-    };
-    ipcRenderer.on(TRPC_IPC_CHANNEL, onIpcMessage);
-    return () => {
-      ipcRenderer.removeListener(TRPC_IPC_CHANNEL, onIpcMessage);
-    };
-  },
-};
+const createElectronTrpcBridge = () =>
+  createPortBridge({
+    send: (channel) => {
+      ipcRenderer.send(channel);
+    },
+    on: (channel, listener) =>
+      ipcRenderer.on(channel, (event) => {
+        // preload の世界の MessagePort は DOM の MessagePort で、BridgePort の操作をすべて持つ
+        listener({ ports: event.ports as BridgePort[] });
+      }),
+  });
 
 declare global {
   interface Window {
     /** preload が無いブラウザ実行時は未定義になる */
-    electronTRPC?: typeof electronTRPC;
+    electronTRPC?: ReturnType<typeof createElectronTrpcBridge>;
   }
 }
 
 /** 通信路を `window.electronTRPC` として画面へ公開する。preload の読み込み時に 1 回呼ぶ */
 export const exposeTrpcBridge = (): void => {
+  const electronTRPC = createElectronTrpcBridge();
   process.once('loaded', () => {
     contextBridge.exposeInMainWorld('electronTRPC', electronTRPC);
   });

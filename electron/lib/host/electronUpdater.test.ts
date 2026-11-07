@@ -10,9 +10,17 @@ import {
   type AutoUpdaterSource,
   canAutoInstallUpdates,
   createElectronUpdater,
+  FORCE_QUIT_AFTER_INSTALL_MS,
 } from './electronUpdater';
 
 type Listener = (...args: unknown[]) => void;
+
+/** 処理本体の終了を待たず、強制終了の待ちも走らせない偽物 */
+const noPrepare = {
+  prepareQuit: async () => {},
+  forceQuit: () => {},
+  schedule: () => {},
+};
 
 /** イベントの購読を記録し、テストからイベントを起こせる偽物の autoUpdater */
 const createFakeAutoUpdater = () => {
@@ -53,7 +61,7 @@ describe('createElectronUpdater', () => {
 
   it('自動インストールできない場合は自動ダウンロードと終了時インストールを無効にする', async () => {
     const { fake, autoUpdater } = createFakeAutoUpdater();
-    const updater = createElectronUpdater(autoUpdater, false);
+    const updater = createElectronUpdater(autoUpdater, noPrepare, false);
 
     expect(fake.autoDownload).toBe(false);
     expect(fake.autoInstallOnAppQuit).toBe(false);
@@ -62,7 +70,7 @@ describe('createElectronUpdater', () => {
 
   it('自動インストールできる場合は自動ダウンロードと終了時インストールを有効にする', async () => {
     const { fake, autoUpdater } = createFakeAutoUpdater();
-    const updater = createElectronUpdater(autoUpdater, true);
+    const updater = createElectronUpdater(autoUpdater, noPrepare, true);
 
     expect(fake.autoDownload).toBe(true);
     expect(fake.autoInstallOnAppQuit).toBe(true);
@@ -71,7 +79,7 @@ describe('createElectronUpdater', () => {
 
   it('update-available を受けると利用可能なバージョンを保持する', async () => {
     const { autoUpdater, emit } = createFakeAutoUpdater();
-    const updater = createElectronUpdater(autoUpdater, false);
+    const updater = createElectronUpdater(autoUpdater, noPrepare, false);
     expect((await updater.getStatus()).availableVersion).toBeNull();
 
     emit('update-available', { version: '1.2.3' });
@@ -81,7 +89,7 @@ describe('createElectronUpdater', () => {
 
   it('update-downloaded を受けるとダウンロード済みになる', async () => {
     const { autoUpdater, emit } = createFakeAutoUpdater();
-    const updater = createElectronUpdater(autoUpdater, true);
+    const updater = createElectronUpdater(autoUpdater, noPrepare, true);
 
     emit('update-downloaded');
 
@@ -90,7 +98,7 @@ describe('createElectronUpdater', () => {
 
   it('error を受けるとログに残す', async () => {
     const { autoUpdater, emit } = createFakeAutoUpdater();
-    const updater = createElectronUpdater(autoUpdater, true);
+    const updater = createElectronUpdater(autoUpdater, noPrepare, true);
 
     emit('error', new Error('download failed'));
 
@@ -117,7 +125,7 @@ describe('createElectronUpdater', () => {
       versionInfo: updateInfo,
       downloadPromise: Promise.resolve([]),
     });
-    const updater = createElectronUpdater(autoUpdater, true);
+    const updater = createElectronUpdater(autoUpdater, noPrepare, true);
 
     await expect(updater.checkForUpdates()).resolves.toEqual({
       isUpdateAvailable: true,
@@ -133,17 +141,108 @@ describe('createElectronUpdater', () => {
   it('更新の仕組みが動かない環境では null を返す', async () => {
     const { fake, autoUpdater } = createFakeAutoUpdater();
     fake.checkForUpdates.mockResolvedValue(null);
-    const updater = createElectronUpdater(autoUpdater, true);
+    const updater = createElectronUpdater(autoUpdater, noPrepare, true);
 
     await expect(updater.checkForUpdates()).resolves.toBeNull();
   });
 
   it('quitAndInstall は autoUpdater の quitAndInstall を呼ぶ', async () => {
     const { fake, autoUpdater } = createFakeAutoUpdater();
-    const updater = createElectronUpdater(autoUpdater, true);
+    const updater = createElectronUpdater(autoUpdater, noPrepare, true);
 
     await updater.quitAndInstall();
 
     expect(fake.quitAndInstall).toHaveBeenCalledTimes(1);
+  });
+
+  it('quitAndInstall は処理本体の終了を待ってから autoUpdater に渡す', async () => {
+    const { fake, autoUpdater } = createFakeAutoUpdater();
+    const order: string[] = [];
+    let finishPrepare: () => void = () => {};
+    const prepareQuit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          order.push('prepare');
+          finishPrepare = () => {
+            order.push('prepared');
+            resolve();
+          };
+        }),
+    );
+    fake.quitAndInstall.mockImplementation(() => {
+      order.push('quitAndInstall');
+    });
+    const updater = createElectronUpdater(
+      autoUpdater,
+      { ...noPrepare, prepareQuit },
+      true,
+    );
+
+    const installing = updater.quitAndInstall();
+    await Promise.resolve();
+    expect(fake.quitAndInstall).not.toHaveBeenCalled();
+
+    finishPrepare();
+    await installing;
+
+    expect(order).toEqual(['prepare', 'prepared', 'quitAndInstall']);
+  });
+
+  describe('インストーラを起動できなかったとき', () => {
+    /** 待ちを記録し、テストから呼び出せる schedule */
+    const createSchedule = () => {
+      const scheduled: { callback: () => void; delayMs: number }[] = [];
+      return {
+        scheduled,
+        schedule: (callback: () => void, delayMs: number) => {
+          scheduled.push({ callback, delayMs });
+        },
+      };
+    };
+
+    it('待ちの上限を過ぎてもアプリが残っていれば、アプリを終える', async () => {
+      const { autoUpdater } = createFakeAutoUpdater();
+      const forceQuit = vi.fn();
+      const { scheduled, schedule } = createSchedule();
+      const updater = createElectronUpdater(
+        autoUpdater,
+        { ...noPrepare, forceQuit, schedule },
+        true,
+      );
+
+      await updater.quitAndInstall();
+      expect(forceQuit).not.toHaveBeenCalled();
+      expect(scheduled.map(({ delayMs }) => delayMs)).toEqual([
+        FORCE_QUIT_AFTER_INSTALL_MS,
+      ]);
+
+      scheduled[0]?.callback();
+      expect(forceQuit).toHaveBeenCalledTimes(1);
+    });
+
+    it('インストールを渡した後に error が届いたら、待たずにアプリを終える', async () => {
+      const { autoUpdater, emit } = createFakeAutoUpdater();
+      const forceQuit = vi.fn();
+      const updater = createElectronUpdater(
+        autoUpdater,
+        { ...noPrepare, forceQuit },
+        true,
+      );
+
+      await updater.quitAndInstall();
+      emit('error', new Error('installer not found'));
+
+      expect(forceQuit).toHaveBeenCalledTimes(1);
+    });
+
+    it('インストールを頼む前の error（更新の確認の失敗など）ではアプリを終えない', () => {
+      const { autoUpdater, emit } = createFakeAutoUpdater();
+      const forceQuit = vi.fn();
+      createElectronUpdater(autoUpdater, { ...noPrepare, forceQuit }, true);
+
+      emit('error', new Error('network down'));
+
+      expect(forceQuit).not.toHaveBeenCalled();
+    });
   });
 });

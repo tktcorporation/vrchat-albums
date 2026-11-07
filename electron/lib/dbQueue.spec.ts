@@ -10,7 +10,7 @@ import {
   vi,
 } from 'vitest';
 
-import DBQueue, { getDBQueue, resetDBQueue } from './dbQueue';
+import DBQueue, { drainDBQueues, getDBQueue, resetDBQueue } from './dbQueue';
 import { logger } from './logger';
 import {
   __cleanupTestRDBClient,
@@ -503,5 +503,44 @@ describe('DBQueue', () => {
 
       expect(queueA).toBe(queueB);
     });
+  });
+});
+
+describe('drainDBQueues', () => {
+  // 止めたキューを後のテストへ持ち越さない
+  afterEach(() => {
+    resetDBQueue();
+  });
+
+  it('実行中のタスクの終わりを待ち、未開始のタスクは始めない', async () => {
+    resetDBQueue();
+    const queue = getDBQueue({ concurrency: 1 });
+    let finishRunning: () => void = () => {};
+    const running = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRunning = resolve;
+        }),
+    );
+    const queued = vi.fn(async () => {});
+    void queue.add(running);
+    void queue.add(queued);
+    await vi.waitFor(() => expect(running).toHaveBeenCalled());
+
+    const draining = drainDBQueues(10_000);
+    finishRunning();
+
+    await expect(draining).resolves.toBe(true);
+    expect(queued).not.toHaveBeenCalled();
+  });
+
+  it('実行中のタスクが上限までに終わらなければ、待たずに false を返す', async () => {
+    resetDBQueue();
+    const queue = getDBQueue({ concurrency: 1 });
+    const running = vi.fn(() => new Promise<void>(() => {}));
+    void queue.add(running);
+    await vi.waitFor(() => expect(running).toHaveBeenCalled());
+
+    await expect(drainDBQueues(10)).resolves.toBe(false);
   });
 });

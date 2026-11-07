@@ -14,13 +14,7 @@ import {
   getShell,
 } from '../electronModules';
 import { logger } from '../logger';
-import type {
-  Host,
-  HostInfo,
-  HostPaths,
-  HostShell,
-  HostUpdater,
-} from './types';
+import type { HostInfo, HostPaths, HostShell } from './types';
 
 /** 殻の情報を読み出す `app` の部分。テストが偽物の app を渡せるよう、使う操作だけに絞る */
 type HostInfoSource = Pick<
@@ -57,7 +51,10 @@ const OPTIONAL_PATH_FALLBACKS = {
   pictures: () =>
     path.join(process.env.USERPROFILE ?? os.homedir(), 'Pictures'),
   temp: () => os.tmpdir(),
-} as const satisfies Record<Exclude<keyof HostPaths, 'userData'>, () => string>;
+} as const satisfies Record<
+  Exclude<keyof HostPaths, 'userData' | 'logs'>,
+  () => string
+>;
 
 const readOptionalPath = (
   app: HostInfoSource,
@@ -86,11 +83,13 @@ const readOptionalPath = (
  * 殻の情報を `app` から読み出す。
  *
  * userData は設定と DB の保存先で、代わりの場所に書くと前回までのデータが見えなくなる。
- * 読めなければ例外のまま起動を止める。
+ * logs は前回までのログと同じ場所に書き続けるため、代わりの場所を使わない。
+ * どちらも読めなければ例外のまま起動を止める。
  */
 export const createElectronHostInfo = (app: HostInfoSource): HostInfo => ({
   paths: {
     userData: app.getPath('userData'),
+    logs: app.getPath('logs'),
     downloads: readOptionalPath(app, 'downloads'),
     pictures: readOptionalPath(app, 'pictures'),
     temp: readOptionalPath(app, 'temp'),
@@ -105,14 +104,13 @@ export const createElectronHostInfo = (app: HostInfoSource): HostInfo => ({
  *
  * どちらも `electron/electronUtil.ts` や `@sentry/electron/main` を読み込む殻の本体にあり、
  * この関数から直接 import すると、OS の操作だけを確かめたいテストまでそれらを読み込む。
- * 殻を登録する側（`electron/registerElectronHost.ts`）から関数として受け取る。
+ * 殻を組み立てる側（`electron/index.ts`）から関数として受け取る。
  */
 export interface ElectronHostDeps {
   /** メインウィンドウを再読み込みする */
   readonly reloadWindow: () => void;
   /** 規約への同意を受けて、同意を前提にする殻の機能を有効にする */
   readonly onTermsAccepted: () => void;
-  readonly updater: HostUpdater;
 }
 
 export const createElectronHostShell = (deps: ElectronHostDeps): HostShell => ({
@@ -169,16 +167,4 @@ export const createElectronHostShell = (deps: ElectronHostDeps): HostShell => ({
   onTermsAccepted: async () => {
     deps.onTermsAccepted();
   },
-});
-
-/**
- * Electron の main プロセスで動く殻の実装。
- *
- * `electron/registerElectronHost.ts` が、処理本体のどのモジュールより先に登録する。
- * `app.getPath()` などはこの関数を呼んだ時点で読むので、`app` が使えるプロセスで呼ぶ。
- */
-export const createElectronHost = (deps: ElectronHostDeps): Host => ({
-  info: createElectronHostInfo(getApp()),
-  shell: createElectronHostShell(deps),
-  updater: deps.updater,
 });

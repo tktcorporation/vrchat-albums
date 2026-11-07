@@ -60,8 +60,11 @@ export const startThumbnailCacheCleanupScheduler = (): void => {
   initialTimer.unref?.();
 };
 
-/** テスト用：タイマーを止めて、もう一度始められる状態に戻す */
-export const resetThumbnailCacheCleanupSchedulerForTest = (): void => {
+/**
+ * 定期クリーンアップのタイマーを止める。実行中のクリーンアップは止めない。
+ * 処理本体の終了のときに、DB を閉じた後で新しく走らないよう呼ぶ。
+ */
+export const stopThumbnailCacheCleanupScheduler = (): void => {
   if (initialTimer !== null) {
     clearTimeout(initialTimer);
   }
@@ -70,6 +73,11 @@ export const resetThumbnailCacheCleanupSchedulerForTest = (): void => {
   }
   initialTimer = null;
   intervalTimer = null;
+};
+
+/** テスト用：タイマーを止めて、もう一度始められる状態に戻す */
+export const resetThumbnailCacheCleanupSchedulerForTest = (): void => {
+  stopThumbnailCacheCleanupScheduler();
   isRunning = false;
 };
 

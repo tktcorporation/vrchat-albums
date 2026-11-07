@@ -5,9 +5,10 @@ import { z } from 'zod';
 
 import { FolderDigestSchema } from '../lib/brandedTypes';
 import { getHost } from '../lib/host';
-
-type TestPlaywrightStoreName = `test-playwright-settings-${string}`;
-type StoreName = 'v0-settings' | 'test-settings' | TestPlaywrightStoreName;
+import {
+  resolveSettingStoreName,
+  type SettingStoreName as StoreName,
+} from '../lib/settingsFile';
 
 const settingStoreKey = [
   'logFilesDir',
@@ -345,11 +346,7 @@ const setSettingStore = (name: StoreName) => {
 };
 
 const initSettingStore = (name?: StoreName) => {
-  const storeName: StoreName =
-    name ??
-    (process.env.PLAYWRIGHT_TEST === 'true' && process.env.PLAYWRIGHT_STORE_HASH
-      ? `test-playwright-settings-${process.env.PLAYWRIGHT_STORE_HASH}`
-      : 'v0-settings');
+  const storeName: StoreName = name ?? resolveSettingStoreName();
 
   if (settingStore !== null) {
     const existsPath = settingStore.__store.path;

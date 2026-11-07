@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TERMS_VERSION } from '../../../src/v2/constants/terms/version';
 import type { SettingStore } from '../settingStore';
 import {
-  resetBackgroundSyncTimerForTest,
+  stopBackgroundSyncTimer,
   startBackgroundSyncTimer,
 } from './backgroundTimer';
 import { syncLogsInBackground } from './service';
@@ -42,7 +42,7 @@ describe('startBackgroundSyncTimer', () => {
   });
 
   afterEach(() => {
-    resetBackgroundSyncTimerForTest();
+    stopBackgroundSyncTimer();
     vi.useRealTimers();
     vi.clearAllMocks();
   });

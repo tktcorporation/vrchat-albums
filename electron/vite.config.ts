@@ -18,6 +18,7 @@ export const electronExternal = [
   '@sentry/electron',
   '@sentry/electron/main',
   '@sentry/electron/preload',
+  '@sentry/electron/utility',
   // Electron 関連のモジュール
   'electron',
   'electron-log',
@@ -44,10 +45,10 @@ export const electronExternal = [
 ];
 
 /**
- * Electron main process のビルド設定。
+ * Electron main process と処理本体（utilityProcess）のビルド設定。
  *
- * Rolldown によるコード分割が有効。index.ts をエントリとして
- * 共有モジュール（logger 等）を自動的にチャンクに分割する。
+ * Rolldown によるコード分割が有効。エントリ間の共有モジュール（logger 等）は
+ * 自動的にチャンクに分割する。どのエントリも `main/` 直下に出力する。
  */
 export default defineConfig({
   mode: process.env.NODE_ENV ?? 'development',
@@ -63,7 +64,11 @@ export default defineConfig({
     target: 'node24',
     lib: {
       entry: {
+        // main プロセス。ウィンドウ・トレイ・自動更新・OS の操作
         index: join(__dirname, 'index.ts'),
+        // 処理本体。main が utilityProcess.fork で起動する（electron/lib/backendProcess/supervisor.ts）。
+        // renderWorker.cjs を同じディレクトリから探すので（workerClient.ts）、同じ main/ に出力する
+        backend: join(__dirname, 'backend/main.ts'),
         // Main プロセスの応答性を保つため CPU バウンドな画像生成は
         // worker_threads で実行する (ADR-005)。そのための独立エントリ。
         renderWorker: join(__dirname, 'module/imageGenerator/renderWorker.ts'),

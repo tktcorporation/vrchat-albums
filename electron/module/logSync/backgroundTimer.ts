@@ -26,8 +26,11 @@ export const startBackgroundSyncTimer = (store: SettingStore): void => {
   }, BACKGROUND_SYNC_INTERVAL_MS);
 };
 
-/** テスト用：タイマーを止めて、もう一度始められる状態に戻す */
-export const resetBackgroundSyncTimerForTest = (): void => {
+/**
+ * 定期的なログ同期を止め、もう一度始められる状態に戻す。動いていなければ何もしない。
+ * ウィンドウを開いて常駐を抜けたときと、処理本体の終了のときに呼ぶ。
+ */
+export const stopBackgroundSyncTimer = (): void => {
   if (timer !== null) {
     clearInterval(timer);
   }

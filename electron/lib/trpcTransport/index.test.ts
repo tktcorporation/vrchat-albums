@@ -1,59 +1,72 @@
 import { EventEmitter } from 'node:events';
 
-import superjson from 'superjson';
 import { describe, expect, it } from 'vitest';
-import { z } from 'zod';
 
-import type { ServerMessage } from '../../../shared/trpcTransport';
-import { eventEmitter, procedure, router } from '../../trpc';
-import type { ConnectableWebContents } from './electronIpcChannel';
-import { startTrpcServer } from './index';
-import { TRPC_IPC_CHANNEL } from './ipcChannelName';
+import {
+  type BrokeredWebContents,
+  type BrokerShell,
+  startTrpcBroker,
+} from './index';
+import { TRPC_PORT_CHANNEL, TRPC_PORT_REQUEST_CHANNEL } from './ipcChannelName';
 
-const testRouter = router({
-  echo: procedure.input(z.string()).query(({ input }) => input),
-});
+/** MessageChannelMain の偽物の port。どの組のどちら側かだけを持つ */
+interface FakePort {
+  readonly pair: number;
+  readonly side: 1 | 2;
+}
 
-/** Electron の app・ipcMain・BrowserWindow の偽物 */
-const createFakeShell = () => {
-  const appEvents = new EventEmitter();
+type Event =
+  | { kind: 'connect'; connectionId: string; port: FakePort }
+  | { kind: 'disconnect'; connectionId: string };
+
+/** Electron の ipcMain・MessageChannelMain・webContents と、処理本体の偽物 */
+const createFake = () => {
   const ipcEvents = new EventEmitter();
-  const shell: NonNullable<Parameters<typeof startTrpcServer>[1]> = {
-    app: {
-      on: (event, listener) => appEvents.on(event, listener),
-      removeListener: (event, listener) =>
-        appEvents.removeListener(event, listener),
-    },
+  let pairs = 0;
+  const shell: BrokerShell<FakePort> = {
     ipcMain: {
       on: (channel, listener) => ipcEvents.on(channel, listener),
       removeListener: (channel, listener) =>
         ipcEvents.removeListener(channel, listener),
     },
+    createChannel: () => {
+      pairs += 1;
+      return {
+        port1: { pair: pairs, side: 1 },
+        port2: { pair: pairs, side: 2 },
+      };
+    },
+  };
+  const backendEvents: Event[] = [];
+  const backend = {
+    connect: (connectionId: string, port: FakePort) => {
+      backendEvents.push({ kind: 'connect', connectionId, port });
+    },
+    disconnect: (connectionId: string) => {
+      backendEvents.push({ kind: 'disconnect', connectionId });
+    },
   };
 
-  const createWindow = () => {
+  const createWebContents = () => {
     const events = new EventEmitter();
-    const received: ServerMessage[] = [];
+    const delivered: { channel: string; ports: FakePort[] }[] = [];
     let destroyed = false;
-    const webContents: ConnectableWebContents = {
+    const webContents: BrokeredWebContents<FakePort> = {
       mainFrame: {},
       isDestroyed: () => destroyed,
-      send: (_channel, message) => {
-        received.push(structuredClone(message));
+      postMessage: (channel, _message, transfer) => {
+        delivered.push({ channel, ports: transfer });
       },
-      on: (event, listener) => events.on(event, listener),
       once: (event, listener) => events.once(event, listener),
     };
-    // BrowserWindow のコンストラクタと同じく、作った時点で同期的に通知する
-    appEvents.emit('browser-window-created', {}, { webContents });
     return {
-      received,
-      sendFromRenderer: (message: unknown) =>
-        ipcEvents.emit(
-          TRPC_IPC_CHANNEL,
-          { sender: webContents, senderFrame: webContents.mainFrame },
-          message,
-        ),
+      delivered,
+      /** preload が読み込まれ、main frame から port を頼む */
+      requestPort: (frame: unknown = webContents.mainFrame) =>
+        ipcEvents.emit(TRPC_PORT_REQUEST_CHANNEL, {
+          sender: webContents,
+          senderFrame: frame,
+        }),
       destroy: () => {
         destroyed = true;
         events.emit('destroyed');
@@ -63,60 +76,93 @@ const createFakeShell = () => {
 
   return {
     shell,
-    createWindow,
-    windowListenerCount: () =>
-      appEvents.listenerCount('browser-window-created'),
-    ipcListenerCount: () => ipcEvents.listenerCount(TRPC_IPC_CHANNEL),
+    backend,
+    backendEvents,
+    createWebContents,
+    requestListenerCount: () =>
+      ipcEvents.listenerCount(TRPC_PORT_REQUEST_CHANNEL),
   };
 };
 
-const echo = (id: string, input: string) => ({
-  kind: 'call',
-  id,
-  type: 'query',
-  path: 'echo',
-  input: superjson.serialize(input),
-});
+describe('startTrpcBroker', () => {
+  it('依頼ごとに port の組を作り、片方を処理本体へ、もう片方を依頼した画面へ渡す', () => {
+    const fake = createFake();
+    startTrpcBroker({ backend: fake.backend }, fake.shell);
+    const first = fake.createWebContents();
+    const second = fake.createWebContents();
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+    first.requestPort();
+    second.requestPort();
 
-const start = (fake: ReturnType<typeof createFakeShell>) =>
-  startTrpcServer(
-    { router: testRouter, createContext: () => ({ eventEmitter }) },
-    fake.shell,
-  );
-
-describe('startTrpcServer', () => {
-  it('作られたウィンドウのそれぞれに接続を張り、その画面にだけ応答する', async () => {
-    const fake = createFakeShell();
-    start(fake);
-
-    const first = fake.createWindow();
-    const second = fake.createWindow();
-    first.sendFromRenderer(echo('a', 'first'));
-    second.sendFromRenderer(echo('b', 'second'));
-    await flush();
-
-    expect(first.received).toMatchObject([{ kind: 'data', id: 'a' }]);
-    expect(second.received).toMatchObject([{ kind: 'data', id: 'b' }]);
+    expect(fake.backendEvents).toMatchObject([
+      { kind: 'connect', port: { pair: 1, side: 1 } },
+      { kind: 'connect', port: { pair: 2, side: 1 } },
+    ]);
+    expect(first.delivered).toEqual([
+      { channel: TRPC_PORT_CHANNEL, ports: [{ pair: 1, side: 2 }] },
+    ]);
+    expect(second.delivered).toEqual([
+      { channel: TRPC_PORT_CHANNEL, ports: [{ pair: 2, side: 2 }] },
+    ]);
   });
 
-  it('止めると張った接続を閉じ、以後に作られたウィンドウにはつながない', async () => {
-    const fake = createFakeShell();
-    const stop = start(fake);
-    const before = fake.createWindow();
-    const destroyedBefore = fake.createWindow();
-    destroyedBefore.destroy();
+  it('同じ画面が読み込み直されたら、前の文書の接続を閉じさせてから新しい接続を渡す', () => {
+    const fake = createFake();
+    startTrpcBroker({ backend: fake.backend }, fake.shell);
+    const webContents = fake.createWebContents();
+
+    webContents.requestPort();
+    webContents.requestPort();
+
+    const [firstConnect, disconnect, secondConnect] = fake.backendEvents;
+    expect(firstConnect?.kind).toBe('connect');
+    expect(disconnect).toEqual({
+      kind: 'disconnect',
+      connectionId: firstConnect?.connectionId,
+    });
+    expect(secondConnect?.kind).toBe('connect');
+    expect(secondConnect?.connectionId).not.toBe(firstConnect?.connectionId);
+    expect(webContents.delivered).toHaveLength(2);
+  });
+
+  it('iframe からの依頼には応えない', () => {
+    const fake = createFake();
+    startTrpcBroker({ backend: fake.backend }, fake.shell);
+    const webContents = fake.createWebContents();
+
+    webContents.requestPort({});
+
+    expect(fake.backendEvents).toEqual([]);
+    expect(webContents.delivered).toEqual([]);
+  });
+
+  it('画面が破棄されたら、その接続を閉じさせる', () => {
+    const fake = createFake();
+    startTrpcBroker({ backend: fake.backend }, fake.shell);
+    const webContents = fake.createWebContents();
+    webContents.requestPort();
+    const connectionId = fake.backendEvents[0]?.connectionId;
+
+    webContents.destroy();
+
+    expect(fake.backendEvents.at(-1)).toEqual({
+      kind: 'disconnect',
+      connectionId,
+    });
+  });
+
+  it('止めると依頼の受け付けをやめ、配った接続を閉じさせる', () => {
+    const fake = createFake();
+    const stop = startTrpcBroker({ backend: fake.backend }, fake.shell);
+    const webContents = fake.createWebContents();
+    webContents.requestPort();
+    const connectionId = fake.backendEvents[0]?.connectionId;
 
     stop();
-    const after = fake.createWindow();
-    before.sendFromRenderer(echo('a', 'x'));
-    after.sendFromRenderer(echo('b', 'x'));
-    await flush();
+    webContents.requestPort();
 
-    expect(before.received).toEqual([]);
-    expect(after.received).toEqual([]);
-    expect(fake.windowListenerCount()).toBe(0);
-    expect(fake.ipcListenerCount()).toBe(0);
+    expect(fake.backendEvents).toHaveLength(2);
+    expect(fake.backendEvents[1]).toEqual({ kind: 'disconnect', connectionId });
+    expect(fake.requestListenerCount()).toBe(0);
   });
 });

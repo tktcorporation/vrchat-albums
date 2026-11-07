@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import { Effect } from 'effect';
 
+import { getHost } from './../lib/host';
 import { logger } from './../lib/logger';
 import { openElectronDialog, openPathInExplorer } from './electronUtil/service';
 import { getSettingStore } from './settingStore';
@@ -35,11 +36,14 @@ export const getVRChatLogFilesDir = (): Effect.Effect<
   );
 };
 
-/** アプリのログフォルダをエクスプローラーで開く */
+/**
+ * アプリのログフォルダをエクスプローラーで開く。
+ * main の `app.log` と処理本体の `backend.log` が同じフォルダにあるので、ファイルではなくフォルダを開く。
+ */
 export const openElectronLogOnExplorer = () => {
-  const electronLogPath = logger.electronLogFilePath;
-  logger.debug(`electronLogPath ${electronLogPath}`);
-  return openPathInExplorer(electronLogPath);
+  const logsDir = getHost().info.paths.logs;
+  logger.debug(`logsDir ${logsDir}`);
+  return openPathInExplorer(logsDir);
 };
 
 /** 指定ディレクトリをエクスプローラーで開く */

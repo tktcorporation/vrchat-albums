@@ -387,6 +387,13 @@ class DBQueue {
   }
 
   /**
+   * 実行中のタスクが終わるまで待機する。キューに積まれて未開始のタスクは待たない
+   */
+  async onPendingZero(): Promise<void> {
+    return this.queue.onPendingZero();
+  }
+
+  /**
    * キューを一時停止する
    */
   pause(): void {
@@ -439,6 +446,33 @@ export const getDBQueue = (options?: DBQueueOptions): DBQueue => {
     throw new Error('DBQueue instance not found'); // 論理的にここは到達しないはず
   }
   return instance;
+};
+
+/**
+ * 処理本体の終了の前に、すべてのキューで新しいタスクの開始を止め、実行中のタスクが終わるのを待つ。
+ *
+ * 未開始のタスクは待たない。止めたキューの未開始のタスクは決して始まらないので、`onIdle` で待つと
+ * 必ず上限まで待つことになる。実行中のタスク（書き込みの途中のトランザクション）だけが、
+ * DB を閉じる前に終わっている必要がある。
+ *
+ * @param timeoutMs 待つ上限。超えたら待たずに返す（呼び出し側はそのまま DB を閉じる）
+ * @returns 実行中のタスクが上限の内に終わったか
+ */
+export const drainDBQueues = async (timeoutMs: number): Promise<boolean> => {
+  const queues = [...instances.values()];
+  for (const queue of queues) {
+    queue.pause();
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), timeoutMs);
+  });
+  const drained = Promise.all(
+    queues.map((queue) => queue.onPendingZero()),
+  ).then(() => true as const);
+  const result = await Promise.race([drained, timedOut]);
+  clearTimeout(timer);
+  return result;
 };
 
 /**

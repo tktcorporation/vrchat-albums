@@ -2,13 +2,13 @@ id: backend-shell-import
 language: TypeScript
 severity: error
 message: |
-  処理本体（electron/api.ts・electron/trpc.ts・electron/module）から殻の本体を import しないでください。
-  electron-updater・electron/electronUtil.ts・electron/index.ts・electron/registerElectronHost.ts・
-  electron/lib/sentryMain.ts・electron/lib/host/electronHost.ts・electron/lib/host/electronUpdater.ts の機能は
+  処理本体（electron/backend・electron/api.ts・electron/trpc.ts・electron/module）から殻の本体を import しないでください。
+  electron-updater・electron/electronUtil.ts・electron/index.ts・electron/lib/sentryMain.ts・
+  electron/lib/host/electronHost.ts・electron/lib/host/electronUpdater.ts・electron/lib/backendProcess/supervisor.ts の機能は
   electron/lib/host の getHost()（shell・updater）から受け取ってください。
 note: |
-  処理本体は utilityProcess へ移せるよう、main プロセスにしか無いもの（ウィンドウ・自動更新・
-  エラー監視の初期化）へ直接届かないようにする。殻はそれらを Host として実装する。
+  処理本体は utilityProcess で動き、main プロセスにしか無いもの（ウィンドウ・自動更新・
+  エラー監視の初期化）は使えない。殻はそれらを Host として実装し、処理本体からの要求で実行する。
   親ディレクトリの index を指す相対パス（'..'、'../index'、'../../index' など）は electron/index.ts に
   届きうるので、処理本体からは使わない。
   参照: .claude/rules/project/electron-import.md
@@ -22,7 +22,9 @@ utils:
       # electron/index.ts。親ディレクトリや自ディレクトリの index だけを指す相対パス
       - regex: ^['"`]\.{1,2}(/\.\.)*(/index(\.(ts|js|cjs|mjs))?)?['"`]$
       # 殻を組み立てて登録するモジュール（Electron の API とエラー監視の初期化を持つ）
-      - regex: /(registerElectronHost|sentryMain|electronUpdater|electronHost)(\.(ts|js|cjs|mjs))?['"`]$
+      - regex: /(sentryMain|electronUpdater|electronHost|supervisor)(\.(ts|js|cjs|mjs))?['"`]$
+      # main 用のエラー監視の SDK（Electron の app を前提にする）
+      - regex: ^['"`]@sentry/electron/main['"`]$
 rule:
   any:
     - all:
@@ -43,6 +45,7 @@ rule:
               - kind: template_string
             matches: forbidden-source
 files:
+  - electron/backend/**/*.ts
   - electron/module/**/*.ts
   - electron/api.ts
   - electron/trpc.ts

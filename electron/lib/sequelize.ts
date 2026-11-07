@@ -136,15 +136,23 @@ export const __initTestRDBClient = async () => {
   return client;
 };
 /**
- * テスト用に生成した RDBClient を破棄しリセットする。
+ * 開いている RDBClient を閉じる。開いていなければ何もしない。
+ *
+ * 実行中のクエリの終わりは待たない。処理本体の終了では、先に `drainDBQueues`（`./dbQueue`）で
+ * キューの実行中のタスクを待ってから呼ぶ。キューを通らないクエリが実行中なら、そのクエリは失敗する。
  */
-export const __cleanupTestRDBClient = async () => {
+export const closeRDBClient = async () => {
   if (rdbClient === null) {
     return;
   }
   await rdbClient.__client.close();
   rdbClient = null;
 };
+
+/**
+ * テスト用に生成した RDBClient を破棄しリセットする。
+ */
+export const __cleanupTestRDBClient = (): Promise<void> => closeRDBClient();
 
 /**
  * 初期化済みの RDBClient を取得する。

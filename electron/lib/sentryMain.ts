@@ -6,10 +6,10 @@ import {
 
 import { scrubEventData } from '../../src/lib/utils/masking';
 import { SENTRY_DATA_COLLECTION } from '../constants/sentryDataCollection';
-import { getSettingStore } from '../module/settingStore';
 import { hasAcceptedCurrentTerms } from '../module/terms/consent';
 import { getApp } from './electronModules';
 import { logger } from './logger';
+import type { SettingsSnapshot } from './settingsFile';
 
 interface ErrorEvent extends Event {
   type: undefined;
@@ -24,9 +24,17 @@ let isSentryInitializedMain = false;
  * 2 度目以降は何もしない。初期化しても、送信のたびに現在の版の規約への同意を確かめ、
  * 同意が無ければイベントを捨てる。
  *
- * 設定ストアは送信時の同意の確認に使うので、`initSettingStore()` の後に呼ぶ。
+ * 処理本体（utilityProcess）のイベントも、`@sentry/electron/utility` から main の SDK へ渡り、
+ * main の `captureEvent` を通るので、ここの `beforeSend` が同じ判定と伏せ字をかける。
+ * そのため処理本体の起動（`utilityProcess.fork`）より前に呼ぶ。SDK は初期化のときに fork を包み、
+ * 処理本体へイベントの送り道を渡すので、初期化より前に起動した処理本体からは送れない。
+ *
+ * @param readSettings 送信のたびに呼び、設定ファイルから同意の状態を読む。
+ *   設定ファイルを書くのは処理本体なので、main は値を覚えずに読み直す
  */
-export const initializeMainSentry = (): void => {
+export const initializeMainSentry = (
+  readSettings: () => Pick<SettingsSnapshot, 'termsAccepted' | 'termsVersion'>,
+): void => {
   if (isSentryInitializedMain) {
     logger.info('Sentry already initialized in main process.');
     return;
@@ -38,7 +46,6 @@ export const initializeMainSentry = (): void => {
   }
 
   const isDev = !getApp().isPackaged;
-  const settingStore = getSettingStore();
 
   logger.info(
     `Sentry initializing in main process via electron/lib/sentryMain.ts: isDev: ${isDev}`,
@@ -53,7 +60,13 @@ export const initializeMainSentry = (): void => {
     dataCollection: SENTRY_DATA_COLLECTION,
     beforeSend: (event: ErrorEvent, _hint: EventHint) => {
       // 開発環境でも、現在の版の規約に同意しているかを確かめる
-      if (!hasAcceptedCurrentTerms(settingStore)) {
+      const settings = readSettings();
+      if (
+        !hasAcceptedCurrentTerms({
+          getTermsAccepted: () => settings.termsAccepted,
+          getTermsVersion: () => settings.termsVersion,
+        })
+      ) {
         if (isDev) {
           logger.info(
             'Sentry event dropped in development mode due to terms not accepted.',
@@ -80,3 +93,6 @@ export const initializeMainSentry = (): void => {
   );
   isSentryInitializedMain = true;
 };
+
+/** main のエラー監視が初期化済みか。処理本体のエラー監視は、これが true のときだけ初期化する */
+export const isMainSentryInitialized = (): boolean => isSentryInitializedMain;
