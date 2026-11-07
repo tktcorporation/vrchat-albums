@@ -3,7 +3,8 @@ language: TypeScript
 severity: error
 message: |
   処理本体（electron/api.ts・electron/trpc.ts・electron/module）から殻の本体を import しないでください。
-  electron-updater・electron/electronUtil.ts・electron/index.ts の機能は
+  electron-updater・electron/electronUtil.ts・electron/index.ts・electron/registerElectronHost.ts・
+  electron/lib/sentryMain.ts・electron/lib/host/electronHost.ts・electron/lib/host/electronUpdater.ts の機能は
   electron/lib/host の getHost()（shell・updater）から受け取ってください。
 note: |
   処理本体は utilityProcess へ移せるよう、main プロセスにしか無いもの（ウィンドウ・自動更新・
@@ -15,11 +16,13 @@ note: |
 utils:
   forbidden-source:
     any:
-      - regex: ^['"]electron-updater(/.*)?['"]$
+      - regex: ^['"`]electron-updater(/.*)?['"`]$
       # electron/electronUtil.ts（electron/module/electronUtil/ には index が無く、ディレクトリとしては import しない）
-      - regex: (^['"]|/)electronUtil['"]$
+      - regex: (^['"`]|/)electronUtil(\.(ts|js|cjs|mjs))?['"`]$
       # electron/index.ts。親ディレクトリや自ディレクトリの index だけを指す相対パス
-      - regex: ^['"]\.{1,2}(/\.\.)*(/index)?['"]$
+      - regex: ^['"`]\.{1,2}(/\.\.)*(/index(\.(ts|js|cjs|mjs))?)?['"`]$
+      # 殻を組み立てて登録するモジュール（Electron の API とエラー監視の初期化を持つ）
+      - regex: /(registerElectronHost|sentryMain|electronUpdater|electronHost)(\.(ts|js|cjs|mjs))?['"`]$
 rule:
   any:
     - all:
@@ -35,7 +38,9 @@ rule:
             - pattern: require($PATH)
         - has:
             stopBy: end
-            kind: string
+            any:
+              - kind: string
+              - kind: template_string
             matches: forbidden-source
 files:
   - electron/module/**/*.ts

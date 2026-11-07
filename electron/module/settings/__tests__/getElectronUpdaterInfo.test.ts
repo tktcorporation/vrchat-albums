@@ -1,8 +1,9 @@
-import { Effect } from 'effect';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { type HostUpdateCheckResult, registerHost } from '../../../lib/host';
 import { createTestHost } from '../../../lib/host/testHost';
+import { UpdateCheckFailed } from '../errors';
 import { getElectronUpdaterInfo } from '../service';
 
 const checkResult = (version: string): HostUpdateCheckResult => ({
@@ -66,6 +67,11 @@ describe('getElectronUpdaterInfo', () => {
     );
 
     const exit = await Effect.runPromiseExit(getElectronUpdaterInfo());
-    expect(exit._tag).toBe('Failure');
+    expect(Exit.isFailure(exit)).toBe(true);
+    const error = Exit.isFailure(exit)
+      ? Option.getOrUndefined(Cause.findErrorOption(exit.cause))
+      : undefined;
+    expect(error).toBeInstanceOf(UpdateCheckFailed);
+    expect(error?.message).toBe('network down');
   });
 });
