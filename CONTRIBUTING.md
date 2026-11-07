@@ -171,6 +171,8 @@
 
 - **リリース PR**: `main` へのプッシュ時に、未消費の changeset からバージョンと CHANGELOG を更新するプルリクエスト（`changeset-release/main` ブランチ、タイトル `chore: release`）が作成・更新されます。
   - 参照: [.github/workflows/changeset-release.yml](.github/workflows/changeset-release.yml)
+- **リリース前の動作確認**: リリース PR に `preview` ラベルを付けると、その PR の内容を Windows・Linux・macOS 向けにビルドし、ダウンロードのリンクを PR にコメントします。ラベルを付けている間は、リリース PR が更新されるたびに作り直します。成果物は GitHub Releases には上がらず、preview を入れた環境も本番の版が出れば自動アップデートされます。
+  - 参照: [.github/workflows/release-preview.yml](.github/workflows/release-preview.yml)
 - **自動タグ付け**: リリース PR のマージなどで `package.json` のバージョンが上がると、`main` の lint とテスト（Lint and Test Cross）が通ったコミットにそのバージョンのタグ（`v<version>`）が自動的に作成されます。
   - 参照: [.github/workflows/tag-on-push.yml](.github/workflows/tag-on-push.yml)
 - **ビルドとリリース**: 新しいタグがプッシュされると、アプリケーションがビルドされ、GitHub Releases に成果物がアップロードされます。

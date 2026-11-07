@@ -1,0 +1,165 @@
+name: Release Preview Build
+
+# changesets が作るリリース PR（changeset-release/main）に `preview` ラベルが付いている間、
+# その PR の head を 3 OS でビルドし、Actions の artifact に置いてダウンロードのリンクを PR にコメントする。
+# ラベルを付けた時点と、main への merge でリリース PR が更新されるたびに作り直す。
+# GitHub Release には何も上げない（--publish never）ので、配布中の版と自動アップデートの経路に触れない。
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# 同じ PR の古いビルドは新しい head のビルドで置き換える。
+# `preview` 以外のラベルを付けた実行は何もせずに終わるので、進行中のビルドを止めないよう別のグループに入れる。
+concurrency:
+  group: release-preview-${{ github.event.pull_request.number }}-${{ github.event.action == 'labeled' && github.event.label.name != 'preview' && github.run_id || 'build' }}
+  cancel-in-progress: true
+
+jobs:
+  vars:
+    if: >-
+      github.event.pull_request.head.ref == 'changeset-release/main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'preview') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'preview')
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      # リリース PR の package.json は次に出す版（例: 0.30.0）になっている。そのままビルドすると、
+      # preview を入れた環境では本番の 0.30.0 が同じ版に見えて自動アップデートされない。
+      # semver の prerelease（0.30.0-preview.N < 0.30.0）にして、本番が出たら更新されるようにする。
+      - name: Compute preview version
+        id: version
+        run: |
+          base=$(node -p "require('./package.json').version")
+          echo "version=${base}-preview.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build on ${{ matrix.os }}
+    needs: vars
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact-glob: dist/*.exe
+          - os: ubuntu-22.04
+            platform: linux
+            artifact-glob: dist/*.AppImage
+          - os: macos-latest
+            platform: mac
+            artifact-glob: dist/*.dmg
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node and Install Dependencies
+        uses: ./.github/actions/setup-node-and-install
+
+      - name: Cache Electron and Electron Builder
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
+
+      # ビルドが読む版（アプリの版・成果物のファイル名）を preview の版にそろえる。
+      # ルートの版は lockfile に載らないので、インストール後に書き換えても依存の解決は変わらない。
+      - name: Set preview version
+        env:
+          PREVIEW_VERSION: ${{ needs.vars.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            pkg.version = process.env.PREVIEW_VERSION;
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+
+      # SENTRY_DSN を渡さないので、preview ビルドはエラー監視へ送信しない
+      - name: Build Electron App
+        env:
+          NODE_ENV: production
+        run: |
+          pnpm clean:build
+          pnpm build
+          pnpm exec electron-builder --config=electron-builder.cjs --${{ matrix.platform }} --publish never
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrchat-albums-${{ needs.vars.outputs.version }}-${{ matrix.platform }}
+          path: ${{ matrix.artifact-glob }}
+          if-no-files-found: error
+          retention-days: 14
+          # インストーラは圧縮済みなので、再圧縮に時間をかけない
+          compression-level: 0
+
+  comment:
+    needs: [vars, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Comment download links on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PREVIEW_VERSION: ${{ needs.vars.outputs.version }}
+        run: |
+          # 同じ PR へのコメントを 1 件に保つため、目印のあるコメントを探して更新する
+          marker='<!-- release-preview-build -->'
+          run_url="https://github.com/${REPO}/actions/runs/${RUN_ID}"
+
+          rows=$(gh api --paginate "repos/${REPO}/actions/runs/${RUN_ID}/artifacts" \
+            --jq ".artifacts[] | \"| \(.name) | [ダウンロード](${run_url}/artifacts/\(.id)) |\"")
+
+          {
+            echo "$marker"
+            echo "## Preview build: \`${PREVIEW_VERSION}\`"
+            echo
+            echo "このリリース PR の head（${HEAD_SHA:0:8}）をビルドしました。ダウンロードには GitHub へのログインが必要で、14 日後に消えます。"
+            echo
+            echo "| 成果物 | リンク |"
+            echo "| --- | --- |"
+            echo "$rows"
+            echo
+            echo "ビルドのログ: ${run_url}"
+          } > body.md
+
+          comment_id=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id" | head -n 1)
+
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH "repos/${REPO}/issues/comments/${comment_id}" -F body=@body.md > /dev/null
+          else
+            gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" -F body=@body.md > /dev/null
+          fi
