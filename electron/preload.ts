@@ -3,37 +3,37 @@
  * Sentry の IPC 連携を有効化するため、`@sentry/electron/preload` を読み込む。
  */
 import '@sentry/electron/preload';
-import type { Operation } from '@trpc/client';
-import type { TRPCResponseMessage } from '@trpc/server/rpc';
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
-type ETRPCRequest =
-  | { method: 'request'; operation: Operation }
-  | { method: 'subscription.stop'; id: number };
-
-interface RendererGlobalElectronTRPC {
-  sendMessage: (args: ETRPCRequest) => void;
-  onMessage: (callback: (args: TRPCResponseMessage) => void) => void;
-}
-
-const ELECTRON_TRPC_CHANNEL = 'trpc-electron';
+import type {
+  ClientMessage,
+  MessageChannel,
+  ServerMessage,
+} from '../shared/trpcTransport';
+import { TRPC_IPC_CHANNEL } from './lib/trpcTransport/ipcChannelName';
 
 /**
- * tRPC 用の IPC チャンネルをレンダラに公開するヘルパー。
- * preload スクリプトの `loaded` イベントで呼び出される。
+ * tRPC のメッセージを運ぶ通信路（`shared/trpcTransport.ts`）。
+ * 画面側の link（`src/trpc/messageLink.ts`）が使い、受け手は
+ * electron/lib/trpcTransport/electronIpcChannel.ts。
+ * 送受信とも固定の 1 チャンネルだけを使い、画面に任意の IPC を許さない。
+ * 送った中身は処理本体側がスキーマで確かめる。
  */
-const exposeElectronTRPC = () => {
-  const electronTRPC: RendererGlobalElectronTRPC = {
-    sendMessage: (operation) =>
-      ipcRenderer.send(ELECTRON_TRPC_CHANNEL, operation),
-    onMessage: (callback) =>
-      ipcRenderer.on(
-        ELECTRON_TRPC_CHANNEL,
-        (_event, args: TRPCResponseMessage) => callback(args),
-      ),
-  };
-  contextBridge.exposeInMainWorld('electronTRPC', electronTRPC);
+const electronTRPC: MessageChannel<ClientMessage, ServerMessage> = {
+  send: (message) => {
+    ipcRenderer.send(TRPC_IPC_CHANNEL, message);
+  },
+  onMessage: (listener) => {
+    const onIpcMessage = (_event: IpcRendererEvent, message: ServerMessage) => {
+      listener(message);
+    };
+    ipcRenderer.on(TRPC_IPC_CHANNEL, onIpcMessage);
+    return () => {
+      ipcRenderer.removeListener(TRPC_IPC_CHANNEL, onIpcMessage);
+    };
+  },
 };
+
 /**
  * ウィンドウ操作ボタン（AppHeader）用の API。
  * レンダラに任意の IPC 送受信を許さないよう、送信先チャンネルを固定した関数だけを公開する。
@@ -56,9 +56,11 @@ declare global {
   interface Window {
     /** preload が無いブラウザ実行時は未定義になる */
     Main?: typeof windowControls;
+    /** preload が無いブラウザ実行時は未定義になる */
+    electronTRPC?: typeof electronTRPC;
   }
 }
 
 process.once('loaded', () => {
-  exposeElectronTRPC();
+  contextBridge.exposeInMainWorld('electronTRPC', electronTRPC);
 });

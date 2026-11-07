@@ -11,9 +11,6 @@ import { app, type BrowserWindow } from 'electron';
 // Electron ネイティブの app.isPackaged を使用
 const isDev = !app.isPackaged;
 
-// Packages
-import { createIPCHandler } from 'trpc-electron/main';
-
 import { scrubEventData } from '../src/lib/utils/masking';
 import { router } from './api';
 import { SENTRY_DATA_COLLECTION } from './constants/sentryDataCollection';
@@ -23,11 +20,14 @@ import { getHost, registerHost } from './lib/host';
 import { createElectronHost } from './lib/host/electronHost';
 import { logger } from './lib/logger';
 import * as sequelizeClient from './lib/sequelize';
+import { serveOverElectronIpc } from './lib/trpcTransport/electronIpcChannel';
+import { serveTrpc } from './lib/trpcTransport/serveTrpc';
 import { getBackgroundUsecase } from './module/backGroundUsecase';
 import { startBackgroundSyncTimer } from './module/logSync/backgroundTimer';
 import { initSettingStore } from './module/settingStore';
 import { hasAcceptedCurrentTerms } from './module/terms/consent';
 import { startThumbnailCacheCleanupScheduler } from './module/vrchatPhoto/thumbnailCacheCleanupScheduler';
+import { eventEmitter } from './trpc';
 
 // electron/module のサービスは getHost() から OS の機能を受け取る。
 // どのサービスより先に殻を登録するため、モジュール本体の最初の処理として登録する
@@ -144,10 +144,15 @@ const initializeApp = async () => {
 
   const mainWindow = await createOrGetMainWindow();
 
-  createIPCHandler({
-    router,
-    windows: [mainWindow],
-  });
+  // ctx は electron/trpc.ts の initTRPC.context が宣言する形で渡す。procedure は ctx を読まず、
+  // イベントは electron/trpc.ts の eventEmitter を直接使う
+  serveOverElectronIpc(mainWindow.webContents, (channel) =>
+    serveTrpc({
+      router,
+      createContext: () => ({ eventEmitter }),
+      channel,
+    }),
+  );
   void electronUtil.setTray();
   startThumbnailCacheCleanupScheduler();
 
