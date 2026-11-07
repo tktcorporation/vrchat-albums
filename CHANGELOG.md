@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.31.6
+
+### Patch Changes
+
+- [#905](https://github.com/tktcorporation/vrchat-albums/pull/905) [`a415f40`](https://github.com/tktcorporation/vrchat-albums/commit/a415f40ba53d889515fa1048b02c8cdbf5dd51db) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 写真の読み込みや DB の処理を別プロセスで動かし、重い処理の間もウィンドウの操作と描画が止まらないようにする。
+
+- [#907](https://github.com/tktcorporation/vrchat-albums/pull/907) [`d2a5eaf`](https://github.com/tktcorporation/vrchat-albums/commit/d2a5eafa700a2970353dc91db4d7a1af3293ba29) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 設定画面のアップデート確認が、配布元の版が動いている版より古いときに「アップデートあり」と表示していた不具合を直す。
+
 ## 0.31.5
 
 ### Patch Changes
