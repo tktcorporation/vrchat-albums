@@ -136,15 +136,21 @@ export const __initTestRDBClient = async () => {
   return client;
 };
 /**
- * テスト用に生成した RDBClient を破棄しリセットする。
+ * 開いている RDBClient を閉じる。開いていなければ何もしない。
+ * 処理本体の終了時に、書き込みの途中で接続が切れないよう、プロセスを終える前に呼ぶ。
  */
-export const __cleanupTestRDBClient = async () => {
+export const closeRDBClient = async () => {
   if (rdbClient === null) {
     return;
   }
   await rdbClient.__client.close();
   rdbClient = null;
 };
+
+/**
+ * テスト用に生成した RDBClient を破棄しリセットする。
+ */
+export const __cleanupTestRDBClient = (): Promise<void> => closeRDBClient();
 
 /**
  * 初期化済みの RDBClient を取得する。

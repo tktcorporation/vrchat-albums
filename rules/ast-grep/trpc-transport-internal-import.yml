@@ -3,10 +3,11 @@ language: TypeScript
 severity: error
 message: |
   electron/lib/trpcTransport/ の中身を外から import しないでください。
-  処理本体は electron/lib/trpcTransport（index.ts）の startTrpcServer を、
+  main は electron/lib/trpcTransport（index.ts）の startTrpcBroker を、
+  処理本体は electron/lib/trpcTransport/backend の serveTrpcOnPort を、
   preload は electron/lib/trpcTransport/preload の exposeTrpcBridge を使ってください。
 note: |
-  殻（Electron の IPC）を換えるときに書き換える範囲を、この 2 つの入口の後ろに閉じ込めるため。
+  殻（Electron の MessagePort）を換えるときに書き換える範囲を、この 3 つの入口の後ろに閉じ込めるため。
   テストは中身を直接確かめるので対象外。
   構成: electron/lib/trpcTransport/index.ts の JSDoc
 rule:
@@ -21,7 +22,7 @@ rule:
         - not:
             has:
               field: source
-              regex: trpcTransport/(index|preload)['"]$
+              regex: trpcTransport/(index|preload|backend)['"]$
     - all:
         - any:
             - pattern: import($PATH)
@@ -34,7 +35,7 @@ rule:
             has:
               stopBy: end
               kind: string
-              regex: trpcTransport/(index|preload)['"]$
+              regex: trpcTransport/(index|preload|backend)['"]$
 files:
   - '**/*.ts'
 ignores:

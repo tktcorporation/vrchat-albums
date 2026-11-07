@@ -8,7 +8,6 @@ import {
   createElectronHostInfo,
   createElectronHostShell,
 } from './electronHost';
-import { createTestHost } from './testHost';
 
 type PathName = Parameters<
   Parameters<typeof createElectronHostInfo>[0]['getPath']
@@ -33,6 +32,7 @@ describe('createElectronHostInfo', () => {
 
     expect(info.paths).toEqual({
       userData: '/os/userData',
+      logs: '/os/logs',
       downloads: '/os/downloads',
       pictures: '/os/pictures',
       temp: '/os/temp',
@@ -86,7 +86,6 @@ describe('createElectronHostShell', () => {
     const shell = createElectronHostShell({
       reloadWindow,
       onTermsAccepted,
-      updater: createTestHost().updater,
     });
 
     await shell.reloadWindow();

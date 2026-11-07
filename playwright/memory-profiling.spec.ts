@@ -80,10 +80,14 @@ const getProcessMemory = async (
 };
 
 /**
- * メモリ監視を開始
+ * メモリ監視を開始する。
+ *
+ * アプリは main プロセスと処理本体（utilityProcess）に分かれ、サービス・DB・worker は処理本体で動く。
+ * 計測するプロセスは標本ごとに `getPids` で取り直し、RSS を合計する。処理本体は異常終了すると
+ * 起動し直されて PID が変わるため。
  */
 const startMemoryMonitoring = (
-  pid: number,
+  getPids: () => Promise<readonly number[]>,
   intervalMs: number,
 ): { stop: () => MemoryReport; samples: MemorySample[] } => {
   const samples: MemorySample[] = [];
@@ -91,14 +95,16 @@ const startMemoryMonitoring = (
 
   const intervalId = setInterval(() => {
     void (async () => {
-      const mem = await getProcessMemory(pid);
-      if (mem) {
+      const pids = await getPids();
+      const mems = await Promise.all(pids.map(getProcessMemory));
+      const measured = mems.filter((mem) => mem !== null);
+      if (measured.length > 0) {
         samples.push({
           timestamp: Date.now() - startTime,
-          rssMB: mem.rss,
-          heapUsedMB: mem.heap,
-          externalMB: mem.external,
-          label: `t+${Math.floor((Date.now() - startTime) / 1000)}s`,
+          rssMB: measured.reduce((sum, mem) => sum + mem.rss, 0),
+          heapUsedMB: measured.reduce((sum, mem) => sum + mem.heap, 0),
+          externalMB: measured.reduce((sum, mem) => sum + mem.external, 0),
+          label: `t+${Math.floor((Date.now() - startTime) / 1000)}s (pids: ${pids.join(',')})`,
         });
       }
     })();
@@ -325,10 +331,31 @@ test.describe('初回起動時のメモリプロファイリング', () => {
       throw new Error('Failed to get Electron process PID');
     }
 
-    console.log(`Electron process PID: ${pid}`);
+    console.log(`Electron main process PID: ${pid}`);
+
+    // 処理本体（electron/lib/backendProcess/supervisor.ts の BACKEND_SERVICE_NAME）の PID は
+    // main の app.getAppMetrics() から引く。アプリの終了の途中で取れなければ main だけを測る
+    const getPids = async (): Promise<readonly number[]> => {
+      const backendPids = await electronApp
+        .evaluate(({ app }) =>
+          app
+            .getAppMetrics()
+            .filter(
+              (metric) =>
+                metric.type === 'Utility' &&
+                metric.name === 'vrchat-albums-backend',
+            )
+            .map((metric) => metric.pid),
+        )
+        .catch((): number[] => []);
+      return [pid, ...backendPids];
+    };
 
     // メモリ監視を開始
-    const memoryMonitor = startMemoryMonitoring(pid, MEMORY_SAMPLE_INTERVAL_MS);
+    const memoryMonitor = startMemoryMonitoring(
+      getPids,
+      MEMORY_SAMPLE_INTERVAL_MS,
+    );
 
     // メインプロセスのログを監視
     mainProcess.stdout?.on('data', (data) => {

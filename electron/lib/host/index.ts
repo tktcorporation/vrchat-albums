@@ -5,10 +5,10 @@ export type * from './types';
 /**
  * 処理本体が使う殻の機能の登録先。
  *
- * 殻の実装は `electron/registerElectronHost.ts` が `registerHost()` で登録し、
+ * 処理本体（utilityProcess）の入口 `electron/backend/main.ts` が、main から届いた殻の情報と、
+ * main へ操作を頼むクライアント（`electron/lib/hostRpc/client.ts`）を `registerHost()` で登録し、
  * 処理本体は `getHost()` で取り出す。`electron/api.ts` などはモジュールの読み込み時に
- * `getHost()` を呼ぶため、`electron/index.ts` はこの登録モジュールを最初に import する
- * （順序は ast-grep の `register-electron-host-first` が検出する）。
+ * `getHost()` を呼ぶため、入口は登録の後にそれらを動的に読み込む。
  * テストは `vitest.setup.ts` で `createTestHost()` を登録する。
  *
  * Effect の Layer ではなくモジュール単位の登録にしているのは、electron/ の

@@ -5,6 +5,24 @@ const mockCaptureException = vi.fn();
 const mockCaptureMessage = vi.fn();
 const mockGetSettingStore = vi.fn();
 
+/**
+ * logger を読み込み、各プロセスの入口と同じく送り先を登録する。
+ * 規約への同意は、処理本体が設定ストアから読む形を偽物で再現する。
+ */
+const importLogger = async () => {
+  const loggerModule = await import('./logger');
+  loggerModule.configureErrorReporting({
+    source: 'electron-main',
+    isTermsAccepted: () =>
+      (
+        mockGetSettingStore() as { getTermsAccepted: () => boolean }
+      ).getTermsAccepted(),
+    captureException: mockCaptureException,
+    captureMessage: mockCaptureMessage,
+  });
+  return loggerModule;
+};
+
 describe('logger Sentry consent integration', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -16,15 +34,6 @@ describe('logger Sentry consent integration', () => {
         getPath: () => '/test/logs',
         isPackaged: false,
       },
-    }));
-
-    vi.doMock('@sentry/electron/main', () => ({
-      captureException: mockCaptureException,
-      captureMessage: mockCaptureMessage,
-    }));
-
-    vi.doMock('../module/settingStore', () => ({
-      getSettingStore: mockGetSettingStore,
     }));
 
     vi.doMock('electron-log', () => ({
@@ -48,13 +57,24 @@ describe('logger Sentry consent integration', () => {
     }));
   });
 
+  it('should not send to Sentry before a reporter is configured', async () => {
+    const { logger } = await import('./logger');
+
+    logger.error({ message: 'Test error before configuration' });
+    logger.warnWithSentry({ message: 'Test warning before configuration' });
+
+    expect(mockGetSettingStore).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+    expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+
   it('should not send to Sentry when terms are not accepted', async () => {
     mockGetSettingStore.mockReturnValue({
       getTermsAccepted: () => false,
     });
 
     // Dynamically import logger after mocks are set
-    const { logger } = await import('./logger');
+    const { logger } = await importLogger();
 
     logger.error({ message: 'Test error without consent' });
 
@@ -68,7 +88,7 @@ describe('logger Sentry consent integration', () => {
     });
 
     // Dynamically import logger after mocks are set
-    const { logger } = await import('./logger');
+    const { logger } = await importLogger();
 
     logger.error({ message: 'Test error with consent' });
 
@@ -88,7 +108,7 @@ describe('logger Sentry consent integration', () => {
       getTermsAccepted: () => true,
     });
 
-    const { logger } = await import('./logger');
+    const { logger } = await importLogger();
 
     logger.error({
       message: 'Test error with custom tags',
@@ -112,7 +132,7 @@ describe('logger Sentry consent integration', () => {
       getTermsAccepted: () => true,
     });
 
-    const { logger } = await import('./logger');
+    const { logger } = await importLogger();
 
     logger.error({
       message: 'Test error with conflicting source tag',
@@ -133,7 +153,7 @@ describe('logger Sentry consent integration', () => {
         getTermsAccepted: () => false,
       });
 
-      const { logger } = await import('./logger');
+      const { logger } = await importLogger();
 
       logger.warnWithSentry({ message: 'Test warning without consent' });
 
@@ -145,7 +165,7 @@ describe('logger Sentry consent integration', () => {
         getTermsAccepted: () => true,
       });
 
-      const { logger } = await import('./logger');
+      const { logger } = await importLogger();
 
       logger.warnWithSentry({ message: 'Test warning with consent' });
 
@@ -165,7 +185,7 @@ describe('logger Sentry consent integration', () => {
         getTermsAccepted: () => true,
       });
 
-      const { logger } = await import('./logger');
+      const { logger } = await importLogger();
 
       logger.warnWithSentry({
         message: 'Test warning with details',
@@ -188,7 +208,7 @@ describe('logger Sentry consent integration', () => {
         getTermsAccepted: () => true,
       });
 
-      const { logger } = await import('./logger');
+      const { logger } = await importLogger();
 
       logger.warnWithSentry({
         message: new Error('Error object warning'),

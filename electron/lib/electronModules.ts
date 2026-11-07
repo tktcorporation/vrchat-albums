@@ -5,8 +5,8 @@
  * Playwright テスト実行時に Electron の初期化がブロックされてタイムアウトする。
  * このモジュールで遅延 require に集約する。
  *
- * 使うのは殻の側（`electron/lib/host/electronHost.ts`、`electron/lib/sentryMain.ts`、tRPC の受け口
- * `electron/lib/trpcTransport/index.ts`、殻より先に読み込まれる `electron/lib/logger.ts`）だけ。electron/module のサービスは OS の機能を
+ * 使うのは main プロセスの殻の側（`electron/lib/host/electronHost.ts`、`electron/lib/sentryMain.ts`、tRPC の仲介
+ * `electron/lib/trpcTransport/index.ts`、処理本体の起動 `electron/lib/backendProcess/supervisor.ts`）だけ。electron/module のサービスは OS の機能を
  * `getHost()`（electron/lib/host）から受け取り、このモジュールを直接使わない。
  * サービスを utilityProcess へ移すと Electron の API が使えなくなるため。
  *
@@ -24,6 +24,8 @@ export const getClipboardItem = () => getElectron().ClipboardItem;
 export const getNativeImage = () => getElectron().nativeImage;
 export const getNotification = () => getElectron().Notification;
 export const getIpcMain = () => getElectron().ipcMain;
+export const getMessageChannelMain = () => getElectron().MessageChannelMain;
+export const getUtilityProcess = () => getElectron().utilityProcess;
 
 /**
  * Electron 環境であれば `fn(app)` を、そうでなければ `fallback` を返す。

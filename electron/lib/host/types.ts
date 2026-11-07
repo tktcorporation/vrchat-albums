@@ -19,6 +19,8 @@
 export interface HostPaths {
   /** 設定・DB・ログの保存先。例: `%APPDATA%\\VRChatAlbums` */
   readonly userData: string;
+  /** ログの保存先。例: `%APPDATA%\\VRChatAlbums\\logs` */
+  readonly logs: string;
   readonly downloads: string;
   readonly pictures: string;
   readonly temp: string;

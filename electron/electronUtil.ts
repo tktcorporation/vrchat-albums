@@ -8,6 +8,7 @@ import {
   BrowserWindow,
   ipcMain,
   Menu,
+  type Rectangle,
   screen, // Ensure screen is imported
   shell,
   Tray,
@@ -25,10 +26,19 @@ import {
 } from './lib/externalUrl';
 import { logger } from './lib/logger';
 import { pathExistsAsync } from './lib/pathExists';
-// Local
-import { getSettingStore, type SettingStore } from './module/settingStore'; // Import the type
 
-let settingStore: SettingStore | null = null;
+/**
+ * ウィンドウの位置と大きさの保存先。
+ *
+ * 設定ファイルを書くのは処理本体だけなので、main は読み出しと、処理本体への保存の依頼を受け取る。
+ * 組み立ては `electron/index.ts` が行う。
+ */
+interface WindowBoundsStore {
+  readonly load: () => Rectangle | undefined;
+  readonly save: (bounds: Rectangle) => void;
+}
+
+let windowBoundsStore: WindowBoundsStore | null = null;
 
 const WINDOW_CONFIG = {
   DEFAULT_WIDTH: 1024,
@@ -136,7 +146,7 @@ const hardenWebContents = (
   });
 
   // レンダラーはカメラ・通知・クリップボード読み取り等の権限を要する Web API を
-  // 使わない（クリップボード操作と通知は main プロセスの tRPC 経由）ため、すべて拒否する
+  // 使わない（クリップボード操作と通知は処理本体の依頼で main が行う）ため、すべて拒否する
   webContents.session.setPermissionRequestHandler(
     (_webContents, permission, callback) => {
       logger.warn({ message: `Denied permission request: ${permission}` });
@@ -151,10 +161,10 @@ const hardenWebContents = (
  * 既存のウィンドウがなければ初期サイズで作成する。
  */
 function createWindow(): BrowserWindow {
-  if (!settingStore) {
-    throw new Error('settingStore not initialized in electronUtil');
+  if (!windowBoundsStore) {
+    throw new Error('windowBoundsStore not initialized in electronUtil');
   }
-  const savedBounds = settingStore.getWindowBounds(); // Uncomment and use this
+  const savedBounds = windowBoundsStore.load();
 
   // Default width and height if no saved bounds
   let width: number = WINDOW_CONFIG.DEFAULT_WIDTH;
@@ -295,15 +305,7 @@ function createWindow(): BrowserWindow {
 
   // ウィンドウの状態を保存
   mainWindow.on('close', () => {
-    if (!settingStore) {
-      // It's unlikely to reach here if createWindow succeeded, but good for safety
-      logger.error({
-        message: 'settingStore not initialized in mainWindow close event',
-      });
-      return;
-    }
-    const bounds = mainWindow.getBounds();
-    settingStore.setWindowBounds(bounds);
+    saveWindowBounds(mainWindow);
   });
 
   // ディスプレイ構成が変更された時のハンドリング
@@ -399,6 +401,20 @@ function createWindow(): BrowserWindow {
 
   return mainWindow;
 }
+
+/** ウィンドウの位置と大きさを、次の起動のために保存する */
+const saveWindowBounds = (window: BrowserWindow): void => {
+  if (!windowBoundsStore) {
+    logger.error({
+      message: 'windowBoundsStore not initialized when saving window bounds',
+    });
+    return;
+  }
+  if (window.isDestroyed()) {
+    return;
+  }
+  windowBoundsStore.save(window.getBounds());
+};
 
 let mainWindow: BrowserWindow | null = null;
 /**
@@ -554,15 +570,24 @@ export const reloadMainWindow = (): void => {
   }
 };
 
+/**
+ * メインウィンドウの位置と大きさを保存する。ウィンドウが無ければ何もしない。
+ *
+ * アプリの終了では、ウィンドウが閉じる（`close`）より先に処理本体を終了させるので、
+ * 終了の直前に呼び、処理本体が動いているうちに保存を頼む。
+ */
+export const saveMainWindowBounds = (): void => {
+  const window = getWindow();
+  if (window) {
+    saveWindowBounds(window);
+  }
+};
+
 export { setTray, createOrGetWindow, revealWindow };
 
 /**
- * 他モジュールから設定ストアを利用できるよう初期化する。
- * main プロセス起動時に一度だけ呼び出されることを想定。
+ * ウィンドウの位置と大きさの保存先を受け取る。最初のウィンドウを作る前に 1 度だけ呼ぶ。
  */
-export const initializeSettingStoreForUtil = (): void => {
-  if (settingStore === null) {
-    settingStore = getSettingStore();
-    logger.info('SettingStore initialized for electronUtil.ts');
-  }
+export const initializeWindowBoundsStore = (store: WindowBoundsStore): void => {
+  windowBoundsStore = store;
 };

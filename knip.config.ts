@@ -20,6 +20,8 @@ const config: KnipConfig = {
       entry: [
         // Main process。electron/vite.config.ts の lib.entry と一致させる
         'electron/index.ts',
+        // 処理本体（utilityProcess）。main がビルド後の backend.cjs をパス文字列で起動する
+        'electron/backend/main.ts',
         // worker_threads のエントリ。workerClient.ts がビルド後の renderWorker.cjs を
         // パス文字列で起動するため import では辿れない (ADR-005)
         'electron/module/imageGenerator/renderWorker.ts',
