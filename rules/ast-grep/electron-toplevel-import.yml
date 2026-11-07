@@ -2,18 +2,33 @@ id: electron-toplevel-import
 language: TypeScript
 severity: error
 message: |
-  Electron モジュール ($IMPORTS) をトップレベルでインポートしないでください。
-  Playwright テストがクラッシュします。electron/lib/electronModules.ts の遅延取得ヘルパーを使用してください。
+  electron/module のサービスから Electron を直接使わないでください。
+  OS の機能（パス・ダイアログ・クリップボード・通知・ログイン時の起動）は
+  electron/lib/host の getHost() から受け取ってください。
 note: |
-  参照: .claude/rules/electron-import.md
-  ヘルパー: electron/lib/electronModules.ts
-  許可ファイル: index.ts, preload.ts
+  サービスを utilityProcess へ移すと、app・dialog・clipboard・shell・Notification が使えなくなるため、
+  サービスは殻が実装する Host インターフェースだけに依存する。
+  型だけの import（`import type { X } from 'electron'`）は対象外。
+  参照: .claude/rules/project/electron-import.md
+  インターフェース: electron/lib/host/types.ts
 rule:
-  pattern: import { $$$IMPORTS } from 'electron'
-  not:
-    inside:
-      kind: function_declaration
-      stopBy: end
+  any:
+    # 値としての import（`import type` は実行時に残らないので除く）
+    - all:
+        - kind: import_statement
+        - has:
+            field: source
+            regex: ^['"]electron['"]$
+        - not:
+            regex: ^import\s+type\s
+    # Electron を遅延取得するヘルパーは殻の側だけが使う
+    - all:
+        - kind: import_statement
+        - has:
+            field: source
+            regex: /lib/(electronModules|wrappedApp)['"]$
+    - pattern: import('electron')
+    - pattern: require('electron')
 files:
   - electron/module/**/*.ts
 ignores:

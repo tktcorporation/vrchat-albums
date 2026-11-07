@@ -28,15 +28,6 @@ vi.mock('../../settingStore');
 vi.mock('../../initProgress/emitter');
 vi.mock('../../migration/service');
 
-// Electron環境のモック
-vi.mock('electron', () => ({
-  app: {
-    getVersion: vi.fn().mockReturnValue('1.0.0'),
-    getPath: vi.fn().mockReturnValue('/tmp/logs'),
-    isPackaged: true, // 本番環境として扱う
-  },
-}));
-
 // 型定義
 const mockLogger = logger as unknown as {
   info: ReturnType<typeof vi.fn>;

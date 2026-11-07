@@ -5,6 +5,8 @@ import * as path from 'node:path';
 import { Cause, Effect, Exit, Option, Result } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { registerHost } from '../../../lib/host';
+import { createTestHost } from '../../../lib/host/testHost';
 import type { LogRecord } from '../converters/dbToLogStore';
 import type { ExportResult } from '../exportService/exportService';
 import * as exportServiceModule from '../exportService/exportService';
@@ -22,9 +24,8 @@ vi.mock('node:fs', () => ({
   },
 }));
 
-vi.mock('../../../lib/wrappedApp', () => ({
-  getAppUserDataPath: vi.fn(() => '/mocked/userData'),
-}));
+// サービスがユーザーデータとして読むディレクトリをテスト用に差し替える
+registerHost(createTestHost({ paths: { userData: '/mocked/userData' } }));
 
 vi.mock('../exportService/exportService', () => ({
   exportLogStoreFromDB: vi.fn(),

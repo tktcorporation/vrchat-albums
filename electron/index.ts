@@ -19,14 +19,19 @@ import { router } from './api';
 import { SENTRY_DATA_COLLECTION } from './constants/sentryDataCollection';
 import * as electronUtil from './electronUtil';
 import { initializeSettingStoreForUtil } from './electronUtil';
+import { getHost, registerHost } from './lib/host';
+import { createElectronHost } from './lib/host/electronHost';
 import { logger } from './lib/logger';
 import * as sequelizeClient from './lib/sequelize';
-import { getAppUserDataPath } from './lib/wrappedApp';
 import { getBackgroundUsecase } from './module/backGroundUsecase';
 import { startBackgroundSyncTimer } from './module/logSync/backgroundTimer';
 import { initSettingStore } from './module/settingStore';
 import { hasAcceptedCurrentTerms } from './module/terms/consent';
 import { startThumbnailCacheCleanupScheduler } from './module/vrchatPhoto/thumbnailCacheCleanupScheduler';
+
+// electron/module のサービスは getHost() から OS の機能を受け取る。
+// どのサービスより先に殻を登録するため、モジュール本体の最初の処理として登録する
+registerHost(createElectronHost());
 
 const settingStore = initSettingStore();
 initializeSettingStoreForUtil();
@@ -112,7 +117,7 @@ const createOrGetMainWindow = async (): Promise<BrowserWindow> => {
  */
 const initializeRDBClient = async () => {
   const filePath = path
-    .join(getAppUserDataPath(), 'db.sqlite')
+    .join(getHost().info.paths.userData, 'db.sqlite')
     .split(path.sep)
     .join(path.posix.sep);
   await sequelizeClient.initRDBClient({

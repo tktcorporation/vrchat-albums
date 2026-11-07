@@ -15,15 +15,17 @@ import {
   vi,
 } from 'vitest';
 
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
+
 // Minimal mocks - only mock what's absolutely necessary for test environment
 const testUserDataDir = path.join(
   os.tmpdir(),
   `vrchat-albums-test-${uuidv7()}`,
 );
 
-vi.mock('../../lib/wrappedApp', () => ({
-  getAppUserDataPath: vi.fn(() => testUserDataDir),
-}));
+// サービスがユーザーデータとして読むディレクトリをテスト用に差し替える
+registerHost(createTestHost({ paths: { userData: testUserDataDir } }));
 
 // Mock VRChat log directory (since we don't have actual VRChat logs in test)
 vi.mock('../vrchatLogFileDirService/vrchatLogFileDirService', async () => {

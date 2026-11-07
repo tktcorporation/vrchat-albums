@@ -4,18 +4,13 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 
 import { Effect } from 'effect';
-import { app } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
 import { logger } from '../../lib/logger';
 import { importService } from '../vrchatLog/importService/importService';
 import * as migrationService from './service';
-
-vi.mock('electron', () => ({
-  app: {
-    getPath: vi.fn(),
-  },
-}));
 
 vi.mock('../../lib/logger', () => ({
   logger: {
@@ -75,7 +70,7 @@ describe('migration service integration', () => {
     await nodeFsPromises.mkdir(mockOldAppPath, { recursive: true });
     await nodeFsPromises.mkdir(mockCurrentAppPath, { recursive: true });
 
-    vi.mocked(app['getPath']).mockReturnValue(mockCurrentAppPath);
+    registerHost(createTestHost({ paths: { userData: mockCurrentAppPath } }));
   });
 
   afterEach(async () => {
@@ -83,6 +78,7 @@ describe('migration service integration', () => {
     await nodeFsPromises.rm(testDir, { recursive: true, force: true });
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    registerHost(createTestHost());
   });
 
   describe('isMigrationNeeded', () => {

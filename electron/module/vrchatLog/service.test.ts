@@ -5,7 +5,8 @@ import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, test, vi } from 'vitest';
 
-import { getAppUserDataPath } from '../../lib/wrappedApp';
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
 import * as fs from '../../lib/wrappedFs';
 import { VRChatLogLineSchema } from './model';
 import {
@@ -15,11 +16,6 @@ import {
   getLogStoreFilePathForDate,
   getLogStoreFilePathsInRange,
 } from './service';
-
-// getAppUserDataPathのモック
-vi.mock('../../lib/wrappedApp', () => ({
-  getAppUserDataPath: vi.fn().mockReturnValue('/mock/user/data'),
-}));
 
 // node:fsのモック
 vi.mock('node:fs', () => ({
@@ -65,7 +61,7 @@ vi.mock('../../lib/wrappedFs', () => ({
 describe('getLogStoreFilePathForDate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAppUserDataPath).mockReturnValue('/mock/user/data');
+    registerHost(createTestHost({ paths: { userData: '/mock/user/data' } }));
   });
 
   it('指定された日付に基づいて正しいパスを生成する', () => {
@@ -100,7 +96,7 @@ describe('getLogStoreFilePathForDate', () => {
 describe('getLogStoreFilePathsInRange', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAppUserDataPath).mockReturnValue('/mock/user/data');
+    registerHost(createTestHost({ paths: { userData: '/mock/user/data' } }));
   });
 
   it('指定された日付からのログファイルパスを取得する', async () => {
@@ -262,7 +258,7 @@ describe('vrchatLog service', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAppUserDataPath).mockReturnValue(mockUserDataPath);
+    registerHost(createTestHost({ paths: { userData: mockUserDataPath } }));
   });
 
   describe('getLegacyLogStoreFilePath', () => {

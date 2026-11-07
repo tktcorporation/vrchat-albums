@@ -7,6 +7,7 @@ import {
   ERROR_CODES,
   UserFacingError,
 } from '../../lib/errors';
+import { getHost } from '../../lib/host';
 import { logger } from '../../lib/logger';
 import * as sequelizeClient from '../../lib/sequelize';
 import { beginInitProgressRun } from '../initProgress/emitter';
@@ -166,11 +167,9 @@ const runInitializationHoldingLock = async (
         logger.info(
           'Step 2.5: Setting default auto-start enabled for first launch...',
         );
-        await import('electron')
-          .then(({ app }) => {
-            app.setLoginItemSettings({
-              openAtLogin: true,
-            });
+        await getHost()
+          .shell.setOpenAtLogin(true)
+          .then(() => {
             settingStore.setAutoStartEnabled(true);
             logger.info(
               'Auto-start enabled by default for first launch and saved to settingStore',
@@ -182,17 +181,15 @@ const runInitializationHoldingLock = async (
           });
       } else if (savedAutoStartIntent !== null) {
         // 通常起動: settingStore に保存された意図と OS 状態を比較
-        await import('electron')
-          .then(({ app }) => {
-            const currentOsSetting = app.getLoginItemSettings().openAtLogin;
+        await getHost()
+          .shell.getOpenAtLogin()
+          .then(async (currentOsSetting) => {
             if (savedAutoStartIntent && !currentOsSetting) {
               // ユーザーは有効にしていたが OS 側が無効 → アップデートでリセットされた可能性
               logger.info(
                 'Step 2.5: Auto-start was enabled by user but OS reports disabled. Re-registering login item (likely due to app update changing exe path).',
               );
-              app.setLoginItemSettings({
-                openAtLogin: true,
-              });
+              await getHost().shell.setOpenAtLogin(true);
               logger.info('Auto-start re-registered successfully after update');
             }
           })

@@ -4,18 +4,14 @@ import * as path from 'node:path';
 
 import { writeClipboardFilePaths } from 'clip-filepaths';
 import { Effect } from 'effect';
-import type { NativeImage } from 'electron';
 import { match, P } from 'ts-pattern';
 
-import {
-  getApp,
-  getClipboard,
-  getClipboardItem,
-  getDialog,
-  getNativeImage,
-  getShell,
-} from '../../lib/electronModules';
 import { checkExternalUrl } from '../../lib/externalUrl';
+import {
+  getHost,
+  type OpenDialogProperty,
+  type SaveDialogResult,
+} from '../../lib/host';
 import type { FileIOError } from './errors';
 import {
   ExternalUrlNotAllowed,
@@ -27,18 +23,18 @@ import {
 } from './errors';
 
 /**
- * shell.openPath() をラップした共通ヘルパー関数。
+ * 殻の openPath() をラップした共通ヘルパー関数。
  * エクスプローラーとフォトビューアでの開く操作で共通利用される。
- * shell.openPath() はエラー時に文字列を返し、成功時は空文字列を返す。
+ * openPath() はエラー時に文字列を返し、成功時は空文字列を返す。
  */
 const openPathWithShell = (
   targetPath: string,
 ): Effect.Effect<string, OpenPathFailed> => {
   return Effect.gen(function* () {
-    // shell.openPath() returns error message string on failure, empty string on success
+    // openPath() returns error message string on failure, empty string on success
     // Any exceptions thrown are unexpected and should propagate to Sentry
     const errorMsg = yield* Effect.promise(() =>
-      getShell().openPath(targetPath),
+      getHost().shell.openPath(targetPath),
     );
     if (errorMsg) {
       return yield* Effect.fail(
@@ -62,7 +58,7 @@ const openPathInExplorer = openPathWithShell;
  * エクスポート機能のデフォルト出力先として利用される。
  */
 const getDownloadsPath = (): string => {
-  return getApp().getPath('downloads');
+  return getHost().info.paths.downloads;
 };
 
 /**
@@ -70,23 +66,23 @@ const getDownloadsPath = (): string => {
  * VRChat ログフォルダなどの設定入力で利用される。
  */
 const openElectronDialog = (
-  properties: ('openDirectory' | 'openFile' | 'multiSelections')[],
+  properties: readonly OpenDialogProperty[],
 ): Effect.Effect<string[], OperationCanceled> => {
   return Effect.gen(function* () {
     const result = yield* Effect.promise(() =>
-      getDialog().showOpenDialog({ properties }),
+      getHost().shell.showOpenDialog(properties),
     );
     if (result.canceled) {
       return yield* Effect.fail(new OperationCanceled({}));
     }
-    return result.filePaths;
+    return [...result.filePaths];
   });
 };
 
 /**
  * 既定のブラウザで URL を開く。ShareDialog などからリンクを開く際に使用される。
  *
- * `shell.openExternal` はスキームに関連付けられた OS のハンドラを起動するため、
+ * 殻の `openExternal` はスキームに関連付けられた OS のハンドラを起動するため、
  * checkExternalUrl が許可した URL だけを渡す。拒否は入力に起因する予期された失敗なので、
  * Sentry へ送る defect にせず ExternalUrlNotAllowed として値で返す。
  */
@@ -103,7 +99,7 @@ const openUrlInDefaultBrowser = (
     );
   }
   // openExternal の reject は OS 側の想定外の失敗なので defect として Sentry へ届ける
-  return Effect.promise(() => getShell().openExternal(checked.url));
+  return Effect.promise(() => getHost().shell.openExternal(checked.url));
 };
 
 /**
@@ -111,17 +107,6 @@ const openUrlInDefaultBrowser = (
  * PhotoCard の"画像で開く"操作などから利用される。
  */
 const openPhotoPathWithPhotoApp = openPathWithShell;
-
-/**
- * NativeImage を PNG としてクリップボードへ書き込む。
- * Electron の clipboard は W3C Clipboard API と同じ MIME 型付きの ClipboardItem を受け取るため、
- * 元画像の形式に関わらず PNG へ変換して `image/png` として渡す。
- */
-const writeImageToClipboard = (image: NativeImage): Promise<void> => {
-  const ClipboardItem = getClipboardItem();
-  const png = new Blob([new Uint8Array(image.toPNG())], { type: 'image/png' });
-  return getClipboard().write([new ClipboardItem({ 'image/png': png })]);
-};
 
 /**
  * Base64 形式の画像を一時保存してからクリップボードへコピーする。
@@ -136,8 +121,7 @@ const copyImageByBase64 = (options: {
       pngBase64: options.pngBase64,
     },
     async (tempPngPath) => {
-      const image = getNativeImage().createFromPath(tempPngPath);
-      await writeImageToClipboard(image);
+      await getHost().shell.writeClipboardImageFromPngFile(tempPngPath);
       // eventEmitter.emit('toast', 'copied'); // service 層からは直接 emit しない
     },
   );
@@ -228,8 +212,10 @@ export const handlePngBase64WithCallback = (
  * PNG ファイル保存用のダイアログを表示する。
  * downloadImageAsPhotoLogPng から呼び出される。
  */
-export const showSavePngDialog = async (filenameWithoutExt: string) => {
-  return getDialog().showSaveDialog({
+export const showSavePngDialog = (
+  filenameWithoutExt: string,
+): Promise<SaveDialogResult> => {
+  return getHost().shell.showSaveDialog({
     defaultPath: path.join(
       os.homedir(),
       'Downloads',

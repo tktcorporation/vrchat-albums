@@ -3,8 +3,12 @@ import * as path from 'node:path';
 
 import { Cause, Effect, Exit, Option, Result } from 'effect';
 
+import { getHost } from '../../lib/host';
 import { logger } from '../../lib/logger';
-import { pathExistsAsync } from '../../lib/pathExists';
+import {
+  type PathExistenceCheckFailed,
+  pathExistsAsync,
+} from '../../lib/pathExists';
 
 export interface MigrationResult {
   migrated: boolean;
@@ -31,160 +35,118 @@ export const clearMigrationCache = (): void => {
   migrationCheckCache = null;
 };
 
+/** 判定結果をキャッシュへ保存して返す */
+const cacheMigrationCheck = (result: boolean): boolean => {
+  migrationCheckCache = {
+    result,
+    timestamp: Date.now(),
+  };
+  return result;
+};
+
+/**
+ * 移行が必要かを、キャッシュを見ずにファイルシステムから判定する。
+ * 確認自体の失敗（権限不足など）はエラーとして返し、呼び出し側で「移行不要」として扱う。
+ * 存在しないとみなして分岐を進めないため。
+ */
+const checkMigrationNeeded = (): Effect.Effect<
+  boolean,
+  PathExistenceCheckFailed
+> =>
+  Effect.gen(function* () {
+    const oldAppPath = yield* getOldAppUserDataPath();
+    const currentAppPath = getHost().info.paths.userData;
+
+    logger.debug('[Migration] Checking migration status:', {
+      oldAppPath,
+      currentAppPath,
+    });
+
+    // Check if old app directory exists
+    const oldAppExists = yield* pathExistsAsync(oldAppPath);
+    if (!oldAppExists) {
+      logger.debug('No old app data found, migration not needed');
+      return false;
+    }
+
+    // Check if migration marker exists (to prevent re-migration)
+    const migrationMarkerPath = path.join(
+      currentAppPath,
+      '.migration-completed',
+    );
+    const markerExists = yield* pathExistsAsync(migrationMarkerPath);
+    if (markerExists) {
+      logger.debug('Migration already completed, skipping');
+      return false;
+    }
+
+    logger.info('Migration needed from old app directory');
+    return true;
+  });
+
 /**
  * Check if migration is needed
  * エラーが発生した場合はfalseを返して正常に動作を継続（エラーはログに記録）
  * Result型で返すが、エラーは常にログ記録後にfalseとして成功扱い
  */
 export const isMigrationNeeded = (): Effect.Effect<boolean> => {
-  return Effect.tryPromise({
-    try: async (): Promise<boolean> => {
-      // キャッシュチェック
-      if (migrationCheckCache !== null) {
-        const cacheAge = Date.now() - migrationCheckCache.timestamp;
-        if (cacheAge < CACHE_LIFETIME) {
-          return migrationCheckCache.result;
-        }
-      }
+  // キャッシュチェック
+  if (migrationCheckCache !== null) {
+    const cacheAge = Date.now() - migrationCheckCache.timestamp;
+    if (cacheAge < CACHE_LIFETIME) {
+      return Effect.succeed(migrationCheckCache.result);
+    }
+  }
 
-      // effect-lint-allow-try-catch: Electron 環境検出パターン
-      try {
-        const { app } = await import('electron');
-        const oldAppPathResult = await Effect.runPromise(
-          getOldAppUserDataPath(),
-        );
-        const oldAppPath = oldAppPathResult;
-        const currentAppPath = app.getPath('userData');
-
-        logger.debug('[Migration] Checking migration status:', {
-          oldAppPath,
-          currentAppPath,
-        });
-
-        // Check if old app directory exists
-        // 確認自体の失敗（権限不足など）は reject され、下の catch でログに残して
-        // 「移行不要」として扱う。存在しないとみなして分岐を進めないため
-        const oldAppExists = await Effect.runPromise(
-          pathExistsAsync(oldAppPath),
-        );
-
-        if (!oldAppExists) {
-          logger.debug('No old app data found, migration not needed');
-          const result = false;
-          // キャッシュに保存
-          migrationCheckCache = {
-            result,
-            timestamp: Date.now(),
-          };
-          return result;
-        }
-
-        // Check if migration marker exists (to prevent re-migration)
-        const migrationMarkerPath = path.join(
-          currentAppPath,
-          '.migration-completed',
-        );
-        const markerExists = await Effect.runPromise(
-          pathExistsAsync(migrationMarkerPath),
-        );
-
-        if (markerExists) {
-          logger.debug('Migration already completed, skipping');
-          const result = false;
-          // キャッシュに保存
-          migrationCheckCache = {
-            result,
-            timestamp: Date.now(),
-          };
-          return result;
-        }
-
-        logger.info('Migration needed from old app directory');
-        const result = true;
-        // キャッシュに保存
-        migrationCheckCache = {
-          result,
-          timestamp: Date.now(),
-        };
-        return result;
-      } catch (error) {
+  return checkMigrationNeeded().pipe(
+    // 判定の失敗は起動を止めず「移行不要」として扱うため、失敗も defect もログに残して false にする
+    Effect.catchCause((cause) =>
+      Effect.sync(() => {
+        const error = Cause.squash(cause);
         logger.error({
           message: 'Error checking migration status',
           stack: error instanceof Error ? error : new Error(String(error)),
         });
-        const result = false;
-        // エラー時もキャッシュに保存（頻繁なファイルアクセスを防ぐ）
-        migrationCheckCache = {
-          result,
-          timestamp: Date.now(),
-        };
-        return result;
-      }
-    },
-    catch: () => {
-      // This should never happen since the inner try-catch handles all errors
-      return undefined as never;
-    },
-  });
+        return false;
+      }),
+    ),
+    // エラー時もキャッシュに保存（頻繁なファイルアクセスを防ぐ）
+    Effect.map(cacheMigrationCheck),
+  );
 };
 
 /**
  * Get the path to the old app's user data directory
  * 同期的なファイルアクセスを避けて、パスのみ返す
- * エラー時はデフォルトパスを返す（エラーはログに記録）
+ * 旧アプリの userData は、現在の userData と同じ親ディレクトリにある
  */
 const getOldAppUserDataPath = (): Effect.Effect<string> => {
+  const parentDir = path.dirname(getHost().info.paths.userData);
+  const possibleOldAppNames = ['vrchat-photo-journey', 'VRChatPhotoJourney'];
   return Effect.tryPromise({
-    try: async (): Promise<string> => {
-      // effect-lint-allow-try-catch: Electron 環境検出パターン（動的 import('electron') の失敗をキャッチ）
-      try {
-        const { app } = await import('electron');
-        return app.getPath('userData');
-      } catch (error) {
-        logger.error({
-          message: 'Failed to get old app path',
-          stack: error instanceof Error ? error : new Error(String(error)),
-        });
-        return '';
+    try: async () => {
+      for (const appName of possibleOldAppNames) {
+        const possiblePath = path.join(parentDir, appName);
+        const existsResult = await Effect.runPromise(
+          Effect.result(pathExistsAsync(possiblePath)),
+        );
+        if (Result.isFailure(existsResult)) {
+          // 候補が使えないだけで移行全体は止めない。存在しない場合と区別してログに残す
+          logger.error({
+            message: `Failed to check old app directory: ${possiblePath}`,
+            stack: existsResult.failure,
+          });
+          continue;
+        }
+        if (existsResult.success) {
+          return possiblePath;
+        }
       }
+      // Return default if none exist
+      return path.join(parentDir, 'vrchat-photo-journey');
     },
     catch: () => undefined as never,
-  }).pipe(
-    Effect.flatMap((currentUserDataPath) => {
-      if (currentUserDataPath === '') {
-        return Effect.succeed('');
-      }
-      const parentDir = path.dirname(currentUserDataPath);
-      const possibleOldAppNames = [
-        'vrchat-photo-journey',
-        'VRChatPhotoJourney',
-      ];
-      return Effect.tryPromise({
-        try: async () => {
-          for (const appName of possibleOldAppNames) {
-            const possiblePath = path.join(parentDir, appName);
-            const existsResult = await Effect.runPromise(
-              Effect.result(pathExistsAsync(possiblePath)),
-            );
-            if (Result.isFailure(existsResult)) {
-              // 候補が使えないだけで移行全体は止めない。存在しない場合と区別してログに残す
-              logger.error({
-                message: `Failed to check old app directory: ${possiblePath}`,
-                stack: existsResult.failure,
-              });
-              continue;
-            }
-            if (existsResult.success) {
-              return possiblePath;
-            }
-          }
-          // Return default if none exist
-          return path.join(parentDir, 'vrchat-photo-journey');
-        },
-        catch: () => undefined as never,
-      });
-    }),
-  );
+  });
 };
 
 /**
@@ -232,9 +194,8 @@ export const performMigrationIfNeeded = (): Effect.Effect<void> => {
 export const performMigration = (): Effect.Effect<MigrationResult> => {
   return Effect.tryPromise({
     try: async () => {
-      const { app } = await import('electron');
       const oldAppPath = await Effect.runPromise(getOldAppUserDataPath());
-      const currentAppPath = app.getPath('userData');
+      const currentAppPath = getHost().info.paths.userData;
 
       logger.info('Starting migration process...');
       logger.info(`Old app path: ${oldAppPath}`);

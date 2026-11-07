@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
-import { getNotification } from '../../lib/electronModules';
+import { getHost } from '../../lib/host';
 import { logger } from '../../lib/logger';
 import type { SettingStore } from '../settingStore';
 import { hasAcceptedCurrentTerms } from '../terms/consent';
@@ -74,11 +74,10 @@ const runBackgroundSync = async (store: SettingStore, now: Date) => {
 
     logger.error({ message: error });
 
-    const Notification = getNotification();
-    new Notification({
+    await getHost().shell.notify({
       title: `joinの記録に失敗しました: ${now.toString()}`,
       body: errorMessage,
-    }).show();
+    });
 
     return;
   }
@@ -96,9 +95,8 @@ const runBackgroundSync = async (store: SettingStore, now: Date) => {
     return;
   }
 
-  const Notification = getNotification();
-  new Notification({
+  await getHost().shell.notify({
     title: `joinの記録に成功しました: ${now.toString()}`,
     body: `${createdVRChatPhotoPathModelList.length}枚の新しい写真を記録しました\n${createdWorldJoinLogModelList.length}件のワールド参加を記録しました\n${createdPlayerJoinLogModelList.length}件のプレイヤー参加を記録しました`,
-  }).show();
+  });
 };

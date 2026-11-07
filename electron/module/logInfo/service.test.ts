@@ -5,7 +5,8 @@ import * as datefns from 'date-fns';
 import { Effect, Exit } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getAppUserDataPath } from '../../lib/wrappedApp';
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
 import type { InitProgressRun } from '../initProgress/emitter';
 import { VRChatLogStoreFilePathSchema } from '../vrchatLog/model';
 // import type { VRChatWorldJoinLog } from '../vrchatLog/service';
@@ -111,11 +112,6 @@ vi.mock('../../lib/dbQueue', () => ({
   }),
 }));
 
-// getAppUserDataPathのモック
-vi.mock('../../lib/wrappedApp', () => ({
-  getAppUserDataPath: vi.fn().mockReturnValue('/mock/user/data'),
-}));
-
 // node:fsのモック
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(false),
@@ -131,7 +127,7 @@ vi.mock('node:fs', () => ({
 describe('loadLogInfoIndexFromVRChatLog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAppUserDataPath).mockReturnValue('/mock/user/data');
+    registerHost(createTestHost({ paths: { userData: '/mock/user/data' } }));
   });
 
   it('DBに記録がない場合は1年前からログを取得する', async () => {
@@ -441,7 +437,7 @@ describe('_getLogStoreFilePaths behavior within loadLogInfoIndexFromVRChatLog', 
   beforeEach(() => {
     // 各テストの前にモックの状態をリセット
     vi.clearAllMocks(); // 既存のモックもクリア
-    vi.mocked(getAppUserDataPath).mockReturnValue('/mock/user/data');
+    registerHost(createTestHost({ paths: { userData: '/mock/user/data' } }));
 
     // _getLogStoreFilePaths の依存関係のモックを再設定
     vi.mocked(worldJoinLogService.findLatestWorldJoinLog).mockReturnValue(

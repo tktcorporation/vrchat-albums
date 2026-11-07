@@ -1,25 +1,17 @@
 import * as fs from 'node:fs';
-import * as realOs from 'node:os';
+import * as os from 'node:os';
 
 import * as path from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
 import {
   cleanupThumbnailCache,
   selectThumbnailCacheFilesToDelete,
   THUMBNAIL_CACHE_LIMITS,
   type ThumbnailCacheEntry,
 } from './vrchatPhoto.service';
-
-// キャッシュディレクトリは os.tmpdir() 配下に作られるため、テストごとの一時ディレクトリへ向ける
-const tmpState = vi.hoisted(() => ({ dir: '' }));
-vi.mock('node:os', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:os')>();
-  return {
-    ...actual,
-    tmpdir: () => tmpState.dir || actual.tmpdir(),
-  };
-});
 
 // 選定と削除の間に起きる再生成を再現するため、stat の直後に差し込める口を用意する
 const statHook = vi.hoisted(() => ({
@@ -119,20 +111,23 @@ describe('selectThumbnailCacheFilesToDelete', () => {
 });
 
 describe('cleanupThumbnailCache（実ファイルシステム）', () => {
+  let tempDir: string;
   let cacheDir: string;
 
   beforeEach(() => {
-    tmpState.dir = fs.mkdtempSync(
-      path.join(realOs.tmpdir(), 'vrchat-albums-thumb-test-'),
+    tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'vrchat-albums-thumb-test-'),
     );
-    cacheDir = path.join(tmpState.dir, 'vrchat-albums-thumbnails');
+    // キャッシュディレクトリは殻の一時ディレクトリ配下に作られるため、テストごとの一時ディレクトリへ向ける
+    registerHost(createTestHost({ paths: { temp: tempDir } }));
+    cacheDir = path.join(tempDir, 'vrchat-albums-thumbnails');
     fs.mkdirSync(cacheDir, { recursive: true });
   });
 
   afterEach(() => {
     statHook.afterStat = undefined;
-    fs.rmSync(tmpState.dir, { recursive: true, force: true });
-    tmpState.dir = '';
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    registerHost(createTestHost());
   });
 
   const writeWithAge = (name: string, ageMs: number) => {

@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { autoUpdater, type UpdateCheckResult } from 'electron-updater';
 
-import { getApp } from '../../lib/electronModules';
+import { getHost } from '../../lib/host';
 import { logger } from '../../lib/logger';
 import { UpdateCheckFailed } from './errors';
 
@@ -15,14 +15,13 @@ export interface UpdaterInfo {
  * 開発環境では package.json の値を優先する。
  */
 export const getAppVersion = (): string => {
-  // 本番では getApp().getVersion() を使用してバージョンを取得
+  // 本番では殻が持つアプリのバージョンを使う
   const appVersionDev = process.env.npm_package_version;
   if (appVersionDev !== undefined) {
     return appVersionDev;
   }
 
-  // Electron の getApp().getVersion() を使用してバージョンを取得
-  const appVersion = getApp().getVersion();
+  const { appVersion } = getHost().info;
 
   if (!appVersion) {
     throw new Error('App version is undefined');
@@ -57,7 +56,7 @@ export const getElectronUpdaterInfo = (): Effect.Effect<
       logger.debug('Update info:', updateInfo);
       return {
         isUpdateAvailable:
-          updateInfo.updateInfo.version !== getApp().getVersion(),
+          updateInfo.updateInfo.version !== getHost().info.appVersion,
         updateInfo: updateInfo,
       };
     }),

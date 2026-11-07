@@ -15,6 +15,8 @@ import {
   vi,
 } from 'vitest';
 
+import { registerHost } from '../../lib/host';
+import { createTestHost } from '../../lib/host/testHost';
 import type { ImportBackupMetadata } from './backupService/backupService';
 import { BackupExportFailed, BackupNotFound } from './backupService/errors';
 import {
@@ -253,10 +255,8 @@ const testUserDataDir = path.join(
   `vrchat-albums-test-${uuidv7()}`,
 );
 
-// モック設定 - 統合テストでは最小限のモックのみ使用
-vi.mock('../../lib/wrappedApp', () => ({
-  getAppUserDataPath: vi.fn(() => testUserDataDir),
-}));
+// サービスがユーザーデータとして読むディレクトリをテスト用に差し替える
+registerHost(createTestHost({ paths: { userData: testUserDataDir } }));
 
 // ファイルシステム操作のモック（テスト用ディレクトリを使用）
 vi.mock('../fileHandlers/logStorageManager', () => {
