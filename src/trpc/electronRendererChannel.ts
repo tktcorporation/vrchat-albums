@@ -1,5 +1,5 @@
 /**
- * 画面側の tRPC 通信路を、preload が公開する `window.electronTRPC`（`electron/preload.ts`）で作る。
+ * 画面側の tRPC 通信路を、preload が公開する `window.electronTRPC`（`electron/lib/trpcTransport/preload.ts` の `exposeTrpcBridge`）で作る。
  *
  * `window.electronTRPC` は呼び出しのたびに読む。preload の無い環境（テストやブラウザでの実行）で
  * このモジュールを読み込んだだけでは失敗させず、実際に通信しようとした時点で失敗させるため。

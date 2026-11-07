@@ -9,13 +9,22 @@ note: |
   テストは中身を直接確かめるので対象外。
   構成: electron/lib/trpcTransport/index.ts の JSDoc
 rule:
-  all:
-    - any:
-        - kind: import_statement
-        - kind: export_statement
-    - has:
-        field: source
-        regex: (^['"]|/)trpc/
+  any:
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - has:
+            field: source
+            regex: (^['"]|/)trpc/
+    - all:
+        - any:
+            - pattern: import($PATH)
+            - pattern: require($PATH)
+        - has:
+            stopBy: end
+            kind: string
+            regex: (^['"]|/)trpc/
 files:
   - '**/*.ts'
   - '**/*.tsx'
@@ -38,13 +47,22 @@ note: |
   テストは中身を直接確かめるので対象外。
   構成: electron/lib/trpcTransport/index.ts の JSDoc
 rule:
-  all:
-    - any:
-        - kind: import_statement
-        - kind: export_statement
-    - has:
-        field: source
-        regex: (^['"]|/)trpc/
+  any:
+    - all:
+        - any:
+            - kind: import_statement
+            - kind: export_statement
+        - has:
+            field: source
+            regex: (^['"]|/)trpc/
+    - all:
+        - any:
+            - pattern: import($PATH)
+            - pattern: require($PATH)
+        - has:
+            stopBy: end
+            kind: string
+            regex: (^['"]|/)trpc/
 files:
   - '**/*.ts'
   - '**/*.tsx'
