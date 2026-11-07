@@ -118,6 +118,8 @@ jobs:
           name: vrchat-albums-${{ needs.vars.outputs.version }}-${{ matrix.platform }}
           path: ${{ matrix.artifact-glob }}
           if-no-files-found: error
+          # ジョブを再実行したとき、同じ実行の中で同じ名前の artifact が既にあっても上書きする
+          overwrite: true
           retention-days: 14
           # インストーラは圧縮済みなので、再圧縮に時間をかけない
           compression-level: 0
@@ -161,9 +163,13 @@ jobs:
               echo "> 一部の OS のビルドが失敗しました。下の表にない OS はビルドのログを確認してください。"
               echo
             fi
-            echo "| 成果物 | リンク |"
-            echo "| --- | --- |"
-            echo "$rows"
+            if [[ -n "$rows" ]]; then
+              echo "| 成果物 | リンク |"
+              echo "| --- | --- |"
+              echo "$rows"
+            else
+              echo "成果物はありません。"
+            fi
             echo
             echo "ビルドのログ: ${run_url}"
           } > body.md
