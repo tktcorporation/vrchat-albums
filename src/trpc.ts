@@ -1,3 +1,12 @@
+/**
+ * 画面から処理本体の tRPC を呼ぶための、画面側の唯一の入口（全体の構成は
+ * `electron/lib/trpcTransport/index.ts`）。
+ *
+ * 画面のコードは `trpcClient` と `trpcReact` だけを使い、`src/trpc/` の中身を直接読まない
+ * （ast-grep の `renderer-trpc-internal-import` が検出する）。殻を換えるときは、
+ * 通信路の実装 `src/trpc/electronRendererChannel.ts` を差し替え、ここで渡す channel を
+ * 付け替える。link（`src/trpc/messageLink.ts`）と呼び出し側は変えない。
+ */
 import { createTRPCClient } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
 import superjson from 'superjson';

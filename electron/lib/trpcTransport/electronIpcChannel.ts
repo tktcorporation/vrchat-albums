@@ -88,19 +88,31 @@ const createWebContentsChannel = (
  *
  * @param connect 通信路を受け取って接続を始め、接続を閉じる関数を返す（`serveTrpc`）
  * @param ipcMain 画面からのメッセージを受け取る口。Electron では `ipcMain`
+ * @returns いまの接続を閉じ、以後の文書にもつながない関数。webContents より先に
+ *   サーバーを止めるときに使う
  */
 export const serveOverElectronIpc = (
   webContents: ConnectableWebContents,
   connect: (channel: MessageChannel<ServerMessage, unknown>) => () => void,
   ipcMain: IpcReceiver,
-): void => {
+): (() => void) => {
   let disconnect = connect(createWebContentsChannel(webContents, ipcMain));
+  let closed = false;
+  const close = () => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    disconnect();
+  };
 
   webContents.on('did-navigate', () => {
+    if (closed) {
+      return;
+    }
     disconnect();
     disconnect = connect(createWebContentsChannel(webContents, ipcMain));
   });
-  webContents.once('destroyed', () => {
-    disconnect();
-  });
+  webContents.once('destroyed', close);
+  return close;
 };

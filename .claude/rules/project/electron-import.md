@@ -40,6 +40,8 @@ await getHost().shell.notify({ title, body });
 
 Electron の API を直接呼ぶのは殻の側（`electron/index.ts`、`electron/electronUtil.ts`、`electron/lib/host/electronHost.ts`、殻より先に読み込まれる `electron/lib/logger.ts`）だけ。共通モジュールでは `electron/lib/electronModules.ts` の遅延取得ヘルパーを使う。
 
+画面との tRPC の通信（IPC）は `electron/lib/trpcTransport/` の入口（処理本体は `startTrpcServer`、preload は `exposeTrpcBridge`）だけを使う。構成と殻を換えるときの差し替え範囲は `electron/lib/trpcTransport/index.ts` の JSDoc にある。
+
 ### 遅延評価（require）
 
 ```typescript
