@@ -53,9 +53,10 @@ export const getElectronUpdaterInfo = (): Effect.Effect<
         };
       }
       logger.debug('Update info:', updateInfo);
+      // 版の大小と配布チャンネルの判定は electron-updater に任せる。版の文字列が違うだけで
+      // 更新ありとすると、beta 版を動かしているときに古い安定版を更新として表示する。
       return {
-        isUpdateAvailable:
-          updateInfo.updateInfo.version !== getHost().info.appVersion,
+        isUpdateAvailable: updateInfo.isUpdateAvailable,
         updateInfo: updateInfo,
       };
     }),

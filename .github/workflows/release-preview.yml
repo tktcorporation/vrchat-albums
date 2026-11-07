@@ -1,0 +1,190 @@
+name: Release Preview Build
+
+# changesets が作るリリース PR（changeset-release/main）に `preview` ラベルが付いている間、
+# その PR の head を 3 OS でビルドし、Actions の artifact に置いてダウンロードのリンクを PR にコメントする。
+# ラベルを付けた時点と、main への merge でリリース PR が更新されるたびに作り直す。
+# GitHub Release には何も上げない（--publish never）ので、配布中の版と自動アップデートの経路に触れない。
+on:
+  pull_request:
+    types: [labeled, unlabeled, synchronize, reopened, closed]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# 同じ PR の古いビルドは、新しい head のビルド、`preview` ラベルの取り外し、PR の close（merge を含む）で止める。
+# `preview` 以外のラベルの付け外しは何もせずに終わるので、進行中のビルドを止めないよう別のグループに入れる。
+concurrency:
+  group: release-preview-${{ github.event.pull_request.number }}-${{ (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'preview' && github.run_id || 'build' }}
+  cancel-in-progress: true
+
+jobs:
+  vars:
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.ref == 'changeset-release/main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'preview') &&
+      ((github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'preview')
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          sparse-checkout: package.json
+          sparse-checkout-cone-mode: false
+
+      # リリース PR の package.json は次に出す版（例: 0.30.0）になっている。そのままビルドすると、
+      # preview を入れた環境では本番の 0.30.0 が同じ版に見えて自動アップデートされない。
+      # semver の prerelease（0.30.0-beta.N < 0.30.0）にして、本番が出たら更新されるようにする。
+      # 識別子は beta にする。electron-updater は prerelease の版を動かしているとき、識別子をチャンネルとして扱い、
+      # alpha と beta 以外のチャンネルでは同じ識別子のタグしか探さないので、本番のタグ vX.Y.Z を拾わなくなる。
+      - name: Compute preview version
+        id: version
+        run: |
+          base=$(node -p "require('./package.json').version")
+          echo "version=${base}-beta.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build on ${{ matrix.os }}
+    needs: vars
+    runs-on: ${{ matrix.os }}
+    # 既定の 6 時間では、止まったビルドが runner を長く占有する
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      # 1 つの OS が失敗しても、ほかの OS の成果物は動作確認に使えるので最後まで作る
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact-glob: dist/*.exe
+          - os: ubuntu-22.04
+            platform: linux
+            artifact-glob: dist/*.AppImage
+          - os: macos-latest
+            platform: mac
+            artifact-glob: dist/*.dmg
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node and Install Dependencies
+        uses: ./.github/actions/setup-node-and-install
+
+      - name: Cache Electron and Electron Builder
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
+
+      # ビルドが読む版（アプリの版・成果物のファイル名）を preview の版にそろえる。
+      # ルートの版は lockfile に載らないので、インストール後に書き換えても依存の解決は変わらない。
+      - name: Set preview version
+        env:
+          PREVIEW_VERSION: ${{ needs.vars.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            pkg.version = process.env.PREVIEW_VERSION;
+            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          '
+
+      # SENTRY_DSN を渡さないので、preview ビルドはエラー監視へ送信しない
+      - name: Build Electron App
+        env:
+          NODE_ENV: production
+        run: |
+          pnpm clean:build
+          pnpm build
+          pnpm exec electron-builder --config=electron-builder.cjs --${{ matrix.platform }} --publish never
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrchat-albums-${{ needs.vars.outputs.version }}-${{ matrix.platform }}
+          path: ${{ matrix.artifact-glob }}
+          if-no-files-found: error
+          # ジョブを再実行したとき、同じ実行の中で同じ名前の artifact が既にあっても上書きする
+          overwrite: true
+          retention-days: 14
+          # インストーラは圧縮済みなので、再圧縮に時間をかけない
+          compression-level: 0
+
+  comment:
+    needs: [vars, build]
+    # 一部の OS が失敗しても、できた成果物のリンクと失敗したことを PR に残す。
+    # 失敗した head のまま前回の成功コメントが残ると、最新の head のビルドだと誤解されるため。
+    if: ${{ !cancelled() && needs.vars.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: Comment download links on the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PREVIEW_VERSION: ${{ needs.vars.outputs.version }}
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          # 同じ PR へのコメントを 1 件に保つため、目印のあるコメントを探して更新する
+          marker='<!-- release-preview-build -->'
+          run_url="https://github.com/${REPO}/actions/runs/${RUN_ID}"
+
+          rows=$(gh api --paginate "repos/${REPO}/actions/runs/${RUN_ID}/artifacts" \
+            --jq ".artifacts | sort_by(.name)[] | \"| \(.name) | [ダウンロード](${run_url}/artifacts/\(.id)) |\"")
+
+          {
+            echo "$marker"
+            echo "## Preview build: \`${PREVIEW_VERSION}\`"
+            echo
+            echo "このリリース PR の head（${HEAD_SHA:0:8}）をビルドしました。成果物は zip で、ダウンロードには GitHub へのログインが必要です。14 日後に消えます。"
+            echo
+            if [[ "$BUILD_RESULT" != "success" ]]; then
+              echo "> [!WARNING]"
+              echo "> ビルドに失敗した OS があります。成果物が無い OS はビルドのログを確認してください。"
+              echo
+            fi
+            if [[ -n "$rows" ]]; then
+              echo "| 成果物 | リンク |"
+              echo "| --- | --- |"
+              echo "$rows"
+            else
+              echo "成果物はありません。"
+            fi
+            echo
+            echo "ビルドのログ: ${run_url}"
+          } > body.md
+
+          # パイプで head に渡すと gh の失敗が終了コードに出ず、検索に失敗したまま新しいコメントを重ねて作るので、
+          # 結果をいったん変数に受けてから先頭を取る
+          comment_ids=$(gh api --paginate "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"${marker}\"))) | .id")
+          comment_id=${comment_ids%%$'\n'*}
+
+          if [[ -n "$comment_id" ]]; then
+            gh api --method PATCH "repos/${REPO}/issues/comments/${comment_id}" -F body=@body.md > /dev/null
+          else
+            gh api --method POST "repos/${REPO}/issues/${PR_NUMBER}/comments" -F body=@body.md > /dev/null
+          fi
