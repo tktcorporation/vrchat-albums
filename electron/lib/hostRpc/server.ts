@@ -1,10 +1,13 @@
 /**
  * 処理本体からの殻の操作の要求を、main プロセスで実行して応える（取り決めは `./protocol.ts`）。
  */
+import * as path from 'node:path';
+
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
 import type { MessageChannel } from '../../../shared/trpcTransport';
+import { checkExternalUrl } from '../externalUrl';
 import type { HostShell, HostUpdater } from '../host/types';
 import { logger } from '../logger';
 import {
@@ -16,13 +19,48 @@ import {
   HostRequestSchema,
 } from './protocol';
 
+/**
+ * OS のハンドラへ渡す操作を、main の側でもう一度確かめる。
+ *
+ * 処理本体は画面から届いた文字列をそのまま渡しうる。`shell.openExternal` は URL のスキームに
+ * 関連付けられたハンドラを起動するので、`file:` などを通すとローカルの実行ファイルを開けてしまう。
+ * 処理本体の側の確認が漏れても、OS を操作する main で止める。
+ */
+const openExternalChecked = (shell: HostShell, url: string): Promise<void> => {
+  const checked = checkExternalUrl(url);
+  if (!checked.ok) {
+    return Promise.reject(
+      new Error(
+        `Refused to open external URL (${checked.rejection.type}): ${url}`,
+      ),
+    );
+  }
+  return shell.openExternal(checked.url);
+};
+
+/**
+ * `shell.openPath` は相対パスを OS の作業ディレクトリから解決し、意図しない場所を開きうるので、
+ * 絶対パスだけを受け付ける。開く対象（フォルダ・写真・ログ）はどれも処理本体が絶対パスで持つ。
+ */
+const openPathChecked = (
+  shell: HostShell,
+  targetPath: string,
+): Promise<string> => {
+  if (!path.isAbsolute(targetPath)) {
+    return Promise.reject(
+      new Error(`Refused to open a relative path: ${targetPath}`),
+    );
+  }
+  return shell.openPath(targetPath);
+};
+
 /** 要求を実際の実装へ渡す表。操作を足すと、表の書き漏らしが型エラーになる */
 const createDispatchTable = (impl: {
   readonly shell: HostShell;
   readonly updater: HostUpdater;
 }): HostRpcMethods => ({
-  'shell.openPath': (targetPath) => impl.shell.openPath(targetPath),
-  'shell.openExternal': (url) => impl.shell.openExternal(url),
+  'shell.openPath': (targetPath) => openPathChecked(impl.shell, targetPath),
+  'shell.openExternal': (url) => openExternalChecked(impl.shell, url),
   'shell.showOpenDialog': (properties) => impl.shell.showOpenDialog(properties),
   'shell.showSaveDialog': (options) => impl.shell.showSaveDialog(options),
   'shell.writeClipboardImageFromPngFile': (pngPath) =>

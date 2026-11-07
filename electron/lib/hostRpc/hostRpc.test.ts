@@ -94,6 +94,45 @@ describe('host RPC', () => {
     );
   });
 
+  it('外部で開いてよい URL だけを、正規化してから main の実装へ渡す', async () => {
+    const pair = createInMemoryPair();
+    const openExternal = vi.fn(async (_url: string) => {});
+    serveHostRpc(pair.mainSide, createTestHost({ shell: { openExternal } }));
+    const client = createHostRpcClient(pair.backendSide);
+
+    await expect(
+      client.shell.openExternal('HTTPS://example.com/a b'),
+    ).resolves.toBeUndefined();
+    expect(openExternal).toHaveBeenCalledWith('https://example.com/a%20b');
+  });
+
+  it('https 以外や形の壊れた URL は main の実装を呼ばずに reject する', async () => {
+    const pair = createInMemoryPair();
+    const openExternal = vi.fn(async (_url: string) => {});
+    serveHostRpc(pair.mainSide, createTestHost({ shell: { openExternal } }));
+    const client = createHostRpcClient(pair.backendSide);
+
+    await expect(
+      client.shell.openExternal('file:///C:/Windows/System32/calc.exe'),
+    ).rejects.toThrow('DISALLOWED_SCHEME');
+    await expect(client.shell.openExternal('not a url')).rejects.toThrow(
+      'MALFORMED_URL',
+    );
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('相対パスは main の実装を呼ばずに reject する', async () => {
+    const pair = createInMemoryPair();
+    const openPath = vi.fn(async (_target: string) => '');
+    serveHostRpc(pair.mainSide, createTestHost({ shell: { openPath } }));
+    const client = createHostRpcClient(pair.backendSide);
+
+    await expect(client.shell.openPath('relative/dir')).rejects.toThrow(
+      'relative path',
+    );
+    expect(openPath).not.toHaveBeenCalled();
+  });
+
   it('知らない操作や引数の壊れた要求には実装を呼ばずに失敗を返す', async () => {
     const pair = createInMemoryPair();
     const writeClipboardText = vi.fn(async () => {});

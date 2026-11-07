@@ -463,9 +463,11 @@ const revealWindow = (window: BrowserWindow): void => {
 
 /**
  * システムトレイに常駐させるための初期化処理を行う。
- * アプリ終了時に破棄され、ウィンドウ表示などのメニューを提供する。
+ * アプリの終了が確定したとき（will-quit）に破棄され、ウィンドウ表示などのメニューを提供する。
+ *
+ * @param showWindow ウィンドウを出す操作。終了の手順の間は出さないよう、呼び出し側が判断を包んで渡す
  */
-const setTray = () => {
+const setTray = (showWindow: () => void) => {
   let tray: Tray | null = null;
 
   const createTray = async () => {
@@ -517,7 +519,7 @@ const setTray = () => {
       {
         label: 'ウィンドウを表示',
         click: () => {
-          revealWindow(createOrGetWindow());
+          showWindow();
         },
       },
       { type: 'separator' },
@@ -543,13 +545,14 @@ const setTray = () => {
 
       // トレイアイコンクリック時にウィンドウを表示
       tray.on('click', () => {
-        revealWindow(createOrGetWindow());
+        showWindow();
       });
     }
   };
 
-  // アプリ終了時にトレイも破棄
-  app.on('before-quit', () => {
+  // 終了の手順（処理本体の終了を待つ）の間もトレイから操作できるよう、破棄は終了が確定してからにする。
+  // before-quit は処理本体の終了を待つために取り消されるので、その時点で破棄すると戻らない
+  app.on('will-quit', () => {
     if (tray) {
       tray.destroy();
       tray = null;
@@ -574,7 +577,7 @@ export const reloadMainWindow = (): void => {
  * メインウィンドウの位置と大きさを保存する。ウィンドウが無ければ何もしない。
  *
  * アプリの終了では、ウィンドウが閉じる（`close`）より先に処理本体を終了させるので、
- * 終了の直前に呼び、処理本体が動いているうちに保存を頼む。
+ * 終了の手順（`electron/lib/appLifecycle.ts`）の最初に呼び、処理本体が動いているうちに保存を頼む。
  */
 export const saveMainWindowBounds = (): void => {
   const window = getWindow();

@@ -50,6 +50,10 @@ if (isBackendProcess) {
  * 処理本体の入口（`electron/backend/main.ts`）が、main から起動時の情報を受け取った直後に 1 度だけ呼ぶ。
  * main の `app.log` とは別のファイルにする。2 つのプロセスが同じファイルへ書くと、
  * それぞれのローテーションが相手の書き込みを消しうるため。
+ *
+ * 標準出力への書き込みはここで止める。main は処理本体の標準出力を自分のログへ流すので、
+ * 書き続けると同じ行が `backend.log` と main の `app.log` の両方に残る。保存先が決まる前の出力と、
+ * logger を通らない Node 自身のエラー出力だけが main のログへ流れる。
  */
 export const configureBackendLogFile = (options: {
   readonly logsDir: string;
@@ -58,6 +62,7 @@ export const configureBackendLogFile = (options: {
   const filePath = path.join(options.logsDir, 'backend.log');
   log.transports.file.resolvePathFn = () => filePath;
   applyLevels(options.isPackaged);
+  log.transports.console.level = false;
 };
 
 /** エラー監視へ送るときに添える情報。Sentry の CaptureContext のうち、logger が使う部分 */

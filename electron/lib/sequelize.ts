@@ -137,7 +137,9 @@ export const __initTestRDBClient = async () => {
 };
 /**
  * 開いている RDBClient を閉じる。開いていなければ何もしない。
- * 処理本体の終了時に、書き込みの途中で接続が切れないよう、プロセスを終える前に呼ぶ。
+ *
+ * 実行中のクエリの終わりは待たない。処理本体の終了では、先に `drainDBQueues`（`./dbQueue`）で
+ * キューの実行中のタスクを待ってから呼ぶ。キューを通らないクエリが実行中なら、そのクエリは失敗する。
  */
 export const closeRDBClient = async () => {
   if (rdbClient === null) {

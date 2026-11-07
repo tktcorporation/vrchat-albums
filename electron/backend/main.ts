@@ -12,7 +12,7 @@
  *    殻の登録より後に動的に読み込む
  * 4. main へ `ready` を送る
  *
- * `init` より後に届いた指示（画面との接続・終了など）は、準備が済むまで届いた順に待たせる。
+ * `init` より後に届いた指示（画面との接続・終了など）の扱いと、起動の失敗の扱いは `./controller.ts` が持つ。
  */
 import path from 'node:path';
 
@@ -22,13 +22,11 @@ import {
   flush as flushSentry,
   init as initSentry,
 } from '@sentry/electron/utility';
-import type { MessagePortMain } from 'electron';
-import { match } from 'ts-pattern';
 
 import type { MessageChannel } from '../../shared/trpcTransport';
 import {
+  BACKEND_SHUTDOWN_TIMEOUT_MS,
   type BackendToMainMessage,
-  type MainToBackendMessage,
   MainToBackendSchema,
   parseControlMessage,
 } from '../lib/backendProcess/protocol';
@@ -42,9 +40,21 @@ import {
   logger,
 } from '../lib/logger';
 import { serveTrpcOnPort } from '../lib/trpcTransport/backend';
+import {
+  type BackendRuntime,
+  createBackendController,
+  type InitMessage,
+} from './controller';
 
 /** Sentry に送れずに終了するのを避けるため、終了の前に送信を待つ上限 */
 const SENTRY_FLUSH_TIMEOUT_MS = 2_000;
+
+/**
+ * 終了のときに、実行中の DB の処理が終わるのを待つ上限。
+ * この待ちと Sentry への送信の待ちを、main が強制終了するまでの時間の内に収め、DB を閉じる時間を残す
+ */
+const DB_DRAIN_TIMEOUT_MS =
+  BACKEND_SHUTDOWN_TIMEOUT_MS - SENTRY_FLUSH_TIMEOUT_MS - 1_000;
 
 const parentPort = process.parentPort;
 
@@ -65,23 +75,6 @@ const mainChannel: MessageChannel<HostRequest | BackendToMainMessage, unknown> =
     },
   };
 
-/** 準備が済んだ処理本体。指示はこれを受け取ってから実行する */
-interface Runtime {
-  readonly openConnection: (
-    connectionId: string,
-    port: MessagePortMain,
-  ) => void;
-  readonly closeConnection: (connectionId: string) => void;
-  readonly startBackgroundSync: () => void;
-  readonly setWindowBounds: (bounds: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }) => void;
-  readonly shutdown: () => Promise<void>;
-}
-
 const exitAfterFlush = async (code: number): Promise<never> => {
   await flushSentry(SENTRY_FLUSH_TIMEOUT_MS);
   process.exit(code);
@@ -98,10 +91,7 @@ const resolveDatabasePath = (info: HostInfo): string =>
     .join(path.posix.sep);
 
 /** `init` を受けて、処理本体の準備を進める */
-const start = async (init: {
-  readonly info: HostInfo;
-  readonly errorReporting: boolean;
-}): Promise<Runtime> => {
+const start = async (init: InitMessage): Promise<BackendRuntime> => {
   const { info } = init;
   configureBackendLogFile({
     logsDir: info.paths.logs,
@@ -125,6 +115,7 @@ const start = async (init: {
   });
 
   const { initRDBClient, closeRDBClient } = await import('../lib/sequelize');
+  const { drainDBQueues } = await import('../lib/dbQueue');
   await initRDBClient({ db_url: resolveDatabasePath(info) });
 
   const [{ router }, { eventEmitter }, backgroundTimer, cleanupScheduler] =
@@ -152,86 +143,55 @@ const start = async (init: {
       connections.get(connectionId)?.();
       connections.delete(connectionId);
     },
-    startBackgroundSync: () => {
-      backgroundTimer.startBackgroundSyncTimer(settingStore);
+    setBackgroundSync: (enabled) => {
+      if (enabled) {
+        backgroundTimer.startBackgroundSyncTimer(settingStore);
+      } else {
+        backgroundTimer.stopBackgroundSyncTimer();
+      }
     },
     setWindowBounds: (bounds) => {
       settingStore.setWindowBounds(bounds);
     },
+    // 新しい処理が始まらないよう、タイマーと画面との接続を先に止める。実行中の DB の処理を待ってから
+    // DB を閉じ、殻の操作の待ちは最後に打ち切る（DB の処理の途中で殻の操作を待つことがあるため）
     shutdown: async () => {
+      backgroundTimer.stopBackgroundSyncTimer();
+      cleanupScheduler.stopThumbnailCacheCleanupScheduler();
       for (const close of connections.values()) {
         close();
       }
       connections.clear();
-      hostRpc.dispose();
+      const drained = await drainDBQueues(DB_DRAIN_TIMEOUT_MS);
+      if (!drained) {
+        logger.warn(
+          `DB tasks did not finish within ${String(DB_DRAIN_TIMEOUT_MS)}ms, closing the database anyway`,
+        );
+      }
       await closeRDBClient();
+      hostRpc.dispose();
     },
   };
 };
 
-/** 起動の失敗や終了の指示で、受け付けた後の指示を実行しないための印 */
-let runtime: Promise<Runtime> | null = null;
-
-const handle = (message: MainToBackendMessage, ports: MessagePortMain[]) => {
-  match(message)
-    .with({ kind: 'init' }, (init) => {
-      if (runtime !== null) {
-        logger.warn('Backend received init twice, ignoring');
-        return;
-      }
-      runtime = start(init);
-      runtime
-        .then(() => {
-          mainChannel.send({ kind: 'ready' });
-          logger.info('Backend ready');
-        })
-        .catch(async (error: unknown) => {
-          logger.error({ message: error });
-          await exitAfterFlush(1);
-        });
-    })
-    .otherwise((command) => {
-      if (runtime === null) {
-        logger.warn(`Backend received ${command.kind} before init, ignoring`);
-        return;
-      }
-      void runtime.then((ready) =>
-        match(command)
-          .with({ kind: 'connect' }, ({ connectionId }) => {
-            const [port] = ports;
-            if (port === undefined) {
-              logger.warn(`connect without a port: ${connectionId}`);
-              return;
-            }
-            ready.openConnection(connectionId, port);
-          })
-          .with({ kind: 'disconnect' }, ({ connectionId }) => {
-            ready.closeConnection(connectionId);
-          })
-          .with({ kind: 'startBackgroundSync' }, () => {
-            ready.startBackgroundSync();
-          })
-          .with({ kind: 'setWindowBounds' }, ({ bounds }) => {
-            ready.setWindowBounds(bounds);
-          })
-          .with({ kind: 'shutdown' }, () => {
-            void ready
-              .shutdown()
-              .catch((error: unknown) => {
-                logger.error({ message: error });
-              })
-              .then(() => exitAfterFlush(0));
-          })
-          .exhaustive(),
-      );
-    });
-};
+const controller = createBackendController({
+  start,
+  sendReady: () => {
+    mainChannel.send({ kind: 'ready' });
+  },
+  exit: exitAfterFlush,
+  log: {
+    info: (message) => logger.info(message),
+    warn: (message) => logger.warn(message),
+    error: (params) => logger.error(params),
+  },
+});
 
 parentPort.on('message', (event: Electron.MessageEvent) => {
   const message = parseControlMessage(MainToBackendSchema, event.data);
   // 殻の操作の応答とエラー監視のメッセージは、それぞれの受け手が読む
   if (message !== null) {
-    handle(message, event.ports);
+    controller.handle(message, event.ports);
   }
 });
 

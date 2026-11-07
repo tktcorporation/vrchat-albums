@@ -34,6 +34,11 @@ export const MainToBackendSchema = z.discriminatedUnion('kind', [
     info: HostInfoSchema,
     /** main がエラー監視を初期化したか。していなければ処理本体も初期化しない（送る経路が無い） */
     errorReporting: z.boolean(),
+    /**
+     * 起動の時点でアプリが常駐中か。起動し直した処理本体も、常駐中なら定期的なログの同期を始める。
+     * 処理本体が止まっている間に常駐へ入った・抜けた結果も、この値で起動時に届く
+     */
+    backgroundSync: z.boolean(),
   }),
   z.object({
     /** 画面の文書 1 つ分の tRPC の接続。port はメッセージの ports で渡す */
@@ -46,8 +51,12 @@ export const MainToBackendSchema = z.discriminatedUnion('kind', [
     connectionId: z.string().min(1),
   }),
   z.object({
-    /** ウィンドウをすべて閉じて常駐に入ったので、定期的なログの同期を始める */
-    kind: z.literal('startBackgroundSync'),
+    /**
+     * 常駐に入った（true）・ウィンドウを開いて抜けた（false）。常駐中だけ定期的なログの同期を動かす。
+     * 処理本体が止まっている間は送らず、次の起動の `init` の `backgroundSync` で伝える
+     */
+    kind: z.literal('setBackgroundSync'),
+    enabled: z.boolean(),
   }),
   z.object({
     /** 閉じたウィンドウの位置と大きさを、次の起動のために設定へ保存する */
@@ -60,12 +69,18 @@ export const MainToBackendSchema = z.discriminatedUnion('kind', [
     }),
   }),
   z.object({
-    /** アプリの終了。DB を閉じてからプロセスを終える */
+    /** アプリの終了。実行中の DB の処理を待ち、DB を閉じてからプロセスを終える */
     kind: z.literal('shutdown'),
   }),
 ]);
 
 export type MainToBackendMessage = z.infer<typeof MainToBackendSchema>;
+
+/**
+ * main が `shutdown` を送ってから、処理本体が自分で終わるのを待つ上限。超えたら main が強制終了する。
+ * 処理本体は、終了の処理（DB の処理の待ち・エラー監視への送信）をこの時間の内に収める
+ */
+export const BACKEND_SHUTDOWN_TIMEOUT_MS = 5_000;
 
 /** 処理本体から main へ送るメッセージ */
 export const BackendToMainSchema = z.discriminatedUnion('kind', [

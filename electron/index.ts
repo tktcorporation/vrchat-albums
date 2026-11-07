@@ -9,6 +9,7 @@ import { app, BrowserWindow, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 
 import * as electronUtil from './electronUtil';
+import { createAppLifecycle } from './lib/appLifecycle';
 import { createBackendSupervisor } from './lib/backendProcess/supervisor';
 import {
   createElectronHostInfo,
@@ -47,9 +48,6 @@ configureErrorReporting({
 // 処理本体の起動より先に初期化する
 initializeMainSentry(readSettings);
 
-/** 処理本体の起動し直しを諦めたときにアプリを終えるため、終了の待ちを飛ばす印 */
-let quitWithoutBackend = false;
-
 const backend = createBackendSupervisor({
   hostInfo,
   errorReporting: isMainSentryInitialized(),
@@ -57,7 +55,13 @@ const backend = createBackendSupervisor({
     reloadWindow: electronUtil.reloadMainWindow,
     onTermsAccepted: () => initializeMainSentry(readSettings),
   }),
-  updater: createElectronUpdater(autoUpdater),
+  // 更新のインストールでも、通常の終了と同じ手順で処理本体を終えてからインストーラに渡す
+  updater: createElectronUpdater(autoUpdater, {
+    prepareQuit: () => lifecycle.shutdown(),
+    forceQuit: () => lifecycle.forceQuit(),
+  }),
+  // lifecycle は下で作る。この関数は処理本体の起動（app の準備の後）にだけ呼ばれる
+  isBackgroundSyncEnabled: () => lifecycle.isInBackground(),
   // 処理本体の中の接続と購読は失われたので、画面を読み込み直して接続を張り直す
   onRestarted: () => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -69,10 +73,25 @@ const backend = createBackendSupervisor({
       'VRChat Albums',
       'アプリの処理を続けられなくなったため終了します。もう一度起動してください。',
     );
-    quitWithoutBackend = true;
     app.quit();
   },
 });
+
+const lifecycle = createAppLifecycle({
+  app,
+  backend,
+  getWindows: () => BrowserWindow.getAllWindows(),
+  saveWindowBounds: electronUtil.saveMainWindowBounds,
+  isBackgroundEnabled: () => readSettings().backgroundFileCreateFlag,
+  platform: process.platform,
+});
+
+/** 利用者の操作（トレイ・Dock・二重起動）でウィンドウを出す。終了の手順の間は出さない */
+const showWindow = (): void => {
+  lifecycle.whenRunning(() => {
+    electronUtil.revealWindow(electronUtil.createOrGetWindow());
+  });
+};
 
 // preload は文書が読み込まれるたびに port を頼む。最初のウィンドウより先に受け付けを始めるため、
 // モジュールの読み込み時に呼ぶ。アプリの終了まで止めないので、戻り値の停止関数は使わない
@@ -93,7 +112,6 @@ const initializeApp = async () => {
   if (!process.env.PLAYWRIGHT_TEST) {
     const gotTheLock = app.requestSingleInstanceLock();
     if (!gotTheLock) {
-      quitWithoutBackend = true;
       app.quit();
       return;
     }
@@ -103,7 +121,7 @@ const initializeApp = async () => {
 
   electronUtil.createOrGetWindow();
 
-  void electronUtil.setTray();
+  void electronUtil.setTray(showWindow);
 
   // electron-unhandled は top-level await を含む ESM のため、CJS の main バンドルから
   // require() で読めない。外部モジュールのまま動的 import で読み込む。
@@ -121,38 +139,8 @@ app
 process.on('uncaughtException', (error) => logger.error({ message: error }));
 process.on('unhandledRejection', (error) => logger.error({ message: error }));
 
-app.on('second-instance', () => {
-  electronUtil.revealWindow(electronUtil.createOrGetWindow());
-});
+app.on('second-instance', showWindow);
 
 // macOS では起動直後（ウィンドウの描画前）にも activate が届く。描画前のウィンドウは
 // revealWindow が見せないので、最初の表示は createWindow の ready-to-show に任せられる
-app.on('activate', () => {
-  electronUtil.revealWindow(electronUtil.createOrGetWindow());
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform === 'darwin') {
-    return;
-  }
-  // background処理が有効になっている場合は終了しない
-  if (readSettings().backgroundFileCreateFlag) {
-    backend.send({ kind: 'startBackgroundSync' });
-    return;
-  }
-  app.quit();
-});
-
-// 処理本体に DB を閉じさせてから終える。終了の途中で DB への書き込みが切れないようにするため。
-// ウィンドウはこの後に閉じるので、位置と大きさは処理本体が動いているうちに保存を頼む
-app.on('before-quit', (event) => {
-  if (quitWithoutBackend) {
-    return;
-  }
-  event.preventDefault();
-  electronUtil.saveMainWindowBounds();
-  void backend.stop().finally(() => {
-    quitWithoutBackend = true;
-    app.quit();
-  });
-});
+app.on('activate', showWindow);

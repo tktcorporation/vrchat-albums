@@ -7,6 +7,9 @@
  * 処理本体が予期せず終了したら、`./restartPolicy.ts` の判断で起動し直し、起動時の情報を送り直してから
  * `onRestarted` を呼ぶ（呼び出し側が全ウィンドウを再読み込みし、画面との接続を張り直す）。
  * 起動し直しを諦めたときは `onGiveUp` を呼ぶ。
+ *
+ * いつ常駐に入り、いつ終了するかはこのモジュールでは決めない。それはアプリの状態として
+ * `electron/lib/appLifecycle.ts` が持ち、このモジュールは起動のたびに `isBackgroundSyncEnabled` を読んで送る。
  */
 import * as path from 'node:path';
 
@@ -20,17 +23,31 @@ import type { HostResponse } from '../hostRpc/protocol';
 import { serveHostRpc } from '../hostRpc/server';
 import { logger } from '../logger';
 import {
+  BACKEND_SHUTDOWN_TIMEOUT_MS,
   BackendToMainSchema,
   type MainToBackendMessage,
   parseControlMessage,
 } from './protocol';
 import { createRestartPolicy, type RestartDecision } from './restartPolicy';
 
-/** 終了を頼んでから、処理本体が自分で終わるのを待つ上限。超えたら強制終了する */
-const SHUTDOWN_TIMEOUT_MS = 5_000;
-
 /** `app.getAppMetrics()` などで処理本体を見分けるための名前 */
 export const BACKEND_SERVICE_NAME = 'vrchat-albums-backend';
+
+/** supervisor が使う utilityProcess の部分。テストが偽物のプロセスを渡せるよう、使う操作だけに絞る */
+export type BackendChildProcess = Pick<
+  UtilityProcess,
+  'pid' | 'stdout' | 'stderr' | 'on' | 'once' | 'postMessage' | 'kill'
+>;
+
+/** 処理本体を起動する関数。既定は `utilityProcess.fork` */
+export type ForkBackend = (
+  scriptPath: string,
+  options: {
+    readonly serviceName: string;
+    readonly stdio: 'pipe';
+    readonly env: NodeJS.ProcessEnv;
+  },
+) => BackendChildProcess;
 
 export interface BackendSupervisorOptions {
   /** 起動のたびに送る、殻についての情報 */
@@ -44,13 +61,24 @@ export interface BackendSupervisorOptions {
   readonly onRestarted: () => void;
   /** 起動し直しを諦めたときに呼ぶ */
   readonly onGiveUp: () => void;
+  /** 起動のたびに読む、アプリが常駐中か。起動し直した処理本体が定期的な同期を始め直すため */
+  readonly isBackgroundSyncEnabled: () => boolean;
+  /** テストが偽物のプロセスを渡すための差し替え口 */
+  readonly fork?: ForkBackend;
+  /** テストが待ち時間を短くするための差し替え口 */
+  readonly shutdownTimeoutMs?: number;
 }
 
 export interface BackendSupervisor {
   /** 処理本体を起動する。`app` の準備ができた後に 1 度だけ呼ぶ */
   start(): void;
-  /** 制御メッセージを送る。処理本体が動いていなければ捨てる */
-  send(message: Exclude<MainToBackendMessage, { kind: 'connect' }>): void;
+  /**
+   * 制御メッセージを送る。処理本体が動いていなければ捨てる。
+   * 止まっている間に失われると困る状態（常駐中か）は、次の起動の `init` で送り直す
+   */
+  send(
+    message: Exclude<MainToBackendMessage, { kind: 'connect' | 'init' }>,
+  ): void;
   /** 画面の文書 1 つ分の接続の port を渡す。処理本体が動いていなければ port を閉じる */
   connect(connectionId: string, port: MessagePortMain): void;
   disconnect(connectionId: string): void;
@@ -61,6 +89,8 @@ export interface BackendSupervisor {
 /**
  * 処理本体の標準出力・標準エラーを、行ごとに main のログへ流す。
  * 処理本体がログの保存先を受け取る前の出力や、Node 自身が出すエラーを残すため。
+ * 保存先を受け取った後の処理本体の logger は標準出力へ書かない（`configureBackendLogFile`）ので、
+ * 同じ行が両方のログに残ることはない。
  */
 const forwardLines = (
   stream: NodeJS.ReadableStream | null,
@@ -83,11 +113,20 @@ const forwardLines = (
   });
 };
 
-/** utilityProcess を、殻の操作の要求と応答を運ぶ通信路として扱う */
+/**
+ * utilityProcess を、殻の操作の要求と応答を運ぶ通信路として扱う。
+ *
+ * 終了した処理本体へは応答を送らない。殻の操作（更新のインストールなど）の実行中に処理本体を
+ * 止めることがあり、終わったプロセスへ送ると Electron が例外を投げうるため。
+ */
 const createChildChannel = (
-  child: UtilityProcess,
+  child: BackendChildProcess,
+  hasExited: () => boolean,
 ): MessageChannel<HostResponse, unknown> => ({
   send: (message) => {
+    if (hasExited()) {
+      return;
+    }
     child.postMessage(message);
   },
   onMessage: (listener) => {
@@ -112,17 +151,24 @@ export const createBackendSupervisor = (
   options: BackendSupervisorOptions,
 ): BackendSupervisor => {
   const decideRestart = createRestartPolicy();
-  let child: UtilityProcess | null = null;
+  const fork: ForkBackend =
+    options.fork ??
+    ((scriptPath, forkOptions) =>
+      getUtilityProcess().fork(scriptPath, [], forkOptions));
+  const shutdownTimeoutMs =
+    options.shutdownTimeoutMs ?? BACKEND_SHUTDOWN_TIMEOUT_MS;
+  let child: BackendChildProcess | null = null;
   let stopping: Promise<void> | null = null;
   let restartTimer: ReturnType<typeof setTimeout> | null = null;
 
   const spawn = (): void => {
-    const forked = getUtilityProcess().fork(resolveBackendScriptPath(), [], {
+    const forked = fork(resolveBackendScriptPath(), {
       serviceName: BACKEND_SERVICE_NAME,
       stdio: 'pipe',
       env: process.env,
     });
     child = forked;
+    let exited = false;
 
     forwardLines(forked.stdout, (line) => logger.info(`[backend] ${line}`));
     forwardLines(forked.stderr, (line) => logger.warn(`[backend] ${line}`));
@@ -138,12 +184,16 @@ export const createBackendSupervisor = (
         })
         .exhaustive();
     });
-    serveHostRpc(createChildChannel(forked), {
-      shell: options.shell,
-      updater: options.updater,
-    });
+    serveHostRpc(
+      createChildChannel(forked, () => exited),
+      {
+        shell: options.shell,
+        updater: options.updater,
+      },
+    );
 
     forked.once('exit', (code) => {
+      exited = true;
       if (child === forked) {
         child = null;
       }
@@ -157,6 +207,7 @@ export const createBackendSupervisor = (
       kind: 'init',
       info: options.hostInfo,
       errorReporting: options.errorReporting,
+      backgroundSync: options.isBackgroundSyncEnabled(),
     } satisfies MainToBackendMessage);
   };
 
@@ -236,7 +287,7 @@ export const createBackendSupervisor = (
             'Backend did not exit in time after shutdown, killing it',
           );
           running.kill();
-        }, SHUTDOWN_TIMEOUT_MS);
+        }, shutdownTimeoutMs);
         running.once('exit', () => {
           clearTimeout(timeout);
           resolve();
