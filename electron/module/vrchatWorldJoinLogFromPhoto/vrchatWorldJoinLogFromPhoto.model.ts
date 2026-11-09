@@ -1,5 +1,6 @@
 import { and, asc, desc, gt, lt } from 'drizzle-orm';
 
+import { insertInChunks } from '../../lib/db/chunkedInsert';
 import { getDB } from '../../lib/db/client';
 import { vrchatWorldJoinLogsFromPhoto } from '../../lib/db/schema';
 import type { WorldId } from '../vrchatLog/type';
@@ -21,29 +22,27 @@ export type VRChatWorldJoinLogFromPhotoModel =
 /**
  * 写真から抽出したワールド入室情報を保存し、新しく登録した行を返す。
  * 同じワールドの同じ時刻（一意インデックス worldInstanceId-joinDateTime-fromPhoto）は挿入しない。
+ * 衝突先を指定しない ON CONFLICT DO NOTHING にしているのは、古い DB に残る別の一意インデックスに
+ * 当たった行も、エラーにせず挿入しないため。
  */
 export const createVRChatWorldJoinLogFromPhoto = async (
   vrchatWorldJoinLogFromPhotoList: VRChatWorldJoinLogFromPhoto[],
 ): Promise<VRChatWorldJoinLogFromPhotoModel[]> => {
-  if (vrchatWorldJoinLogFromPhotoList.length === 0) {
-    return [];
-  }
-  return getDB()
-    .insert(vrchatWorldJoinLogsFromPhoto)
-    .values(
-      vrchatWorldJoinLogFromPhotoList.map((logInfo) => ({
-        joinDateTime: logInfo.joinDate,
-        worldId: logInfo.worldId,
-      })),
-    )
-    .onConflictDoNothing({
-      target: [
-        vrchatWorldJoinLogsFromPhoto.worldId,
-        vrchatWorldJoinLogsFromPhoto.joinDateTime,
-      ],
-    })
-    .returning()
-    .all();
+  return insertInChunks(
+    getDB(),
+    vrchatWorldJoinLogsFromPhoto,
+    vrchatWorldJoinLogFromPhotoList.map((logInfo) => ({
+      joinDateTime: logInfo.joinDate,
+      worldId: logInfo.worldId,
+    })),
+    (executor, rows) =>
+      executor
+        .insert(vrchatWorldJoinLogsFromPhoto)
+        .values(rows)
+        .onConflictDoNothing()
+        .returning()
+        .all(),
+  );
 };
 
 /**

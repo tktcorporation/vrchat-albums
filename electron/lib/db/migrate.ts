@@ -3,13 +3,17 @@ import type { DatabaseSync } from 'node:sqlite';
 import { getTableName } from 'drizzle-orm';
 import type { NodeSQLiteDatabase } from 'drizzle-orm/node-sqlite';
 import { migrateSync } from 'drizzle-orm/sqlite-core';
-import { Cause, Effect, Exit } from 'effect';
-import path from 'pathe';
+import { Effect } from 'effect';
 
 import { logger } from '../logger';
-import { LegacyTakeoverFailed, type LegacyTakeoverError } from './errors';
+import {
+  LegacyTakeoverFailed,
+  type LegacyTakeoverError,
+  LegacyTakeoverIncomplete,
+} from './errors';
 import {
   backupLegacyDatabase,
+  legacyBackupDir,
   listUserTables,
   reconcileLegacySchema,
 } from './legacyTakeover';
@@ -61,7 +65,7 @@ const takeOverLegacyDatabase = (props: {
     const backupPath = yield* backupLegacyDatabase({
       sqlite: props.sqlite,
       dbPath: props.dbPath,
-      backupDir: path.join(path.dirname(props.dbPath), 'backups'),
+      backupDir: legacyBackupDir(props.dbPath),
       now: new Date(),
     });
     const { applied } = yield* reconcileLegacySchema({
@@ -80,7 +84,18 @@ const takeOverLegacyDatabase = (props: {
           });
         }
       },
-    });
+    }).pipe(
+      // 複製を残せた後の失敗は、複製の場所を添えて返す。呼び出し元が DB を作り直すかを決める
+      Effect.mapError((reason) =>
+        backupPath === null
+          ? reason
+          : new LegacyTakeoverIncomplete({
+              message: `Could not take over the database; the backup is at ${backupPath}: ${reason.message}`,
+              backupPath,
+              reason,
+            }),
+      ),
+    );
     logger.info({
       message: 'Took over the database created by Sequelize',
       details: { backupPath, reconciledStatements: applied },
@@ -91,17 +106,19 @@ const takeOverLegacyDatabase = (props: {
  * 開いている DB に、処理本体へ埋め込んだマイグレーションのうち未適用のものを適用する。
  *
  * Sequelize の時代の DB は、先に `takeOverLegacyDatabase` で引き継ぐ。引き継げない DB は
- * 触らずに残し、エラーを記録して投げる（起動時の初期化が失敗として画面に出す）。
+ * 触らずに残し、エラーを返す。複製を残せた後の失敗は `LegacyTakeoverIncomplete` で返り、
+ * DB を作り直すかどうかは呼び出し元（`./client.ts` の `migrateRDBClient`）が決める。
  *
  * マイグレーションは同期で実行され、その間は処理本体のイベントループが止まる。
+ * マイグレーションの SQL の失敗は予期しないエラーとして投げる（defect）。
  */
-export const applyMigrations = async (props: {
+export const applyMigrations = (props: {
   db: NodeSQLiteDatabase;
   sqlite: DatabaseSync;
   dbPath: string;
-}): Promise<void> => {
-  const migrations = loadEmbeddedMigrations();
-  const program = Effect.gen(function* () {
+}): Effect.Effect<void, LegacyTakeoverError> =>
+  Effect.gen(function* () {
+    const migrations = loadEmbeddedMigrations();
     if (isLegacyDatabase(listUserTables(props.sqlite))) {
       yield* takeOverLegacyDatabase(props);
     }
@@ -111,14 +128,3 @@ export const applyMigrations = async (props: {
       `Database migrations applied (${migrations.length} known) in ${(performance.now() - startedAt).toFixed(0)}ms`,
     );
   });
-
-  const exit = await Effect.runPromiseExit(program);
-  if (Exit.isFailure(exit)) {
-    const error = Cause.squash(exit.cause);
-    logger.error({
-      message: 'Database migration failed',
-      stack: error instanceof Error ? error : new Error(String(error)),
-    });
-    throw error;
-  }
-};

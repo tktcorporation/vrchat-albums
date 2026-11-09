@@ -176,3 +176,30 @@ export const appTables = [
   vrchatPhotoPaths,
   vrchatPhotoMetadata,
 ] as const;
+
+/** アプリのテーブルの名前 */
+export type AppTableName = (typeof appTables)[number]['_']['name'];
+
+/**
+ * テーブルの行を、DB の外のどこから作り直せるか。
+ * - `logStore`: アプリがログを書き写して残す保存先（`<userData>/logStore`）。全件のログ同期で読み直す
+ * - `photoFolder`: 写真のフォルダ。全件の写真インデックスの作成で、ファイル名・画像・埋め込みのメタデータから読み直す
+ * - `none`: 利用者が DB にだけ書いたもので、作り直せない
+ */
+export type TableRebuildSource = 'logStore' | 'photoFolder' | 'none';
+
+/**
+ * 引き継げなかった DB を作り直してよいかを決める、テーブルごとの作り直しの元。
+ * テーブルを足したときは、ここに書くまで型エラーになる。`none` のテーブルが 1 つでもあれば、
+ * 引き継げなかった DB は作り直さずに起動を止める（`../db/client.ts` の `migrateRDBClient`）。
+ *
+ * @see electron/module/logInfo/service.ts - loadLogInfoIndexFromVRChatLog（ログ同期と写真インデックスの作成）
+ */
+export const TABLE_REBUILD_SOURCES = {
+  VRChatWorldJoinLogModels: 'logStore',
+  VRChatWorldJoinLogFromPhotoModels: 'photoFolder',
+  VRChatPlayerJoinLogModels: 'logStore',
+  VRChatPlayerLeaveLogModels: 'logStore',
+  VRChatPhotoPathModels: 'photoFolder',
+  VRChatPhotoMetadataModels: 'photoFolder',
+} as const satisfies Record<AppTableName, TableRebuildSource>;

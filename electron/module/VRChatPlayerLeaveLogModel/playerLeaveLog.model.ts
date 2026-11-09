@@ -1,3 +1,4 @@
+import { insertInChunks } from '../../lib/db/chunkedInsert';
 import { type DBExecutor, getDB } from '../../lib/db/client';
 import { vrchatPlayerLeaveLogs } from '../../lib/db/schema';
 
@@ -15,6 +16,7 @@ export type VRChatPlayerLeaveLogModel =
  *
  * 同期で実行するので、ログの一括登録のトランザクション（`logInfo/service.ts`）の中から
  * そのトランザクションを渡して呼べる。主キー以外に一意制約が無いため、重複の除去はしない。
+ * 一意制約に当たった行は、どの制約かを問わず挿入しない（ON CONFLICT DO NOTHING）。
  */
 export const insertVRChatPlayerLeaveLogs = (
   executor: DBExecutor,
@@ -24,15 +26,18 @@ export const insertVRChatPlayerLeaveLogs = (
     playerId: string | null;
   }[],
 ): VRChatPlayerLeaveLogModel[] => {
-  if (leaveLogList.length === 0) {
-    return [];
-  }
-  return executor
-    .insert(vrchatPlayerLeaveLogs)
-    .values(leaveLogList)
-    .onConflictDoNothing()
-    .returning()
-    .all();
+  return insertInChunks(
+    executor,
+    vrchatPlayerLeaveLogs,
+    leaveLogList,
+    (tx, rows) =>
+      tx
+        .insert(vrchatPlayerLeaveLogs)
+        .values(rows)
+        .onConflictDoNothing()
+        .returning()
+        .all(),
+  );
 };
 
 /** 既定の DB に `insertVRChatPlayerLeaveLogs` を実行する */

@@ -10,6 +10,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 
+import { insertInChunks } from '../../lib/db/chunkedInsert';
 import { type DBExecutor, getDB } from '../../lib/db/client';
 import { vrchatPlayerJoinLogs } from '../../lib/db/schema';
 import type { VRChatPlayerJoinLog } from '../vrchatLog/service';
@@ -28,6 +29,8 @@ export type VRChatPlayerJoinLogModel = typeof vrchatPlayerJoinLogs.$inferSelect;
  *
  * バッチ内の重複は playerName+joinDateTime キーで JS 側で除き、DB に既にある行との重複は
  * 一意インデックス（playerName-joinDateTime）に当たった行を挿入しないことで除く。
+ * 衝突先を指定しない ON CONFLICT DO NOTHING にしているのは、古い DB に残る別の一意インデックスに
+ * 当たった行も、エラーにせず挿入しないため。
  * 同期で実行するので、ログの一括登録のトランザクションの中からそのトランザクションを渡して呼べる。
  */
 export const insertVRChatPlayerJoinLogs = (
@@ -50,21 +53,14 @@ export const insertVRChatPlayerJoinLogs = (
       playerName: logInfo.playerName,
     }));
 
-  if (newLogs.length === 0) {
-    return [];
-  }
-
-  return executor
-    .insert(vrchatPlayerJoinLogs)
-    .values(newLogs)
-    .onConflictDoNothing({
-      target: [
-        vrchatPlayerJoinLogs.playerName,
-        vrchatPlayerJoinLogs.joinDateTime,
-      ],
-    })
-    .returning()
-    .all();
+  return insertInChunks(executor, vrchatPlayerJoinLogs, newLogs, (tx, rows) =>
+    tx
+      .insert(vrchatPlayerJoinLogs)
+      .values(rows)
+      .onConflictDoNothing()
+      .returning()
+      .all(),
+  );
 };
 
 /** 既定の DB に `insertVRChatPlayerJoinLogs` を実行する */

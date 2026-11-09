@@ -1,9 +1,19 @@
+import { EventEmitter } from 'node:events';
+
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TERMS_VERSION } from '../../../../src/v2/constants/terms/version';
 import * as dbClient from '../../../lib/db/client';
-import { ERROR_CODES, UserFacingError } from '../../../lib/errors';
+import {
+  LegacyDatabaseNotRebuildable,
+  LegacySchemaIrreconcilable,
+} from '../../../lib/db/errors';
+import {
+  ERROR_CATEGORIES,
+  ERROR_CODES,
+  UserFacingError,
+} from '../../../lib/errors';
 import { logger } from '../../../lib/logger';
 import {
   beginInitProgressRun,
@@ -69,7 +79,9 @@ const createRunStub = (
 });
 
 // settingsControllerから initializeAppData を取得するためのヘルパー
-async function getInitializeAppDataFunction() {
+async function getInitializeAppDataFunction(
+  eventEmitter: EventEmitter = new EventEmitter(),
+) {
   // 動的にインポートしてモック後の実装を取得
   const { settingsRouter } = await import('../settingsController');
   const router = settingsRouter();
@@ -79,11 +91,7 @@ async function getInitializeAppDataFunction() {
   // mutationを直接実行
   return async () => {
     // Callerを作成してmutationを呼び出す
-    const caller = router.createCaller({
-      eventEmitter: await import('node:events').then(
-        (m) => new m.EventEmitter(),
-      ),
-    });
+    const caller = router.createCaller({ eventEmitter });
     return caller.initializeAppData();
   };
 }
@@ -101,7 +109,9 @@ describe('settingsController.initializeAppData', () => {
     mockLogger.warnWithSentry = vi.fn();
     mockLogger.error = vi.fn();
 
-    mockDbClient.migrateRDBClient = vi.fn().mockResolvedValue(undefined);
+    mockDbClient.migrateRDBClient = vi
+      .fn()
+      .mockResolvedValue({ kind: 'migrated' });
 
     mockVrchatWorldJoinLogService.findVRChatWorldJoinLogList = vi
       .fn()
@@ -475,7 +485,7 @@ describe('settingsController.initializeAppData', () => {
     }
 
     // エラー後に再実行可能
-    mockDbClient.migrateRDBClient.mockResolvedValue(undefined);
+    mockDbClient.migrateRDBClient.mockResolvedValue({ kind: 'migrated' });
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
     }
@@ -606,6 +616,79 @@ describe('settingsController.initializeAppData', () => {
       expect.anything(),
       retryRun,
     );
+  });
+
+  describe('Sequelize の時代の DB を引き継げなかったとき', () => {
+    const reason = new LegacySchemaIrreconcilable({
+      message: 'irreconcilable',
+      issues: [
+        {
+          kind: 'COLUMN_TYPE_MISMATCH',
+          table: 'VRChatPlayerLeaveLogModels',
+          column: 'leaveDateTime',
+          expected: 'text',
+          actual: 'INTEGER',
+        },
+      ],
+    });
+    const backupPath = '/userData/backups/db-before-drizzle-x.sqlite';
+
+    it('DB を作り直したら、複製の場所を知らせて全件の同期で埋め直す', async () => {
+      mockDbClient.migrateRDBClient.mockResolvedValue({
+        kind: 'rebuilt',
+        backupPath,
+        setAsidePath: '/userData/backups/db-unrecoverable-x.sqlite',
+        reason,
+      });
+      const run = createRunStub(1);
+      vi.mocked(beginInitProgressRun).mockImplementation(() => run);
+      const eventEmitter = new EventEmitter();
+      const toasts: unknown[] = [];
+      eventEmitter.on('toast', (message: unknown) => toasts.push(message));
+
+      const initialize = await getInitializeAppDataFunction(eventEmitter);
+      await expect(initialize()).resolves.toEqual({ success: true });
+
+      expect(toasts).toEqual([expect.stringContaining(backupPath)]);
+      expect(mockSyncLogs).toHaveBeenCalledWith(
+        lockStub,
+        LOG_SYNC_MODE.FULL,
+        run,
+      );
+      // 空の DB でも初回起動として扱わない（自動起動を勝手に有効にしない）
+      expect(run.setLaunch).toHaveBeenCalledWith(
+        expect.objectContaining({ isFirstLaunch: false }),
+      );
+    });
+
+    it('作り直せないテーブルがあれば、複製の場所を含む説明で起動を止める', async () => {
+      mockDbClient.migrateRDBClient.mockRejectedValue(
+        new LegacyDatabaseNotRebuildable({
+          message: 'not rebuildable',
+          backupPath,
+          nonDerivableTables: ['UserNotes'],
+          reason,
+        }),
+      );
+
+      const initialize = await getInitializeAppDataFunction();
+      const error = await initialize().then(
+        () => null,
+        (error: unknown) => error,
+      );
+
+      const userFacing = (error as { cause?: unknown }).cause;
+      expect(userFacing).toBeInstanceOf(UserFacingError);
+      expect((userFacing as UserFacingError).errorInfo).toMatchObject({
+        code: ERROR_CODES.DATABASE_LEGACY_TAKEOVER_FAILED,
+        category: ERROR_CATEGORIES.DATABASE_ERROR,
+        userMessage: expect.stringContaining(backupPath),
+      });
+      expect((userFacing as UserFacingError).errorInfo?.userMessage).toContain(
+        'UserNotes',
+      );
+      expect(mockSyncLogs).not.toHaveBeenCalled();
+    });
   });
 });
 

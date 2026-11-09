@@ -1,5 +1,6 @@
 import { and, asc, countDistinct, desc, gt, lt } from 'drizzle-orm';
 
+import { insertInChunks } from '../../../lib/db/chunkedInsert';
 import { type DBExecutor, getDB } from '../../../lib/db/client';
 import { vrchatWorldJoinLogs } from '../../../lib/db/schema';
 import type { VRChatWorldJoinLog } from '../../vrchatLog/service';
@@ -17,34 +18,32 @@ export type VRChatWorldJoinLogModel = typeof vrchatWorldJoinLogs.$inferSelect;
  * ワールド参加ログを一括登録し、新しく登録した行を返す。
  *
  * 同じインスタンスへの同じ時刻の参加（一意インデックス worldInstanceId-joinDateTime）は挿入しない。
+ * 衝突先を指定しない ON CONFLICT DO NOTHING にしているのは、古い DB に残る別の一意インデックスに
+ * 当たった行も、エラーにせず挿入しないため。
  * 同期で実行するので、ログの一括登録のトランザクションの中からそのトランザクションを渡して呼べる。
  */
 export const insertVRChatWorldJoinLogs = (
   executor: DBExecutor,
   vrchatWorldJoinLogList: VRChatWorldJoinLog[],
 ): VRChatWorldJoinLogModel[] => {
-  if (vrchatWorldJoinLogList.length === 0) {
-    return [];
-  }
-  return executor
-    .insert(vrchatWorldJoinLogs)
-    .values(
-      vrchatWorldJoinLogList.map((logInfo) => ({
-        joinDateTime: logInfo.joinDate,
-        worldId: logInfo.worldId,
-        // VRChatWorldInstanceId はメソッドを持つクラスなので文字列を取り出す
-        worldInstanceId: logInfo.worldInstanceId.value,
-        worldName: logInfo.worldName,
-      })),
-    )
-    .onConflictDoNothing({
-      target: [
-        vrchatWorldJoinLogs.worldInstanceId,
-        vrchatWorldJoinLogs.joinDateTime,
-      ],
-    })
-    .returning()
-    .all();
+  return insertInChunks(
+    executor,
+    vrchatWorldJoinLogs,
+    vrchatWorldJoinLogList.map((logInfo) => ({
+      joinDateTime: logInfo.joinDate,
+      worldId: logInfo.worldId,
+      // VRChatWorldInstanceId はメソッドを持つクラスなので文字列を取り出す
+      worldInstanceId: logInfo.worldInstanceId.value,
+      worldName: logInfo.worldName,
+    })),
+    (tx, rows) =>
+      tx
+        .insert(vrchatWorldJoinLogs)
+        .values(rows)
+        .onConflictDoNothing()
+        .returning()
+        .all(),
+  );
 };
 
 /** 既定の DB に `insertVRChatWorldJoinLogs` を実行する。service 層から呼び出される */

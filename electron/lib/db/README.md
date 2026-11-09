@@ -10,6 +10,8 @@
 | `migrations/`       | drizzle-kit が生成したマイグレーション。処理本体のバンドルへ埋め込む（`migrations.ts`）        |
 | `migrate.ts`        | 起動時の初期化（`settingsController` の Step 1）から呼ばれ、未適用のマイグレーションを適用する |
 | `legacyTakeover.ts` | Sequelize が作った DB を、複製してから Drizzle の管理下へ引き継ぐ                              |
+| `legacyRecovery.ts` | 引き継げなかった DB を作り直してよいかの判断と、DB の退避                                      |
+| `chunkedInsert.ts`  | 複数行の INSERT を、SQLite の束縛パラメータの上限に収まる大きさに分けて実行する                |
 
 ## テーブル定義を変える
 

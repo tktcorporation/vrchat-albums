@@ -2,9 +2,11 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 
+import * as datefns from 'date-fns';
 import { drizzle } from 'drizzle-orm/node-sqlite';
+import { Cause, Effect, Exit } from 'effect';
 import path from 'pathe';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { readTableDefinitions, type TableDefinition } from './legacyTakeover';
 import { applyMigrations } from './migrate';
@@ -25,6 +27,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   for (const sqlite of openDatabases) {
     if (sqlite.isOpen) {
       sqlite.close();
@@ -44,8 +47,13 @@ const openFileDatabase = (setupSql?: string) => {
   return { sqlite, db: drizzle({ client: sqlite }), dbPath };
 };
 
-const migrate = (target: ReturnType<typeof openFileDatabase>) =>
-  applyMigrations(target);
+/** マイグレーションを適用し、失敗したらそのエラーで reject する */
+const migrate = async (target: ReturnType<typeof openFileDatabase>) => {
+  const exit = await Effect.runPromiseExit(applyMigrations(target));
+  if (Exit.isFailure(exit)) {
+    throw Cause.squash(exit.cause);
+  }
+};
 
 /** 型名の大文字小文字のように、SQLite の扱いが変わらない書き方の違いを揃えて比べる */
 const normalize = (tables: TableDefinition[]) =>
@@ -78,8 +86,21 @@ const backups = () => {
   const dir = path.join(workDir, 'backups');
   return readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .map((entry) => entry.name);
+    .map((entry) => entry.name)
+    .toSorted();
 };
+
+const openBackup = (name: string) => {
+  const backup = new DatabaseSync(path.join(workDir, 'backups', name));
+  openDatabases.push(backup);
+  return backup;
+};
+
+/** 引き継げない食い違い（leaveDateTime の型が違う）を作る */
+const MAKE_IRRECONCILABLE = `
+  DROP TABLE VRChatPlayerLeaveLogModels;
+  CREATE TABLE VRChatPlayerLeaveLogModels (id TEXT PRIMARY KEY, leaveDateTime INTEGER NOT NULL, playerName TEXT NOT NULL, playerId TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL);
+`;
 
 describe('applyMigrations', () => {
   it('空の DB に、Sequelize が作っていたものと同じテーブル定義を作る', async () => {
@@ -121,9 +142,8 @@ describe('applyMigrations', () => {
 
     // 複製には引き継ぐ前の行がある
     const [backupName] = backups();
-    expect(backupName).toMatch(/^db-before-drizzle-\d{8}T\d{6}\.sqlite$/);
-    const backup = new DatabaseSync(path.join(workDir, 'backups', backupName));
-    openDatabases.push(backup);
+    expect(backupName).toMatch(/^db-before-drizzle-\d{8}T\d{9}\.sqlite$/);
+    const backup = openBackup(backupName);
     expect(
       backup.prepare('SELECT count(*) AS n FROM VRChatPhotoPathModels').get(),
     ).toEqual({ n: 1 });
@@ -203,19 +223,23 @@ describe('applyMigrations', () => {
     const before = sqliteMaster(target.sqlite);
 
     await expect(migrate(target)).rejects.toMatchObject({
-      _tag: 'LegacySchemaIrreconcilable',
-      issues: [
-        {
-          kind: 'COLUMN_TYPE_MISMATCH',
-          table: 'VRChatPlayerLeaveLogModels',
-          column: 'leaveDateTime',
-        },
-        {
-          kind: 'EXTRA_NOT_NULL_COLUMN',
-          table: 'VRChatPlayerLeaveLogModels',
-          column: 'extra',
-        },
-      ],
+      _tag: 'LegacyTakeoverIncomplete',
+      backupPath: expect.stringContaining('db-before-drizzle-'),
+      reason: {
+        _tag: 'LegacySchemaIrreconcilable',
+        issues: [
+          {
+            kind: 'COLUMN_TYPE_MISMATCH',
+            table: 'VRChatPlayerLeaveLogModels',
+            column: 'leaveDateTime',
+          },
+          {
+            kind: 'EXTRA_NOT_NULL_COLUMN',
+            table: 'VRChatPlayerLeaveLogModels',
+            column: 'extra',
+          },
+        ],
+      },
     });
     expect(sqliteMaster(target.sqlite)).toEqual(before);
   });
@@ -232,7 +256,8 @@ describe('applyMigrations', () => {
     const before = sqliteMaster(target.sqlite);
 
     await expect(migrate(target)).rejects.toMatchObject({
-      _tag: 'LegacyTakeoverFailed',
+      _tag: 'LegacyTakeoverIncomplete',
+      reason: { _tag: 'LegacyTakeoverFailed' },
     });
     expect(sqliteMaster(target.sqlite)).toEqual(before);
   });
@@ -248,5 +273,140 @@ describe('applyMigrations', () => {
     expect(sqliteMaster(target.sqlite)).toEqual(masterAfterFirst);
     expect(appliedMigrationNames(target.sqlite)).toEqual(migrationsAfterFirst);
     expect(backups()).toHaveLength(1);
+  });
+
+  it('複製には WAL にだけある行も入る', async () => {
+    const target = openFileDatabase(SEQUELIZE_FIXTURE);
+    // 自動のチェックポイントを止め、足した行を WAL にだけ置く
+    target.sqlite.exec(`
+      PRAGMA wal_autocheckpoint=0;
+      INSERT INTO VRChatPhotoPathModels (id, photoPath, photoTakenAt, height, width, createdAt, updatedAt)
+        VALUES ('wal-only', '/p/wal.png', '2024-02-01 00:00:00.000 +00:00', 1, 1, '2024-02-01 00:00:00.000 +00:00', '2024-02-01 00:00:00.000 +00:00');
+    `);
+
+    await migrate(target);
+
+    const [backupName] = backups();
+    expect(
+      openBackup(backupName)
+        .prepare(
+          'SELECT photoPath FROM VRChatPhotoPathModels ORDER BY photoPath',
+        )
+        .all()
+        .map((row) => row.photoPath),
+    ).toEqual(['/p/a.png', '/p/wal.png']);
+  });
+
+  it('引き継ぎを終えるまで試すたびに新しい複製を作り、新しい 3 つだけを残す', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const target = openFileDatabase(SEQUELIZE_FIXTURE);
+    target.sqlite.exec(MAKE_IRRECONCILABLE);
+
+    const attempts = [
+      '2026-01-01T00:00:00.001Z',
+      '2026-01-01T00:00:00.002Z',
+      '2026-01-01T00:00:01.000Z',
+      '2026-01-02T00:00:00.000Z',
+      '2026-01-03T00:00:00.000Z',
+    ];
+    for (const [i, at] of attempts.entries()) {
+      vi.setSystemTime(new Date(at));
+      // 前の試行の後に書かれた行が、次の複製に入ることを確かめるため
+      target.sqlite.exec(
+        `INSERT INTO VRChatPlayerJoinLogModels (id, playerId, playerName, joinDateTime, createdAt, updatedAt)
+           VALUES ('attempt-${i}', NULL, 'P${i}', '2024-02-0${i + 1} 00:00:00.000 +00:00', 'x', 'x')`,
+      );
+      await expect(migrate(target)).rejects.toMatchObject({
+        _tag: 'LegacyTakeoverIncomplete',
+      });
+    }
+
+    // 古い 2 つを消し、新しい 3 つを残す
+    expect(backups()).toEqual(
+      attempts
+        .slice(-3)
+        .map(
+          (at) =>
+            `db-before-drizzle-${datefns.format(new Date(at), "yyyyMMdd'T'HHmmssSSS")}.sqlite`,
+        ),
+    );
+    // 最後の複製には、最後の試行の直前に書いた行まで入っている
+    expect(
+      openBackup(backups().at(-1) ?? '')
+        .prepare('SELECT count(*) AS n FROM VRChatPlayerJoinLogModels')
+        .get(),
+    ).toEqual({ n: 1 + attempts.length });
+  });
+
+  it('NOT NULL のはずの列が NULL 可でも、NULL の行が無ければ引き継ぐ', async () => {
+    const target = openFileDatabase(SEQUELIZE_FIXTURE);
+    target.sqlite.exec(`
+      CREATE TABLE leave_copy AS SELECT * FROM VRChatPlayerLeaveLogModels;
+      DROP TABLE VRChatPlayerLeaveLogModels;
+      CREATE TABLE VRChatPlayerLeaveLogModels (id TEXT PRIMARY KEY, leaveDateTime TEXT, playerName TEXT NOT NULL, playerId TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL);
+      INSERT INTO VRChatPlayerLeaveLogModels SELECT * FROM leave_copy;
+      DROP TABLE leave_copy;
+    `);
+
+    await migrate(target);
+
+    expect(appliedMigrationNames(target.sqlite)).toHaveLength(1);
+  });
+
+  it('NOT NULL のはずの列に NULL の行があれば、引き継げない食い違いとして止める', async () => {
+    const target = openFileDatabase(SEQUELIZE_FIXTURE);
+    target.sqlite.exec(`
+      DROP TABLE VRChatPlayerLeaveLogModels;
+      CREATE TABLE VRChatPlayerLeaveLogModels (id TEXT PRIMARY KEY, leaveDateTime TEXT, playerName TEXT NOT NULL, playerId TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL);
+      INSERT INTO VRChatPlayerLeaveLogModels VALUES ('null-row', NULL, 'Alice', NULL, 'x', 'x');
+    `);
+    const before = sqliteMaster(target.sqlite);
+
+    await expect(migrate(target)).rejects.toMatchObject({
+      _tag: 'LegacyTakeoverIncomplete',
+      reason: {
+        _tag: 'LegacySchemaIrreconcilable',
+        issues: [
+          {
+            kind: 'NULL_IN_NOT_NULL_COLUMN',
+            table: 'VRChatPlayerLeaveLogModels',
+            column: 'leaveDateTime',
+          },
+        ],
+      },
+    });
+    expect(sqliteMaster(target.sqlite)).toEqual(before);
+  });
+
+  it('知らない一意インデックスは、衝突先を指定する更新が無いテーブルなら引き継ぐ', async () => {
+    const target = openFileDatabase(SEQUELIZE_FIXTURE);
+    target.sqlite.exec(
+      'CREATE UNIQUE INDEX legacy_world_name ON VRChatWorldJoinLogModels (worldName, joinDateTime)',
+    );
+
+    await migrate(target);
+
+    expect(appliedMigrationNames(target.sqlite)).toHaveLength(1);
+  });
+
+  it('衝突先を指定して更新するテーブルに知らない一意インデックスがあれば止める', async () => {
+    const target = openFileDatabase(SEQUELIZE_FIXTURE);
+    target.sqlite.exec(
+      'CREATE UNIQUE INDEX legacy_photo_taken_at ON VRChatPhotoPathModels (photoTakenAt)',
+    );
+
+    await expect(migrate(target)).rejects.toMatchObject({
+      _tag: 'LegacyTakeoverIncomplete',
+      reason: {
+        _tag: 'LegacySchemaIrreconcilable',
+        issues: [
+          {
+            kind: 'EXTRA_UNIQUE_INDEX_ON_UPSERT_TABLE',
+            table: 'VRChatPhotoPathModels',
+            index: 'legacy_photo_taken_at',
+          },
+        ],
+      },
+    });
   });
 });

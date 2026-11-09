@@ -6,10 +6,22 @@ import {
   type NodeSQLiteDatabase,
   type NodeSQLiteTransaction,
 } from 'drizzle-orm/node-sqlite';
+import { Cause, Effect, Exit } from 'effect';
+import { match } from 'ts-pattern';
 
 import { logger } from '../logger';
+import {
+  LegacyDatabaseNotRebuildable,
+  LegacyDatabaseRebuildFailed,
+  type LegacySchemaIrreconcilable,
+  type LegacyTakeoverError,
+  type LegacyTakeoverFailed,
+  type LegacyTakeoverIncomplete,
+} from './errors';
+import { planLegacyRecovery, setAsideLegacyDatabase } from './legacyRecovery';
+import { legacyBackupDir } from './legacyTakeover';
 import { applyMigrations } from './migrate';
-import { appTables } from './schema';
+import { appTables, TABLE_REBUILD_SOURCES } from './schema';
 
 /** アプリが使う Drizzle の DB。`node:sqlite` の同期ドライバの上に作る */
 export type AppDatabase = NodeSQLiteDatabase;
@@ -102,20 +114,146 @@ export const getDB = (): AppDatabase => getRDBClient().db;
  */
 export const getRawSQLite = (): DatabaseSync => getRDBClient().sqlite;
 
-/**
- * 開いている DB に、未適用のマイグレーションを適用する。
- *
- * Sequelize の時代に作られた DB は、初回だけ複製を残してから引き継ぐ（`./legacyTakeover.ts`）。
- * 適用済みのマイグレーションは飛ばすので、起動のたびに呼んでよい。
- * 起動時の初期化（`settingsController` の Step 1）から呼ばれる。
- */
-export const migrateRDBClient = async (): Promise<void> => {
-  const client = getRDBClient();
-  await applyMigrations({
+/** `migrateRDBClient` の結果 */
+export type MigrateOutcome =
+  | { kind: 'migrated' }
+  | {
+      /**
+       * Sequelize の時代の DB を引き継げなかったので、退避して空の DB を作り直した。
+       * 行はログの保存先と写真のフォルダからの全件の同期で作り直す必要がある
+       */
+      kind: 'rebuilt';
+      /** 引き継ぐ前の DB の複製 */
+      backupPath: string;
+      /** 退避した DB 本体 */
+      setAsidePath: string;
+      reason: LegacySchemaIrreconcilable | LegacyTakeoverFailed;
+    };
+
+const applyMigrationsTo = (
+  client: RDBClient,
+): Effect.Effect<void, LegacyTakeoverError> =>
+  applyMigrations({
     db: client.db,
     sqlite: client.sqlite,
     dbPath: client.path,
   });
+
+/**
+ * 引き継げなかった DB を退避し、同じ場所に空の DB を作ってマイグレーションを適用する。
+ *
+ * どのテーブルも DB の外から作り直せる（`TABLE_REBUILD_SOURCES`）ときだけ行う。作り直さないと、
+ * 引き継ぎは起動のたびに同じところで失敗し続け、アプリを使えなくなる。行は呼び出し元が全件の
+ * ログ同期で作り直す。作り直せないテーブルがあれば、DB に触らずに `LegacyDatabaseNotRebuildable` を返す。
+ */
+const rebuildUntakeableDatabase = (
+  incomplete: LegacyTakeoverIncomplete,
+): Effect.Effect<
+  MigrateOutcome,
+  LegacyDatabaseNotRebuildable | LegacyDatabaseRebuildFailed
+> =>
+  Effect.gen(function* () {
+    const plan = planLegacyRecovery(TABLE_REBUILD_SOURCES);
+    yield* match(plan)
+      .with({ kind: 'rebuild' }, () => Effect.void)
+      .with({ kind: 'stop' }, ({ nonDerivableTables }) =>
+        Effect.fail(
+          new LegacyDatabaseNotRebuildable({
+            message: `The database cannot be rebuilt because these tables hold data that exists only in the database: ${nonDerivableTables.join(', ')}`,
+            backupPath: incomplete.backupPath,
+            nonDerivableTables,
+            reason: incomplete.reason,
+          }),
+        ),
+      )
+      .exhaustive();
+
+    const dbPath = getRDBClient().path;
+    closeRDBClient();
+    const setAsidePath = yield* setAsideLegacyDatabase({
+      dbPath,
+      backupDir: legacyBackupDir(dbPath),
+      now: new Date(),
+    }).pipe(
+      // DB を元の場所から動かせなかったなら、元の DB を開き直して接続を起動前と同じ状態に戻す
+      Effect.tapError((failed) =>
+        Effect.sync(() => {
+          if (!failed.movedMainFile) {
+            openRDBClient(dbPath);
+          }
+        }),
+      ),
+      Effect.mapError(
+        (failed) =>
+          new LegacyDatabaseRebuildFailed({
+            message: `Failed to move the database aside: ${dbPath}`,
+            backupPath: incomplete.backupPath,
+            cause: failed.cause,
+          }),
+      ),
+    );
+
+    yield* applyMigrationsTo(openRDBClient(dbPath)).pipe(
+      Effect.mapError(
+        (cause) =>
+          new LegacyDatabaseRebuildFailed({
+            message: `Failed to create a new database: ${dbPath}`,
+            backupPath: incomplete.backupPath,
+            cause,
+          }),
+      ),
+    );
+
+    logger.warnWithSentry({
+      message:
+        'Rebuilt the database because the database created by Sequelize could not be taken over',
+      stack: incomplete,
+      details: {
+        backupPath: incomplete.backupPath,
+        setAsidePath,
+        reason: incomplete.reason._tag,
+        issues: match(incomplete.reason)
+          .with({ _tag: 'LegacySchemaIrreconcilable' }, (r) => r.issues)
+          .with({ _tag: 'LegacyTakeoverFailed' }, () => [])
+          .exhaustive(),
+      },
+    });
+    return {
+      kind: 'rebuilt' as const,
+      backupPath: incomplete.backupPath,
+      setAsidePath,
+      reason: incomplete.reason,
+    };
+  });
+
+/**
+ * 開いている DB に、未適用のマイグレーションを適用する。
+ *
+ * Sequelize の時代に作られた DB は、引き継ぎを終えるまで、試すたびに複製を残してから引き継ぐ
+ * （`./legacyTakeover.ts`）。引き継げなければ `rebuildUntakeableDatabase` で作り直し、
+ * 結果の `rebuilt` で呼び出し元に全件の同期と利用者への知らせを求める。
+ * 適用済みのマイグレーションは飛ばすので、起動のたびに呼んでよい。
+ * 起動時の初期化（`settingsController` の Step 1）から呼ばれる。
+ *
+ * @throws LegacyTakeoverError | LegacyDatabaseNotRebuildable | LegacyDatabaseRebuildFailed
+ *   引き継ぎも作り直しもできなかった。DB は元のままだが、`LegacyDatabaseRebuildFailed` では
+ *   退避先（`backups`）へ移った後のことがある。その場合も次の起動は空の DB から全件の同期で埋め直す
+ */
+export const migrateRDBClient = async (): Promise<MigrateOutcome> => {
+  const program = applyMigrationsTo(getRDBClient()).pipe(
+    Effect.as<MigrateOutcome>({ kind: 'migrated' }),
+    Effect.catchTag('LegacyTakeoverIncomplete', rebuildUntakeableDatabase),
+  );
+  const exit = await Effect.runPromiseExit(program);
+  if (Exit.isFailure(exit)) {
+    const error = Cause.squash(exit.cause);
+    logger.error({
+      message: 'Database migration failed',
+      stack: error instanceof Error ? error : new Error(String(error)),
+    });
+    throw error;
+  }
+  return exit.value;
 };
 
 const assertTestEnv = (): void => {

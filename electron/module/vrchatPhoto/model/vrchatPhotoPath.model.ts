@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { insertInChunks } from '../../../lib/db/chunkedInsert';
 import { getDB } from '../../../lib/db/client';
 import { vrchatPhotoPaths } from '../../../lib/db/schema';
 
@@ -49,25 +50,29 @@ export const createOrUpdateListVRChatPhotoPath = async (
     return [];
   }
   // 同じ photoPath の行があれば撮影日時と updatedAt だけを更新する。大きさは初回の登録の値を残す
-  return getDB()
-    .insert(vrchatPhotoPaths)
-    .values(
-      attributes.map((attribute) => ({
-        photoPath: attribute.photoPath,
-        photoTakenAt: attribute.photoTakenAt,
-        width: attribute.width,
-        height: attribute.height,
-      })),
-    )
-    .onConflictDoUpdate({
-      target: vrchatPhotoPaths.photoPath,
-      set: {
-        photoTakenAt: sql`excluded.${sql.identifier('photoTakenAt')}`,
-        updatedAt: sql`excluded.${sql.identifier('updatedAt')}`,
-      },
-    })
-    .returning()
-    .all();
+  return insertInChunks(
+    getDB(),
+    vrchatPhotoPaths,
+    attributes.map((attribute) => ({
+      photoPath: attribute.photoPath,
+      photoTakenAt: attribute.photoTakenAt,
+      width: attribute.width,
+      height: attribute.height,
+    })),
+    (executor, rows) =>
+      executor
+        .insert(vrchatPhotoPaths)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: vrchatPhotoPaths.photoPath,
+          set: {
+            photoTakenAt: sql`excluded.${sql.identifier('photoTakenAt')}`,
+            updatedAt: sql`excluded.${sql.identifier('updatedAt')}`,
+          },
+        })
+        .returning()
+        .all(),
+  );
 };
 
 /**

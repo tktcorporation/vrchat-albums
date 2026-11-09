@@ -10,6 +10,7 @@
 
 import { inArray, sql } from 'drizzle-orm';
 
+import { insertInChunks } from '../../lib/db/chunkedInsert';
 import { getDB } from '../../lib/db/client';
 import { vrchatPhotoMetadata } from '../../lib/db/schema';
 
@@ -32,25 +33,27 @@ export interface VRChatPhotoMetadataCreationAttributes {
 export const createOrUpdatePhotoMetadataBatch = async (
   attributes: VRChatPhotoMetadataCreationAttributes[],
 ): Promise<VRChatPhotoMetadataModel[]> => {
-  if (attributes.length === 0) {
-    return [];
-  }
-
-  return getDB()
-    .insert(vrchatPhotoMetadata)
-    .values(attributes)
-    .onConflictDoUpdate({
-      target: vrchatPhotoMetadata.photoPath,
-      set: {
-        authorId: sql`excluded.${sql.identifier('authorId')}`,
-        authorDisplayName: sql`excluded.${sql.identifier('authorDisplayName')}`,
-        worldId: sql`excluded.${sql.identifier('worldId')}`,
-        worldDisplayName: sql`excluded.${sql.identifier('worldDisplayName')}`,
-        updatedAt: sql`excluded.${sql.identifier('updatedAt')}`,
-      },
-    })
-    .returning()
-    .all();
+  return insertInChunks(
+    getDB(),
+    vrchatPhotoMetadata,
+    attributes,
+    (executor, rows) =>
+      executor
+        .insert(vrchatPhotoMetadata)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: vrchatPhotoMetadata.photoPath,
+          set: {
+            authorId: sql`excluded.${sql.identifier('authorId')}`,
+            authorDisplayName: sql`excluded.${sql.identifier('authorDisplayName')}`,
+            worldId: sql`excluded.${sql.identifier('worldId')}`,
+            worldDisplayName: sql`excluded.${sql.identifier('worldDisplayName')}`,
+            updatedAt: sql`excluded.${sql.identifier('updatedAt')}`,
+          },
+        })
+        .returning()
+        .all(),
+  );
 };
 
 /**
