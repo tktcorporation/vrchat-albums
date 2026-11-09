@@ -77,7 +77,7 @@ vi.mock('../settingStore', async (importOriginal) => {
   };
 });
 
-import * as initRDBClient from '../../lib/sequelize';
+import * as initRDBClient from '../../lib/db/client';
 import { eventEmitter } from '../../trpc';
 import type * as SettingStoreModule from '../settingStore';
 import { initSettingStore } from '../settingStore';
@@ -100,12 +100,12 @@ describe('vrchatLogController integration test with minimal mocks', () => {
   beforeAll(async () => {
     // Initialize test database
     await initRDBClient.__initTestRDBClient();
-    await initRDBClient.__forceSyncRDBClient();
+    initRDBClient.__resetTestRDBClient();
   }, 10000);
 
   beforeEach(async () => {
     // Clean up DB before each test
-    await initRDBClient.__forceSyncRDBClient();
+    initRDBClient.__resetTestRDBClient();
 
     // Initialize settings and router
     initSettingStore();
@@ -127,7 +127,7 @@ describe('vrchatLogController integration test with minimal mocks', () => {
   });
 
   afterAll(async () => {
-    await initRDBClient.__cleanupTestRDBClient();
+    initRDBClient.__cleanupTestRDBClient();
   });
 
   // Unused function - commented out to pass linting
@@ -187,7 +187,7 @@ describe('vrchatLogController integration test with minimal mocks', () => {
     expect(exportResult.totalLogLines).toBeGreaterThan(0);
 
     // 3. Clear DB
-    await initRDBClient.__forceSyncRDBClient();
+    initRDBClient.__resetTestRDBClient();
 
     // Verify DB is empty
     const worldLogsAfterClear =

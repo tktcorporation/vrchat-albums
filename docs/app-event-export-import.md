@@ -58,7 +58,7 @@ This document describes the planned enhancement for supporting VRChat applicatio
 1. **Pattern Consistency**: All log patterns are centrally managed to prevent mismatches
 2. **Type Safety**: Uses ts-pattern for exhaustive pattern matching
 3. **TODO Implementation**: App event features are stubbed out for future implementation
-4. **No New Models**: App events will be handled without creating new Sequelize models
+4. **No New Models**: App events will be handled without creating new database tables
 
 ## Future Work
 

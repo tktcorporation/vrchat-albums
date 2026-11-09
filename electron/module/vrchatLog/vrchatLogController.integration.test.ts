@@ -241,7 +241,7 @@ vi.mock('../settingStore', async (importOriginal) => {
   };
 });
 
-import * as initRDBClient from '../../lib/sequelize';
+import * as initRDBClient from '../../lib/db/client';
 import { eventEmitter } from '../../trpc';
 import type * as SettingStoreModule from '../settingStore';
 import { initSettingStore } from '../settingStore';
@@ -445,12 +445,12 @@ describe('vrchatLogController integration - Import and Rollback', () => {
   beforeAll(async () => {
     // テスト用データベース初期化
     await initRDBClient.__initTestRDBClient();
-    await initRDBClient.__forceSyncRDBClient();
+    initRDBClient.__resetTestRDBClient();
   }, 10000);
 
   beforeEach(async () => {
     // 各テストの前にDBをクリーンアップ
-    await initRDBClient.__forceSyncRDBClient();
+    initRDBClient.__resetTestRDBClient();
 
     // バックアップ履歴をクリア
     backupHistory.length = 0;
@@ -485,7 +485,7 @@ describe('vrchatLogController integration - Import and Rollback', () => {
   });
 
   afterAll(async () => {
-    await initRDBClient.__cleanupTestRDBClient();
+    initRDBClient.__cleanupTestRDBClient();
   });
 
   const createTestLogStoreFile = async (yearMonth: string, content: string) => {
@@ -699,7 +699,7 @@ describe('vrchatLogController integration - Import and Rollback', () => {
       expect(exportResult.exportedFiles.length).toBeGreaterThan(0);
 
       // 3. DBをクリア
-      await initRDBClient.__forceSyncRDBClient();
+      initRDBClient.__resetTestRDBClient();
 
       // 4. エクスポートしたディレクトリを再インポート
       // エクスポートディレクトリのパスを取得

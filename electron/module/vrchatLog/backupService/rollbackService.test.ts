@@ -5,7 +5,6 @@ import * as path from 'node:path';
 import { Cause, Effect, Exit, Option } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import * as dbQueueModule from '../../../lib/dbQueue';
 import * as logSyncModule from '../../logSync/service';
 import { LogFilesNotFound } from '../errors';
 import * as logStorageManagerModule from '../fileHandlers/logStorageManager';
@@ -43,19 +42,6 @@ vi.mock('../../logSync/service', () => ({
     INCREMENTAL: 'incremental',
   },
   syncLogs: vi.fn(),
-}));
-
-vi.mock('../../../lib/dbQueue', () => ({
-  getDBQueue: vi.fn(() => ({
-    transaction: vi.fn((callback: (t: unknown) => Promise<unknown>) => {
-      return Effect.tryPromise({
-        try: () => callback(null),
-        catch: (e) => {
-          throw e;
-        },
-      });
-    }),
-  })),
 }));
 
 describe('rollbackService', () => {
@@ -288,47 +274,6 @@ describe('rollbackService', () => {
           );
         }
       }
-    });
-
-    it('キューがタイムアウトした場合は適切に処理される', async () => {
-      // トランザクションがTASK_TIMEOUTエラーを返すようにモック
-      vi.mocked(dbQueueModule.getDBQueue).mockReturnValueOnce({
-        transaction: vi.fn(() => {
-          return Effect.fail({
-            type: 'TASK_TIMEOUT' as const,
-            message: 'Task timeout',
-          });
-        }),
-      } as unknown as ReturnType<typeof dbQueueModule.getDBQueue>);
-
-      const exit = await Effect.runPromiseExit(
-        rollbackService.rollbackToBackup(mockBackup),
-      );
-
-      expect(Exit.isFailure(exit)).toBe(true);
-      if (Exit.isFailure(exit)) {
-        const failOpt = Cause.findErrorOption(exit.cause);
-        if (Option.isSome(failOpt)) {
-          expect(getRollbackErrorMessage(failOpt.value)).toContain(
-            'トランザクションに失敗しました',
-          );
-        }
-      }
-    });
-
-    it('予期しないエラーが発生した場合はそのままthrowされる', async () => {
-      const unexpectedError = new Error('Unexpected database error');
-      // トランザクションが予期しないエラーをthrowするようにモック
-      vi.mocked(dbQueueModule.getDBQueue).mockReturnValueOnce({
-        transaction: vi.fn(() => {
-          return Effect.die(unexpectedError);
-        }),
-      } as unknown as ReturnType<typeof dbQueueModule.getDBQueue>);
-
-      // 予期しないエラーはそのままthrowされる（Sentryに送信される）
-      await expect(
-        Effect.runPromise(rollbackService.rollbackToBackup(mockBackup)),
-      ).rejects.toThrow('Unexpected database error');
     });
   });
 

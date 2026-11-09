@@ -1,6 +1,7 @@
 import { Cause, Effect, Exit, Option, Result } from 'effect';
 import { match, P } from 'ts-pattern';
 
+import * as dbClient from '../../lib/db/client';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -8,7 +9,6 @@ import {
 } from '../../lib/errors';
 import { getHost, type HostUpdateCheckResult } from '../../lib/host';
 import { logger } from '../../lib/logger';
-import * as sequelizeClient from '../../lib/sequelize';
 import { beginInitProgressRun } from '../initProgress/emitter';
 import {
   LOG_SYNC_MODE,
@@ -87,11 +87,13 @@ const runInitializationHoldingLock = async (
   try {
     logger.info('=== Starting application data initialization ===');
 
-    // Step 1: データベース同期
+    // Step 1: データベースのマイグレーション
+    // 画面の進捗に「DB の準備」として出し、失敗は初期化の失敗として画面に出すため、処理本体の起動ではなく
+    // ここで行う。Sequelize の時代の DB の初回の引き継ぎ（複製と定義の補修）もここで走る。
     // VRChat ログディレクトリの存在確認は事前に行わず、ログ同期のエラーで判定する
-    logger.info('Step 1: Syncing database schema...');
+    logger.info('Step 1: Migrating database...');
     run.stage('database_sync', 0);
-    await sequelizeClient.syncRDBClient();
+    await dbClient.migrateRDBClient();
     run.stage('database_sync', 100);
 
     // Step 2: 初回起動判定とPhotoPath変更確認

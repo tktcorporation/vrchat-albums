@@ -139,7 +139,7 @@
 - プロジェクトでは [oxlint](https://oxc.rs/) によるリンティングと [oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) によるフォーマットを行っています。コミット前に `pnpm lint:fix` を実行して、コードスタイルを統一してください。
   主要なルールは `.oxlintrc.json` と `.oxfmtrc.json` で設定されています。
 - TypeScript の strict モードが有効になっています。
-- Sequelize モデルでは TypeScript のデコレーターが使用されています。
+- DB のテーブル定義とマイグレーションの作り方は [`electron/lib/db/README.md`](electron/lib/db/README.md) を参照してください。
 
 ## ブランチ戦略
 

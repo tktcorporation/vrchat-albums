@@ -4,10 +4,9 @@ import * as path from 'node:path';
 
 type NodeDirent = Dirent;
 
-import { Cause, Effect, Option, Result } from 'effect';
+import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
-import { getDBQueue } from '../../../lib/dbQueue';
 import { logger } from '../../../lib/logger';
 import {
   RollbackBackupDirNotFound,
@@ -16,7 +15,6 @@ import {
   RollbackNoDirsRestored,
   RollbackNoValidMonthData,
   type RollbackServiceError,
-  RollbackTransactionFailed,
 } from './errors';
 
 /**
@@ -51,10 +49,6 @@ export const getRollbackErrorMessage = (error: RollbackServiceError): string =>
     .with(
       { _tag: 'RollbackDbRebuildFailed' },
       (e) => `DB再構築に失敗しました: ${e.message}`,
-    )
-    .with(
-      { _tag: 'RollbackTransactionFailed' },
-      (e) => `トランザクションに失敗しました: ${e.message}`,
     )
     .exhaustive();
 
@@ -97,121 +91,38 @@ export class RollbackService {
     return Effect.gen({ self: this }, function* () {
       logger.info(`Starting rollback to backup: ${backup.id}`);
 
-      const dbQueue = getDBQueue();
+      const backupPath = path.join(
+        backupService.getBackupBasePath(),
+        backup.exportFolderPath,
+      );
 
-      // dbQueue.transaction returns Effect<T, DBQueueError>
-      // The inner callback is a regular async function
-      // We use a discriminated union to pass inner errors out of the transaction boundary
-      type InnerResult =
-        | { _tag: 'ok' }
-        | { _tag: 'err'; error: RollbackServiceError };
+      // logStore の入れ替えはファイルの操作だけなので、DB のトランザクションの外で行う。
+      // DB の再構築は、ログ同期（syncLogs）がログの一括登録を自分のトランザクションで書き込む
+      yield* this.validateBackupData(backupPath);
 
-      const innerResult = yield* dbQueue
-        .transaction<InnerResult>(async () => {
-          const backupPath = path.join(
-            backupService.getBackupBasePath(),
-            backup.exportFolderPath,
-          );
+      // ファイルシステムエラーは予期しないエラーとしてthrow
+      yield* Effect.promise(() => this.clearCurrentLogStore());
 
-          // 1. バックアップデータの存在確認
-          const validationExit = await Effect.runPromiseExit(
-            this.validateBackupData(backupPath),
-          );
-          if (validationExit._tag === 'Failure') {
-            const failOpt = Cause.findErrorOption(validationExit.cause);
-            if (Option.isSome(failOpt)) {
-              return { _tag: 'err' as const, error: failOpt.value };
-            }
-            // Defect - rethrow
-            const dieOpt = Result.getSuccess(
-              Cause.findDefect(validationExit.cause),
-            );
-            if (Option.isSome(dieOpt)) {
-              throw dieOpt.value;
-            }
-            throw new Error('Unknown effect failure');
-          }
+      yield* this.restoreLogStoreFromBackup(backupPath);
 
-          // 2. 現在のlogStoreをクリア
-          // ファイルシステムエラーは予期しないエラーとしてthrow
-          await this.clearCurrentLogStore();
+      yield* this.rebuildDatabaseFromLogStore();
 
-          // 3. バックアップからlogStore復帰
-          const restoreExit = await Effect.runPromiseExit(
-            this.restoreLogStoreFromBackup(backupPath),
-          );
-          if (restoreExit._tag === 'Failure') {
-            const failOpt = Cause.findErrorOption(restoreExit.cause);
-            if (Option.isSome(failOpt)) {
-              return { _tag: 'err' as const, error: failOpt.value };
-            }
-            const dieOpt = Result.getSuccess(
-              Cause.findDefect(restoreExit.cause),
-            );
-            if (Option.isSome(dieOpt)) {
-              throw dieOpt.value;
-            }
-            throw new Error('Unknown effect failure');
-          }
-
-          // 4. DBを再構築（復帰したlogStoreから）
-          const rebuildExit = await Effect.runPromiseExit(
-            this.rebuildDatabaseFromLogStore(),
-          );
-          if (rebuildExit._tag === 'Failure') {
-            const failOpt = Cause.findErrorOption(rebuildExit.cause);
-            if (Option.isSome(failOpt)) {
-              return { _tag: 'err' as const, error: failOpt.value };
-            }
-            const dieOpt = Result.getSuccess(
-              Cause.findDefect(rebuildExit.cause),
-            );
-            if (Option.isSome(dieOpt)) {
-              throw dieOpt.value;
-            }
-            throw new Error('Unknown effect failure');
-          }
-
-          // 5. バックアップ状態更新
-          backup.status = 'rolled_back';
-          const updateExit = await Effect.runPromiseExit(
-            backupService.updateBackupMetadata(backup),
-          );
-          if (updateExit._tag === 'Failure') {
-            const failOpt = Cause.findErrorOption(updateExit.cause);
-            if (Option.isSome(failOpt)) {
-              logger.warnWithSentry({
-                message: `Failed to update backup metadata after rollback: ${getBackupErrorMessage(failOpt.value)}`,
-                details: {
-                  backupId: backup.id,
-                  errorTag: failOpt.value._tag,
-                },
-              });
-            }
-            // ロールバック自体は成功しているので警告のみ
-          }
-
-          logger.info(`Rollback completed successfully: ${backup.id}`);
-          return { _tag: 'ok' as const };
-        }, 'rollbackService.rebuildFromBackup')
-        .pipe(
-          Effect.mapError((dbQueueError): RollbackServiceError =>
-            match(dbQueueError)
-              .with(
-                { type: 'QUEUE_FULL' },
-                (e) => new RollbackTransactionFailed({ message: e.message }),
-              )
-              .with(
-                { type: 'TASK_TIMEOUT' },
-                (e) => new RollbackTransactionFailed({ message: e.message }),
-              )
-              .exhaustive(),
-          ),
-        );
-
-      if (innerResult._tag === 'err') {
-        return yield* Effect.fail(innerResult.error);
+      // バックアップ状態更新。ロールバック自体は成功しているので、失敗しても警告だけ残す
+      backup.status = 'rolled_back';
+      const updateResult = yield* Effect.result(
+        backupService.updateBackupMetadata(backup),
+      );
+      if (updateResult._tag === 'Failure') {
+        logger.warnWithSentry({
+          message: `Failed to update backup metadata after rollback: ${getBackupErrorMessage(updateResult.failure)}`,
+          details: {
+            backupId: backup.id,
+            errorTag: updateResult.failure._tag,
+          },
+        });
       }
+
+      logger.info(`Rollback completed successfully: ${backup.id}`);
     });
   }
 

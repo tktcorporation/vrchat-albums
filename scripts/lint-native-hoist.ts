@@ -28,7 +28,7 @@ const require = createRequire(import.meta.url);
 
 /**
  * electron/vite.config.ts の electronExternal 配列からモジュール名を抽出する。
- * Electron API や Sequelize 等を除いた、ネイティブモジュールの候補を返す。
+ * Electron API 等を除いた、ネイティブモジュールの候補を返す。
  */
 function parseElectronExternal(): string[] {
   const configPath = path.join(ROOT, 'electron', 'vite.config.ts');

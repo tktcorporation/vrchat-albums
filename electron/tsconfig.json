@@ -11,8 +11,6 @@
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "sourceMap": true,
     "inlineSourceMap": false,
     "inlineSources": true,

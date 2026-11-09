@@ -1,16 +1,19 @@
 import { parseISO } from 'date-fns';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import * as client from '../../lib/sequelize';
+import * as client from '../../lib/db/client';
+import { vrchatWorldJoinLogsFromPhoto } from '../../lib/db/schema';
 import type { WorldId } from '../vrchatLog/type';
 import {
   createVRChatWorldJoinLogFromPhoto,
   findVRChatWorldJoinLogFromPhotoList,
 } from './service';
-import { VRChatWorldJoinLogFromPhotoModel } from './vrchatWorldJoinLogFromPhoto.model';
 
 const WORLD_A = 'wrld_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' as WorldId;
 const WORLD_B = 'wrld_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' as WorldId;
+
+const countRows = () =>
+  client.getDB().select().from(vrchatWorldJoinLogsFromPhoto).all().length;
 
 describe('vrchatWorldJoinLogFromPhoto service', () => {
   beforeAll(async () => {
@@ -18,11 +21,11 @@ describe('vrchatWorldJoinLogFromPhoto service', () => {
   }, 10000);
 
   beforeEach(async () => {
-    await client.__forceSyncRDBClient();
+    client.__resetTestRDBClient();
   });
 
   afterAll(async () => {
-    await client.__cleanupTestRDBClient();
+    client.__cleanupTestRDBClient();
   });
 
   describe('createVRChatWorldJoinLogFromPhoto', () => {
@@ -30,7 +33,7 @@ describe('vrchatWorldJoinLogFromPhoto service', () => {
       const created = await createVRChatWorldJoinLogFromPhoto([]);
 
       expect(created).toEqual([]);
-      expect(await VRChatWorldJoinLogFromPhotoModel.count()).toBe(0);
+      expect(countRows()).toBe(0);
     });
 
     it('worldId と joinDate を joinDateTime 列に対応付けて保存する', async () => {
@@ -41,7 +44,11 @@ describe('vrchatWorldJoinLogFromPhoto service', () => {
       ]);
 
       expect(created).toHaveLength(1);
-      const rows = await VRChatWorldJoinLogFromPhotoModel.findAll();
+      const rows = client
+        .getDB()
+        .select()
+        .from(vrchatWorldJoinLogsFromPhoto)
+        .all();
       expect(rows).toHaveLength(1);
       expect(rows[0].worldId).toBe(WORLD_A);
       expect(rows[0].joinDateTime.getTime()).toBe(joinDate.getTime());
@@ -74,7 +81,7 @@ describe('vrchatWorldJoinLogFromPhoto service', () => {
       await createVRChatWorldJoinLogFromPhoto([log]);
       await createVRChatWorldJoinLogFromPhoto([log]);
 
-      expect(await VRChatWorldJoinLogFromPhotoModel.count()).toBe(1);
+      expect(countRows()).toBe(1);
     });
 
     it('1 回の投入内の重複も 1 行にまとめる', async () => {
@@ -85,7 +92,7 @@ describe('vrchatWorldJoinLogFromPhoto service', () => {
         { worldId: WORLD_A, joinDate },
       ]);
 
-      expect(await VRChatWorldJoinLogFromPhotoModel.count()).toBe(1);
+      expect(countRows()).toBe(1);
     });
 
     it('同じ日時でも worldId が違えば別の行として保存する', async () => {
@@ -96,7 +103,7 @@ describe('vrchatWorldJoinLogFromPhoto service', () => {
         { worldId: WORLD_B, joinDate },
       ]);
 
-      expect(await VRChatWorldJoinLogFromPhotoModel.count()).toBe(2);
+      expect(countRows()).toBe(2);
     });
 
     it('同じ worldId でも日時が 1ms 違えば別の行として保存する', async () => {
@@ -105,7 +112,7 @@ describe('vrchatWorldJoinLogFromPhoto service', () => {
         { worldId: WORLD_A, joinDate: parseISO('2024-01-01T10:00:00.001') },
       ]);
 
-      expect(await VRChatWorldJoinLogFromPhotoModel.count()).toBe(2);
+      expect(countRows()).toBe(2);
     });
   });
 

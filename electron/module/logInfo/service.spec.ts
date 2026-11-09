@@ -2,7 +2,7 @@ import * as datefns from 'date-fns';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import * as client from '../../lib/sequelize';
+import * as client from '../../lib/db/client';
 import {
   OptionalVRChatPlayerIdSchema,
   VRChatPlayerNameSchema,
@@ -19,11 +19,11 @@ describe('logInfo service', () => {
     }, 10000);
 
     beforeEach(async () => {
-      await client.__forceSyncRDBClient();
+      client.__resetTestRDBClient();
     });
 
     afterAll(async () => {
-      await client.__cleanupTestRDBClient();
+      client.__cleanupTestRDBClient();
     });
 
     it('プレイヤー参加ログから頻度順に上位プレイヤー名を取得する', async () => {

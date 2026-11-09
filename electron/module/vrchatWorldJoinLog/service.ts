@@ -1,4 +1,3 @@
-import type { Transaction } from '@sequelize/core';
 import { Effect } from 'effect';
 
 import { type DBHelperError, enqueueTask } from '../../lib/dbHelper';
@@ -11,14 +10,9 @@ import * as model from './VRChatWorldJoinLogModel/s_model';
  */
 export const createVRChatWorldJoinLogModel = (
   vrchatWorldJoinLogList: VRChatWorldJoinLog[],
-  options?: { transaction?: Transaction },
 ): Effect.Effect<model.VRChatWorldJoinLogModel[], DBHelperError> => {
   return Effect.tryPromise({
-    try: () =>
-      model.createVRChatWorldJoinLog(
-        vrchatWorldJoinLogList,
-        options?.transaction,
-      ),
+    try: () => model.createVRChatWorldJoinLog(vrchatWorldJoinLogList),
     catch: (error): DBHelperError => ({
       type: 'BATCH_OPERATION_FAILED',
       message: `Failed to create world join logs: ${
@@ -57,7 +51,7 @@ export const findVRChatWorldJoinLogList = async ({
   ltJoinDateTime?: Date;
   orderByJoinDateTime: 'asc' | 'desc';
   limit?: number;
-}) => {
+}): Promise<VRChatWorldJoinLogWithSource[]> => {
   const modelList = await model.findVRChatWorldJoinLogList({
     gtJoinDateTime,
     ltJoinDateTime,
@@ -66,13 +60,13 @@ export const findVRChatWorldJoinLogList = async ({
   });
   return modelList.map((m) => {
     return {
-      id: m.id as string,
+      id: m.id,
       worldId: m.worldId,
       worldName: m.worldName,
       worldInstanceId: m.worldInstanceId,
       joinDateTime: m.joinDateTime,
-      createdAt: m.createdAt as Date,
-      updatedAt: m.updatedAt as Date | null,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
     };
   });
 };

@@ -11,7 +11,9 @@ const nodeBuiltins = [
 
 /**
  * Electron の main/preload で共通の外部化対象。
- * ネイティブモジュール、Electron API、Sequelize 等はバンドルせず外部化する。
+ * ネイティブモジュール、Electron API 等はバンドルせず外部化する。
+ * DB の層（drizzle-orm と Node 組み込みの node:sqlite）はネイティブモジュールを持たないので、
+ * drizzle-orm はバンドルに含め、node:sqlite は組み込みモジュールとして外部化する。
  */
 export const electronExternal = [
   // Sentry 関連のモジュール
@@ -29,17 +31,6 @@ export const electronExternal = [
   '@resvg/resvg-js',
   'clip-filepaths',
   '@vrchat-albums/exif-native',
-  // Sequelize 関連のモジュール
-  '@sequelize/core',
-  '@sequelize/core/decorators-legacy',
-  '@sequelize/sqlite3',
-  '@sequelize/mariadb',
-  '@sequelize/mssql',
-  '@sequelize/mysql',
-  '@sequelize/postgres',
-  '@sequelize/db2',
-  '@sequelize/db2-ibmi',
-  '@sequelize/snowflake',
   // Node.js の組み込みモジュールを外部化
   ...nodeBuiltins,
 ];

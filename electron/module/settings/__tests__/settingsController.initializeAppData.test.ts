@@ -2,9 +2,9 @@ import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TERMS_VERSION } from '../../../../src/v2/constants/terms/version';
+import * as dbClient from '../../../lib/db/client';
 import { ERROR_CODES, UserFacingError } from '../../../lib/errors';
 import { logger } from '../../../lib/logger';
-import * as sequelizeClient from '../../../lib/sequelize';
 import {
   beginInitProgressRun,
   type InitProgressRun,
@@ -21,7 +21,7 @@ import * as vrchatWorldJoinLogService from '../../vrchatWorldJoinLog/service';
 
 // モジュールのモック
 vi.mock('../../../lib/logger');
-vi.mock('../../../lib/sequelize');
+vi.mock('../../../lib/db/client');
 vi.mock('../../logSync/service');
 vi.mock('../../vrchatWorldJoinLog/service');
 vi.mock('../../settingStore');
@@ -37,8 +37,8 @@ const mockLogger = logger as unknown as {
   error: ReturnType<typeof vi.fn>;
 };
 
-const mockSequelizeClient = sequelizeClient as unknown as {
-  syncRDBClient: ReturnType<typeof vi.fn>;
+const mockDbClient = dbClient as unknown as {
+  migrateRDBClient: ReturnType<typeof vi.fn>;
 };
 
 const mockSyncLogs = syncLogsHoldingLock as ReturnType<typeof vi.fn>;
@@ -101,7 +101,7 @@ describe('settingsController.initializeAppData', () => {
     mockLogger.warnWithSentry = vi.fn();
     mockLogger.error = vi.fn();
 
-    mockSequelizeClient.syncRDBClient = vi.fn().mockResolvedValue(undefined);
+    mockDbClient.migrateRDBClient = vi.fn().mockResolvedValue(undefined);
 
     mockVrchatWorldJoinLogService.findVRChatWorldJoinLogList = vi
       .fn()
@@ -138,9 +138,9 @@ describe('settingsController.initializeAppData', () => {
       '=== Starting application data initialization ===',
     );
     expect(mockLogger.info).toHaveBeenCalledWith(
-      'Step 1: Syncing database schema...',
+      'Step 1: Migrating database...',
     );
-    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalled();
+    expect(mockDbClient.migrateRDBClient).toHaveBeenCalled();
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Step 2: Checking if this is first launch...',
     );
@@ -171,7 +171,7 @@ describe('settingsController.initializeAppData', () => {
     await expect(initializeAppData()).rejects.toThrow(
       '利用規約に同意してから操作してください',
     );
-    expect(mockSequelizeClient.syncRDBClient).not.toHaveBeenCalled();
+    expect(mockDbClient.migrateRDBClient).not.toHaveBeenCalled();
     expect(beginInitProgressRun).not.toHaveBeenCalled();
   });
 
@@ -187,7 +187,7 @@ describe('settingsController.initializeAppData', () => {
     await expect(initializeAppData()).rejects.toThrow(
       '利用規約に同意してから操作してください',
     );
-    expect(mockSequelizeClient.syncRDBClient).not.toHaveBeenCalled();
+    expect(mockDbClient.migrateRDBClient).not.toHaveBeenCalled();
   });
 
   it('初回起動時は FULL モードでログ同期が実行される', async () => {
@@ -356,7 +356,7 @@ describe('settingsController.initializeAppData', () => {
 
   it('データベース同期エラー時はエラーをスローする', async () => {
     // データベース同期エラー
-    mockSequelizeClient.syncRDBClient.mockRejectedValue(
+    mockDbClient.migrateRDBClient.mockRejectedValue(
       new Error('Database sync failed'),
     );
 
@@ -385,7 +385,7 @@ describe('settingsController.initializeAppData', () => {
 
   it('予期しないエラー時は適切なエラーメッセージをスローする', async () => {
     // 文字列エラー（Error オブジェクトではない）
-    mockSequelizeClient.syncRDBClient.mockRejectedValue('String error');
+    mockDbClient.migrateRDBClient.mockRejectedValue('String error');
 
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
@@ -423,7 +423,7 @@ describe('settingsController.initializeAppData', () => {
     expect(firstResult).toEqual({ success: true });
     expect(secondResult).toEqual({ success: true });
     // 初期化本体は 1 回しか走らない
-    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(1);
+    expect(mockDbClient.migrateRDBClient).toHaveBeenCalledTimes(1);
     expect(mockSyncLogs).toHaveBeenCalledTimes(1);
     expect(mockLogger.info).toHaveBeenCalledWith(
       'Initialization already in progress, joining the running initialization',
@@ -431,7 +431,7 @@ describe('settingsController.initializeAppData', () => {
   });
 
   it('実行中の初期化が失敗したら、合流した呼び出しにも同じエラーが届く', async () => {
-    mockSequelizeClient.syncRDBClient.mockRejectedValue(
+    mockDbClient.migrateRDBClient.mockRejectedValue(
       new Error('Database sync failed'),
     );
     if (!initializeAppData) {
@@ -443,7 +443,7 @@ describe('settingsController.initializeAppData', () => {
     ]);
 
     expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected']);
-    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(1);
+    expect(mockDbClient.migrateRDBClient).toHaveBeenCalledTimes(1);
   });
 
   it('正常完了後はフラグがリセットされる', async () => {
@@ -463,9 +463,7 @@ describe('settingsController.initializeAppData', () => {
 
   it('エラー発生後もフラグがリセットされる', async () => {
     // エラーを発生させる
-    mockSequelizeClient.syncRDBClient.mockRejectedValue(
-      new Error('Test error'),
-    );
+    mockDbClient.migrateRDBClient.mockRejectedValue(new Error('Test error'));
 
     try {
       if (!initializeAppData) {
@@ -477,7 +475,7 @@ describe('settingsController.initializeAppData', () => {
     }
 
     // エラー後に再実行可能
-    mockSequelizeClient.syncRDBClient.mockResolvedValue(undefined);
+    mockDbClient.migrateRDBClient.mockResolvedValue(undefined);
     if (!initializeAppData) {
       throw new Error('initializeAppData not initialized');
     }
@@ -584,7 +582,7 @@ describe('settingsController.initializeAppData', () => {
     vi.mocked(beginInitProgressRun)
       .mockReturnValueOnce(failedRun)
       .mockReturnValueOnce(retryRun);
-    mockSequelizeClient.syncRDBClient.mockRejectedValueOnce(
+    mockDbClient.migrateRDBClient.mockRejectedValueOnce(
       new Error('Database sync failed'),
     );
 
@@ -595,7 +593,7 @@ describe('settingsController.initializeAppData', () => {
     const result = await initializeAppData();
 
     expect(result).toEqual({ success: true });
-    expect(mockSequelizeClient.syncRDBClient).toHaveBeenCalledTimes(2);
+    expect(mockDbClient.migrateRDBClient).toHaveBeenCalledTimes(2);
     expect(beginInitProgressRun).toHaveBeenCalledTimes(2);
     expect(vi.mocked(failedRun.end).mock.calls).toEqual([['error']]);
     expect(vi.mocked(retryRun.end).mock.calls).toEqual([['completed']]);

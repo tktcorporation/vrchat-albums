@@ -80,15 +80,9 @@ const exitAfterFlush = async (code: number): Promise<never> => {
   process.exit(code);
 };
 
-/**
- * DB のファイルの場所。ユーザーデータのディレクトリに置く。
- * Sequelize の SQLite は区切りに `/` を使うパスを前提にするので、Windows の区切りを置き換える。
- */
+/** DB のファイルの場所。ユーザーデータのディレクトリに置く */
 const resolveDatabasePath = (info: HostInfo): string =>
-  path
-    .join(info.paths.userData, 'db.sqlite')
-    .split(path.sep)
-    .join(path.posix.sep);
+  path.join(info.paths.userData, 'db.sqlite');
 
 /** `init` を受けて、処理本体の準備を進める */
 const start = async (init: InitMessage): Promise<BackendRuntime> => {
@@ -114,9 +108,9 @@ const start = async (init: InitMessage): Promise<BackendRuntime> => {
     captureMessage,
   });
 
-  const { initRDBClient, closeRDBClient } = await import('../lib/sequelize');
+  const { initRDBClient, closeRDBClient } = await import('../lib/db/client');
   const { drainDBQueues } = await import('../lib/dbQueue');
-  await initRDBClient({ db_url: resolveDatabasePath(info) });
+  initRDBClient({ db_url: resolveDatabasePath(info) });
 
   const [{ router }, { eventEmitter }, backgroundTimer, cleanupScheduler] =
     await Promise.all([
@@ -168,7 +162,7 @@ const start = async (init: InitMessage): Promise<BackendRuntime> => {
           `DB tasks did not finish within ${String(DB_DRAIN_TIMEOUT_MS)}ms, closing the database anyway`,
         );
       }
-      await closeRDBClient();
+      closeRDBClient();
       hostRpc.dispose();
     },
   };

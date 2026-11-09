@@ -30,7 +30,7 @@ import {
   vi,
 } from 'vitest';
 
-import * as client from '../../lib/sequelize';
+import * as client from '../../lib/db/client';
 import {
   type getSettingStore,
   initSettingStoreForTest,
@@ -199,7 +199,7 @@ describeWhenProfiling('写真インデックス作成のメモリプロファイ
   }, 600000); // 10分のタイムアウト
 
   beforeEach(async () => {
-    await client.__forceSyncRDBClient();
+    client.__resetTestRDBClient();
   });
 
   afterEach(() => {
@@ -211,7 +211,7 @@ describeWhenProfiling('写真インデックス作成のメモリプロファイ
     process.env = originalEnv;
 
     // DBをクリーンアップ
-    await client.__cleanupTestRDBClient();
+    client.__cleanupTestRDBClient();
 
     // テスト用ディレクトリを削除
     if (testDir) {

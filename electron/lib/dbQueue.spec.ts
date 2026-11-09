@@ -10,24 +10,37 @@ import {
   vi,
 } from 'vitest';
 
-import DBQueue, { drainDBQueues, getDBQueue, resetDBQueue } from './dbQueue';
-import { logger } from './logger';
 import {
   __cleanupTestRDBClient,
-  __forceSyncRDBClient,
   __initTestRDBClient,
-  getRDBClient,
-} from './sequelize';
+  __resetTestRDBClient,
+  getDB,
+} from './db/client';
+import { vrchatPlayerLeaveLogs } from './db/schema';
+import DBQueue, { drainDBQueues, getDBQueue, resetDBQueue } from './dbQueue';
+import { logger } from './logger';
+
+const insertLeaveLog = (
+  tx: Parameters<Parameters<DBQueue['transaction']>[0]>[0],
+  playerName: string,
+) =>
+  tx
+    .insert(vrchatPlayerLeaveLogs)
+    .values({ leaveDateTime: new Date(), playerName, playerId: null })
+    .run();
+
+const countLeaveLogs = () =>
+  getDB().select().from(vrchatPlayerLeaveLogs).all().length;
 
 describe('DBQueue', () => {
   beforeAll(async () => {
     await __initTestRDBClient();
   }, 10000);
-  beforeEach(async () => {
-    await __forceSyncRDBClient();
+  beforeEach(() => {
+    __resetTestRDBClient();
   });
-  afterAll(async () => {
-    await __cleanupTestRDBClient();
+  afterAll(() => {
+    __cleanupTestRDBClient();
   });
 
   it('同じ設定では同じインスタンスを返すこと', () => {
@@ -167,91 +180,68 @@ describe('DBQueue', () => {
     await secondTaskPromise;
   });
 
-  it('トランザクションを使用してタスクを実行できること', async () => {
+  it('トランザクションの中の書き込みをコミットし、タスクの戻り値を返すこと', async () => {
     const queue = getDBQueue();
-    const transactionTask = vi.fn().mockResolvedValue('transaction result');
 
-    const value = await Effect.runPromise(queue.transaction(transactionTask));
+    const value = await Effect.runPromise(
+      queue.transaction((tx) => {
+        insertLeaveLog(tx, 'A');
+        insertLeaveLog(tx, 'B');
+        return 'transaction result';
+      }),
+    );
 
-    expect(transactionTask).toHaveBeenCalledTimes(1);
     expect(value).toBe('transaction result');
+    expect(countLeaveLogs()).toBe(2);
   });
 
-  it('トランザクションで予期しないエラーが発生した場合にエラーをthrowすること', async () => {
+  it('タスクが投げたらトランザクションの書き込みを巻き戻し、エラーをthrowすること', async () => {
     const queue = getDBQueue();
-    const error = new Error('Transaction error');
-    const transactionTask = vi.fn().mockRejectedValue(error);
 
     // 予期しないエラーはthrowされる（Sentryに送信される）
     await expect(
-      Effect.runPromise(queue.transaction(transactionTask)),
+      Effect.runPromise(
+        queue.transaction((tx) => {
+          insertLeaveLog(tx, 'A');
+          throw new Error('Transaction error');
+        }),
+      ),
     ).rejects.toThrow('Transaction error');
 
-    expect(transactionTask).toHaveBeenCalledTimes(1);
+    expect(countLeaveLogs()).toBe(0);
   });
 
-  it('クエリを実行できること', async () => {
+  it('クエリを実行し、行をプレーンなオブジェクトで返すこと', async () => {
     const queue = getDBQueue();
-    const mockResult = [{ name: 'test_table' }];
+    await Effect.runPromise(
+      queue.transaction((tx) => insertLeaveLog(tx, 'Alice')),
+    );
 
-    // Sequelizeのqueryメソッドをモック化
-    const originalClient = getRDBClient().__client;
-    const mockQuery = vi.fn().mockResolvedValue(mockResult);
-    getRDBClient().__client.query = mockQuery;
+    const result = await queue.query(
+      'SELECT playerName FROM VRChatPlayerLeaveLogModels',
+    );
 
-    const result = await queue.query('SELECT * FROM test_table');
-
-    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM test_table', {
-      type: 'SELECT',
-    });
-    expect(result).toEqual(mockResult);
-
-    // モックをリストア
-    getRDBClient().__client = originalClient;
+    expect(result).toEqual([{ playerName: 'Alice' }]);
+    expect(Object.getPrototypeOf(result[0])).toBe(Object.prototype);
   });
 
   it('queryWithResultでクエリを実行してEffect型で結果を返すこと', async () => {
     const queue = getDBQueue();
-    const mockResult = [{ name: 'test_table' }];
-
-    // Sequelizeのqueryメソッドをモック化
-    const originalClient = getRDBClient().__client;
-    const mockQuery = vi.fn().mockResolvedValue(mockResult);
-    getRDBClient().__client.query = mockQuery;
 
     const value = await Effect.runPromise(
-      queue.queryWithResult('SELECT * FROM test_table'),
+      queue.queryWithResult('SELECT 1 AS one'),
     );
 
-    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM test_table', {
-      type: 'SELECT',
-    });
-    expect(value).toEqual(mockResult);
-
-    // モックをリストア
-    getRDBClient().__client = originalClient;
+    expect(value).toEqual([{ one: 1 }]);
   });
 
   it('queryWithResultで予期しないエラーが発生した場合にエラーをthrowすること', async () => {
     const queue = getDBQueue();
-    const error = new Error('Query error');
-
-    // Sequelizeのqueryメソッドをモック化
-    const originalClient = getRDBClient().__client;
-    const mockQuery = vi.fn().mockRejectedValue(error);
-    getRDBClient().__client.query = mockQuery;
 
     // 予期しないエラーはthrowされる（Sentryに送信される）
     await expect(
-      Effect.runPromise(queue.queryWithResult('SELECT * FROM test_table')),
-    ).rejects.toThrow('Query error');
-
-    expect(mockQuery).toHaveBeenCalledWith('SELECT * FROM test_table', {
-      type: 'SELECT',
-    });
-
-    // モックをリストア
-    getRDBClient().__client = originalClient;
+      Effect.runPromise(queue.queryWithResult('SELECT * FROM missing_table')),
+    ).rejects.toThrow('no such table');
   });
 
   it('複数のタスクを順番に処理すること', async () => {
@@ -364,18 +354,20 @@ describe('DBQueue', () => {
       const queue = getDBQueue();
       const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
 
-      // SequelizeDatabaseError 相当: 生のドライバエラー（.code 付き）を cause に保持する
+      // Drizzle のクエリの失敗と同じ形: node:sqlite のエラー（拡張エラーコードの errcode 付き）を cause に保持する
       const driverError = Object.assign(new Error('disk I/O error'), {
-        code: 'SQLITE_IOERR',
+        code: 'ERR_SQLITE_ERROR',
+        errcode: 522, // SQLITE_IOERR_SHORT_READ
+        errstr: 'disk I/O error',
       });
-      const sequelizeLikeError = new Error('SQLITE_IOERR: disk I/O error', {
+      const drizzleLikeError = new Error('Failed query: insert ...', {
         cause: driverError,
       });
-      const task = vi.fn().mockRejectedValue(sequelizeLikeError);
+      const task = vi.fn().mockRejectedValue(drizzleLikeError);
 
       await expect(
         Effect.runPromise(queue.addWithResult(task, 'test.batchInsert')),
-      ).rejects.toThrow('SQLITE_IOERR: disk I/O error');
+      ).rejects.toThrow('Failed query');
 
       const taskLabeledCall = errorSpy.mock.calls.find(
         ([params]) => params.details?.task === 'test.batchInsert',
@@ -391,6 +383,41 @@ describe('DBQueue', () => {
           dbQueueName: 'write',
           sqliteErrorCode: 'SQLITE_IOERR',
         },
+      });
+    });
+
+    it('実際の DB のエラー（Drizzle が包んだ node:sqlite のエラー）からもエラーコードを抽出すること', async () => {
+      const queue = getDBQueue();
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      await expect(
+        Effect.runPromise(
+          queue.transaction((tx) => {
+            tx.insert(vrchatPlayerLeaveLogs)
+              .values({
+                id: 'same',
+                leaveDateTime: new Date(),
+                playerName: 'A',
+                playerId: null,
+              })
+              .run();
+            tx.insert(vrchatPlayerLeaveLogs)
+              .values({
+                id: 'same',
+                leaveDateTime: new Date(),
+                playerName: 'B',
+                playerId: null,
+              })
+              .run();
+          }, 'test.realError'),
+        ),
+      ).rejects.toThrow();
+
+      const taskLabeledCall = errorSpy.mock.calls.find(
+        ([params]) => params.details?.task === 'test.realError',
+      );
+      expect(taskLabeledCall?.[0].details).toMatchObject({
+        sqliteErrorCode: 'SQLITE_CONSTRAINT',
       });
     });
 
@@ -418,21 +445,14 @@ describe('DBQueue', () => {
       const sensitiveQuery =
         "SELECT * FROM vrchat_world_join_logs WHERE player_name = 'SecretPlayerName'";
 
-      const originalClient = getRDBClient().__client;
-      getRDBClient().__client.query = vi
-        .fn()
-        .mockRejectedValue(new Error('syntax error'));
-
       await expect(
         Effect.runPromise(queue.queryWithResult(sensitiveQuery)),
-      ).rejects.toThrow('syntax error');
+      ).rejects.toThrow('no such table');
 
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const [params] = errorSpy.mock.calls[0];
       expect(params.message).not.toContain('SecretPlayerName');
       expect(JSON.stringify(params.details)).not.toContain('SecretPlayerName');
-
-      getRDBClient().__client = originalClient;
     });
 
     it('SQLiteエラーコードを持たない予期しないエラーではsqliteErrorCodeを含めないこと', async () => {
@@ -454,13 +474,13 @@ describe('DBQueue', () => {
       );
     });
 
-    it('cause を持たずエラー自身に code がある場合もSQLiteエラーコードを抽出すること', async () => {
+    it('cause を持たずエラー自身に errcode がある場合もSQLiteエラーコードを抽出すること', async () => {
       const queue = getDBQueue();
       const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
 
       const errorWithDirectCode = Object.assign(
         new Error('SQLITE_BUSY: database is locked'),
-        { code: 'SQLITE_BUSY' },
+        { code: 'ERR_SQLITE_ERROR', errcode: 5, errstr: 'database is locked' },
       );
       const task = vi.fn().mockRejectedValue(errorWithDirectCode);
 

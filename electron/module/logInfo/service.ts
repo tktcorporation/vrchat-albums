@@ -1,11 +1,13 @@
 import { performance } from 'node:perf_hooks';
 
-import { col, fn, literal, Op } from '@sequelize/core';
 import { buildWorldSessions, resolveSession } from '@shared/worldSession';
 import * as datefns from 'date-fns';
+import { asc, count, desc, like } from 'drizzle-orm';
 import { Effect } from 'effect';
 import { match } from 'ts-pattern';
 
+import { getDB } from '../../lib/db/client';
+import { vrchatPlayerJoinLogs, vrchatWorldJoinLogs } from '../../lib/db/schema';
 import { getDBQueue } from '../../lib/dbQueue';
 import { toError } from '../../lib/errorMapping';
 import { logger } from '../../lib/logger';
@@ -24,12 +26,21 @@ import type { VRChatPhotoPathModel } from '../vrchatPhoto/model/vrchatPhotoPath.
 import * as vrchatPhotoService from '../vrchatPhoto/vrchatPhoto.service';
 import type { PhotoIndexProgress } from '../vrchatPhoto/vrchatPhoto.service';
 import * as metadataService from '../vrchatPhotoMetadata/service';
-import { VRChatPlayerJoinLogModel } from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
+import {
+  insertVRChatPlayerJoinLogs,
+  type VRChatPlayerJoinLogModel,
+} from '../VRChatPlayerJoinLogModel/playerJoinInfoLog.model';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
-import type { VRChatPlayerLeaveLogModel } from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
+import {
+  insertVRChatPlayerLeaveLogs,
+  type VRChatPlayerLeaveLogModel,
+} from '../VRChatPlayerLeaveLogModel/playerLeaveLog.model';
 import * as playerLeaveLogService from '../VRChatPlayerLeaveLogModel/playerLeaveLog.service';
 import * as worldJoinLogService from '../vrchatWorldJoinLog/service';
-import { VRChatWorldJoinLogModel } from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
+import {
+  insertVRChatWorldJoinLogs,
+  type VRChatWorldJoinLogModel,
+} from '../vrchatWorldJoinLog/VRChatWorldJoinLogModel/s_model';
 import { findVRChatWorldJoinLogFromPhotoList } from '../vrchatWorldJoinLogFromPhoto/service';
 import { LogInfoError } from './error';
 import { type LogInfoServiceError, LogInfoUnknownError } from './errors';
@@ -528,10 +539,12 @@ export function loadLogInfoIndexFromVRChatLog({
     reportLogsInserted(0);
 
     // DB Queue の transaction() を使い、書き込みをキュー経由でシリアライズする。
-    // Sequelize の managed transaction により自動 commit/rollback される。
+    // トランザクションのコールバックは同期で、途中で例外が出れば全バッチを巻き戻す。
+    // 同期で書き込むので、書き込みの間は進捗の送信が処理本体のイベントループで止まり、
+    // コミットの後でまとめて届く。
     // DBQueueError は予期しないエラー（DB接続断等）なので defect として Sentry に送信する。
     yield* getDBQueue()
-      .transaction(async (transaction) => {
+      .transaction((tx) => {
         for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
           const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
           const batch = newLogs.slice(i, i + BATCH_SIZE);
@@ -546,33 +559,23 @@ export function loadLogInfoIndexFromVRChatLog({
             (log): log is VRChatPlayerLeaveLog => log.logType === 'playerLeave',
           );
 
-          // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
-          const worldJoinResults = await Effect.runPromise(
-            worldJoinLogService
-              .createVRChatWorldJoinLogModel(worldJoinLogBatch, { transaction })
-              .pipe(Effect.mapError(toError)),
+          results.createdWorldJoinLogModelList.push(
+            ...insertVRChatWorldJoinLogs(tx, worldJoinLogBatch),
           );
-          const playerJoinResults = await Effect.runPromise(
-            playerJoinLogService.createVRChatPlayerJoinLogModel(
-              playerJoinLogBatch,
-              { transaction },
-            ),
+          results.createdPlayerJoinLogModelList.push(
+            ...insertVRChatPlayerJoinLogs(tx, playerJoinLogBatch),
           );
-          const playerLeaveResults =
-            await playerLeaveLogService.createVRChatPlayerLeaveLogModel(
+          results.createdPlayerLeaveLogModelList.push(
+            ...insertVRChatPlayerLeaveLogs(
+              tx,
               playerLeaveLogBatch.map((logInfo) => ({
-                leaveDate: logInfo.leaveDate,
+                leaveDateTime: logInfo.leaveDate,
                 playerName: logInfo.playerName,
                 playerId: logInfo.playerId ?? null,
               })),
-              { transaction },
-            );
+            ),
+          );
 
-          results.createdWorldJoinLogModelList.push(...worldJoinResults);
-          results.createdPlayerJoinLogModelList.push(...playerJoinResults);
-          results.createdPlayerLeaveLogModelList.push(...playerLeaveResults);
-
-          // 進捗をUIプログレスバーに反映（毎バッチ）
           reportLogsInserted(i + batch.length);
           logger.debug(`log batch inserted: ${batchNumber}/${totalBatches}`);
         }
@@ -687,17 +690,14 @@ export const getWorldNameSuggestions = (
 ): Effect.Effect<string[]> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   return Effect.promise(async () => {
-    const worldJoinLogs = await VRChatWorldJoinLogModel.findAll({
-      attributes: ['worldName'],
-      where: {
-        worldName: {
-          [Op.like]: `%${query}%`,
-        },
-      },
-      group: ['worldName'],
-      order: [['worldName', 'ASC']],
-      limit,
-    });
+    const worldJoinLogs = getDB()
+      .select({ worldName: vrchatWorldJoinLogs.worldName })
+      .from(vrchatWorldJoinLogs)
+      .where(like(vrchatWorldJoinLogs.worldName, `%${query}%`))
+      .groupBy(vrchatWorldJoinLogs.worldName)
+      .orderBy(asc(vrchatWorldJoinLogs.worldName))
+      .limit(limit)
+      .all();
 
     return worldJoinLogs.map((log) => log.worldName);
   });
@@ -715,17 +715,14 @@ export const getPlayerNameSuggestions = (
 ): Effect.Effect<string[]> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   return Effect.promise(async () => {
-    const playerJoinLogs = await VRChatPlayerJoinLogModel.findAll({
-      attributes: ['playerName'],
-      where: {
-        playerName: {
-          [Op.like]: `%${query}%`,
-        },
-      },
-      group: ['playerName'],
-      order: [['playerName', 'ASC']],
-      limit,
-    });
+    const playerJoinLogs = getDB()
+      .select({ playerName: vrchatPlayerJoinLogs.playerName })
+      .from(vrchatPlayerJoinLogs)
+      .where(like(vrchatPlayerJoinLogs.playerName, `%${query}%`))
+      .groupBy(vrchatPlayerJoinLogs.playerName)
+      .orderBy(asc(vrchatPlayerJoinLogs.playerName))
+      .limit(limit)
+      .all();
 
     return playerJoinLogs.map((log) => log.playerName);
   });
@@ -741,12 +738,13 @@ export const getFrequentPlayerNames = (
 ): Effect.Effect<string[]> => {
   // データベースエラーは予期しないエラーなので、try-catchせずに上位に伝播
   return Effect.promise(async () => {
-    const playerCounts = await VRChatPlayerJoinLogModel.findAll({
-      attributes: ['playerName', [fn('COUNT', col('playerName')), 'count']],
-      group: ['playerName'],
-      order: [[literal('count'), 'DESC']],
-      limit,
-    });
+    const playerCounts = getDB()
+      .select({ playerName: vrchatPlayerJoinLogs.playerName })
+      .from(vrchatPlayerJoinLogs)
+      .groupBy(vrchatPlayerJoinLogs.playerName)
+      .orderBy(desc(count(vrchatPlayerJoinLogs.playerName)))
+      .limit(limit)
+      .all();
 
     return playerCounts.map((player) => player.playerName);
   });
@@ -837,17 +835,14 @@ export const searchSessionsByPlayerName = (
 
     // データベースエラーは予期しないエラーなので defect として上位に伝播
     // プレイヤー名で部分一致検索（大文字小文字を区別しない）
-    const playerJoinLogs = yield* Effect.promise(() =>
-      VRChatPlayerJoinLogModel.findAll({
-        attributes: ['joinDateTime'],
-        where: {
-          playerName: {
-            [Op.like]: `%${playerName}%`,
-          },
-        },
-        order: [['joinDateTime', 'DESC']],
-        limit,
-      }),
+    const playerJoinLogs = yield* Effect.sync(() =>
+      getDB()
+        .select({ joinDateTime: vrchatPlayerJoinLogs.joinDateTime })
+        .from(vrchatPlayerJoinLogs)
+        .where(like(vrchatPlayerJoinLogs.playerName, `%${playerName}%`))
+        .orderBy(desc(vrchatPlayerJoinLogs.joinDateTime))
+        .limit(limit)
+        .all(),
     );
 
     if (playerJoinLogs.length === 0) {

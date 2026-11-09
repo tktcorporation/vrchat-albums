@@ -97,14 +97,14 @@ vi.mock('../vrchatPhotoMetadata/service', () => ({
 }));
 
 // getDBQueue のモック: DB Queue のトランザクション管理をスタブ化
-// transaction() は callback に Transaction を渡して実行し、Effect でラップして返す
+// transaction() は同期の callback にトランザクションの代わりの値を渡して実行し、Effect でラップして返す。
+// 登録するログが無いテストだけなので、callback がトランザクションを使うことは無い
 vi.mock('../../lib/dbQueue', () => ({
   getDBQueue: vi.fn().mockReturnValue({
     transaction: vi
       .fn()
-      .mockImplementation((callback: (tx: unknown) => Promise<unknown>) => {
-        // モックトランザクションオブジェクトで callback を実行し、結果を Effect.tryPromise でラップ
-        return Effect.tryPromise({
+      .mockImplementation((callback: (tx: unknown) => unknown) => {
+        return Effect.try({
           try: () => callback({}),
           catch: (e) => ({ type: 'TASK_TIMEOUT' as const, message: String(e) }),
         });

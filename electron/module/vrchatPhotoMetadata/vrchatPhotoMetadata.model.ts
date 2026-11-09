@@ -1,5 +1,5 @@
 /**
- * VRChat 写真メタデータの DB モデル
+ * VRChat 写真メタデータの DB 操作
  *
  * VRChat公式 (2025.3.1以降) が XMP で写真に埋め込むメタデータを永続化する。
  * VRChatPhotoPathModel と photoPath で 1:1 の関係。
@@ -8,69 +8,12 @@
  * @see electron/module/vrchatPhotoMetadata/parser.ts - メタデータの抽出・パース処理
  */
 
-import {
-  type CreationOptional,
-  DataTypes,
-  type InferAttributes,
-  type InferCreationAttributes,
-  Model,
-  Op,
-} from '@sequelize/core';
-import {
-  Attribute,
-  Default,
-  Index,
-  NotNull,
-  PrimaryKey,
-  Table,
-} from '@sequelize/core/decorators-legacy';
-import { uuidv7 } from 'uuidv7';
+import { inArray, sql } from 'drizzle-orm';
 
-@Table({ tableName: 'VRChatPhotoMetadataModels' })
-export class VRChatPhotoMetadataModel extends Model<
-  InferAttributes<VRChatPhotoMetadataModel>,
-  InferCreationAttributes<VRChatPhotoMetadataModel>
-> {
-  @Attribute(DataTypes.UUID)
-  @PrimaryKey
-  @Default(uuidv7)
-  declare id: CreationOptional<string>;
+import { getDB } from '../../lib/db/client';
+import { vrchatPhotoMetadata } from '../../lib/db/schema';
 
-  /** 写真ファイルのパス (VRChatPhotoPathModel.photoPath と対応) */
-  @Attribute(DataTypes.STRING)
-  @NotNull
-  @Index({ unique: true })
-  declare photoPath: string;
-
-  /** 撮影者のVRChatユーザーID (usr_xxx) — メタデータがある = AuthorID が存在する */
-  @Attribute(DataTypes.STRING)
-  @NotNull
-  declare authorId: string;
-
-  /** 撮影者の表示名 — Author フィールドがない場合は authorId がフォールバック値として入る */
-  @Attribute(DataTypes.STRING)
-  @NotNull
-  declare authorDisplayName: string;
-
-  /** ワールドID (wrld_xxx) */
-  @Attribute(DataTypes.STRING)
-  @Index
-  declare worldId: string | null;
-
-  /** ワールドの表示名 */
-  @Attribute(DataTypes.STRING)
-  declare worldDisplayName: string | null;
-
-  @Attribute(DataTypes.DATE)
-  @Default(DataTypes.NOW)
-  declare createdAt: CreationOptional<Date>;
-
-  declare updatedAt: CreationOptional<Date>;
-}
-
-// ============================================================================
-// モデル操作関数
-// ============================================================================
+export type VRChatPhotoMetadataModel = typeof vrchatPhotoMetadata.$inferSelect;
 
 export interface VRChatPhotoMetadataCreationAttributes {
   photoPath: string;
@@ -83,7 +26,7 @@ export interface VRChatPhotoMetadataCreationAttributes {
 /**
  * メタデータレコードを一括で登録・更新する
  *
- * 同じ photoPath のレコードが既に存在する場合は更新する。
+ * 同じ photoPath のレコードが既に存在する場合は、メタデータの列と updatedAt を更新する。
  * 写真インデックス作成時にバッチで呼び出される。
  */
 export const createOrUpdatePhotoMetadataBatch = async (
@@ -93,20 +36,27 @@ export const createOrUpdatePhotoMetadataBatch = async (
     return [];
   }
 
-  return VRChatPhotoMetadataModel.bulkCreate(attributes, {
-    updateOnDuplicate: [
-      'authorId',
-      'authorDisplayName',
-      'worldId',
-      'worldDisplayName',
-    ],
-  });
+  return getDB()
+    .insert(vrchatPhotoMetadata)
+    .values(attributes)
+    .onConflictDoUpdate({
+      target: vrchatPhotoMetadata.photoPath,
+      set: {
+        authorId: sql`excluded.${sql.identifier('authorId')}`,
+        authorDisplayName: sql`excluded.${sql.identifier('authorDisplayName')}`,
+        worldId: sql`excluded.${sql.identifier('worldId')}`,
+        worldDisplayName: sql`excluded.${sql.identifier('worldDisplayName')}`,
+        updatedAt: sql`excluded.${sql.identifier('updatedAt')}`,
+      },
+    })
+    .returning()
+    .all();
 };
 
 /**
  * 入力パスのうち、まだメタデータが存在しないパスだけを返す
  *
- * SQL の NOT IN でフィルタするため、全件をメモリにロードしない。
+ * SQL の IN でフィルタするため、全件をメモリにロードしない。
  * SQLite のパラメータ上限を避けるためチャンク分割する。
  *
  * 呼び出し元: service.extractAndSaveMetadataBatch（差分処理）
@@ -123,11 +73,11 @@ export const filterPathsWithoutMetadata = async (
   const existingPaths = new Set<string>();
   for (let i = 0; i < photoPaths.length; i += CHUNK_SIZE) {
     const chunk = photoPaths.slice(i, i + CHUNK_SIZE);
-    const records = await VRChatPhotoMetadataModel.findAll({
-      attributes: ['photoPath'],
-      where: { photoPath: { [Op.in]: chunk } },
-      raw: true,
-    });
+    const records = getDB()
+      .select({ photoPath: vrchatPhotoMetadata.photoPath })
+      .from(vrchatPhotoMetadata)
+      .where(inArray(vrchatPhotoMetadata.photoPath, chunk))
+      .all();
     for (const r of records) {
       existingPaths.add(r.photoPath);
     }

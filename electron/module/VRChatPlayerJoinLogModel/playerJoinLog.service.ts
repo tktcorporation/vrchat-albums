@@ -1,4 +1,3 @@
-import type { Transaction } from '@sequelize/core';
 import { Effect } from 'effect';
 
 import { enqueueTask } from '../../lib/dbHelper';
@@ -13,19 +12,16 @@ import * as model from './playerJoinInfoLog.model';
 /**
  * VRChatのプレイヤー参加ログを作成する
  * @param playerJoinLogList プレイヤー参加ログのリスト
- * @param options.transaction 外部トランザクション（バッチ挿入の一括コミット用）
- * @returns 作成されたプレイヤー参加ログのリスト
+ * @returns 新しく登録したプレイヤー参加ログのリスト（既にあった行は含まない）
  */
 export const createVRChatPlayerJoinLogModel = (
   playerJoinLogList: VRChatPlayerJoinLog[],
-  options?: { transaction?: Transaction },
 ): Effect.Effect<
   model.VRChatPlayerJoinLogModel[],
   PlayerJoinLogServiceError
 > => {
   return Effect.tryPromise({
-    try: () =>
-      model.createVRChatPlayerJoinLog(playerJoinLogList, options?.transaction),
+    try: () => model.createVRChatPlayerJoinLog(playerJoinLogList),
     catch: (e) =>
       new PlayerJoinLogDatabaseError({
         message: `プレイヤー参加ログの作成に失敗しました: ${

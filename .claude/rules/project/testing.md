@@ -21,15 +21,17 @@ Vitest を使用したユニットテストと Playwright を使用した E2E �
 ```typescript
 describe('service with database', () => {
   beforeAll(async () => {
-    client.__initTestRDBClient();
+    // メモリ上の DB を開き、マイグレーションを適用する
+    await client.__initTestRDBClient();
   }, 10000);
 
-  beforeEach(async () => {
-    await client.__forceSyncRDBClient();
+  beforeEach(() => {
+    // アプリのテーブルを空にする
+    client.__resetTestRDBClient();
   });
 
-  afterAll(async () => {
-    await client.__cleanupTestRDBClient();
+  afterAll(() => {
+    client.__cleanupTestRDBClient();
   });
 
   it('test case', async () => {
@@ -38,6 +40,8 @@ describe('service with database', () => {
   });
 });
 ```
+
+`client` は `electron/lib/db/client.ts`。
 
 **参考**: `electron/module/logInfo/service.spec.ts`
 
