@@ -577,7 +577,11 @@ export const reconcileLegacySchema = (props: {
     }).pipe(
       Effect.tapError(() =>
         Effect.sync(() => {
-          props.sqlite.exec('ROLLBACK');
+          // SQLITE_FULL・SQLITE_IOERR などでは SQLite が自分で巻き戻し済みで、
+          // 重ねて ROLLBACK すると失敗して元のエラーを隠すため、開いているときだけ巻き戻す。
+          if (props.sqlite.isTransaction) {
+            props.sqlite.exec('ROLLBACK');
+          }
         }),
       ),
     );
