@@ -267,9 +267,10 @@ describe('applyMigrations', () => {
     expect(sqliteMaster(target.sqlite)).toEqual(before);
   });
 
-  it('補修の途中でディスクが足りなくなったら、その理由のまま失敗し、DB を元のままにする', async () => {
+  it('補修の途中でディスクが足りなくなったら、開いたままのトランザクションを巻き戻し、その理由のまま失敗する', async () => {
     const target = openFileDatabase(SEQUELIZE_FIXTURE);
-    // 空きページを詰めてから上限を今の大きさに固定し、インデックスを足す書き込みを SQLITE_FULL にする
+    // 空きページを詰めてから上限を今の大きさに固定し、インデックスを足す書き込みを SQLITE_FULL にする。
+    // このとき SQLite は失敗した文だけを巻き戻し、トランザクションは開いたまま残る
     target.sqlite.exec(`
       DROP INDEX \`world-joinDateTime-idx\`;
       VACUUM;
