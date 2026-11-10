@@ -8,8 +8,13 @@ import { Cause, Effect, Exit } from 'effect';
 import path from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { readTableDefinitions, type TableDefinition } from './legacyTakeover';
+import {
+  readTableDefinitions,
+  reconcileLegacySchema,
+  type TableDefinition,
+} from './legacyTakeover';
 import { applyMigrations } from './migrate';
+import { loadEmbeddedMigrations } from './migrations';
 import { vrchatPhotoPaths } from './schema';
 
 /** アプリのバージョン 0.31.6 が作った DB（行を含む）。既存の DB の基準 */
@@ -258,6 +263,55 @@ describe('applyMigrations', () => {
     await expect(migrate(target)).rejects.toMatchObject({
       _tag: 'LegacyTakeoverIncomplete',
       reason: { _tag: 'LegacyTakeoverFailed' },
+    });
+    expect(sqliteMaster(target.sqlite)).toEqual(before);
+  });
+
+  it('補修の途中でディスクが足りなくなったら、その理由のまま失敗し、DB を元のままにする', async () => {
+    const target = openFileDatabase(SEQUELIZE_FIXTURE);
+    // 空きページを詰めてから上限を今の大きさに固定し、インデックスを足す書き込みを SQLITE_FULL にする
+    target.sqlite.exec(`
+      DROP INDEX \`world-joinDateTime-idx\`;
+      VACUUM;
+    `);
+    const pageCount = Number(
+      target.sqlite.prepare('PRAGMA page_count').get()?.page_count,
+    );
+    target.sqlite.exec(`PRAGMA max_page_count=${pageCount}`);
+    const before = sqliteMaster(target.sqlite);
+
+    await expect(migrate(target)).rejects.toMatchObject({
+      _tag: 'LegacyTakeoverIncomplete',
+      reason: {
+        _tag: 'LegacyTakeoverFailed',
+        message: expect.stringContaining('database or disk is full'),
+      },
+    });
+    expect(target.sqlite.isTransaction).toBe(false);
+    expect(sqliteMaster(target.sqlite)).toEqual(before);
+  });
+
+  it('SQLite がトランザクションを巻き戻し済みでも、元の失敗を返す', async () => {
+    const target = openFileDatabase(SEQUELIZE_FIXTURE);
+    target.sqlite.exec('DROP INDEX `world-joinDateTime-idx`');
+    const before = sqliteMaster(target.sqlite);
+    // SQLITE_IOERR などで SQLite がトランザクションごと巻き戻した状態を作る
+    const markBaselineApplied = () => {
+      target.sqlite.exec('ROLLBACK');
+      throw new Error('disk I/O error');
+    };
+
+    const exit = await Effect.runPromiseExit(
+      reconcileLegacySchema({
+        sqlite: target.sqlite,
+        baselineStatements: loadEmbeddedMigrations()[0]?.sql ?? [],
+        markBaselineApplied,
+      }),
+    );
+
+    expect(Exit.isFailure(exit) && Cause.squash(exit.cause)).toMatchObject({
+      _tag: 'LegacyTakeoverFailed',
+      message: expect.stringContaining('disk I/O error'),
     });
     expect(sqliteMaster(target.sqlite)).toEqual(before);
   });
