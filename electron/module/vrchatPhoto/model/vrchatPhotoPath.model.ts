@@ -1,70 +1,36 @@
-import {
-  col,
-  type CreationOptional,
-  DataTypes,
-  fn,
-  type InferAttributes,
-  type InferCreationAttributes,
-  literal,
-  Model,
-  Op,
-} from '@sequelize/core';
-import {
-  Attribute,
-  Default,
-  Index,
-  NotNull,
-  PrimaryKey,
-  Table,
-} from '@sequelize/core/decorators-legacy';
-import { uuidv7 } from 'uuidv7';
+import { and, asc, count, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
-@Table({ tableName: 'VRChatPhotoPathModels' })
+import { insertInChunks } from '../../../lib/db/chunkedInsert';
+import { getDB } from '../../../lib/db/client';
+import { vrchatPhotoPaths } from '../../../lib/db/schema';
+
 /**
- * VRChat写真のパスとメタデータを管理するモデル。
+ * VRChat 写真のパス・撮影日時・大きさの行。
  *
  * @see docs/photo-grouping-logic.md - 写真グループ化ロジック
  * @see VRChatWorldJoinLogModel - ワールド参加ログとの関連
  */
-export class VRChatPhotoPathModel extends Model<
-  InferAttributes<VRChatPhotoPathModel>,
-  InferCreationAttributes<VRChatPhotoPathModel>
-> {
-  @Attribute(DataTypes.UUID)
-  @PrimaryKey
-  @Default(uuidv7)
-  declare id: CreationOptional<string>;
+export type VRChatPhotoPathModel = typeof vrchatPhotoPaths.$inferSelect;
 
-  // TODO: world id をここに入れる必要はある？
-  // もしくは join log に紐づける？
+/** 撮影日時の範囲の条件。境界はどちらも含まない */
+const photoTakenAtBetween = (query?: {
+  gtPhotoTakenAt?: Date;
+  ltPhotoTakenAt?: Date;
+}) =>
+  and(
+    query?.gtPhotoTakenAt
+      ? gt(vrchatPhotoPaths.photoTakenAt, query.gtPhotoTakenAt)
+      : undefined,
+    query?.ltPhotoTakenAt
+      ? lt(vrchatPhotoPaths.photoTakenAt, query.ltPhotoTakenAt)
+      : undefined,
+  );
 
-  @Attribute(DataTypes.STRING)
-  @NotNull
-  @Index({ unique: true })
-  declare photoPath: string;
-
-  @Attribute(DataTypes.DATE)
-  @NotNull
-  declare photoTakenAt: Date;
-
-  // 縦横比
-  @Attribute(DataTypes.INTEGER)
-  @NotNull
-  @Default(720)
-  declare height: number;
-
-  @Attribute(DataTypes.INTEGER)
-  @NotNull
-  @Default(1280)
-  declare width: number;
-
-  // declare fileCreatedAt: Date;
-  @Attribute(DataTypes.DATE)
-  @Default(DataTypes.NOW)
-  declare createdAt: CreationOptional<Date>;
-  declare updatedAt: CreationOptional<Date>;
-}
+const photoTakenAtOrder = (order: 'asc' | 'desc' | undefined) =>
+  order === 'desc'
+    ? desc(vrchatPhotoPaths.photoTakenAt)
+    : asc(vrchatPhotoPaths.photoTakenAt);
 
 interface VRChatPhotoPathCreationAttributes {
   photoPath: string;
@@ -80,19 +46,33 @@ interface VRChatPhotoPathCreationAttributes {
 export const createOrUpdateListVRChatPhotoPath = async (
   attributes: VRChatPhotoPathCreationAttributes[],
 ): Promise<VRChatPhotoPathModel[]> => {
-  const result = await VRChatPhotoPathModel.bulkCreate(
+  if (attributes.length === 0) {
+    return [];
+  }
+  // 同じ photoPath の行があれば撮影日時と updatedAt だけを更新する。大きさは初回の登録の値を残す
+  return insertInChunks(
+    getDB(),
+    vrchatPhotoPaths,
     attributes.map((attribute) => ({
       photoPath: attribute.photoPath,
       photoTakenAt: attribute.photoTakenAt,
       width: attribute.width,
       height: attribute.height,
     })),
-    {
-      updateOnDuplicate: ['photoPath', 'photoTakenAt'], // 更新するフィールドを指定
-    },
+    (executor, rows) =>
+      executor
+        .insert(vrchatPhotoPaths)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: vrchatPhotoPaths.photoPath,
+          set: {
+            photoTakenAt: sql`excluded.${sql.identifier('photoTakenAt')}`,
+            updatedAt: sql`excluded.${sql.identifier('updatedAt')}`,
+          },
+        })
+        .returning()
+        .all(),
   );
-
-  return result;
 };
 
 /**
@@ -113,20 +93,23 @@ export const getVRChatPhotoPathList = async (query?: {
   limit?: number;
   offset?: number;
 }): Promise<VRChatPhotoPathModel[]> => {
-  const photoPathList = await VRChatPhotoPathModel.findAll({
-    where: {
-      photoTakenAt: {
-        ...(query?.gtPhotoTakenAt && { [Op.gt]: query.gtPhotoTakenAt }),
-        ...(query?.ltPhotoTakenAt && { [Op.lt]: query.ltPhotoTakenAt }),
-      },
-    },
-    order: [['photoTakenAt', query?.orderByPhotoTakenAt ?? 'asc']],
-    // limit が明示的に指定された場合のみ適用（デフォルトは全件取得）
-    ...(query?.limit !== undefined && { limit: query.limit }),
-    ...(query?.offset !== undefined && { offset: query.offset }),
-  });
-
-  return photoPathList;
+  const select = getDB()
+    .select()
+    .from(vrchatPhotoPaths)
+    .where(photoTakenAtBetween(query))
+    .orderBy(photoTakenAtOrder(query?.orderByPhotoTakenAt))
+    .$dynamic();
+  // limit が明示的に指定された場合のみ適用（デフォルトは全件取得）
+  const limited =
+    query?.limit === undefined ? select : select.limit(query.limit);
+  const paged =
+    query?.offset === undefined
+      ? limited
+      : // SQLite は LIMIT の無い OFFSET を受け付けないため、limit が無ければ上限なし（-1）を付ける
+        (query.limit === undefined ? limited.limit(-1) : limited).offset(
+          query.offset,
+        );
+  return paged.all();
 };
 
 /**
@@ -135,19 +118,26 @@ export const getVRChatPhotoPathList = async (query?: {
 export const getVRChatPhotoPathByPhotoPath = async (
   photoPath: string,
 ): Promise<VRChatPhotoPathModel | null> => {
-  return VRChatPhotoPathModel.findOne({
-    where: { photoPath },
-  });
+  return (
+    getDB()
+      .select()
+      .from(vrchatPhotoPaths)
+      .where(eq(vrchatPhotoPaths.photoPath, photoPath))
+      .get() ?? null
+  );
 };
 
 /**
- * モデルインスタンスを削除する
+ * 行を削除する
  * validateVRChatPhotoPathModel から利用される
  */
 export const deleteVRChatPhotoPathModel = async (
   photoPathModel: VRChatPhotoPathModel,
 ): Promise<void> => {
-  await photoPathModel.destroy();
+  getDB()
+    .delete(vrchatPhotoPaths)
+    .where(eq(vrchatPhotoPaths.id, photoPathModel.id))
+    .run();
 };
 
 const PhotoCountPerMonthRowSchema = z.object({
@@ -165,15 +155,13 @@ const PhotoCountPerMonthRowSchema = z.object({
 export const getPhotoCountPerLocalMonth = async (): Promise<
   { month: string; count: number }[]
 > => {
-  const rows = await VRChatPhotoPathModel.findAll({
-    attributes: [
-      [fn('strftime', '%Y-%m', col('photoTakenAt'), 'localtime'), 'month'],
-      [fn('COUNT', col('id')), 'count'],
-    ],
-    group: [literal('month')],
-    order: [[literal('month'), 'ASC']],
-    raw: true,
-  });
+  const month = sql<string>`strftime('%Y-%m', ${vrchatPhotoPaths.photoTakenAt}, 'localtime')`;
+  const rows = getDB()
+    .select({ month, count: count(vrchatPhotoPaths.id) })
+    .from(vrchatPhotoPaths)
+    .groupBy(month)
+    .orderBy(asc(month))
+    .all();
   return z.array(PhotoCountPerMonthRowSchema).parse(rows);
 };
 
@@ -199,19 +187,17 @@ export const getVRChatPhotoMetadataList = async (query?: {
   ltPhotoTakenAt?: Date;
   orderByPhotoTakenAt: 'asc' | 'desc';
 }): Promise<VRChatPhotoMetadata[]> => {
-  const photoList = await VRChatPhotoPathModel.findAll({
-    attributes: ['id', 'photoTakenAt', 'width', 'height'], // photoPath を除外
-    where: {
-      photoTakenAt: {
-        ...(query?.gtPhotoTakenAt && { [Op.gt]: query.gtPhotoTakenAt }),
-        ...(query?.ltPhotoTakenAt && { [Op.lt]: query.ltPhotoTakenAt }),
-      },
-    },
-    order: [['photoTakenAt', query?.orderByPhotoTakenAt ?? 'asc']],
-    raw: true, // プレーンオブジェクトを返す（メモリ効率向上）
-  });
-
-  return photoList as VRChatPhotoMetadata[];
+  return getDB()
+    .select({
+      id: vrchatPhotoPaths.id,
+      photoTakenAt: vrchatPhotoPaths.photoTakenAt,
+      width: vrchatPhotoPaths.width,
+      height: vrchatPhotoPaths.height,
+    })
+    .from(vrchatPhotoPaths)
+    .where(photoTakenAtBetween(query))
+    .orderBy(photoTakenAtOrder(query?.orderByPhotoTakenAt))
+    .all();
 };
 
 /**
@@ -225,15 +211,11 @@ export const getVRChatPhotoPathsByIds = async (
     return new Map();
   }
 
-  const photos = await VRChatPhotoPathModel.findAll({
-    attributes: ['id', 'photoPath'],
-    where: {
-      id: {
-        [Op.in]: ids,
-      },
-    },
-    raw: true,
-  });
+  const photos = getDB()
+    .select({ id: vrchatPhotoPaths.id, photoPath: vrchatPhotoPaths.photoPath })
+    .from(vrchatPhotoPaths)
+    .where(inArray(vrchatPhotoPaths.id, ids))
+    .all();
 
   const pathMap = new Map<string, string>();
   for (const photo of photos) {

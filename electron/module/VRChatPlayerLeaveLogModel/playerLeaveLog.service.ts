@@ -1,6 +1,11 @@
-import { Op, type Transaction } from '@sequelize/core';
+import { and, asc, desc, gt, lt } from 'drizzle-orm';
 
-import { VRChatPlayerLeaveLogModel } from './playerLeaveLog.model';
+import { getDB } from '../../lib/db/client';
+import { vrchatPlayerLeaveLogs } from '../../lib/db/schema';
+import {
+  createVRChatPlayerLeaveLogs,
+  type VRChatPlayerLeaveLogModel,
+} from './playerLeaveLog.model';
 
 export const createVRChatPlayerLeaveLogModel = async (
   leaveLogList: {
@@ -8,49 +13,41 @@ export const createVRChatPlayerLeaveLogModel = async (
     playerName: string;
     playerId: string | null;
   }[],
-  options?: { transaction?: Transaction },
-): Promise<VRChatPlayerLeaveLogModel[]> => {
-  const newLogs = leaveLogList.map((logInfo) => ({
-    leaveDateTime: logInfo.leaveDate,
-    playerName: logInfo.playerName,
-    playerId: logInfo.playerId,
-  }));
+): Promise<VRChatPlayerLeaveLogModel[]> =>
+  createVRChatPlayerLeaveLogs(
+    leaveLogList.map((logInfo) => ({
+      leaveDateTime: logInfo.leaveDate,
+      playerName: logInfo.playerName,
+      playerId: logInfo.playerId,
+    })),
+  );
 
-  if (newLogs.length > 0) {
-    const vrchatPlayerLeaveLog = await VRChatPlayerLeaveLogModel.bulkCreate(
-      newLogs,
-      {
-        ignoreDuplicates: true,
-        transaction: options?.transaction,
-      },
-    );
-
-    return vrchatPlayerLeaveLog;
-  }
-
-  return [];
-};
-
-export const findLatestPlayerLeaveLog = async () => {
-  return VRChatPlayerLeaveLogModel.findOne({
-    order: [['leaveDateTime', 'DESC']],
-  });
-};
+export const findLatestPlayerLeaveLog =
+  async (): Promise<VRChatPlayerLeaveLogModel | null> =>
+    getDB()
+      .select()
+      .from(vrchatPlayerLeaveLogs)
+      .orderBy(desc(vrchatPlayerLeaveLogs.leaveDateTime))
+      .limit(1)
+      .get() ?? null;
 
 export const findVRChatPlayerLeaveLogList = async (query?: {
   gtLeaveDateTime?: Date;
   ltLeaveDateTime?: Date;
   orderByLeaveDateTime: 'asc' | 'desc';
 }): Promise<VRChatPlayerLeaveLogModel[]> => {
-  const playerLeaveLogList = await VRChatPlayerLeaveLogModel.findAll({
-    where: {
-      leaveDateTime: {
-        ...(query?.gtLeaveDateTime && { [Op.gt]: query.gtLeaveDateTime }),
-        ...(query?.ltLeaveDateTime && { [Op.lt]: query.ltLeaveDateTime }),
-      },
-    },
-    order: [['leaveDateTime', query?.orderByLeaveDateTime ?? 'asc']],
-  });
-
-  return playerLeaveLogList;
+  const column = vrchatPlayerLeaveLogs.leaveDateTime;
+  return getDB()
+    .select()
+    .from(vrchatPlayerLeaveLogs)
+    .where(
+      and(
+        query?.gtLeaveDateTime ? gt(column, query.gtLeaveDateTime) : undefined,
+        query?.ltLeaveDateTime ? lt(column, query.ltLeaveDateTime) : undefined,
+      ),
+    )
+    .orderBy(
+      query?.orderByLeaveDateTime === 'desc' ? desc(column) : asc(column),
+    )
+    .all();
 };

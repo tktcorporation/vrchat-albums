@@ -1,0 +1,617 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "id": "263b155d-b89f-4114-add1-c6ace00fec5b",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "ddl": [
+    {
+      "name": "VRChatPhotoMetadataModels",
+      "entityType": "tables"
+    },
+    {
+      "name": "VRChatPhotoPathModels",
+      "entityType": "tables"
+    },
+    {
+      "name": "VRChatPlayerJoinLogModels",
+      "entityType": "tables"
+    },
+    {
+      "name": "VRChatPlayerLeaveLogModels",
+      "entityType": "tables"
+    },
+    {
+      "name": "VRChatWorldJoinLogModels",
+      "entityType": "tables"
+    },
+    {
+      "name": "VRChatWorldJoinLogFromPhotoModels",
+      "entityType": "tables"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "photoPath",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "authorId",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "authorDisplayName",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "worldId",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "worldDisplayName",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "createdAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "updatedAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "photoPath",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "photoTakenAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "height",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "720",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "width",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1280",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "createdAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "updatedAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "playerId",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "playerName",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "joinDateTime",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "createdAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "updatedAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerLeaveLogModels",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerLeaveLogModels",
+      "name": "leaveDateTime",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerLeaveLogModels",
+      "name": "playerName",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerLeaveLogModels",
+      "name": "playerId",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerLeaveLogModels",
+      "name": "createdAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPlayerLeaveLogModels",
+      "name": "updatedAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "worldId",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "worldName",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "worldInstanceId",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "joinDateTime",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "createdAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "updatedAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogFromPhotoModels",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogFromPhotoModels",
+      "name": "worldId",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogFromPhotoModels",
+      "name": "joinDateTime",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogFromPhotoModels",
+      "name": "createdAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatWorldJoinLogFromPhotoModels",
+      "name": "updatedAt",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "v_r_chat_photo_metadata_models_photo_path_unique",
+      "columns": [
+        {
+          "value": "photoPath",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "v_r_chat_photo_metadata_models_world_id",
+      "columns": [
+        {
+          "value": "worldId",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "v_r_chat_photo_path_models_photo_path_unique",
+      "columns": [
+        {
+          "value": "photoPath",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "playerName-joinDateTime",
+      "columns": [
+        {
+          "value": "playerName",
+          "isExpression": false
+        },
+        {
+          "value": "joinDateTime",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "joinDateTime-idx",
+      "columns": [
+        {
+          "value": "joinDateTime",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "worldInstanceId-joinDateTime",
+      "columns": [
+        {
+          "value": "worldInstanceId",
+          "isExpression": false
+        },
+        {
+          "value": "joinDateTime",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "world-joinDateTime-idx",
+      "columns": [
+        {
+          "value": "joinDateTime",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatWorldJoinLogFromPhotoModels",
+      "name": "worldInstanceId-joinDateTime-fromPhoto",
+      "columns": [
+        {
+          "value": "worldId",
+          "isExpression": false
+        },
+        {
+          "value": "joinDateTime",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatWorldJoinLogFromPhotoModels",
+      "name": "photo-joinDateTime-idx",
+      "columns": [
+        {
+          "value": "joinDateTime",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "VRChatPhotoMetadataModels",
+      "name": "VRChatPhotoMetadataModels_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "VRChatPhotoPathModels",
+      "name": "VRChatPhotoPathModels_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "VRChatPlayerJoinLogModels",
+      "name": "VRChatPlayerJoinLogModels_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "VRChatPlayerLeaveLogModels",
+      "name": "VRChatPlayerLeaveLogModels_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "VRChatWorldJoinLogModels",
+      "name": "VRChatWorldJoinLogModels_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "VRChatWorldJoinLogFromPhotoModels",
+      "name": "VRChatWorldJoinLogFromPhotoModels_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    }
+  ],
+  "renames": []
+}

@@ -45,7 +45,7 @@ await getHost().shell.notify({ title, body });
 | main                       | `electron/index.ts`        | ウィンドウ・トレイ・自動更新・OS の操作（`HostShell` の実装）・エラー監視の初期化            |
 | 処理本体（utilityProcess） | `electron/backend/main.ts` | tRPC の router・サービス・DB・worker・設定ファイルの書き込み・バックグラウンド同期のタイマー |
 
-main は処理本体のモジュール（`electron/api.ts`・`electron/trpc.ts`・`electron/module/` のサービス・Sequelize・ネイティブモジュール）を読み込まない。設定ファイルを書くのは処理本体だけで、main は `electron/lib/settingsFile.ts` で読むだけにする（理由は同ファイルの JSDoc）。
+main は処理本体のモジュール（`electron/api.ts`・`electron/trpc.ts`・`electron/module/` のサービス・DB の層（`electron/lib/db/`・`electron/lib/dbQueue.ts`・`drizzle-orm`・`node:sqlite`）・ネイティブモジュール）を読み込まない。DB は同期ドライバで動き、クエリの間は読み込んだプロセスのイベントループが止まるため（ADR-007）。設定ファイルを書くのは処理本体だけで、main は `electron/lib/settingsFile.ts` で読むだけにする（理由は同ファイルの JSDoc）。
 
 処理本体の入口は、main から殻の情報が届いてから殻を登録し、その後で処理本体のモジュールを動的に読み込む。処理本体のモジュールには、読み込まれた時点で `getHost()` を使うもの（`electron/api.ts` が開く設定ストアの保存先など）があるため。
 

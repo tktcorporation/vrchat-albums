@@ -1,6 +1,6 @@
 # ADR-004: Sequelize の retry.timeout を使用しない
 
-- **ステータス**: accepted
+- **ステータス**: superseded by [ADR-007](./007-sync-sqlite-driver-in-backend.md)
 - **日付**: 2026-04-29
 - **関連コード**: `electron/lib/sequelize.ts`
 - **関連ルール**: なし（コード内コメントで強制）

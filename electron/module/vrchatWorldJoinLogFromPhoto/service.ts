@@ -31,11 +31,11 @@ export const findVRChatWorldJoinLogFromPhotoList = async (query?: {
   const modelList = await Model.findVRChatWorldJoinLogFromPhotoList(query);
   return modelList.map((m) => {
     return {
-      id: m.id as string,
+      id: m.id,
       worldId: m.worldId,
       joinDate: m.joinDateTime,
-      createdAt: m.createdAt as Date,
-      updatedAt: m.updatedAt as Date | null,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
     };
   });
 };

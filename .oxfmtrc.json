@@ -25,6 +25,7 @@
     ".grit",
     "pnpm-lock.yaml",
     "src/assets/licenses.json",
+    "electron/lib/db/migrations",
     "CHANGELOG.md",
     ".github/workflows",
     "*.d.ts",

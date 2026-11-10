@@ -1,21 +1,8 @@
-import {
-  type CreationOptional,
-  DataTypes,
-  type InferAttributes,
-  type InferCreationAttributes,
-  Model,
-  Op,
-} from '@sequelize/core';
-import {
-  Attribute,
-  createIndexDecorator,
-  Default,
-  NotNull,
-  PrimaryKey,
-  Table,
-} from '@sequelize/core/decorators-legacy';
-import { uuidv7 } from 'uuidv7';
+import { and, asc, desc, gt, lt } from 'drizzle-orm';
 
+import { insertInChunks } from '../../lib/db/chunkedInsert';
+import { getDB } from '../../lib/db/client';
+import { vrchatWorldJoinLogsFromPhoto } from '../../lib/db/schema';
 import type { WorldId } from '../vrchatLog/type';
 
 export interface VRChatWorldJoinLogFromPhoto {
@@ -23,86 +10,39 @@ export interface VRChatWorldJoinLogFromPhoto {
   worldId: WorldId;
 }
 
-const WorldInstanceIdJoinDateTimeFromPhotoIndex = createIndexDecorator(
-  'WorldInstanceIdJoinDateTimeFromPhotoIndex',
-  {
-    name: 'worldInstanceId-joinDateTime-fromPhoto',
-    type: 'fulltext',
-    concurrently: true,
-    unique: true,
-  },
-);
-
-const JoinDateTimeFromPhotoIndex = createIndexDecorator(
-  'JoinDateTimeFromPhotoIndex',
-  {
-    name: 'photo-joinDateTime-idx',
-    concurrently: true,
-  },
-);
-
-@Table({ tableName: 'VRChatWorldJoinLogFromPhotoModels' })
 /**
- * 写真から抽出したワールド入室情報を保存するモデル。
+ * 写真から推定したワールド入室の行。
  *
  * @see docs/photo-grouping-logic.md - 写真グループ化ロジック
- * @see docs/log-sync-architecture.md - ログ同期の設計
  * @see VRChatWorldJoinLogModel - ログ由来のワールド入室情報
  */
-export class VRChatWorldJoinLogFromPhotoModel extends Model<
-  InferAttributes<VRChatWorldJoinLogFromPhotoModel>,
-  InferCreationAttributes<VRChatWorldJoinLogFromPhotoModel>
-> {
-  @Attribute(DataTypes.UUID)
-  @PrimaryKey
-  @Default(uuidv7)
-  declare id: CreationOptional<string>;
-
-  @Attribute(DataTypes.STRING)
-  @NotNull
-  @WorldInstanceIdJoinDateTimeFromPhotoIndex
-  declare worldId: WorldId;
-
-  @Attribute(DataTypes.DATE)
-  @NotNull
-  @WorldInstanceIdJoinDateTimeFromPhotoIndex
-  @JoinDateTimeFromPhotoIndex
-  declare joinDateTime: Date;
-
-  @Attribute(DataTypes.DATE)
-  @Default(DataTypes.NOW)
-  @NotNull
-  declare createdAt: CreationOptional<Date>;
-
-  @Attribute(DataTypes.DATE)
-  declare updatedAt: CreationOptional<Date>;
-}
+export type VRChatWorldJoinLogFromPhotoModel =
+  typeof vrchatWorldJoinLogsFromPhoto.$inferSelect;
 
 /**
- * 写真から抽出したワールド入室情報をデータベースに保存する。
- * サービス層から呼び出される実体モデル操作関数。
+ * 写真から抽出したワールド入室情報を保存し、新しく登録した行を返す。
+ * 同じワールドの同じ時刻（一意インデックス worldInstanceId-joinDateTime-fromPhoto）は挿入しない。
+ * 衝突先を指定しない ON CONFLICT DO NOTHING にしているのは、古い DB に残る別の一意インデックスに
+ * 当たった行も、エラーにせず挿入しないため。
  */
 export const createVRChatWorldJoinLogFromPhoto = async (
   vrchatWorldJoinLogFromPhotoList: VRChatWorldJoinLogFromPhoto[],
 ): Promise<VRChatWorldJoinLogFromPhotoModel[]> => {
-  const newLogs = vrchatWorldJoinLogFromPhotoList.map((logInfo) => ({
-    joinDateTime: logInfo.joinDate,
-    worldId: logInfo.worldId,
-  }));
-
-  if (newLogs.length === 0) {
-    return [];
-  }
-
-  const vrchatWorldJoinLog = await VRChatWorldJoinLogFromPhotoModel.bulkCreate(
-    newLogs,
-    {
-      ignoreDuplicates: true,
-      validate: true,
-    },
+  return insertInChunks(
+    getDB(),
+    vrchatWorldJoinLogsFromPhoto,
+    vrchatWorldJoinLogFromPhotoList.map((logInfo) => ({
+      joinDateTime: logInfo.joinDate,
+      worldId: logInfo.worldId,
+    })),
+    (executor, rows) =>
+      executor
+        .insert(vrchatWorldJoinLogsFromPhoto)
+        .values(rows)
+        .onConflictDoNothing()
+        .returning()
+        .all(),
   );
-
-  return vrchatWorldJoinLog;
 };
 
 /**
@@ -116,16 +56,19 @@ export const findVRChatWorldJoinLogFromPhotoList = async (query?: {
   /** 取得する最大件数。orderByJoinDateTime の順で先頭から数える。省略時は全件 */
   limit?: number;
 }): Promise<VRChatWorldJoinLogFromPhotoModel[]> => {
-  const logs = await VRChatWorldJoinLogFromPhotoModel.findAll({
-    where: {
-      joinDateTime: {
-        ...(query?.gtJoinDateTime && { [Op.gt]: query.gtJoinDateTime }),
-        ...(query?.ltJoinDateTime && { [Op.lt]: query.ltJoinDateTime }),
-      },
-    },
-    order: [['joinDateTime', query?.orderByJoinDateTime ?? 'asc']],
-    ...(query?.limit !== undefined && { limit: query.limit }),
-  });
-
-  return logs;
+  const column = vrchatWorldJoinLogsFromPhoto.joinDateTime;
+  const select = getDB()
+    .select()
+    .from(vrchatWorldJoinLogsFromPhoto)
+    .where(
+      and(
+        query?.gtJoinDateTime ? gt(column, query.gtJoinDateTime) : undefined,
+        query?.ltJoinDateTime ? lt(column, query.ltJoinDateTime) : undefined,
+      ),
+    )
+    .orderBy(query?.orderByJoinDateTime === 'desc' ? desc(column) : asc(column))
+    .$dynamic();
+  return (
+    query?.limit === undefined ? select : select.limit(query.limit)
+  ).all();
 };

@@ -4,7 +4,7 @@ import { parseISO } from 'date-fns';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import * as client from '../../lib/sequelize';
+import * as client from '../../lib/db/client';
 import {
   OptionalVRChatPlayerIdSchema,
   VRChatPlayerNameSchema,
@@ -65,11 +65,11 @@ describe('SessionInfoBatch world change behavior', () => {
   }, 10000);
 
   beforeEach(async () => {
-    await client.__forceSyncRDBClient();
+    client.__resetTestRDBClient();
   });
 
   afterAll(async () => {
-    await client.__cleanupTestRDBClient();
+    client.__cleanupTestRDBClient();
   });
 
   it('should NOT include players from previous world when world changes', async () => {

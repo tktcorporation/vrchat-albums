@@ -10,7 +10,7 @@ import {
   vi,
 } from 'vitest';
 
-import * as client from '../../lib/sequelize';
+import * as client from '../../lib/db/client';
 import { VRChatPlayerNameSchema } from '../vrchatLog/model';
 import * as playerJoinLogService from '../VRChatPlayerJoinLogModel/playerJoinLog.service';
 
@@ -20,14 +20,14 @@ describe('getFrequentPlayerNames tRPC endpoint integration tests', () => {
   }, 10000);
 
   beforeEach(async () => {
-    await client.__forceSyncRDBClient();
+    client.__resetTestRDBClient();
     // このテストファイル内でのみモックを無効化
     vi.doUnmock('../logInfo/service');
     vi.doUnmock('../VRChatPlayerJoinLogModel/playerJoinLog.service');
   });
 
   afterAll(async () => {
-    await client.__cleanupTestRDBClient();
+    client.__cleanupTestRDBClient();
   });
 
   it('tRPCエンドポイント経由でよく遊ぶプレイヤー名を取得できる', async () => {

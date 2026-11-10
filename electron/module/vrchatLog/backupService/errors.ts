@@ -101,13 +101,6 @@ export class RollbackDbRebuildFailed extends Data.TaggedError(
   message: string;
 }> {}
 
-/** ロールバックのトランザクションに失敗 */
-export class RollbackTransactionFailed extends Data.TaggedError(
-  'RollbackTransactionFailed',
-)<{
-  message: string;
-}> {}
-
 /** ロールバックエラーの Union 型 */
 export type RollbackServiceError =
   | RollbackBackupDirNotFound
@@ -116,5 +109,4 @@ export type RollbackServiceError =
   | RollbackValidationFailed
   | RollbackRestoreFailed
   | RollbackNoDirsRestored
-  | RollbackDbRebuildFailed
-  | RollbackTransactionFailed;
+  | RollbackDbRebuildFailed;

@@ -2,7 +2,7 @@ import * as datefns from 'date-fns';
 import { Cause, Effect, Exit, Option } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import * as client from '../../lib/sequelize';
+import * as client from '../../lib/db/client';
 import { VRChatPlayerNameSchema } from '../vrchatLog/model';
 import * as service from './playerJoinLog.service';
 
@@ -12,10 +12,10 @@ describe('VRChatPlayerJoinLogModel', () => {
       await client.__initTestRDBClient();
     }, 10000);
     beforeEach(async () => {
-      await client.__forceSyncRDBClient();
+      client.__resetTestRDBClient();
     });
     afterAll(async () => {
-      await client.__cleanupTestRDBClient();
+      client.__cleanupTestRDBClient();
     });
     it('should create playerJoinLog', async () => {
       const playerJoinLogList = [

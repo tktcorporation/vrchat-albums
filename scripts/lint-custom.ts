@@ -29,6 +29,7 @@ const tasks: LintTask[] = [
   { name: 'ts-pattern', script: 'scripts/lint-ts-pattern.ts' },
   { name: 'logger-level', script: 'scripts/lint-logger-level.ts' },
   { name: 'native-hoist', script: 'scripts/lint-native-hoist.ts' },
+  { name: 'db-migrations', script: 'scripts/check-db-migrations.ts' },
 ];
 
 let allPassed = true;

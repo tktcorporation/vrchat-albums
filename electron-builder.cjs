@@ -21,7 +21,6 @@ const config = {
   asarUnpack: [
     'node_modules/@resvg/resvg-js*/**',
     'node_modules/@napi-rs/image*/**',
-    'node_modules/sqlite3/**',
     'node_modules/clip-filepaths*/**',
     'node_modules/@vrchat-albums/exif-native*/**',
     // renderWorker.cjs は worker_threads の Worker としてファイルパスから

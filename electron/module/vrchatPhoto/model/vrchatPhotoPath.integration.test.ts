@@ -2,7 +2,7 @@ import * as datefns from 'date-fns';
 import { uuidv7 } from 'uuidv7';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import * as client from '../../../lib/sequelize';
+import * as client from '../../../lib/db/client';
 import {
   createOrUpdateListVRChatPhotoPath,
   getPhotoCountPerLocalMonth,
@@ -24,11 +24,11 @@ describe('VRChatPhotoPath Model Integration Tests', () => {
   }, 10000);
 
   beforeEach(async () => {
-    await client.__forceSyncRDBClient();
+    client.__resetTestRDBClient();
   });
 
   afterAll(async () => {
-    await client.__cleanupTestRDBClient();
+    client.__cleanupTestRDBClient();
   });
 
   // テストデータ作成ヘルパー

@@ -1,6 +1,14 @@
+import type { EventEmitter } from 'node:events';
+
 import { Cause, Effect, Exit, Option, Result } from 'effect';
 import { match, P } from 'ts-pattern';
 
+import * as dbClient from '../../lib/db/client';
+import {
+  LegacyBackupFailed,
+  LegacyDatabaseNotRebuildable,
+  LegacyDatabaseRebuildFailed,
+} from '../../lib/db/errors';
 import {
   ERROR_CATEGORIES,
   ERROR_CODES,
@@ -8,7 +16,6 @@ import {
 } from '../../lib/errors';
 import { getHost, type HostUpdateCheckResult } from '../../lib/host';
 import { logger } from '../../lib/logger';
-import * as sequelizeClient from '../../lib/sequelize';
 import { beginInitProgressRun } from '../initProgress/emitter';
 import {
   LOG_SYNC_MODE,
@@ -65,19 +72,68 @@ const hasPhotoPathChanged = (): boolean => {
 };
 
 /**
+ * DB のマイグレーションで起きた、利用者に手を打ってもらう必要がある失敗を、画面に出す説明へ変える。
+ * どれも DB を元のまま残して起動を止めるので、次に起動しても同じ失敗になる。何が起きたかと
+ * 複製の場所を毎回示し、利用者が知らないまま起動に失敗し続けないようにする。
+ * それ以外の失敗はそのまま返す。
+ */
+const toMigrationUserFacingError = (error: unknown): unknown =>
+  match(error)
+    .with(P.instanceOf(LegacyDatabaseNotRebuildable), (e) =>
+      UserFacingError.withStructuredInfo({
+        code: ERROR_CODES.DATABASE_LEGACY_TAKEOVER_FAILED,
+        category: ERROR_CATEGORIES.DATABASE_ERROR,
+        message: e.message,
+        userMessage: `データベースを新しい形式へ引き継げませんでした。ログや写真から作り直せないデータ（${e.nonDerivableTables.join('、')}）があるため、データベースには触れずに起動を止めました。引き継ぐ前のデータベースの複製: ${e.backupPath}`,
+        details: {
+          backupPath: e.backupPath,
+          nonDerivableTables: e.nonDerivableTables,
+          reason: e.reason._tag,
+        },
+        cause: e,
+      }),
+    )
+    .with(P.instanceOf(LegacyDatabaseRebuildFailed), (e) =>
+      UserFacingError.withStructuredInfo({
+        code: ERROR_CODES.DATABASE_LEGACY_TAKEOVER_FAILED,
+        category: ERROR_CATEGORIES.DATABASE_ERROR,
+        message: e.message,
+        userMessage: `データベースを新しい形式へ引き継げず、作り直すこともできませんでした。データベースのファイルを他のアプリが使っていないか確認して、アプリを起動し直してください。引き継ぐ前のデータベースの複製: ${e.backupPath}`,
+        details: { backupPath: e.backupPath },
+        cause: e,
+      }),
+    )
+    .with(P.instanceOf(LegacyBackupFailed), (e) =>
+      UserFacingError.withStructuredInfo({
+        code: ERROR_CODES.DATABASE_MIGRATION_FAILED,
+        category: ERROR_CATEGORIES.DATABASE_ERROR,
+        message: e.message,
+        userMessage: `データベースを新しい形式へ引き継ぐ前の複製を作れませんでした。ディスクの空き容量と、${e.backupPath} への書き込み権限を確認してください。データベースには何も書き込んでいません。`,
+        details: { backupPath: e.backupPath },
+        cause: e,
+      }),
+    )
+    .otherwise((e) => e);
+
+/**
  * アプリケーション起動時の初期化処理。
  * 進捗ストリームの実行を最初から最後まで、ログ同期のセマフォの permit を持ったまま進める。
  * permit の外で開始すると、初期化中に始まった単独のログ同期（バックグラウンド同期・インポート後の同期など）が
  * 初期化の実行を置き換えたり閉じたりしてしまうため。単独の同期は初期化が終わるまで待つ。
  */
-const runInitialization = (): Promise<{ success: true }> =>
-  runWithLogSyncLock((lock) => runInitializationHoldingLock(lock));
+const runInitialization = (
+  eventEmitter: EventEmitter,
+): Promise<{ success: true }> =>
+  runWithLogSyncLock((lock) =>
+    runInitializationHoldingLock(lock, eventEmitter),
+  );
 
 /**
  * 初期化処理の本体。データベース初期化、初回起動判定、ログ同期を順に実行し、進捗を init-progress へ送る。
  */
 const runInitializationHoldingLock = async (
   lock: LogSyncLock,
+  eventEmitter: EventEmitter,
 ): Promise<{ success: true }> => {
   // 起動種別は DB の準備ができるまで判定できないため、null で実行を始めて Step 2 で設定する
   const run = beginInitProgressRun('startup', null);
@@ -87,12 +143,30 @@ const runInitializationHoldingLock = async (
   try {
     logger.info('=== Starting application data initialization ===');
 
-    // Step 1: データベース同期
+    // Step 1: データベースのマイグレーション
+    // 画面の進捗に「DB の準備」として出し、失敗は初期化の失敗として画面に出すため、処理本体の起動ではなく
+    // ここで行う。Sequelize の時代の DB の初回の引き継ぎ（複製と定義の補修）もここで走る。
     // VRChat ログディレクトリの存在確認は事前に行わず、ログ同期のエラーで判定する
-    logger.info('Step 1: Syncing database schema...');
+    logger.info('Step 1: Migrating database...');
     run.stage('database_sync', 0);
-    await sequelizeClient.syncRDBClient();
+    const migration = await dbClient
+      .migrateRDBClient()
+      .catch((error: unknown) => {
+        throw toMigrationUserFacingError(error);
+      });
     run.stage('database_sync', 100);
+    // 引き継げなかった DB を作り直したときは、空の DB を全件の同期で埋め直す（ADR-001 のとおり syncLogs で行う）。
+    // 写真の一覧が一度空になり、同期に時間がかかる理由を、複製の場所と一緒に知らせる
+    const rebuiltDatabase = match(migration)
+      .with({ kind: 'rebuilt' }, (rebuilt) => rebuilt)
+      .with({ kind: 'migrated' }, () => null)
+      .exhaustive();
+    if (rebuiltDatabase !== null) {
+      eventEmitter.emit(
+        'toast',
+        `データベースを新しい形式へ引き継げなかったため、作り直しました。VRChat のログと写真から読み込み直します。元のデータベースの複製: ${rebuiltDatabase.backupPath}`,
+      );
+    }
 
     // Step 2: 初回起動判定とPhotoPath変更確認
     logger.info('Step 2: Checking if this is first launch...');
@@ -133,6 +207,12 @@ const runInitializationHoldingLock = async (
           syncMode = LOG_SYNC_MODE.FULL;
         },
       );
+
+    if (rebuiltDatabase !== null) {
+      // DB は空でも利用者は初めて起動したのではないので、初回起動の設定（自動起動の有効化など）はしない
+      isFirstLaunch = false;
+      syncMode = LOG_SYNC_MODE.FULL;
+    }
 
     logger.info(
       `Detected ${
@@ -353,14 +433,14 @@ export const settingsRouter = () =>
      * アプリケーション起動時の完全な初期化処理を実行する。
      * データベース初期化、同期、ログ同期まで順次実行される。
      */
-    initializeAppData: consentedProcedure.mutation(async () => {
+    initializeAppData: consentedProcedure.mutation(async ({ ctx }) => {
       if (inFlightInitialization) {
         logger.info(
           'Initialization already in progress, joining the running initialization',
         );
         return inFlightInitialization;
       }
-      const initialization = runInitialization().finally(() => {
+      const initialization = runInitialization(ctx.eventEmitter).finally(() => {
         inFlightInitialization = null;
       });
       inFlightInitialization = initialization;

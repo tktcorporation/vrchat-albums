@@ -141,7 +141,7 @@ const createChildChannel = (
  * 処理本体の入口のファイル。main のバンドルと同じディレクトリ（`main/`）にある。
  *
  * パッケージ時も app.asar の中のパスのまま起動する。処理本体が読み込む JavaScript の依存
- * （electron-store・Sequelize など）は app.asar の中の node_modules にしか無く、
+ * （electron-store など）は app.asar の中の node_modules にしか無く、
  * app.asar.unpacked から起動すると見つからない。utilityProcess の Node は app.asar を読める。
  */
 const resolveBackendScriptPath = (): string =>

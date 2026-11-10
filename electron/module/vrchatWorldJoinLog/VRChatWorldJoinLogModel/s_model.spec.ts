@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import * as client from '../../../lib/sequelize';
+import * as client from '../../../lib/db/client';
 import {
   type getSettingStore,
   initSettingStoreForTest,
@@ -18,13 +18,9 @@ import * as model from './s_model';
 describe('module/logInfo/s_model', () => {
   beforeAll(async () => {
     await client.__initTestRDBClient();
-    // migrate db
-    await client.syncRDBClient({
-      checkRequired: false,
-    });
   }, 10000);
   afterAll(async () => {
-    await client.__cleanupTestRDBClient();
+    client.__cleanupTestRDBClient();
   });
   it('has a model', async () => {
     const storedVRChatLogFilesDirPath = {

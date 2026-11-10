@@ -10,11 +10,12 @@
 
 ## 一覧
 
-| ADR                                                   | タイトル                                             | ステータス |
-| ----------------------------------------------------- | ---------------------------------------------------- | ---------- |
-| [001](./001-log-sync-single-entry-point.md)           | ログ同期の単一エントリポイント                       | accepted   |
-| [002](./002-effect-ts-error-handling.md)              | Effect TS によるエラーハンドリング                   | accepted   |
-| [003](./003-post-tool-use-auto-lint.md)               | PostToolUse 自動 lint フック                         | accepted   |
-| [004](./004-no-sequelize-retry-timeout.md)            | Sequelize の retry.timeout を使用しない              | accepted   |
-| [005](./005-main-process-cpu-bound-worker-offload.md) | Main プロセスの CPU バウンド処理は worker_threads へ | accepted   |
-| [006](./006-derived-data-trpc-query-not-mutation.md)  | 副作用のない導出データは tRPC の query にする        | accepted   |
+| ADR                                                   | タイトル                                              | ステータス |
+| ----------------------------------------------------- | ----------------------------------------------------- | ---------- |
+| [001](./001-log-sync-single-entry-point.md)           | ログ同期の単一エントリポイント                        | accepted   |
+| [002](./002-effect-ts-error-handling.md)              | Effect TS によるエラーハンドリング                    | accepted   |
+| [003](./003-post-tool-use-auto-lint.md)               | PostToolUse 自動 lint フック                          | accepted   |
+| [004](./004-no-sequelize-retry-timeout.md)            | Sequelize の retry.timeout を使用しない               | superseded |
+| [005](./005-main-process-cpu-bound-worker-offload.md) | Main プロセスの CPU バウンド処理は worker_threads へ  | accepted   |
+| [006](./006-derived-data-trpc-query-not-mutation.md)  | 副作用のない導出データは tRPC の query にする         | accepted   |
+| [007](./007-sync-sqlite-driver-in-backend.md)         | DB は処理本体で同期ドライバから使い、再試行を持たない | accepted   |

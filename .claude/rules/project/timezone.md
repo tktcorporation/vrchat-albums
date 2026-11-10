@@ -23,7 +23,7 @@ VRChat ログと写真の日時データを正しく処理するための規約�
 | ------------------ | -------------------------------------------------------------- |
 | ログパース         | `parseLogDateTime()` でローカルタイムとして解釈                |
 | フロントエンド     | `new Date('YYYY-MM-DDTHH:mm:ss')` でローカルタイム処理         |
-| DB保存             | Sequelize が Date オブジェクトを自動的に UTC で保存            |
+| DB保存             | 日時の列の型 `utcDateTime` が Date を UTC の文字列で保存する   |
 | UTC変換            | JavaScript Date オブジェクトがローカルタイム→UTC変換を自動実行 |
 | 写真タイムスタンプ | ファイル名の日時もローカルタイムとして処理                     |
 
@@ -32,8 +32,12 @@ VRChat ログと写真の日時データを正しく処理するための規約�
 ## 重要なルール
 
 1. **日時処理では常にローカルタイムベースで実装**
-2. **UTC変換は Sequelize/JavaScript に委ねる**
+2. **UTC変換は DB の列の型（`utcDateTime`）と JavaScript に委ねる**
 3. **明示的な UTC 変換は行わない**
+
+### DB の日時の保存形式
+
+日時の列は `electron/lib/db/utcDateTime.ts` の `utcDateTime` で定義し、`YYYY-MM-DD HH:MM:SS.SSS +00:00`（UTC）の文字列で保存する。読み出すと Date に戻る。範囲の検索と並べ替えは文字列の比較で行われ、月ごとの集計は `strftime('%Y-%m', 列, 'localtime')` でローカルタイムに戻してから月を切り出すので、この形式を変えない。SQL を直接書いて日時を入れるときも `formatUtcDateTime` の形式にそろえる。
 
 ---
 

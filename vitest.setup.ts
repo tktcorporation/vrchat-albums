@@ -5,9 +5,9 @@ import { afterAll, afterEach, vi } from 'vitest';
 // getAppVersion() が App version is undefined エラーを投げるのを防ぐ
 process.env.npm_package_version ??= '0.0.0-test';
 
+import * as client from './electron/lib/db/client';
 import { registerHost } from './electron/lib/host';
 import { createTestHost } from './electron/lib/host/testHost';
-import * as client from './electron/lib/sequelize';
 
 // electron/module のサービスは getHost() から OS の機能を受け取るため、
 // 全テストで既定の殻を登録しておく。値や操作を確かめたいテストは各自で登録し直す
@@ -24,8 +24,8 @@ afterEach(() => {
   cleanup();
 });
 
-afterAll(async () => {
-  await client.__cleanupTestRDBClient();
+afterAll(() => {
+  client.__cleanupTestRDBClient();
 });
 
 // electronモジュールのモック

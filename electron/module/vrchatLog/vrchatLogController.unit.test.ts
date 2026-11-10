@@ -67,9 +67,9 @@ vi.mock('../fileHandlers/logStorageManager', () => {
 });
 
 // データベースのモック
-vi.mock('../../lib/sequelize', () => ({
+vi.mock('../../lib/db/client', () => ({
   __initTestRDBClient: vi.fn(),
-  __forceSyncRDBClient: vi.fn(),
+  __resetTestRDBClient: vi.fn(),
   __cleanupTestRDBClient: vi.fn(),
 }));
 

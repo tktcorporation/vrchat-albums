@@ -1,96 +1,42 @@
-import {
-  type CreationOptional,
-  DataTypes,
-  type InferAttributes,
-  type InferCreationAttributes,
-  Model,
-  Op,
-  type Transaction,
-} from '@sequelize/core';
-import {
-  AllowNull,
-  Attribute,
-  createIndexDecorator,
-  Default,
-  NotNull,
-  PrimaryKey,
-  Table,
-} from '@sequelize/core/decorators-legacy';
 import * as dateFns from 'date-fns';
-import { uuidv7 } from 'uuidv7';
+import {
+  and,
+  asc,
+  countDistinct,
+  desc,
+  gte,
+  lt,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 
+import { insertInChunks } from '../../lib/db/chunkedInsert';
+import { type DBExecutor, getDB } from '../../lib/db/client';
+import { vrchatPlayerJoinLogs } from '../../lib/db/schema';
 import type { VRChatPlayerJoinLog } from '../vrchatLog/service';
 
-const PlayerNameJoinDateTimeIndex = createIndexDecorator(
-  'PlayerNameJoinDateTimeIndex',
-  {
-    name: 'playerName-joinDateTime',
-    concurrently: true,
-    unique: true,
-  },
-);
-
-const JoinDateTimeIndex = createIndexDecorator('JoinDateTimeIndex', {
-  name: 'joinDateTime-idx',
-  concurrently: true,
-});
-
-@Table({ tableName: 'VRChatPlayerJoinLogModels' })
 /**
- * プレイヤー参加ログを保存するモデル。
+ * プレイヤー参加ログの行。
  *
  * @see docs/log-sync-architecture.md - ログ同期の設計
  * @see docs/photo-grouping-logic.md - セッション単位の写真グループ化
- * @see VRChatPlayerLeaveLogModel - 退出ログモデル
+ * @see VRChatPlayerLeaveLogModel - 退出ログ
  */
-export class VRChatPlayerJoinLogModel extends Model<
-  InferAttributes<VRChatPlayerJoinLogModel>,
-  InferCreationAttributes<VRChatPlayerJoinLogModel>
-> {
-  @Attribute(DataTypes.UUID)
-  @PrimaryKey
-  @Default(uuidv7)
-  declare id: CreationOptional<string>;
-
-  @Attribute(DataTypes.STRING)
-  @AllowNull
-  declare playerId: string | null;
-
-  @Attribute(DataTypes.STRING)
-  @NotNull
-  @PlayerNameJoinDateTimeIndex
-  declare playerName: string;
-
-  @Attribute(DataTypes.DATE)
-  @NotNull
-  @PlayerNameJoinDateTimeIndex
-  @JoinDateTimeIndex
-  declare joinDateTime: Date;
-
-  @Attribute(DataTypes.DATE)
-  @Default(DataTypes.NOW)
-  declare createdAt: CreationOptional<Date>;
-  declare updatedAt: CreationOptional<Date>;
-}
+export type VRChatPlayerJoinLogModel = typeof vrchatPlayerJoinLogs.$inferSelect;
 
 /**
- * プレイヤー参加ログを一括登録する
+ * プレイヤー参加ログを一括登録し、新しく登録した行を返す。
  *
- * バッチ内の重複は playerName+joinDateTime キーで JS 側で排除し、
- * DB 既存レコードとの重複は SQLite の INSERT OR IGNORE（PlayerNameJoinDateTimeIndex
- * ユニーク制約）で排除する。
- * 従来は毎回 findAll() で全テーブルをメモリロードしていたが、バッチ呼び出しごとに
- * 全テーブルスキャンが走りフルロード時のボトルネックになっていたため除去した。
- *
- * 注意: ignoreDuplicates の場合、bulkCreate の戻り値にはスキップされたレコードも
- * 含まれうる（worldJoin/playerLeave と同じ挙動）。戻り値の件数を「新規作成数」
- * として使う場合は注意が必要。
+ * バッチ内の重複は playerName+joinDateTime キーで JS 側で除き、DB に既にある行との重複は
+ * 一意インデックス（playerName-joinDateTime）に当たった行を挿入しないことで除く。
+ * 衝突先を指定しない ON CONFLICT DO NOTHING にしているのは、古い DB に残る別の一意インデックスに
+ * 当たった行も、エラーにせず挿入しないため。
+ * 同期で実行するので、ログの一括登録のトランザクションの中からそのトランザクションを渡して呼べる。
  */
-export const createVRChatPlayerJoinLog = async (
+export const insertVRChatPlayerJoinLogs = (
+  executor: DBExecutor,
   playerJoinLogList: VRChatPlayerJoinLog[],
-  transaction?: Transaction,
-): Promise<VRChatPlayerJoinLogModel[]> => {
-  // バッチ内の重複を排除（findAll 不要、O(n) で済む）
+): VRChatPlayerJoinLogModel[] => {
   const seen = new Set<string>();
   const newLogs = playerJoinLogList
     .filter((logInfo) => {
@@ -107,15 +53,28 @@ export const createVRChatPlayerJoinLog = async (
       playerName: logInfo.playerName,
     }));
 
-  if (newLogs.length === 0) {
-    return [];
-  }
-
-  return VRChatPlayerJoinLogModel.bulkCreate(newLogs, {
-    ignoreDuplicates: true,
-    transaction,
-  });
+  return insertInChunks(executor, vrchatPlayerJoinLogs, newLogs, (tx, rows) =>
+    tx
+      .insert(vrchatPlayerJoinLogs)
+      .values(rows)
+      .onConflictDoNothing()
+      .returning()
+      .all(),
+  );
 };
+
+/** 既定の DB に `insertVRChatPlayerJoinLogs` を実行する */
+export const createVRChatPlayerJoinLog = async (
+  playerJoinLogList: VRChatPlayerJoinLog[],
+): Promise<VRChatPlayerJoinLogModel[]> =>
+  insertVRChatPlayerJoinLogs(getDB(), playerJoinLogList);
+
+/** `[start, end)` の範囲の条件。end が null なら start 以降すべて */
+const joinDateTimeInRange = (start: Date, end: Date | null): SQL | undefined =>
+  and(
+    gte(vrchatPlayerJoinLogs.joinDateTime, start),
+    end === null ? undefined : lt(vrchatPlayerJoinLogs.joinDateTime, end),
+  );
 
 /**
  * joinDateTime を２つ取得して、その間にある playerJoinLog を取得する
@@ -141,38 +100,16 @@ export const getVRChatPlayerJoinLogListByJoinDateTime = async (
         getUntilDays: null;
       },
 ): Promise<VRChatPlayerJoinLogModel[]> => {
-  if (props.ltJoinDateTime === null) {
-    if (props.getUntilDays === null) {
-      // 無制限に取得
-      const playerJoinLogList = await VRChatPlayerJoinLogModel.findAll({
-        where: {
-          joinDateTime: {
-            [Op.gte]: props.gteJoinDateTime,
-          },
-        },
-      });
-      return playerJoinLogList;
-    }
-    // 指定された日数分取得
-    const playerJoinLogList = await VRChatPlayerJoinLogModel.findAll({
-      where: {
-        joinDateTime: {
-          [Op.gte]: props.gteJoinDateTime,
-          [Op.lt]: dateFns.addDays(props.gteJoinDateTime, props.getUntilDays),
-        },
-      },
-    });
-    return playerJoinLogList;
-  }
-  const playerJoinLogList = await VRChatPlayerJoinLogModel.findAll({
-    where: {
-      joinDateTime: {
-        [Op.gte]: props.gteJoinDateTime,
-        [Op.lt]: props.ltJoinDateTime,
-      },
-    },
-  });
-  return playerJoinLogList;
+  const end =
+    props.ltJoinDateTime ??
+    (props.getUntilDays === null
+      ? null
+      : dateFns.addDays(props.gteJoinDateTime, props.getUntilDays));
+  return getDB()
+    .select()
+    .from(vrchatPlayerJoinLogs)
+    .where(joinDateTimeInRange(props.gteJoinDateTime, end))
+    .all();
 };
 
 /**
@@ -187,58 +124,41 @@ export const getVRChatPlayerJoinLogListByMultipleDateRanges = async (
     return [];
   }
 
-  // 複数の範囲を OR 条件で結合したクエリを作成
-  const whereConditions = dateRanges.map(({ start, end }) => {
-    if (end === null) {
-      return {
-        joinDateTime: {
-          [Op.gte]: start,
-        },
-      };
-    }
-    return {
-      joinDateTime: {
-        [Op.gte]: start,
-        [Op.lt]: end,
-      },
-    };
-  });
-
-  const playerJoinLogList = await VRChatPlayerJoinLogModel.findAll({
-    where: {
-      [Op.or]: whereConditions,
-    },
-    order: [['joinDateTime', 'ASC']],
-  });
+  const playerJoinLogList = getDB()
+    .select()
+    .from(vrchatPlayerJoinLogs)
+    .where(
+      or(
+        ...dateRanges.map(({ start, end }) => joinDateTimeInRange(start, end)),
+      ),
+    )
+    .orderBy(asc(vrchatPlayerJoinLogs.joinDateTime))
+    .all();
 
   // 各レコードにどの範囲に属するかのキーを追加
-  const resultsWithKeys = playerJoinLogList.map((log) => {
-    // このレコードがどの範囲に属するかを特定
+  return playerJoinLogList.map((log) => {
     const matchingRange = dateRanges.find(({ start, end }) => {
       if (end === null) {
         return log.joinDateTime >= start;
       }
       return log.joinDateTime >= start && log.joinDateTime < end;
     });
-
-    return {
-      ...log.dataValues,
-      range_key: matchingRange?.key ?? 'unknown',
-    } as VRChatPlayerJoinLogModel & { range_key: string };
+    return { ...log, range_key: matchingRange?.key ?? 'unknown' };
   });
-
-  return resultsWithKeys;
 };
 
 /**
  * 最後に検出されたプレイヤー参加ログを取得する
  * ログ同期の進捗確認に使用される
  */
-export const findLatestPlayerJoinLog = async () => {
-  return VRChatPlayerJoinLogModel.findOne({
-    order: [['joinDateTime', 'DESC']],
-  });
-};
+export const findLatestPlayerJoinLog =
+  async (): Promise<VRChatPlayerJoinLogModel | null> =>
+    getDB()
+      .select()
+      .from(vrchatPlayerJoinLogs)
+      .orderBy(desc(vrchatPlayerJoinLogs.joinDateTime))
+      .limit(1)
+      .get() ?? null;
 
 /**
  * 出会ったプレイヤーの数を数える。
@@ -247,6 +167,8 @@ export const findLatestPlayerJoinLog = async () => {
  * 表示名を変えたプレイヤーは別人として数えられる。
  * 起動画面の統計（initProgress/stats.ts）から呼び出される。
  */
-export const countDistinctPlayerNames = async (): Promise<number> => {
-  return VRChatPlayerJoinLogModel.count({ distinct: true, col: 'playerName' });
-};
+export const countDistinctPlayerNames = async (): Promise<number> =>
+  getDB()
+    .select({ count: countDistinct(vrchatPlayerJoinLogs.playerName) })
+    .from(vrchatPlayerJoinLogs)
+    .get()?.count ?? 0;
