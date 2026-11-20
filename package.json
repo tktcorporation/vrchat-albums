@@ -158,7 +158,7 @@
     "@vitejs/plugin-react": "6.3.0",
     "@vitest/coverage-v8": "^5.1.0",
     "@welldone-software/why-did-you-render": "^10.0.1",
-    "electron": "~44.11.3",
+    "electron": "~45.3.3",
     "electron-builder": "^26.18.1",
     "electron-builder-squirrel-windows": "^26.18.1",
     "exiftool-vendored": "^39.4.0",
