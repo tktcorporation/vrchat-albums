@@ -530,55 +530,60 @@ export function loadLogInfoIndexFromVRChatLog({
     // DB Queue の transaction() を使い、書き込みをキュー経由でシリアライズする。
     // Sequelize の managed transaction により自動 commit/rollback される。
     // DBQueueError は予期しないエラー（DB接続断等）なので defect として Sentry に送信する。
-    yield* getDBQueue()
-      .transaction(async (transaction) => {
-        for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
-          const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-          const batch = newLogs.slice(i, i + BATCH_SIZE);
+    yield* (
+      getDBQueue()
+        .transaction(async (transaction) => {
+          for (let i = 0; i < newLogs.length; i += BATCH_SIZE) {
+            const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+            const batch = newLogs.slice(i, i + BATCH_SIZE);
 
-          const worldJoinLogBatch = batch.filter(
-            (log): log is VRChatWorldJoinLog => log.logType === 'worldJoin',
-          );
-          const playerJoinLogBatch = batch.filter(
-            (log): log is VRChatPlayerJoinLog => log.logType === 'playerJoin',
-          );
-          const playerLeaveLogBatch = batch.filter(
-            (log): log is VRChatPlayerLeaveLog => log.logType === 'playerLeave',
-          );
-
-          // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
-          const worldJoinResults = await Effect.runPromise(
-            worldJoinLogService
-              .createVRChatWorldJoinLogModel(worldJoinLogBatch, { transaction })
-              .pipe(Effect.mapError(toError)),
-          );
-          const playerJoinResults = await Effect.runPromise(
-            playerJoinLogService.createVRChatPlayerJoinLogModel(
-              playerJoinLogBatch,
-              { transaction },
-            ),
-          );
-          const playerLeaveResults =
-            await playerLeaveLogService.createVRChatPlayerLeaveLogModel(
-              playerLeaveLogBatch.map((logInfo) => ({
-                leaveDate: logInfo.leaveDate,
-                playerName: logInfo.playerName,
-                playerId: logInfo.playerId ?? null,
-              })),
-              { transaction },
+            const worldJoinLogBatch = batch.filter(
+              (log): log is VRChatWorldJoinLog => log.logType === 'worldJoin',
+            );
+            const playerJoinLogBatch = batch.filter(
+              (log): log is VRChatPlayerJoinLog => log.logType === 'playerJoin',
+            );
+            const playerLeaveLogBatch = batch.filter(
+              (log): log is VRChatPlayerLeaveLog =>
+                log.logType === 'playerLeave',
             );
 
-          results.createdWorldJoinLogModelList.push(...worldJoinResults);
-          results.createdPlayerJoinLogModelList.push(...playerJoinResults);
-          results.createdPlayerLeaveLogModelList.push(...playerLeaveResults);
+            // DBHelperError は Error ではない値なので、reject されたときにメッセージとスタックが残るよう Error に変換する
+            const worldJoinResults = await Effect.runPromise(
+              worldJoinLogService
+                .createVRChatWorldJoinLogModel(worldJoinLogBatch, {
+                  transaction,
+                })
+                .pipe(Effect.mapError(toError)),
+            );
+            const playerJoinResults = await Effect.runPromise(
+              playerJoinLogService.createVRChatPlayerJoinLogModel(
+                playerJoinLogBatch,
+                { transaction },
+              ),
+            );
+            const playerLeaveResults =
+              await playerLeaveLogService.createVRChatPlayerLeaveLogModel(
+                playerLeaveLogBatch.map((logInfo) => ({
+                  leaveDate: logInfo.leaveDate,
+                  playerName: logInfo.playerName,
+                  playerId: logInfo.playerId ?? null,
+                })),
+                { transaction },
+              );
 
-          // 進捗をUIプログレスバーに反映（毎バッチ）
-          reportLogsInserted(i + batch.length);
-          logger.debug(`log batch inserted: ${batchNumber}/${totalBatches}`);
-        }
-      }, 'logInfo.batchInsert')
-      // DBQueueError は Error ではない値なので、defect にする前に Error に変換する
-      .pipe(Effect.catch((e) => Effect.die(toError(e))));
+            results.createdWorldJoinLogModelList.push(...worldJoinResults);
+            results.createdPlayerJoinLogModelList.push(...playerJoinResults);
+            results.createdPlayerLeaveLogModelList.push(...playerLeaveResults);
+
+            // 進捗をUIプログレスバーに反映（毎バッチ）
+            reportLogsInserted(i + batch.length);
+            logger.debug(`log batch inserted: ${batchNumber}/${totalBatches}`);
+          }
+        }, 'logInfo.batchInsert')
+        // DBQueueError は Error ではない値なので、defect にする前に Error に変換する
+        .pipe(Effect.catch((e) => Effect.die(toError(e))))
+    );
     const batchProcessEndTime = performance.now();
     logger.info(
       `done DB batch insert: ${(batchProcessEndTime - batchProcessStartTime).toFixed(0)} ms`,
