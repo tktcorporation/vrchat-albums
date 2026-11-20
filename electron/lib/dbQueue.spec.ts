@@ -355,6 +355,70 @@ describe('DBQueue', () => {
     expect(queue.isIdle).toBe(true);
   });
 
+  it('タスクが timeout を超えたら addWithResult が TASK_TIMEOUT で失敗すること', async () => {
+    // p-queue の TimeoutError は DOMException なので、Error として分類できることを確かめる
+    const queue = new DBQueue({ timeout: 20, label: 'timeout-test' });
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const slowTask = () =>
+      new Promise<string>((resolve) => {
+        setTimeout(() => resolve('late'), 200);
+      });
+
+    const exit = await Effect.runPromiseExit(queue.addWithResult(slowTask));
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const failOpt = Cause.findErrorOption(exit.cause);
+      expect(Option.isSome(failOpt) && failOpt.value.type).toBe('TASK_TIMEOUT');
+    }
+    errorSpy.mockRestore();
+  });
+
+  it('clear で取り消した未開始タスクは TASK_CANCELLED で失敗し、error ログを出さないこと', async () => {
+    // p-queue の clear は未開始タスクを AbortError（DOMException）で拒否する
+    const queue = new DBQueue({ concurrency: 1, label: 'cancel-test' });
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    let finishRunning: () => void = () => {};
+    const running = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRunning = resolve;
+        }),
+    );
+    const queued = vi.fn(async () => 'never');
+
+    const runningExit = Effect.runPromiseExit(queue.addWithResult(running));
+    const queuedExit = Effect.runPromiseExit(
+      queue.addWithResult(queued, 'test.cancelled'),
+    );
+    // add 経由の未開始タスクも同じく分類され、error ログを出さずに拒否されること
+    const queuedAdd = queue
+      .add(queued, 'test.cancelledAdd')
+      .catch((error: unknown) => error);
+    await vi.waitFor(() => expect(running).toHaveBeenCalled());
+
+    queue.clear();
+    finishRunning();
+
+    const exit = await queuedExit;
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const failOpt = Cause.findErrorOption(exit.cause);
+      expect(Option.isSome(failOpt) && failOpt.value.type).toBe(
+        'TASK_CANCELLED',
+      );
+    }
+    await expect(queuedAdd).resolves.toMatchObject({ name: 'AbortError' });
+    expect(Exit.isSuccess(await runningExit)).toBe(true);
+    expect(queued).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
   describe('Sentryトリアージ用のエラー情報', () => {
     afterEach(() => {
       vi.restoreAllMocks();
@@ -524,7 +588,8 @@ describe('drainDBQueues', () => {
     );
     const queued = vi.fn(async () => {});
     void queue.add(running);
-    void queue.add(queued);
+    // 未開始のタスクは resetDBQueue（p-queue の clear）で AbortError として拒否される
+    const queuedResult = queue.add(queued).catch((error: unknown) => error);
     await vi.waitFor(() => expect(running).toHaveBeenCalled());
 
     const draining = drainDBQueues(10_000);
@@ -532,6 +597,9 @@ describe('drainDBQueues', () => {
 
     await expect(draining).resolves.toBe(true);
     expect(queued).not.toHaveBeenCalled();
+
+    resetDBQueue();
+    await expect(queuedResult).resolves.toMatchObject({ name: 'AbortError' });
   });
 
   it('実行中のタスクが上限までに終わらなければ、待たずに false を返す', async () => {

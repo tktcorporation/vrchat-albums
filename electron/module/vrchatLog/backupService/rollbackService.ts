@@ -205,6 +205,10 @@ export class RollbackService {
                 { type: 'TASK_TIMEOUT' },
                 (e) => new RollbackTransactionFailed({ message: e.message }),
               )
+              .with(
+                { type: 'TASK_CANCELLED' },
+                (e) => new RollbackTransactionFailed({ message: e.message }),
+              )
               .exhaustive(),
           ),
         );

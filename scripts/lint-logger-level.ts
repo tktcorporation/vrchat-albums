@@ -10,9 +10,14 @@
 
 import consola from 'consola';
 import { glob } from 'glob';
-import * as ts from 'typescript';
+// TypeScript 7 の typescript パッケージはコンパイラ API（ts.createProgram など）を公開しないため、
+// API を公開する 6 系を別名（package.json の typescript-6）で読む
+import * as ts from 'typescript-6';
 
 import { type NormalizedPath, NormalizedPathArraySchema } from './lib/paths';
+import { ensureTypeScript6CompilerApi } from './lib/typescript6';
+
+ensureTypeScript6CompilerApi(ts.versionMajorMinor, 'lint:logger-level');
 
 export interface LoggerLevelIssue {
   file: string;

@@ -1,6 +1,6 @@
 import type { Rectangle } from 'electron';
 import Store from 'electron-store';
-import { match } from 'ts-pattern';
+import { match, P } from 'ts-pattern';
 import { z } from 'zod';
 
 import { FolderDigestSchema } from '../lib/brandedTypes';
@@ -237,12 +237,37 @@ import {
   VRChatPhotoDirPathSchema,
 } from './vrchatPhoto/valueObjects';
 
+/**
+ * electron-store のクラスを取り出す。
+ *
+ * electron-store は ESM だけを公開する。処理本体の CJS 出力（`electron/vite.config.ts` で外部化）は
+ * これを `require()` で読み、Node は default にクラスを持つ名前空間を返す。Rolldown の相互運用は
+ * Node の流儀でその名前空間を丸ごと default として渡すので、`new Store()` は「constructor ではない」で
+ * 失敗する。ESM のまま読む環境（Vitest）ではクラスがそのまま届くので、どちらでもクラスを返す。
+ * 外部化をやめてバンドルすると、依存（when-exit）がブラウザ向けの実装に解決されて動かない。
+ */
+export const resolveElectronStoreClass = (imported: unknown): typeof Store =>
+  match(imported)
+    .when(isElectronStoreClass, (cls) => cls)
+    .with({ default: P.when(isElectronStoreClass) }, ({ default: cls }) => cls)
+    .otherwise(() => {
+      throw new TypeError('electron-store のクラスを読み込めませんでした');
+    });
+
+function isElectronStoreClass(value: unknown): value is typeof Store {
+  return typeof value === 'function';
+}
+
 let settingStore: ReturnType<typeof setSettingStore> | null = null;
 const setSettingStore = (name: StoreName) => {
   // 保存先は、electron-store が main プロセスの `app.getPath('userData')` から補う値と同じものを殻から明示して渡す。
   // `app` の無いプロセスで開くと electron-store は保存先を補えないため。
   // 版（projectVersion）は migrations を使うときだけ要るので渡さない
-  const store = new Store({ name, cwd: getHost().info.paths.userData });
+  const ElectronStoreClass = resolveElectronStoreClass(Store);
+  const store = new ElectronStoreClass({
+    name,
+    cwd: getHost().info.paths.userData,
+  });
   const { get, set } = {
     get: getValue(store),
     set: setValue(store),

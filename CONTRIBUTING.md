@@ -72,9 +72,7 @@
   # oxfmt を使用したフォーマットチェック
   pnpm lint:fmt-check
   # TypeScript の型チェック (tsc)
-  pnpm lint:type-check:tsc
-  # TypeScript の型チェック (tsgo - より高速なRust製チェッカー)
-  pnpm lint:type-check:tsgo
+  pnpm lint:type-check
   # Actionlint による GitHub Actions ワークフローのチェック
   pnpm lint:actionlint
 

@@ -12,20 +12,20 @@
   "scripts": {
     "lint-contrast": "tsx bin/lint-contrast.ts",
     "test": "vitest run",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "consola": "~3.4.2",
     "culori": "^4.0.2",
-    "glob": "^13.0.6",
-    "oxc-parser": "^0.126.0",
-    "postcss": "8.5.29",
-    "ts-pattern": "5.9.0"
+    "glob": "^14.0.6",
+    "oxc-parser": "^0.159.0",
+    "postcss": "8.5.33",
+    "ts-pattern": "5.9.2"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",
     "tsx": "^4.23.15",
-    "typescript": "~5.9.3",
-    "vitest": "^5.0.5"
+    "typescript": "~7.0.2",
+    "vitest": "^5.1.0"
   }
 }
