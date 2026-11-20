@@ -113,7 +113,7 @@
     "electron-store": "^8.2.0",
     "electron-unhandled": "^6.0.0",
     "electron-updater": "6.8.12",
-    "glob": "^13.0.7",
+    "glob": "^14.0.6",
     "hash-wasm": "^4.13.0",
     "jotai": "~3.0.2",
     "lucide-react": "^1.73.0",
