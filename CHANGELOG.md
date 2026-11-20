@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.32.0
+
+### Minor Changes
+
+- [#911](https://github.com/tktcorporation/vrchat-albums/pull/911) [`eed5727`](https://github.com/tktcorporation/vrchat-albums/commit/eed57275a026564cd855ce54711e0237bd7fbce2) Thanks [@tktcorporation](https://github.com/tktcorporation)! - Electron を 45 系へ上げます。内蔵の Chromium と Node.js が新しくなります。
+
+- [#911](https://github.com/tktcorporation/vrchat-albums/pull/911) [`eed5727`](https://github.com/tktcorporation/vrchat-albums/commit/eed57275a026564cd855ce54711e0237bd7fbce2) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 設定の保存に使う electron-store を 12 系へ上げます。保存先・ファイル名・項目は変わらず、これまでの設定はそのまま読み込まれます。
+
+### Patch Changes
+
+- [#911](https://github.com/tktcorporation/vrchat-albums/pull/911) [`eed5727`](https://github.com/tktcorporation/vrchat-albums/commit/eed57275a026564cd855ce54711e0237bd7fbce2) Thanks [@tktcorporation](https://github.com/tktcorporation)! - 依存パッケージをパッチ・マイナーの範囲で更新します（Radix UI、Sentry、TanStack Query/Virtual、tRPC、Effect、electron-updater など）。設定ストアが間接的に使う fast-uri を修正版へ上げ、URI の解釈に関する脆弱性を解消します。
+
+- [#911](https://github.com/tktcorporation/vrchat-albums/pull/911) [`eed5727`](https://github.com/tktcorporation/vrchat-albums/commit/eed57275a026564cd855ce54711e0237bd7fbce2) Thanks [@tktcorporation](https://github.com/tktcorporation)! - データベースへの書き込みを順番に並べるキュー（p-queue）を 10 系へ上げます。書き込みが上限時間を超えたときに、これまでと同じくタイムアウトとして扱われることをテストで確かめています。
+
+- [#911](https://github.com/tktcorporation/vrchat-albums/pull/911) [`eed5727`](https://github.com/tktcorporation/vrchat-albums/commit/eed57275a026564cd855ce54711e0237bd7fbce2) Thanks [@tktcorporation](https://github.com/tktcorporation)! - プレイヤー名の表示幅を測るライブラリ（@chenglou/pretext）を 1.0 へ上げます。絵文字などの幅の測り方が改善されます。
+
 ## 0.31.6
 
 ### Patch Changes
