@@ -145,7 +145,7 @@
     "@electron/rebuild": "~4.2.1",
     "@playwright/test": "1.65.1",
     "@sentry/cli": "~3.8.2",
-    "@sentry/vite-plugin": "^5.4.1",
+    "@sentry/vite-plugin": "^11.13.0",
     "@tailwindcss/vite": "^4.3.5",
     "@testing-library/dom": "~10.4.2",
     "@testing-library/react": "~16.3.3",
