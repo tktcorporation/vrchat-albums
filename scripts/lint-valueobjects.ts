@@ -8,6 +8,9 @@ import path from 'pathe';
 import * as ts from 'typescript-6';
 
 import { type NormalizedPath, NormalizedPathArraySchema } from './lib/paths';
+import { ensureTypeScript6CompilerApi } from './lib/typescript6';
+
+ensureTypeScript6CompilerApi(ts.versionMajorMinor, 'lint:valueobjects');
 
 interface ValueObjectIssue {
   file: string;

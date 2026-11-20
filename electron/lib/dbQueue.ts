@@ -10,12 +10,23 @@ import { getRDBClient } from './sequelize';
 /**
  * データベースキューのエラー型
  *
- * Note: QUERY_ERROR と TRANSACTION_ERROR は削除済み
+ * - TASK_CANCELLED: `clear()` でキューから外され、開始しなかったタスク。
+ *   終了処理やテストのリセットで意図して起こすので、障害として Sentry には送らない。
+ *
  * 予期しないエラーはそのまま throw され Sentry に送信される
  */
 export type DBQueueError =
   | { type: 'QUEUE_FULL'; message: string }
-  | { type: 'TASK_TIMEOUT'; message: string };
+  | { type: 'TASK_TIMEOUT'; message: string }
+  | { type: 'TASK_CANCELLED'; message: string };
+
+/**
+ * p-queue の `clear()` が未開始タスクの Promise を拒否するときのエラー
+ * （`DOMException` で name が 'AbortError'）に一致するパターン。
+ */
+const abortErrorPattern = P.intersection(P.instanceOf(Error), {
+  name: 'AbortError',
+});
 
 /**
  * データベースアクセスのためのキュー設定
@@ -179,6 +190,13 @@ class DBQueue {
             });
           },
         )
+        .with(abortErrorPattern, (e) => {
+          const info = buildDBQueueErrorInfo(e, context);
+          logger.warn(
+            `${info.prefix}: 開始前にキューから取り消されました: ${e.message}`,
+            info.details,
+          );
+        })
         .otherwise((e) => {
           const info = buildDBQueueErrorInfo(e, context);
           logger.error({
@@ -247,6 +265,12 @@ class DBQueue {
                 };
               },
             )
+            .with(abortErrorPattern, (e) => {
+              const info = buildDBQueueErrorInfo(e, context);
+              const message = `${info.prefix}: 開始前にキューから取り消されました: ${e.message}`;
+              logger.warn(message, info.details);
+              return { type: 'TASK_CANCELLED' as const, message };
+            })
             .otherwise((e) => {
               // 予期せぬエラーの場合はログを出力して例外をスロー
               const info = buildDBQueueErrorInfo(e, context);
@@ -373,7 +397,10 @@ class DBQueue {
   }
 
   /**
-   * キューをクリアする
+   * 待機中（未開始）のタスクをキューから外す。実行中のタスクは止めない。
+   *
+   * 外したタスクは始まらずに失敗する。`addWithResult`・`queryWithResult`・`transaction` は
+   * `TASK_CANCELLED` で、`add`・`query` は AbortError で拒否される。
    */
   clear(): void {
     this.queue.clear();

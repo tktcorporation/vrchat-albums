@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -116,6 +117,25 @@ describe('resolveElectronStoreClass', () => {
   it('CJS の出力が require() で受け取る名前空間から default のクラスを取り出す', () => {
     const namespace = { __esModule: true, default: Store };
     expect(resolveElectronStoreClass(namespace)).toBe(Store);
+  });
+
+  it('Node の require(esm) が返す実物の値からクラスを取り出し、そのまま使える', () => {
+    // CJS へ出力した処理本体は electron-store を require() で読む。Node が ESM を require() したときに
+    // 返す名前空間（モジュールの名前空間オブジェクト）を、手で作った値ではなく実物のまま照合する
+    const required: unknown = createRequire(import.meta.url)('electron-store');
+    const ElectronStoreClass = resolveElectronStoreClass(required);
+    const cwd = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'vrchat-albums-settings-require-'),
+    );
+    const store = new ElectronStoreClass<{ termsVersion: string }>({
+      name: 'require-esm',
+      cwd,
+    });
+
+    store.set('termsVersion', '1.2.0');
+
+    expect(store.get('termsVersion')).toBe('1.2.0');
+    fs.rmSync(cwd, { recursive: true, force: true });
   });
 
   it('クラスを含まない値は読み込みの失敗として投げる', () => {

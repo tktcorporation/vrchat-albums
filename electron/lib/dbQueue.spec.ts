@@ -374,6 +374,51 @@ describe('DBQueue', () => {
     errorSpy.mockRestore();
   });
 
+  it('clear で取り消した未開始タスクは TASK_CANCELLED で失敗し、error ログを出さないこと', async () => {
+    // p-queue の clear は未開始タスクを AbortError（DOMException）で拒否する
+    const queue = new DBQueue({ concurrency: 1, label: 'cancel-test' });
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    let finishRunning: () => void = () => {};
+    const running = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRunning = resolve;
+        }),
+    );
+    const queued = vi.fn(async () => 'never');
+
+    const runningExit = Effect.runPromiseExit(queue.addWithResult(running));
+    const queuedExit = Effect.runPromiseExit(
+      queue.addWithResult(queued, 'test.cancelled'),
+    );
+    // add 経由の未開始タスクも同じく分類され、error ログを出さずに拒否されること
+    const queuedAdd = queue
+      .add(queued, 'test.cancelledAdd')
+      .catch((error: unknown) => error);
+    await vi.waitFor(() => expect(running).toHaveBeenCalled());
+
+    queue.clear();
+    finishRunning();
+
+    const exit = await queuedExit;
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const failOpt = Cause.findErrorOption(exit.cause);
+      expect(Option.isSome(failOpt) && failOpt.value.type).toBe(
+        'TASK_CANCELLED',
+      );
+    }
+    await expect(queuedAdd).resolves.toMatchObject({ name: 'AbortError' });
+    expect(Exit.isSuccess(await runningExit)).toBe(true);
+    expect(queued).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
   describe('Sentryトリアージ用のエラー情報', () => {
     afterEach(() => {
       vi.restoreAllMocks();
