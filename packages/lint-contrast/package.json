@@ -12,7 +12,7 @@
   "scripts": {
     "lint-contrast": "tsx bin/lint-contrast.ts",
     "test": "vitest run",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "consola": "~3.4.2",
@@ -25,7 +25,7 @@
   "devDependencies": {
     "@types/culori": "^4.0.1",
     "tsx": "^4.23.15",
-    "typescript": "~5.9.3",
+    "typescript": "~7.0.2",
     "vitest": "^5.1.0"
   }
 }
