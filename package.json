@@ -118,7 +118,7 @@
     "jotai": "~3.0.2",
     "lucide-react": "^1.73.0",
     "ofetch": "~1.5.1",
-    "p-queue": "~9.3.5",
+    "p-queue": "~10.0.0",
     "pathe": "2.0.3",
     "pony-cause": "2.1.11",
     "react": "^19.3.1",
