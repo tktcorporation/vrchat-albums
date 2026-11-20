@@ -83,7 +83,7 @@
     "knip": "knip --config knip.config.ts"
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.7",
+    "@chenglou/pretext": "^1.0.0",
     "@napi-rs/image": "^1.16.0",
     "@radix-ui/react-checkbox": "1.4.1",
     "@radix-ui/react-context-menu": "~2.4.1",
